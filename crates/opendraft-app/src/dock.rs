@@ -9,6 +9,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
 
+mod places;
+mod strip;
+
+pub use places::Places;
+pub use strip::{command_line_strip, keep_minimum_sizes, split_shares, tuck_command_line, Strip};
+
 // Bumped when a new default panel is added, so saved layouts pick it up.
 const LAYOUT_KEY: &str = "dock_layout_v4";
 
@@ -92,136 +98,6 @@ const PANEL_MIN: f32 = 175.0;
 /// strip the app measures it: two lines of history above the input row.
 pub const COMMAND_LINE_MIN_HEIGHT: f32 = 74.0;
 
-/// The command line docked above or below the drawing with no other tab
-/// beside it. It is then drawn like AutoCAD's: no tab bar, and a narrow grip
-/// down its left edge instead.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Strip {
-    Above,
-    Below,
-}
-
-/// The other half of the split `node` is in.
-fn sibling(node: NodeIndex) -> Option<NodeIndex> {
-    let parent = node.parent()?;
-    Some(if node == parent.left() {
-        parent.right()
-    } else {
-        parent.left()
-    })
-}
-
-/// Whether the command line shows as a strip, and on which side of the
-/// drawing.
-pub fn command_line_strip(dock: &DockState<PanelTab>) -> Option<Strip> {
-    let (surface, node, _) = dock.find_tab(&PanelTab::CommandLine)?;
-    let (_, canvas, _) = dock.find_tab(&PanelTab::Canvas)?;
-    let (parent, other) = (node.parent()?, sibling(node)?);
-    let tree = dock.main_surface();
-    if surface != egui_dock::SurfaceIndex::main()
-        || tree[node].tabs_count() != 1
-        || !matches!(tree[parent], egui_dock::Node::Vertical { .. })
-    {
-        return None;
-    }
-    // The other half of the split holds the drawing.
-    std::iter::successors(Some(canvas), |n| n.parent())
-        .any(|n| n == other)
-        .then_some(match node == parent.left() {
-            true => Strip::Above,
-            false => Strip::Below,
-        })
-}
-
-/// A strip dropped along the whole window moves to the drawing's own column,
-/// so the panels beside the drawing keep their full height, as in AutoCAD.
-pub fn tuck_command_line(dock: &mut DockState<PanelTab>) {
-    let Some(strip) = command_line_strip(dock) else {
-        return;
-    };
-    let (Some(found), Some((_, canvas, _))) = (
-        dock.find_tab(&PanelTab::CommandLine),
-        dock.find_tab(&PanelTab::Canvas),
-    ) else {
-        return;
-    };
-    if sibling(found.1) == Some(canvas) {
-        return;
-    }
-    let tree = dock.main_surface();
-    let height = |node: NodeIndex| tree[node].rect().map_or(0.0, |r| r.height());
-    // The drawing gets back the height the strip leaves, then shares it.
-    let (own, drawing) = (height(found.1), height(canvas));
-    let share = match own > 0.0 && drawing > 0.0 {
-        true => own / (own + drawing),
-        false => 1.0 - BELOW_SPLIT,
-    };
-    dock.remove_tab(found);
-    let Some((_, canvas, _)) = dock.find_tab(&PanelTab::Canvas) else {
-        return;
-    };
-    // The fraction is the top half's share.
-    let (tree, tabs) = (dock.main_surface_mut(), vec![PanelTab::CommandLine]);
-    match strip {
-        Strip::Above => tree.split_above(canvas, share, tabs),
-        Strip::Below => tree.split_below(canvas, 1.0 - share, tabs),
-    };
-}
-
-/// The share of every split of the main area, taken before the dock is
-/// shown for [`keep_minimum_sizes`] to see which separators moved.
-pub fn split_shares(dock: &DockState<PanelTab>) -> Vec<Option<f32>> {
-    let share = |node: &egui_dock::Node<PanelTab>| match node {
-        egui_dock::Node::Vertical { fraction, .. }
-        | egui_dock::Node::Horizontal { fraction, .. } => Some(*fraction),
-        _ => None,
-    };
-    dock.main_surface().iter().map(share).collect()
-}
-
-/// `share` of a split `range` points long, held so that its two halves keep
-/// at least `least` points each. Left alone when both cannot fit.
-fn held_share(share: f32, range: f32, least: [f32; 2]) -> f32 {
-    if range <= 0.0 || least[0] + least[1] > range {
-        return share;
-    }
-    share.clamp(least[0] / range, 1.0 - least[1] / range)
-}
-
-/// The dock's own limit on separators is set low enough for the command
-/// line (see [`style`]); this puts the usual limit back on every other
-/// panel and keeps `line_least` points for the command line. Only
-/// separators moved since `before` are touched.
-pub fn keep_minimum_sizes(dock: &mut DockState<PanelTab>, before: &[Option<f32>], line_least: f32) {
-    let tree = dock.main_surface_mut();
-    if tree.len() != before.len() {
-        return;
-    }
-    for (i, was) in before.iter().enumerate() {
-        let index = NodeIndex(i);
-        let vertical = matches!(tree[index], egui_dock::Node::Vertical { .. });
-        let least = [index.left(), index.right()].map(|child| {
-            let command_line = (child.0 < tree.len())
-                .then(|| tree[child].tabs())
-                .flatten()
-                .is_some_and(|tabs| tabs.contains(&PanelTab::CommandLine));
-            match vertical && command_line {
-                true => line_least,
-                false => PANEL_MIN,
-            }
-        });
-        match &mut tree[index] {
-            egui_dock::Node::Vertical { rect, fraction, .. } if Some(*fraction) != *was => {
-                *fraction = held_share(*fraction, rect.height(), least);
-            }
-            egui_dock::Node::Horizontal { rect, fraction, .. } if Some(*fraction) != *was => {
-                *fraction = held_share(*fraction, rect.width(), least);
-            }
-            _ => {}
-        }
-    }
-}
-
 /// Collapse the command line to its input row (`collapsed` points high), or
 /// restore it. `saved` remembers the expanded share between the two. Does
 /// nothing if the panel is not one half of a vertical split.
@@ -257,15 +133,19 @@ pub fn is_open(dock: &DockState<PanelTab>, panel: PanelTab) -> bool {
     dock.find_tab(&panel).is_some()
 }
 
-pub fn apply(dock: &mut DockState<PanelTab>, request: LayoutRequest) {
+pub fn apply(dock: &mut DockState<PanelTab>, places: &mut Places, request: LayoutRequest) {
     match request {
-        LayoutRequest::Reset => *dock = default_layout(),
+        LayoutRequest::Reset => {
+            *dock = default_layout();
+            places.clear();
+        }
         LayoutRequest::Toggle(panel) => {
             if let Some(found) = dock.find_tab(&panel) {
                 if panel.closeable() {
+                    places.note(dock, None);
                     dock.remove_tab(found);
                 }
-            } else {
+            } else if !places.restore(dock, panel) {
                 restore(dock, panel);
             }
         }
@@ -290,9 +170,10 @@ fn float(dock: &mut DockState<PanelTab>, panel: PanelTab) {
     dock.detach_tab(found, egui::Rect::from_min_size(at, size));
 }
 
-/// Put a hidden panel back where the default layout keeps it: Properties
-/// down the left; the command line and Layers sharing the right-hand
-/// column, the command line on top; the assistant beside Layers.
+/// Put a hidden panel that has no place to return to (see [`Places`]) where
+/// the default layout keeps it: Properties down the left; the command line
+/// and Layers sharing the right-hand column, the command line on top; the
+/// assistant beside Layers.
 fn restore(dock: &mut DockState<PanelTab>, panel: PanelTab) {
     let partner = match panel {
         PanelTab::CommandLine => Some((PanelTab::Layers, egui_dock::Split::Above)),
@@ -335,18 +216,24 @@ fn is_valid(dock: &DockState<PanelTab>) -> bool {
         == 1
 }
 
-pub fn load(storage: Option<&dyn eframe::Storage>) -> DockState<PanelTab> {
-    storage
+/// The saved layout and the places of its hidden panels. Without a usable
+/// layout both start afresh.
+pub fn load(storage: Option<&dyn eframe::Storage>) -> (DockState<PanelTab>, Places) {
+    let saved = storage
         .and_then(|s| s.get_string(LAYOUT_KEY))
         .and_then(|text| ron::from_str::<DockState<PanelTab>>(&text).ok())
-        .filter(is_valid)
-        .unwrap_or_else(default_layout)
+        .filter(is_valid);
+    match saved {
+        Some(dock) => (dock, Places::load(storage)),
+        None => (default_layout(), Places::default()),
+    }
 }
 
-pub fn save(dock: &DockState<PanelTab>, storage: &mut dyn eframe::Storage) {
+pub fn save(dock: &DockState<PanelTab>, places: &Places, storage: &mut dyn eframe::Storage) {
     if let Ok(text) = ron::to_string(dock) {
         storage.set_string(LAYOUT_KEY, text);
     }
+    places.save(storage);
 }
 
 /// Dock chrome in the app's flat dark style. A dragged separator leaves a
@@ -437,6 +324,7 @@ pub fn commands() -> Vec<Command<AppState>> {
 
 #[cfg(test)]
 mod tests {
+    use super::strip::{held_share, sibling};
     use super::*;
 
     #[test]
@@ -479,8 +367,16 @@ mod tests {
             PanelTab::Layers,
             PanelTab::Properties,
         ] {
-            apply(&mut dock, LayoutRequest::Toggle(panel));
-            apply(&mut dock, LayoutRequest::Toggle(panel));
+            apply(
+                &mut dock,
+                &mut Places::default(),
+                LayoutRequest::Toggle(panel),
+            );
+            apply(
+                &mut dock,
+                &mut Places::default(),
+                LayoutRequest::Toggle(panel),
+            );
             assert_default_arrangement(&dock);
         }
     }
@@ -506,7 +402,11 @@ mod tests {
     /// The default layout with the command line moved under everything.
     fn docked_below() -> DockState<PanelTab> {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
         dock.main_surface_mut().split_below(
             NodeIndex::root(),
             BELOW_SPLIT,
@@ -541,21 +441,33 @@ mod tests {
         let mut dock = docked_below();
         assert_eq!(command_line_strip(&dock), Some(Strip::Below));
         // Sharing its place with another tab, it needs its tab bar.
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Layers));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Layers),
+        );
         let (surface, node, _) = dock.find_tab(&PanelTab::CommandLine).unwrap();
         dock.set_focused_node_and_surface((surface, node));
         dock.push_to_focused_leaf(PanelTab::Layers);
         assert_eq!(command_line_strip(&dock), None);
         // Nor in a window of its own.
         let mut dock = docked_below();
-        apply(&mut dock, LayoutRequest::Float(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::CommandLine),
+        );
         assert_eq!(command_line_strip(&dock), None);
     }
 
     #[test]
     fn the_command_line_is_a_strip_right_under_the_drawing_too() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
         let canvas = node_of(&dock, PanelTab::Canvas);
         dock.main_surface_mut()
             .split_below(canvas, BELOW_SPLIT, vec![PanelTab::CommandLine]);
@@ -569,7 +481,11 @@ mod tests {
     fn a_strip_along_the_whole_window_moves_under_the_drawing_alone() {
         for (side, share) in [(Strip::Below, 0.8), (Strip::Above, 0.2)] {
             let mut dock = default_layout();
-            apply(&mut dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+            apply(
+                &mut dock,
+                &mut Places::default(),
+                LayoutRequest::Toggle(PanelTab::CommandLine),
+            );
             let (tree, tabs) = (dock.main_surface_mut(), vec![PanelTab::CommandLine]);
             match side {
                 Strip::Below => tree.split_below(NodeIndex::root(), BELOW_SPLIT, tabs),
@@ -663,15 +579,62 @@ mod tests {
     }
 
     #[test]
+    fn a_strip_closed_under_the_drawing_comes_back_as_a_strip() {
+        // Ctrl+9 twice, with the command line tucked under the drawing.
+        let (mut dock, mut places) = (docked_below(), Places::default());
+        tuck_command_line(&mut dock);
+        let before = ron::to_string(dock.main_surface()).unwrap();
+        apply(
+            &mut dock,
+            &mut places,
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
+        assert_eq!(command_line_strip(&dock), None);
+        apply(
+            &mut dock,
+            &mut places,
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
+        assert_eq!(command_line_strip(&dock), Some(Strip::Below));
+        assert_eq!(ron::to_string(dock.main_surface()).unwrap(), before);
+        // Closed before it was tucked, it is tucked once back.
+        let (mut dock, mut places) = (docked_below(), Places::default());
+        apply(
+            &mut dock,
+            &mut places,
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
+        apply(
+            &mut dock,
+            &mut places,
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
+        tuck_command_line(&mut dock);
+        assert_eq!(ron::to_string(dock.main_surface()).unwrap(), before);
+    }
+
+    #[test]
     fn a_docked_panel_floats_into_a_window_and_stays_open() {
         let mut dock = docked_below();
-        apply(&mut dock, LayoutRequest::Float(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::CommandLine),
+        );
         let (surface, ..) = dock.find_tab(&PanelTab::CommandLine).unwrap();
         assert_ne!(surface, egui_dock::SurfaceIndex::main());
         assert!(is_valid(&dock));
         // Asking again, or for the drawing, changes nothing.
-        apply(&mut dock, LayoutRequest::Float(PanelTab::CommandLine));
-        apply(&mut dock, LayoutRequest::Float(PanelTab::Canvas));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::CommandLine),
+        );
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::Canvas),
+        );
         let (canvas, ..) = dock.find_tab(&PanelTab::Canvas).unwrap();
         assert_eq!(canvas, egui_dock::SurfaceIndex::main());
         assert_eq!(dock.iter_surfaces().count(), 2);
@@ -680,18 +643,34 @@ mod tests {
     #[test]
     fn toggle_hides_and_restores_a_panel() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
         assert!(!is_open(&dock, PanelTab::Properties));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
         assert!(is_open(&dock, PanelTab::Properties));
     }
 
     #[test]
     fn command_line_can_be_hidden_and_restored() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
         assert!(!is_open(&dock, PanelTab::CommandLine));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
         assert!(is_open(&dock, PanelTab::CommandLine));
         assert!(is_valid(&dock));
     }
@@ -703,21 +682,37 @@ mod tests {
             !is_open(&dock, PanelTab::Assistant),
             "not there until asked for"
         );
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         let layers = dock.find_tab(&PanelTab::Layers).map(|(s, n, _)| (s, n));
         let assistant = dock.find_tab(&PanelTab::Assistant).map(|(s, n, _)| (s, n));
         assert!(assistant.is_some());
         assert_eq!(layers, assistant, "the same tab strip as Layers");
         assert!(is_valid(&dock));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         assert!(!is_open(&dock, PanelTab::Assistant));
     }
 
     #[test]
     fn the_assistant_opens_even_when_layers_is_closed() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Layers));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Layers),
+        );
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         assert!(is_open(&dock, PanelTab::Assistant));
         assert!(is_valid(&dock));
     }
@@ -725,7 +720,11 @@ mod tests {
     #[test]
     fn a_layout_with_the_assistant_survives_saving() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         let text = ron::to_string(&dock).unwrap();
         let back: DockState<PanelTab> = ron::from_str(&text).unwrap();
         assert!(is_open(&back, PanelTab::Assistant));
@@ -734,22 +733,34 @@ mod tests {
     #[test]
     fn the_drawing_view_cannot_be_toggled_away() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Canvas));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Canvas),
+        );
         assert!(is_open(&dock, PanelTab::Canvas));
     }
 
     #[test]
     fn reset_restores_the_default() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
-        apply(&mut dock, LayoutRequest::Reset);
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
+        apply(&mut dock, &mut Places::default(), LayoutRequest::Reset);
         assert!(is_open(&dock, PanelTab::Properties));
     }
 
     #[test]
     fn layout_round_trips_through_text() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
         let text = ron::to_string(&dock).unwrap();
         let back: DockState<PanelTab> = ron::from_str(&text).unwrap();
         assert!(is_valid(&back));
