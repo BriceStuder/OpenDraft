@@ -62,6 +62,8 @@ impl OpenDraftApp {
             dynamic_suppressed: self.dynamic_suppressed,
         };
         let style = dock::style(&self.theme, &ctx.style());
+        // Before the dock is shown, where a panel may be closed by its tab.
+        self.places.note(&self.dock, Some(ctx));
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(self.theme.colors.window_bg))
             .show(ctx, |ui| {
