@@ -10,6 +10,7 @@ mod badge;
 mod block_dialog;
 mod chrome;
 mod command_line;
+mod command_line_strip;
 mod consent_dialog;
 mod context_menu;
 mod ctrl_watch;
