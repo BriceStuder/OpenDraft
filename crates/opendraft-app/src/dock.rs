@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
 
+mod places;
+
+pub use places::Places;
+
 // Bumped when a new default panel is added, so saved layouts pick it up.
 const LAYOUT_KEY: &str = "dock_layout_v4";
 
@@ -114,24 +118,29 @@ pub fn is_open(dock: &DockState<PanelTab>, panel: PanelTab) -> bool {
     dock.find_tab(&panel).is_some()
 }
 
-pub fn apply(dock: &mut DockState<PanelTab>, request: LayoutRequest) {
+pub fn apply(dock: &mut DockState<PanelTab>, places: &mut Places, request: LayoutRequest) {
     match request {
-        LayoutRequest::Reset => *dock = default_layout(),
+        LayoutRequest::Reset => {
+            *dock = default_layout();
+            places.clear();
+        }
         LayoutRequest::Toggle(panel) => {
             if let Some(found) = dock.find_tab(&panel) {
                 if panel.closeable() {
+                    places.note(dock, None);
                     dock.remove_tab(found);
                 }
-            } else {
+            } else if !places.restore(dock, panel) {
                 restore(dock, panel);
             }
         }
     }
 }
 
-/// Put a hidden panel back where the default layout keeps it: Properties
-/// down the left; the command line and Layers sharing the right-hand
-/// column, the command line on top; the assistant beside Layers.
+/// Put a hidden panel that has no place to return to (see [`Places`]) where
+/// the default layout keeps it: Properties down the left; the command line
+/// and Layers sharing the right-hand column, the command line on top; the
+/// assistant beside Layers.
 fn restore(dock: &mut DockState<PanelTab>, panel: PanelTab) {
     let partner = match panel {
         PanelTab::CommandLine => Some((PanelTab::Layers, egui_dock::Split::Above)),
@@ -174,18 +183,24 @@ fn is_valid(dock: &DockState<PanelTab>) -> bool {
         == 1
 }
 
-pub fn load(storage: Option<&dyn eframe::Storage>) -> DockState<PanelTab> {
-    storage
+/// The saved layout and the places of its hidden panels. Without a usable
+/// layout both start afresh.
+pub fn load(storage: Option<&dyn eframe::Storage>) -> (DockState<PanelTab>, Places) {
+    let saved = storage
         .and_then(|s| s.get_string(LAYOUT_KEY))
         .and_then(|text| ron::from_str::<DockState<PanelTab>>(&text).ok())
-        .filter(is_valid)
-        .unwrap_or_else(default_layout)
+        .filter(is_valid);
+    match saved {
+        Some(dock) => (dock, Places::load(storage)),
+        None => (default_layout(), Places::default()),
+    }
 }
 
-pub fn save(dock: &DockState<PanelTab>, storage: &mut dyn eframe::Storage) {
+pub fn save(dock: &DockState<PanelTab>, places: &Places, storage: &mut dyn eframe::Storage) {
     if let Ok(text) = ron::to_string(dock) {
         storage.set_string(LAYOUT_KEY, text);
     }
+    places.save(storage);
 }
 
 /// Dock chrome in the app's flat dark style.
@@ -314,8 +329,16 @@ mod tests {
             PanelTab::Layers,
             PanelTab::Properties,
         ] {
-            apply(&mut dock, LayoutRequest::Toggle(panel));
-            apply(&mut dock, LayoutRequest::Toggle(panel));
+            apply(
+                &mut dock,
+                &mut Places::default(),
+                LayoutRequest::Toggle(panel),
+            );
+            apply(
+                &mut dock,
+                &mut Places::default(),
+                LayoutRequest::Toggle(panel),
+            );
             assert_default_arrangement(&dock);
         }
     }
@@ -341,18 +364,34 @@ mod tests {
     #[test]
     fn toggle_hides_and_restores_a_panel() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
         assert!(!is_open(&dock, PanelTab::Properties));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
         assert!(is_open(&dock, PanelTab::Properties));
     }
 
     #[test]
     fn command_line_can_be_hidden_and_restored() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
         assert!(!is_open(&dock, PanelTab::CommandLine));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
         assert!(is_open(&dock, PanelTab::CommandLine));
         assert!(is_valid(&dock));
     }
@@ -364,21 +403,37 @@ mod tests {
             !is_open(&dock, PanelTab::Assistant),
             "not there until asked for"
         );
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         let layers = dock.find_tab(&PanelTab::Layers).map(|(s, n, _)| (s, n));
         let assistant = dock.find_tab(&PanelTab::Assistant).map(|(s, n, _)| (s, n));
         assert!(assistant.is_some());
         assert_eq!(layers, assistant, "the same tab strip as Layers");
         assert!(is_valid(&dock));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         assert!(!is_open(&dock, PanelTab::Assistant));
     }
 
     #[test]
     fn the_assistant_opens_even_when_layers_is_closed() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Layers));
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Layers),
+        );
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         assert!(is_open(&dock, PanelTab::Assistant));
         assert!(is_valid(&dock));
     }
@@ -386,7 +441,11 @@ mod tests {
     #[test]
     fn a_layout_with_the_assistant_survives_saving() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Assistant));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Assistant),
+        );
         let text = ron::to_string(&dock).unwrap();
         let back: DockState<PanelTab> = ron::from_str(&text).unwrap();
         assert!(is_open(&back, PanelTab::Assistant));
@@ -395,22 +454,34 @@ mod tests {
     #[test]
     fn the_drawing_view_cannot_be_toggled_away() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Canvas));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Canvas),
+        );
         assert!(is_open(&dock, PanelTab::Canvas));
     }
 
     #[test]
     fn reset_restores_the_default() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
-        apply(&mut dock, LayoutRequest::Reset);
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
+        apply(&mut dock, &mut Places::default(), LayoutRequest::Reset);
         assert!(is_open(&dock, PanelTab::Properties));
     }
 
     #[test]
     fn layout_round_trips_through_text() {
         let mut dock = default_layout();
-        apply(&mut dock, LayoutRequest::Toggle(PanelTab::Properties));
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Properties),
+        );
         let text = ron::to_string(&dock).unwrap();
         let back: DockState<PanelTab> = ron::from_str(&text).unwrap();
         assert!(is_valid(&back));
