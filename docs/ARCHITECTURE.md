@@ -1019,7 +1019,7 @@ What the app must keep true so the API is cheap to add later:
 
 ## Where things are
 
-- Panels: `opendraft-app/src/app/panels.rs`; command line UI: `app/command_line.rs`;
+- Panels: `opendraft-app/src/app/panels.rs`; command line UI: `app/command_line.rs` (and `app/command_line_strip.rs` for its grip when docked above or below the drawing);
   Properties: `properties.rs` (model) and `properties_ui.rs` (view).
 - Visual constants and palettes: `opendraft-ui/src/theme.rs`. Roadmap: `docs/ui_plan.md`
   (its last section, "Where we are and what next", is the place to start a
