@@ -13,6 +13,7 @@ mod home_layout;
 mod linetypes;
 mod mleader_styles;
 mod object_prompt_typing;
+mod panel_places;
 mod placement;
 mod pline_snap;
 mod text_styles;
@@ -39,6 +40,7 @@ fn app() -> OpenDraftApp {
         ribbon: crate::ribbon_def::default_ribbon(),
         ribbon_state: Default::default(),
         dock: dock::default_layout(),
+        places: Default::default(),
         window_title: String::new(),
         last_autosave: std::time::Instant::now(),
         io_waker_set: false,

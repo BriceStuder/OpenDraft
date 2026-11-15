@@ -96,6 +96,8 @@ pub struct OpenDraftApp {
     ribbon: Ribbon,
     ribbon_state: RibbonState,
     dock: DockState<PanelTab>,
+    /// Where each panel was last docked, for showing a hidden one again.
+    places: dock::Places,
     /// The window title last sent, so it is only set when it changes.
     window_title: String,
     /// When recovery copies were last written.
@@ -126,7 +128,7 @@ impl OpenDraftApp {
         theme: Theme,
         settings: Settings,
         defaults: std::sync::Arc<crate::defaults::CommandDefaults>,
-        dock: DockState<PanelTab>,
+        (dock, places): (DockState<PanelTab>, dock::Places),
         recent: RecentFiles,
         updates: crate::updates::Updates,
         open: Vec<std::path::PathBuf>,
@@ -176,6 +178,7 @@ impl OpenDraftApp {
             ribbon: ribbon_def::default_ribbon(),
             ribbon_state: RibbonState::default(),
             dock,
+            places,
             window_title: String::new(),
             last_autosave: std::time::Instant::now(),
             io_waker_set: false,
@@ -390,7 +393,7 @@ impl eframe::App for OpenDraftApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if let Some(request) = self.state.layout_request.take() {
-            dock::apply(&mut self.dock, request);
+            dock::apply(&mut self.dock, &mut self.places, request);
         }
         if !self.io_waker_set {
             // A finished file job wakes the window to collect it.
@@ -436,7 +439,7 @@ impl eframe::App for OpenDraftApp {
         self.state.settings.save(storage);
         self.updates.save(storage);
         self.state.defaults().save(storage);
-        dock::save(&self.dock, storage);
+        dock::save(&self.dock, &self.places, storage);
         self.state.recent.save(storage);
         crate::window_memory::save(storage);
     }
