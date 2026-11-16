@@ -298,7 +298,7 @@ impl OpenDraftApp {
     /// "name* - OpenDraft", following the active drawing; a debug build or
     /// beta says so (`OpenDraft Dev`).
     pub(super) fn update_window_title(&mut self, ctx: &egui::Context) {
-        let app = crate::profile::name();
+        let app = crate::profile::title();
         let title = if self.state.home {
             format!("Home - {app}")
         } else {

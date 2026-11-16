@@ -44,6 +44,16 @@ fn name_for(version: &str, debug: bool, requested: Option<&OsStr>) -> String {
     }
 }
 
+/// The name shown in the window title: CAOlin's, with the profile's suffix
+/// (`CAOlin Dev`). Settings folders still follow [`name`].
+pub fn title() -> String {
+    title_of(name())
+}
+
+fn title_of(name: &str) -> String {
+    name.replacen("OpenDraft", "CAOlin", 1)
+}
+
 /// The profile's name: the application name and the window title.
 pub fn name() -> &'static str {
     static NAME: OnceLock<String> = OnceLock::new();
@@ -135,6 +145,12 @@ mod tests {
         assert_eq!(name_for("0.3.0-dev", false, None), "OpenDraft Dev");
         assert_eq!(name_for("0.2.0", true, None), "OpenDraft Dev");
         assert_eq!(name_for("0.2.0-beta.1", true, None), "OpenDraft Dev");
+    }
+
+    #[test]
+    fn the_window_title_says_caolin() {
+        assert_eq!(title_of("OpenDraft"), "CAOlin");
+        assert_eq!(title_of("OpenDraft Dev"), "CAOlin Dev");
     }
 
     #[test]

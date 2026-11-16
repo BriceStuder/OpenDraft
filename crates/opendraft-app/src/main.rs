@@ -227,7 +227,7 @@ fn main() -> eframe::Result {
     profile::seed_beta_from_release();
     crash_log::install();
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title(profile::name())
+        .with_title(profile::title())
         .with_app_id(profile::app_id())
         .with_inner_size([1280.0, 800.0])
         .with_min_inner_size([640.0, 400.0]);
