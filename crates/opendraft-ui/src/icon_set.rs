@@ -14,10 +14,13 @@
 //! painted in the colour asked for, so it follows the theme and dims when
 //! disabled. A coloured one (any clearly coloured part, such as a green point)
 //! is drawn in its own colours, only fading when disabled; `currentColor` in it
-//! is white. Each icon is rasterised the first time it is drawn at a size.
+//! is white, and the library's accent colour ([`ACCENT_IN_FILES`], the green of
+//! its points and highlights) is drawn in the theme's accent ([`set_accent`]).
+//! Each icon is rasterised the first time it is drawn at a size.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use egui::{pos2, Align2, Color32, ColorImage, Context, FontId, Painter, Pos2, Rect, Vec2};
@@ -38,6 +41,34 @@ struct IconSet {
 }
 
 static SET: OnceLock<IconSet> = OnceLock::new();
+
+/// The accent colour as the drawings in `assets/icons` write it.
+const ACCENT_IN_FILES: &str = "rgb(0,199,154)";
+
+/// The colour drawn in its place, as `0xRRGGBB`: the files' own until a
+/// theme is applied.
+static ACCENT: AtomicU32 = AtomicU32::new(0x00c79a);
+
+/// Draw the accent parts of coloured icons in `color`. `Theme::apply` calls
+/// this, so the icons follow the theme.
+pub fn set_accent(color: Color32) {
+    let packed = u32::from_be_bytes([0, color.r(), color.g(), color.b()]);
+    if ACCENT.swap(packed, Ordering::Relaxed) != packed {
+        // Rasterised with the old colour.
+        if let Some(set) = SET.get() {
+            set.textures
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clear();
+        }
+    }
+}
+
+/// The accent now in use, as CSS.
+fn accent_css() -> String {
+    let [_, r, g, b] = ACCENT.load(Ordering::Relaxed).to_be_bytes();
+    format!("rgb({r},{g},{b})")
+}
 
 include!(concat!(env!("OUT_DIR"), "/embedded_icons.rs"));
 
@@ -104,9 +135,10 @@ fn read(folder: Option<&Path>) -> (HashMap<char, Drawing>, Loaded) {
     (files, loaded)
 }
 
-/// A usable drawing from an SVG file's bytes.
+/// A usable drawing from an SVG file's bytes. Whether it is coloured is
+/// judged on the file's own colours, whatever the theme's accent.
 fn drawing(data: Vec<u8>) -> Result<Drawing, String> {
-    let pixmap = render(&data, 32)?;
+    let pixmap = render(&data, 32, None)?;
     Ok(Drawing {
         coloured: is_coloured(&pixmap),
         data,
@@ -118,9 +150,13 @@ fn drawing(data: Vec<u8>) -> Result<Drawing, String> {
 const COLOURED: u8 = 48;
 
 /// The drawing as a `px` square picture in its own colours. `currentColor` is
-/// white, so Lucide's strokes are white.
-fn render(data: &[u8], px: u32) -> Result<tiny_skia::Pixmap, String> {
-    let text = String::from_utf8_lossy(data).replace("currentColor", "#ffffff");
+/// white, so Lucide's strokes are white, and the library's accent colour is
+/// `accent` (CSS) when one is given.
+fn render(data: &[u8], px: u32, accent: Option<&str>) -> Result<tiny_skia::Pixmap, String> {
+    let mut text = String::from_utf8_lossy(data).replace("currentColor", "#ffffff");
+    if let Some(accent) = accent {
+        text = text.replace(ACCENT_IN_FILES, accent);
+    }
     let tree = usvg::Tree::from_data(text.as_bytes(), &usvg::Options::default())
         .map_err(|e| e.to_string())?;
     let size = tree.size();
@@ -140,7 +176,7 @@ fn render(data: &[u8], px: u32) -> Result<tiny_skia::Pixmap, String> {
 
 /// The drawing as `px` square straight-alpha RGBA bytes, for a window icon.
 pub fn rgba(data: &[u8], px: u32) -> Result<Vec<u8>, String> {
-    let pixmap = render(data, px)?;
+    let pixmap = render(data, px, None)?;
     Ok(pixmap
         .pixels()
         .iter()
@@ -162,10 +198,10 @@ fn is_coloured(pixmap: &tiny_skia::Pixmap) -> bool {
     })
 }
 
-/// The drawing as a `px` square image: its own colours, or for a plain one a
-/// white mask, opaque where the drawing is.
+/// The drawing as a `px` square image: its own colours with the theme's
+/// accent, or for a plain one a white mask, opaque where the drawing is.
 fn rasterise(data: &[u8], px: u32, coloured: bool) -> Result<ColorImage, String> {
-    let pixmap = render(data, px)?;
+    let pixmap = render(data, px, Some(&accent_css()))?;
     let mut image = ColorImage::new([px as usize; 2], Color32::TRANSPARENT);
     for (to, from) in image.pixels.iter_mut().zip(pixmap.pixels()) {
         *to = if coloured {
@@ -399,22 +435,46 @@ mod tests {
 
     #[test]
     fn a_drawing_with_colour_keeps_it_and_a_grey_one_follows_the_theme() {
-        assert!(is_coloured(&render(GREEN_DOT.as_bytes(), 24).unwrap()));
+        assert!(is_coloured(
+            &render(GREEN_DOT.as_bytes(), 24, None).unwrap()
+        ));
         assert!(
-            !is_coloured(&render(RING.as_bytes(), 24).unwrap()),
+            !is_coloured(&render(RING.as_bytes(), 24, None).unwrap()),
             "currentColor is white"
         );
         let grey = GREEN_DOT.replace("rgb(0,199,154)", "rgb(200,200,200)");
-        assert!(!is_coloured(&render(grey.as_bytes(), 24).unwrap()));
+        assert!(!is_coloured(&render(grey.as_bytes(), 24, None).unwrap()));
 
         let image = rasterise(GREEN_DOT.as_bytes(), 24, true).unwrap();
-        assert_eq!(image.pixels[12 * 24 + 12], Color32::from_rgb(0, 199, 154));
         assert_eq!(image.pixels[12 * 24 + 4], Color32::from_rgb(243, 243, 243));
         assert!(fade(Color32::from_rgb(220, 220, 220)).a() == 255);
         assert!(
             fade(Color32::from_rgb(100, 100, 100)).a() < 140,
             "disabled fades"
         );
+    }
+
+    #[test]
+    fn the_accent_of_a_coloured_drawing_is_the_themes() {
+        // The only test that sets the accent: it is shared by the process.
+        let at = |image: &ColorImage| image.pixels[12 * 24 + 12];
+        let own = rasterise(GREEN_DOT.as_bytes(), 24, true).unwrap();
+        assert_eq!(at(&own), Color32::from_rgb(0, 199, 154));
+
+        let sand = Color32::from_rgb(0xec, 0xe3, 0xd2);
+        set_accent(sand);
+        let themed = rasterise(GREEN_DOT.as_bytes(), 24, true).unwrap();
+        assert_eq!(at(&themed), sand);
+        assert_eq!(themed.pixels[12 * 24 + 4], Color32::from_rgb(243, 243, 243));
+        // Sand is nearly grey, yet the drawing still counts as coloured (it
+        // is judged on its file), so its two tones are kept.
+        assert!(drawing(GREEN_DOT.as_bytes().to_vec()).unwrap().coloured);
+
+        crate::Theme::default().apply(&Context::default());
+        let c = crate::Theme::default().colors.accent_text;
+        let themed = rasterise(GREEN_DOT.as_bytes(), 24, true).unwrap();
+        assert_eq!(at(&themed), Color32::from_rgb(c.r(), c.g(), c.b()));
+        set_accent(Color32::from_rgb(0, 199, 154));
     }
 
     #[test]

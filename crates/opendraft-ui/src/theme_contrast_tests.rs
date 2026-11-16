@@ -28,6 +28,35 @@ fn palettes() -> [(&'static str, Colors); 2] {
     [("neutral", Colors::neutral()), ("slate", Colors::slate())]
 }
 
+/// `over` painted on `under`, as egui blends a translucent fill.
+fn blend(over: Color32, under: Color32) -> Color32 {
+    let mix = |o: u8, u: u8| {
+        let kept = f32::from(u) * (1.0 - f32::from(over.a()) / 255.0);
+        (f32::from(o) + kept).round().clamp(0.0, 255.0) as u8
+    };
+    Color32::from_rgb(
+        mix(over.r(), under.r()),
+        mix(over.g(), under.g()),
+        mix(over.b(), under.b()),
+    )
+}
+
+#[test]
+fn text_is_readable_where_the_accent_is_behind_it() {
+    for (name, c) in palettes() {
+        // A chosen row, the active layout tab: the accent itself.
+        let row = contrast(c.on_row(true), c.accent);
+        assert!(row >= 4.5, "{name}: a chosen row's text {row:.2}");
+        assert_eq!(c.on_row(false), c.text);
+        // Selected text in a field keeps the text colour.
+        let behind = blend(c.text_selection(), c.input_bg);
+        let selected = contrast(c.text, behind);
+        assert!(selected >= 4.5, "{name}: selected text {selected:.2}");
+        let marked = contrast(behind, c.input_bg);
+        assert!(marked >= 1.5, "{name}: the selection shows {marked:.2}");
+    }
+}
+
 #[test]
 fn the_reference_ratios_are_right() {
     assert!((contrast(Color32::WHITE, Color32::BLACK) - 21.0).abs() < 1e-9);

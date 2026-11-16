@@ -174,13 +174,22 @@ impl OpenDraftApp {
                         } else {
                             "\u{2610}"
                         };
-                        paint_row(ui, theme, rect, entry.name, entry.description, Some(mark));
+                        let ink = [theme.colors.text, theme.colors.text_weak];
+                        paint_row(
+                            ui,
+                            theme,
+                            rect,
+                            entry.name,
+                            entry.description,
+                            Some(mark),
+                            ink,
+                        );
                         let elements: Vec<_> = entry
                             .pattern
                             .iter()
                             .filter_map(|v| opendraft_core::StrokeElement::from_dxf(*v))
                             .collect();
-                        paint_sample(ui, theme, rect, &elements);
+                        paint_sample(ui, rect, &elements, theme.colors.text);
                     }
                 });
             ui.add_space(12.0);
@@ -221,18 +230,27 @@ fn list(ui: &mut egui::Ui, theme: &Theme, draft: &mut Draft) {
                 if response.clicked() {
                     draft.selected = Some(record.id);
                 }
-                if draft.selected == Some(record.id) {
+                let chosen = draft.selected == Some(record.id);
+                if chosen {
                     ui.painter().rect_filled(rect, 2.0, theme.colors.accent);
                 } else if response.hovered() {
                     ui.painter().rect_filled(rect, 2.0, theme.colors.hover);
                 }
-                paint_row(ui, theme, rect, &record.name, &record.description, None);
-                paint_sample(ui, theme, rect, &record.elements);
+                // On the accent of the chosen row everything is in its ink.
+                let c = &theme.colors;
+                let ink = match chosen {
+                    true => [c.text_on_accent; 2],
+                    false => [c.text, c.text_weak],
+                };
+                let (name, description) = (&record.name, &record.description);
+                paint_row(ui, theme, rect, name, description, None, ink);
+                paint_sample(ui, rect, &record.elements, ink[0]);
             }
         });
 }
 
 /// A row's texts: the name, the description and an optional mark before it.
+/// `ink` is the colour of the name, then of the rest.
 fn paint_row(
     ui: &egui::Ui,
     theme: &Theme,
@@ -240,6 +258,7 @@ fn paint_row(
     name: &str,
     description: &str,
     mark: Option<&str>,
+    ink: [egui::Color32; 2],
 ) {
     let painter = ui.painter().with_clip_rect(rect);
     // The description stops short of the mark at the right.
@@ -256,14 +275,14 @@ fn paint_row(
         Align2::LEFT_CENTER,
         name,
         font.clone(),
-        theme.colors.text,
+        ink[0],
     );
     text_painter.text(
         egui::pos2(rect.left() + DESCRIPTION_AT, rect.center().y),
         Align2::LEFT_CENTER,
         description,
         font.clone(),
-        theme.colors.text_weak,
+        ink[1],
     );
     if let Some(mark) = mark {
         painter.text(
@@ -271,20 +290,20 @@ fn paint_row(
             Align2::RIGHT_CENTER,
             mark,
             font,
-            theme.colors.text_weak,
+            ink[1],
         );
     }
 }
 
 fn paint_sample(
     ui: &egui::Ui,
-    theme: &Theme,
     rect: egui::Rect,
     elements: &[opendraft_core::StrokeElement],
+    ink: egui::Color32,
 ) {
     let area = egui::Rect::from_min_size(
         egui::pos2(rect.left() + SAMPLE_AT, rect.top()),
         egui::vec2(linetype_ui::SAMPLE_WIDTH, rect.height()),
     );
-    linetype_ui::paint_sample(ui.painter(), area, elements, theme.colors.text);
+    linetype_ui::paint_sample(ui.painter(), area, elements, ink);
 }

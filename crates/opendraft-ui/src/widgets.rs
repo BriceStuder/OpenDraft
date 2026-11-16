@@ -118,6 +118,7 @@ fn input_well_style(ui: &mut Ui, theme: &Theme) {
     let c = &theme.colors;
     let v = ui.visuals_mut();
     v.selection.stroke = Stroke::new(1.0_f32, c.accent_hover);
+    v.selection.bg_fill = c.text_selection();
     let w = &mut v.widgets;
     let states = [
         (&mut w.inactive, c.border),

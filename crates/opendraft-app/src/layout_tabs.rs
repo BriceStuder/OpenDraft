@@ -22,8 +22,9 @@ pub fn show(ui: &mut Ui, theme: &Theme, document: &Document, space: Space) -> Op
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         let tab = |ui: &mut Ui, text: &str, active: bool| {
+            // The active tab is filled with the accent.
             let color = if active {
-                theme.colors.text
+                theme.colors.text_on_accent
             } else {
                 theme.colors.text_weak
             };

@@ -240,16 +240,22 @@ fn switch_tip(layer: &Layer, flag: LayerFlag) -> &'static str {
 /// A layer's switches, colour and name across `rect`, as AutoCAD's list.
 fn layer_row_contents(ui: &Ui, theme: &Theme, rect: Rect, layer: &Layer, text: Color32) {
     let c = &theme.colors;
+    // On the accent fill of the current layer's row the switches are in the
+    // text's colour: yellow and grey do not show on it.
+    let (lit, dim) = match text == c.text_on_accent {
+        true => (text, text),
+        false => (SWITCH_ON, c.text_weak),
+    };
     let glyphs = [
         if layer.on {
-            (icons::LAYER_LIST_ON, SWITCH_ON)
+            (icons::LAYER_LIST_ON, lit)
         } else {
-            (icons::LAYER_LIST_OFF, c.text_weak)
+            (icons::LAYER_LIST_OFF, dim)
         },
         if layer.frozen {
-            (icons::LAYER_LIST_FROZEN, c.text_weak)
+            (icons::LAYER_LIST_FROZEN, dim)
         } else {
-            (icons::LAYER_LIST_THAWED, SWITCH_ON)
+            (icons::LAYER_LIST_THAWED, lit)
         },
         if layer.locked {
             (icons::LAYER_LIST_LOCKED, text)

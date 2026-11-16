@@ -309,7 +309,8 @@ fn list(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, styles: &[MLeaderStyle],
                         if response.clicked() {
                             state.selected = style.id;
                         }
-                        if state.selected == style.id {
+                        let chosen = state.selected == style.id;
+                        if chosen {
                             ui.painter().rect_filled(rect, 2.0, theme.colors.accent);
                         } else if response.hovered() {
                             ui.painter().rect_filled(rect, 2.0, theme.colors.hover);
@@ -319,7 +320,7 @@ fn list(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, styles: &[MLeaderStyle],
                             egui::Align2::LEFT_CENTER,
                             &style.name,
                             egui::FontId::proportional(theme.font_size_body),
-                            theme.colors.text,
+                            theme.colors.on_row(chosen),
                         );
                     }
                 });

@@ -178,6 +178,7 @@ impl PanelViewer<'_> {
             if !prompt.command.is_empty() && !prompt.options.is_empty() {
                 ui.label(egui::RichText::new(":").color(theme.colors.text_weak));
             }
+            ui.visuals_mut().selection.bg_fill = theme.colors.text_selection();
             let response = ui.add(
                 egui::TextEdit::singleline(&mut input)
                     .id(input_id)

@@ -271,7 +271,8 @@ fn list(
                         if response.clicked() {
                             draft.selected = id;
                         }
-                        if draft.selected == id {
+                        let chosen = draft.selected == id;
+                        if chosen {
                             ui.painter().rect_filled(rect, 2.0, theme.colors.accent);
                         } else if response.hovered() {
                             ui.painter().rect_filled(rect, 2.0, theme.colors.hover);
@@ -286,7 +287,7 @@ fn list(
                             egui::Align2::LEFT_CENTER,
                             label,
                             egui::FontId::proportional(theme.font_size_body),
-                            theme.colors.text,
+                            theme.colors.on_row(chosen),
                         );
                     }
                 });

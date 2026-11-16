@@ -108,6 +108,21 @@ pub struct Colors {
 }
 
 impl Colors {
+    /// The fill behind selected text in a field. Fainter than the accent,
+    /// since the text on it keeps its own (light) colour.
+    pub fn text_selection(&self) -> Color32 {
+        self.accent.gamma_multiply(0.3)
+    }
+
+    /// The text colour for a list row: on the accent fill of the chosen row,
+    /// or on the panel.
+    pub fn on_row(&self, chosen: bool) -> Color32 {
+        match chosen {
+            true => self.text_on_accent,
+            false => self.text,
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     const fn from_tones(
         base: Color32,
@@ -138,17 +153,18 @@ impl Colors {
             divider: base,
             pressed,
 
-            accent: hex(0x00866b),
-            accent_hover: hex(0x009277),
-            accent_pressed: hex(0x006b55),
-            accent_text: hex(0x4de3c0),
+            // CAOlin's light sand: dark text sits on it, not white.
+            accent: hex(0xece3d2),
+            accent_hover: hex(0xf5efe4),
+            accent_pressed: hex(0xd6cab3),
+            accent_text: hex(0xece3d2),
 
             // Slightly softer than the reference's pure white: light-on-dark
             // text looks heavier than it is.
             text: hex(0xdcdcdc),
             text_weak: hex(0xb4b4b4),
             text_disabled: hex(0x646464),
-            text_on_accent: hex(0xffffff),
+            text_on_accent: hex(0x2a2520),
         }
     }
 
@@ -273,6 +289,7 @@ impl Theme {
         ctx.options_mut(|o| o.theme_preference = egui::ThemePreference::Dark);
         ctx.set_fonts(fonts());
         ctx.set_style_of(egui::Theme::Dark, self.style());
+        crate::icon_set::set_accent(self.colors.accent_text);
     }
 
     pub fn style(&self) -> egui::Style {
