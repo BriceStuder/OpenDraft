@@ -18,6 +18,7 @@ mod placement;
 mod pline_snap;
 mod text_styles;
 mod units;
+mod wheel_double_click;
 
 fn app() -> OpenDraftApp {
     OpenDraftApp {
