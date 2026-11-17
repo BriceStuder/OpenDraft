@@ -88,7 +88,12 @@ pub fn handle_events(editor: &mut MTextEditor, events: &[Event], now: f64) -> Ha
             }
             Event::Ime(_) => editor.composing = None,
             Event::Paste(text) => {
-                if let Some(text) = take(text) {
+                let text = if editor.single_line {
+                    text.replace(['\r', '\n', '\t'], " ")
+                } else {
+                    text.clone()
+                };
+                if let Some(text) = take(&text) {
                     done.touched |= editor.paste(&text, now);
                 } else {
                     editor.notice = Some("the pasted text is too long".to_owned());
@@ -129,8 +134,11 @@ fn key_pressed(editor: &mut MTextEditor, key: Key, m: Modifiers, now: f64, done:
             editor.notice = None;
         }
         Key::Escape => done.outcome = Some(Outcome::Cancel),
-        Key::Enter if m.command => done.outcome = Some(Outcome::Accept),
+        Key::Enter if m.command || editor.single_line => done.outcome = Some(Outcome::Accept),
         Key::Enter => done.touched |= editor.insert("\n", now),
+        // One line of plain text: no tabs and no formatting or field keys.
+        Key::Tab | Key::U | Key::B | Key::I | Key::F
+            if editor.single_line && (key == Key::Tab || m.command) => {}
         Key::Tab if !m.command => done.touched |= editor.insert("\t", now),
         Key::Backspace => done.touched |= editor.backspace(m.command, now),
         Key::Delete => done.touched |= editor.delete(m.command, now),
@@ -369,5 +377,30 @@ mod tests {
         handle_events(&mut e, &[ctrl(Key::A), plain(Key::Backspace)], 0.0);
         assert_eq!(e.contents(), "a\\pxi;b");
         assert!(e.notice.is_some());
+    }
+
+    #[test]
+    fn one_line_enter_accepts_and_nothing_makes_a_break_tab_or_format() {
+        let mut e = editor("");
+        e.single_line = true;
+        let done = handle_events(
+            &mut e,
+            &[
+                Event::Text("ab".into()),
+                plain(Key::Tab),
+                ctrl(Key::B),
+                ctrl(Key::F),
+                Event::Paste(
+                    "c
+d	e"
+                    .into(),
+                ),
+                plain(Key::Enter),
+            ],
+            0.0,
+        );
+        assert_eq!(e.contents(), "abc d e", "no tab, break or bold");
+        assert!(!e.field_dialog);
+        assert_eq!(done.outcome, Some(Outcome::Accept));
     }
 }

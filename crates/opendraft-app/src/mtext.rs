@@ -152,6 +152,16 @@ fn pick_text(ed: &mut Editor) -> Result<opendraft_core::EntityId, Cancelled> {
 /// leaves the drawing as it was.
 pub fn edit_mtext_object(ed: &mut Editor) -> Result<(), Cancelled> {
     let id = pick_text(ed)?;
+    edit_mtext_with_id(ed, id).map(|_| ())
+}
+
+/// Open the editor on the multiline text `id` and record a change as one
+/// undo step (MTEDIT, and TEXTEDIT given a multiline text). Says whether
+/// it changed.
+pub(crate) fn edit_mtext_with_id(
+    ed: &mut Editor,
+    id: opendraft_core::EntityId,
+) -> Result<bool, Cancelled> {
     let original = ed
         .read(move |doc| match doc.get(id) {
             Some(Entity::MText(m)) => Some((**m).clone()),
@@ -159,15 +169,16 @@ pub fn edit_mtext_object(ed: &mut Editor) -> Result<(), Cancelled> {
         })?
         .ok_or(Cancelled)?;
     let Some(edited) = ed.edit_mtext_entity(id, original.clone())? else {
-        return Ok(());
+        return Ok(false);
     };
     if edited == original {
-        return Ok(());
+        return Ok(false);
     }
     ed.transaction("Edit multiline text", move |tx| {
         tx.modify(id, |_| Entity::MText(Box::new(edited.clone())));
         Ok(())
-    })
+    })?;
+    Ok(true)
 }
 
 #[cfg(test)]

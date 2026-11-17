@@ -36,7 +36,6 @@ use crate::purge_line::purge_prompt;
 use crate::rectangle::draw_rectangle;
 use crate::scale_rotate::{rotate_objects, scale_objects};
 use crate::selection::{crossing_polygon, fence, window_polygon};
-use crate::single_line_text_cmd::draw_text;
 use crate::spline_cmd::draw_spline;
 use crate::stretch::stretch_objects;
 
@@ -52,6 +51,7 @@ pub fn build_registry() -> Registry<AppState> {
     registry.needs_drawing_when(|s| s.home);
     let tables = [
         crate::block_commands::commands(),
+        crate::text_commands::commands(),
         crate::clipboard::commands(),
         crate::layer_cmd::commands(),
         crate::circle_arc_commands::commands(),
@@ -180,10 +180,9 @@ fn all() -> Vec<Command<AppState>> {
         editor_command!("draw.hatch", "Hatch", hatch_objects),
         editor_command!("modify.hatchedit", "Edit Hatch", "HATCHEDIT", hatch_edit),
         editor_command!("annotate.mtext", "Multiline Text", "MTEXT", draw_mtext),
-        editor_command!("annotate.text", "Single Line Text", "TEXT", draw_text),
         editor_command!("annotate.mleader", "Multileader", "MLEADER", draw_mleader),
         editor_command!("annotate.leader", "Leader", "LEADER", draw_leader),
-        editor_command!("annotate.mtedit", "Edit Text", "MTEDIT", edit_mtext_object),
+        editor_command!("annotate.mtedit", "Edit MText", "MTEDIT", edit_mtext_object),
         editor_command!("modify.move", "Move", move_objects),
         editor_command!("modify.copy", "Copy", copy_objects),
         editor_command!("modify.rotate", "Rotate", rotate_objects),

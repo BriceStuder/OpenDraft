@@ -56,7 +56,8 @@ pub fn show(
 
     // Keyboard and pointer first, so what is painted is the new state.
     let pad = PADDING * editor.text().nominal_height;
-    let on_grip = super::box_handles::interact(&ctx, editor, camera, canvas, pad, now);
+    let on_grip =
+        !editor.single_line && super::box_handles::interact(&ctx, editor, camera, canvas, pad, now);
     let bounds = {
         let (text, layout) = (editor.text(), editor.layout());
         Rect::from_points(&box_corners(
@@ -125,7 +126,9 @@ pub fn show(
     let mut outcome = handled.outcome;
 
     // The ruler works on the paragraph before the draft is painted.
-    let ruler = {
+    let ruler = if editor.single_line {
+        Rect::NOTHING
+    } else {
         let (text, layout) = (editor.text().clone(), editor.layout().clone());
         let to = |x: f64, y: f64| camera.world_to_screen(text.world_point(&layout, x, y), canvas);
         super::ruler::show(
@@ -153,7 +156,9 @@ pub fn show(
         bg,
         Stroke::new(1.0_f32, style.selected),
     ));
-    super::box_handles::paint(&painter, editor, camera, canvas, pad, style.selected);
+    if !editor.single_line {
+        super::box_handles::paint(&painter, editor, camera, canvas, pad, style.selected);
+    }
     let fill = |rects: Vec<SelectionRect>, colour: Color32| {
         for r in rects {
             let quad = [
@@ -227,14 +232,18 @@ pub fn show(
 
     // The Field dialog is modal: the toolbar steps aside while it is open
     // (it would be drawn over the dialog).
-    let (chosen, tools) = if editor.field_dialog && !editor.field_pick {
+    let (chosen, tools) = if editor.single_line || (editor.field_dialog && !editor.field_pick) {
         (None, Rect::NOTHING)
     } else {
         super::toolbar::show(&ctx, theme, editor, styles, bounds.union(ruler), canvas)
     };
     outcome = outcome.or(chosen);
-    let dialog = super::paragraph_dialog::show(&ctx, theme, editor, now)
-        .or_else(|| super::field_dialog::show(&ctx, theme, editor, now));
+    let dialog = if editor.single_line {
+        None
+    } else {
+        super::paragraph_dialog::show(&ctx, theme, editor, now)
+            .or_else(|| super::field_dialog::show(&ctx, theme, editor, now))
+    };
 
     // A click on the drawing outside the box and the toolbar accepts.
     if pressed {

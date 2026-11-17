@@ -15,13 +15,17 @@ impl AppState {
         let wanted = self
             .waiting()
             .filter(|ask| ask.wants == Wants::MTextEditor)
-            .and_then(|ask| ask.mtext.clone().map(|text| (text, ask.mtext_of)));
+            .and_then(|ask| {
+                ask.mtext
+                    .clone()
+                    .map(|text| (text, ask.mtext_of, ask.single_line))
+            });
         let fields = self.field_context();
         let Some(doc) = self.docs.get_mut(self.run_doc) else {
             return;
         };
         match wanted {
-            Some((text, of)) if doc.mtext_editor.is_none() => {
+            Some((text, of, single_line)) if doc.mtext_editor.is_none() => {
                 let style = doc
                     .session
                     .document()
@@ -30,6 +34,7 @@ impl AppState {
                     .unwrap_or_else(TextStyle::standard);
                 let mut editor = MTextEditor::new(*text, style);
                 editor.replaces = of;
+                editor.single_line = single_line;
                 editor.field_context = fields;
                 doc.mtext_editor = Some(editor);
             }
