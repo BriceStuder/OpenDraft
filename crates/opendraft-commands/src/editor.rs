@@ -373,11 +373,27 @@ impl Editor {
         self.edit_mtext_of(Some(id), text)
     }
 
+    /// Like [`Self::edit_mtext`], for one line of plain text (the projection
+    /// of a single-line text): Enter accepts, and nothing can be formatted.
+    pub fn edit_line(&self, of: Option<EntityId>, text: MText) -> Result<Option<MText>, Cancelled> {
+        self.edit_mtext_prompt(of, text, true)
+    }
+
     fn edit_mtext_of(&self, of: Option<EntityId>, text: MText) -> Result<Option<MText>, Cancelled> {
+        self.edit_mtext_prompt(of, text, false)
+    }
+
+    fn edit_mtext_prompt(
+        &self,
+        of: Option<EntityId>,
+        text: MText,
+        single_line: bool,
+    ) -> Result<Option<MText>, Cancelled> {
         let options = Options::<()>::new("Edit text");
         let mut prompt = Prompt::new(Wants::MTextEditor, &options, None);
         prompt.mtext = Some(Box::new(text));
         prompt.mtext_of = of;
+        prompt.single_line = single_line;
         match self.ask(prompt)? {
             Reply::MText(text) => Ok(Some(*text)),
             Reply::Enter => Ok(None),

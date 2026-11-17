@@ -8,6 +8,8 @@ use opendraft_core::mtext::MTextAttachment;
 pub struct Memory {
     pub height: f64,
     pub attachment: MTextAttachment,
+    /// TEXTEDIT keeps asking for texts (Multiple) rather than ending after one.
+    pub multiple: bool,
 }
 
 impl Default for Memory {
@@ -19,10 +21,12 @@ impl Default for Memory {
 const DEFAULT: Memory = Memory {
     height: 2.5,
     attachment: MTextAttachment::TopLeft,
+    multiple: true,
 };
 
 const HEIGHT_KEY: &str = "text_height";
 const ATTACHMENT_KEY: &str = "text_attachment";
+const MULTIPLE_KEY: &str = "text_edit_multiple";
 
 /// Take the saved settings, keeping the default for anything missing or not
 /// a sensible value.
@@ -39,12 +43,17 @@ pub fn load(storage: Option<&dyn eframe::Storage>) -> Memory {
         .and_then(MTextAttachment::from_code);
     m.height = height.unwrap_or(m.height);
     m.attachment = attachment.unwrap_or(m.attachment);
+    m.multiple = storage
+        .get_string(MULTIPLE_KEY)
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(m.multiple);
     m
 }
 
 pub fn save(m: &Memory, storage: &mut dyn eframe::Storage) {
     storage.set_string(HEIGHT_KEY, m.height.to_string());
     storage.set_string(ATTACHMENT_KEY, m.attachment.code().to_string());
+    storage.set_string(MULTIPLE_KEY, m.multiple.to_string());
 }
 
 #[cfg(test)]
@@ -73,6 +82,7 @@ mod tests {
         let kept = Memory {
             height: 7.5,
             attachment: MTextAttachment::BottomRight,
+            multiple: false,
         };
         let mut saved = Saved::default();
         save(&kept, &mut saved);

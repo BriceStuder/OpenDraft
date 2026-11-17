@@ -287,6 +287,9 @@ pub struct Prompt {
     /// For [`Wants::MTextEditor`]: the text object being edited, if there is
     /// one, so the drawing can leave it out while its draft is shown.
     pub mtext_of: Option<EntityId>,
+    /// For [`Wants::MTextEditor`]: the editor takes one line of plain text
+    /// (single-line TEXT): Enter accepts, and it has no formatting.
+    pub single_line: bool,
     /// For [`Wants::OverkillDialog`]: the settings to start from.
     pub overkill: Option<overkill::Settings>,
     /// For [`Wants::AttributeDefinitionDialog`]: what it opens with.
@@ -318,6 +321,7 @@ impl Prompt {
             esc_backs: options.esc_backs,
             mtext: None,
             mtext_of: None,
+            single_line: false,
             overkill: None,
             attribute_definition: None,
             attribute_editor: None,

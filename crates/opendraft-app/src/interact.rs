@@ -464,6 +464,7 @@ mod tests {
             default_hint: None,
             mtext: None,
             mtext_of: None,
+            single_line: false,
             overkill: None,
             attribute_definition: None,
             attribute_editor: None,

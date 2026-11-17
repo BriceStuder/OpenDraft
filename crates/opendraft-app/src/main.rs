@@ -166,6 +166,8 @@ mod sysvars;
 mod template_state;
 mod templates;
 mod text;
+mod text_commands;
+mod text_edit_cmd;
 mod text_memory;
 mod text_style_draft;
 mod units_state;
