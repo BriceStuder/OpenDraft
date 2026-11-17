@@ -546,6 +546,7 @@ A house tab at the far left of the document tabs (it cannot be closed) shows the
 ## Default panel layout
 
 - **Default layout (done).** `dock::default_layout` now puts Properties down the left (13% of the width), the drawing in the middle, and a right-hand column with the Command Line on top (30%) and Layers below. The saved-layout key moved to `dock_layout_v4`, so existing saved arrangements give way to the new default once. Showing a hidden panel puts it back in that place (the Command Line above Layers, Layers under the Command Line, Properties on the left, anything else beside the drawing). Collapsing the Command Line to its input row works whether it is the top or bottom half of its column.
+- **Wheel double-click (16-11-2026).** Double-clicking the middle button over the drawing zooms to the extents, as AutoCAD does: `View::show` turns it into the same `Request::Extents` that Zoom Extents (`ZE`) leaves, so model space, a layout and an active viewport each do what the command does there, and an empty drawing gets the same default view. It is a view change only: it is not run as a command, so a command in progress keeps its prompt, and it picks and selects nothing. A middle drag still pans (a drag is not a click). 3 tests driven through the app in `dynamic_tests/wheel_double_click.rs`. Tried by hand in the real app on Windows, with and without a command running.
 
 ## Linetypes
 
