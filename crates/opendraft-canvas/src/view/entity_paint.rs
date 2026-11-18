@@ -3,8 +3,9 @@
 //! ones drawn live over it.
 
 use super::*;
-use crate::layer_cache::{capture, tessellate, Inputs, LayerKey, Piece, CHUNK_OBJECTS};
+use crate::layer_cache::{capture, tessellate, Built, Inputs, LayerKey, Piece, CHUNK_OBJECTS};
 use egui::Painter;
+use opendraft_core::Object;
 
 /// Whether a kept layer drawn for the `hits`th time is checked against a fresh
 /// one: every 256th time (every time in tests), in debug builds.
@@ -53,18 +54,14 @@ impl View {
         let have = self.layer_cache.borrow().has(&key);
         if !have {
             let visible = self.camera.visible_world(rect);
-            let ids: Vec<EntityId> = document
-                .visible_in_rect(space, &[], visible)
-                .iter()
-                .map(|o| o.id)
-                .collect();
-            let chunks = ids
+            let objects = document.visible_in_rect(space, &[], visible);
+            let chunks: Vec<Built> = objects
                 .chunks(CHUNK_OBJECTS)
                 .map(|c| {
-                    (
-                        c.to_vec(),
-                        self.build_piece(painter, rect, style, document, c, &[]),
-                    )
+                    let first = document.position(c[0].id).unwrap_or(0);
+                    let ids = c.iter().map(|o| o.id).collect();
+                    let piece = self.build_piece(painter, rect, style, document, c, &[]);
+                    (first, ids, piece)
                 })
                 .collect();
             self.layer_cache.borrow_mut().store(key, chunks, limit);
@@ -73,11 +70,14 @@ impl View {
         let hovered = hover.filter(|h| !selection.contains(h));
         let exclusions = {
             let highlighted = selection.iter().copied().chain(hovered);
-            self.layer_cache.borrow().exclusions(highlighted)
+            self.layer_cache
+                .borrow()
+                .exclusions(highlighted, |id| document.position(id))
         };
         let missing = self.layer_cache.borrow().missing(&exclusions);
         for want in missing {
-            let piece = self.build_piece(painter, rect, style, document, &want.ids, &want.excluded);
+            let objects = self.objects_of(document, &want.ids);
+            let piece = self.build_piece(painter, rect, style, document, &objects, &want.excluded);
             self.layer_cache
                 .borrow_mut()
                 .set_variant(want, piece, limit);
@@ -95,22 +95,28 @@ impl View {
         self.paint_highlighted(painter, rect, style, document, space, selection, hover);
     }
 
-    /// The plain entities `ids` (in draw order) but those in `excluded`
-    /// (sorted), as triangles with the textures they use.
+    /// The objects for `ids`, in the same order; those no longer there are
+    /// left out.
+    fn objects_of<'d>(&self, document: &'d Document, ids: &[EntityId]) -> Vec<&'d Object> {
+        ids.iter().filter_map(|id| document.object(*id)).collect()
+    }
+
+    /// The plain `objects` (in draw order) but those in `excluded` (sorted),
+    /// as triangles with the textures they use.
     fn build_piece(
         &self,
         painter: &Painter,
         rect: Rect,
         style: &CanvasStyle,
         document: &Document,
-        ids: &[EntityId],
+        objects: &[&Object],
         excluded: &[EntityId],
     ) -> Piece {
         let ctx = painter.ctx();
         let none = BTreeSet::new();
         let (shapes, textures) = capture(ctx, painter.clip_rect(), |p| {
-            for id in ids.iter().filter(|id| excluded.binary_search(id).is_err()) {
-                if let Some(object) = document.object(*id) {
+            for object in objects {
+                if excluded.binary_search(&object.id).is_err() {
                     self.paint_object(p, rect, style, document, object, &[], &none, None);
                 }
             }
@@ -129,14 +135,16 @@ impl View {
     ) -> bool {
         let whole = self.layer_cache.borrow().chunk_ids();
         for (n, ids) in whole.iter().enumerate() {
-            let fresh = self.build_piece(painter, rect, style, document, ids, &[]);
+            let objects = self.objects_of(document, ids);
+            let fresh = self.build_piece(painter, rect, style, document, &objects, &[]);
             if !self.layer_cache.borrow().matches(n, None, &fresh) {
                 return false;
             }
         }
         let variants = self.layer_cache.borrow().variants();
         variants.iter().all(|v| {
-            let fresh = self.build_piece(painter, rect, style, document, &v.ids, &v.excluded);
+            let objects = self.objects_of(document, &v.ids);
+            let fresh = self.build_piece(painter, rect, style, document, &objects, &v.excluded);
             self.layer_cache
                 .borrow()
                 .matches(v.chunk, Some(&v.excluded), &fresh)
@@ -208,16 +216,12 @@ impl View {
         rect: Rect,
         style: &CanvasStyle,
         document: &Document,
-        object: &opendraft_core::Object,
+        object: &Object,
         frozen: &[LayerId],
         selection: &BTreeSet<EntityId>,
         hover: Option<EntityId>,
     ) {
         let (id, entity) = (&object.id, &object.entity);
-        let line = match document.color_of(object) {
-            Color::Foreground => style.entity,
-            Color::Rgb(r, g, b) => egui::Color32::from_rgb(r, g, b),
-        };
         let bounds = object.bounds();
         // Entities smaller than a pixel add nothing but triangles when
         // zoomed far out. Selected ones are always drawn.
@@ -231,6 +235,10 @@ impl View {
         if self.hidden == Some(*id) {
             return;
         }
+        let line = match document.color_of(object) {
+            Color::Foreground => style.entity,
+            Color::Rgb(r, g, b) => egui::Color32::from_rgb(r, g, b),
+        };
         if let Entity::MText(text) = entity {
             let (selected, hovered) = (selection.contains(id), hover == Some(*id));
             self.paint_mtext(

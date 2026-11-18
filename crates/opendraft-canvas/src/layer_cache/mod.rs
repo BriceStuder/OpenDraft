@@ -33,7 +33,7 @@ mod key;
 #[cfg(debug_assertions)]
 pub(crate) use capture::same_triangles;
 pub(crate) use capture::{capture, tessellate};
-pub(crate) use chunks::{LayerCache, Piece, CHUNK_OBJECTS};
+pub(crate) use chunks::{Built, LayerCache, Piece, CHUNK_OBJECTS};
 pub(crate) use key::{Inputs, LayerKey};
 
 /// Drawings with fewer objects than this are painted directly in Automatic

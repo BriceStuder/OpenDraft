@@ -371,3 +371,39 @@ fn a_variant_that_does_not_fit_the_limit_is_not_kept() {
     assert_eq!(stats.bytes, base, "memory stays within the limit");
     assert_eq!(stats.builds, 1);
 }
+
+#[test]
+fn highlights_at_the_edges_of_chunks_are_drawn_over_nothing() {
+    // Chunks are 64 entities in tests, so these sit on both sides of edges.
+    let doc = drawing(300);
+    let at = |n: usize| doc.objects()[n].id;
+    let edges: BTreeSet<EntityId> = [0, 63, 64, 127, 128, 255, 256, 299].map(at).into();
+    let mut kept = Rig::new(CacheMode::On, Some((1, 0)));
+    let mut direct = Rig::new(CacheMode::Off, Some((1, 0)));
+    for _ in 0..3 {
+        let (a, b) = (kept.frame(&doc, &edges), direct.frame(&doc, &edges));
+        assert_eq!(as_set(&a), as_set(&b));
+    }
+}
+
+#[test]
+fn highlights_off_screen_or_before_the_first_visible_entity_are_harmless() {
+    let doc = drawing(300);
+    let (first, last) = (doc.objects()[0].id, doc.objects()[299].id);
+    let both = BTreeSet::from([first, last]);
+    let mut kept = Rig::new(CacheMode::On, Some((1, 0)));
+    let mut direct = Rig::new(CacheMode::Off, Some((1, 0)));
+    // Zoomed in on the middle: neither entity is on screen, and the first
+    // visible one is far down the drawing order.
+    for rig in [&mut kept, &mut direct] {
+        rig.view.camera = Camera {
+            center: Point::new(400.0, 150.0),
+            zoom: 5.0,
+        };
+    }
+    for _ in 0..3 {
+        let (a, b) = (kept.frame(&doc, &both), direct.frame(&doc, &both));
+        assert!(!a.is_empty());
+        assert_eq!(as_set(&a), as_set(&b));
+    }
+}

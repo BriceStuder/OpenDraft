@@ -2,7 +2,7 @@
 //! few meshes. A chunk that holds a selected or hovered entity is drawn from a
 //! variant made without it, so the highlight is drawn over nothing.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use egui::epaint::{Mesh, Vertex};
@@ -63,9 +63,14 @@ struct Chunk {
 
 struct Layer {
     chunks: Vec<Chunk>,
-    /// The chunk each entity is in.
-    owner: HashMap<EntityId, usize>,
+    /// The drawing-order position of each chunk's first entity, ascending:
+    /// an entity belongs to the last chunk that starts at or before it.
+    starts: Vec<usize>,
 }
+
+/// A chunk as built: the drawing-order position of its first entity, its
+/// entities, and their picture.
+pub(crate) type Built = (usize, Vec<EntityId>, Piece);
 
 /// What to leave out of each chunk, by chunk: the highlighted entities in it,
 /// sorted.
@@ -103,10 +108,10 @@ impl LayerCache {
         self.stats.bytes = 0;
     }
 
-    /// Keep `chunks` (each its entities and picture) as the layer for `key`,
-    /// unless they are over `limit`.
-    pub fn store(&mut self, key: LayerKey, chunks: Vec<(Vec<EntityId>, Piece)>, limit: usize) {
-        let bytes: usize = chunks.iter().map(|(_, p)| p.bytes).sum();
+    /// Keep `chunks` (each the position of its first entity, its entities and
+    /// its picture) as the layer for `key`, unless they are over `limit`.
+    pub fn store(&mut self, key: LayerKey, chunks: Vec<Built>, limit: usize) {
+        let bytes: usize = chunks.iter().map(|(_, _, p)| p.bytes).sum();
         self.stats.builds += 1;
         self.key = Some(key);
         if bytes > limit {
@@ -114,30 +119,36 @@ impl LayerCache {
             self.stats.bytes = 0;
             return;
         }
-        let mut owner = HashMap::new();
-        for (n, (ids, _)) in chunks.iter().enumerate() {
-            owner.extend(ids.iter().map(|id| (*id, n)));
-        }
+        let starts = chunks.iter().map(|(at, _, _)| *at).collect();
         let chunks = chunks
             .into_iter()
-            .map(|(ids, base)| Chunk {
+            .map(|(_, ids, base)| Chunk {
                 ids,
                 base,
                 variant: None,
             })
             .collect();
         self.stats.bytes = bytes;
-        self.layer = Some(Layer { chunks, owner });
+        self.layer = Some(Layer { chunks, starts });
     }
 
-    /// For each chunk holding some of `highlighted`, those, sorted.
-    pub fn exclusions(&self, highlighted: impl Iterator<Item = EntityId>) -> Exclusions {
+    /// For each chunk holding some of `highlighted`, those, sorted. `position`
+    /// says where in the drawing order an entity is; one that comes before the
+    /// first chunk, or is not there, is in none. One that was not in the layer
+    /// but falls inside a chunk's range is left out of it to no effect.
+    pub fn exclusions(
+        &self,
+        highlighted: impl Iterator<Item = EntityId>,
+        position: impl Fn(EntityId) -> Option<usize>,
+    ) -> Exclusions {
         let mut out = Exclusions::new();
         let Some(layer) = &self.layer else {
             return out;
         };
         for id in highlighted {
-            if let Some(&chunk) = layer.owner.get(&id) {
+            let Some(at) = position(id) else { continue };
+            let after = layer.starts.partition_point(|&start| start <= at);
+            if let Some(chunk) = after.checked_sub(1) {
                 out.entry(chunk).or_default().push(id);
             }
         }

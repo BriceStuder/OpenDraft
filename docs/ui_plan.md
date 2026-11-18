@@ -1063,6 +1063,28 @@ does not show the machine's memory (that needs a system-information dependency, 
 lists of this repository and the template). `AppState`'s selection helpers moved to `state_selection.rs`
 to keep `state.rs` under the size rule.
 
+Phase 4 plan (18-11-2026): a pan or zoom changes the camera, which is in the key, so the layer was
+rebuilt at once, about 100 ms on the large DWG. Design: when only the camera changed, draw the
+kept layer moved (a layer transform for a pan, a scale for a zoom) and rebuild the new one in time
+slices (about 8 ms a frame, after a settle delay, restarting if the camera moves again) and swap when
+it is done; edits, layer changes and the other key inputs still rebuild at once, because an old picture
+would show a deleted entity. Phases: 4a spike (done, below), 4b0 cheaper rebuild (done, below), 4b split
+the key into content and view and draw the old layer moved, 4c the time-sliced builder, 4d the
+settings (While zooming or panning: Exact, Smooth, Automatic, default Automatic; Settle delay, default
+100 ms) and a "rebuilding n%" line in the readout. Not in the first version: a margin around the view,
+so a pan shows blank strips until the new layer arrives.
+
+Phase 4a findings (release build, the large DWG): drawing the kept layer moved costs 8.7 ms with egui's
+layer transform (`Context::set_transform_layer`) and 10.5 ms with hand-made transformed copies, against
+7.4 ms unmoved, so a gesture frame can be about 9 ms. A full rebuild was 175 to 180 ms, not the 70 ms
+assumed: 120 ms of it was painting, of which about 55 ms was the chunk builder looking each entity up
+by id, and the rest an id-to-chunk map of 417k entries.
+
+Phase 4b0 done: chunks are built from the objects the query already returned, an entity's chunk is
+found from its drawing-order position and the position at which each chunk starts (no map), and an
+entity's colour is looked up after the too-small and hidden checks. A rebuild is now 94 to 119 ms
+(zoom extents 98 ms), about the cost of painting directly; the pointer-only frame is unchanged.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
