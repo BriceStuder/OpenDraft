@@ -53,5 +53,47 @@ pub(crate) fn same_triangles<'a>(
 ) -> bool {
     a.len() == b.len()
         && a.zip(b)
-            .all(|(x, y)| x.indices == y.indices && x.vertices == y.vertices)
+            .all(|(x, y)| x.indices == y.indices && same_vertices(&x.vertices, &y.vertices))
+}
+
+/// Whether two vertex lists are the same bit for bit: a vertex at `NaN`, which
+/// a degenerate shape can give, is not equal to itself by `==`.
+#[cfg(debug_assertions)]
+fn same_vertices(a: &[egui::epaint::Vertex], b: &[egui::epaint::Vertex]) -> bool {
+    let bits = |v: &egui::epaint::Vertex| {
+        [
+            v.pos.x.to_bits(),
+            v.pos.y.to_bits(),
+            v.uv.x.to_bits(),
+            v.uv.y.to_bits(),
+        ]
+    };
+    a.len() == b.len()
+        && a.iter()
+            .zip(b)
+            .all(|(x, y)| bits(x) == bits(y) && x.color == y.color)
+}
+
+#[cfg(all(test, debug_assertions))]
+mod tests {
+    use super::*;
+    use egui::epaint::Vertex;
+    use egui::{Color32, Pos2};
+
+    #[test]
+    fn a_mesh_with_a_nan_vertex_is_the_same_as_itself() {
+        let vertex = Vertex {
+            pos: Pos2::new(f32::NAN, f32::NAN),
+            uv: Pos2::ZERO,
+            color: Color32::WHITE,
+        };
+        let mut mesh = Mesh::default();
+        mesh.vertices.push(vertex);
+        mesh.indices.extend([0, 0, 0]);
+        assert!(vertex.pos != vertex.pos, "NaN is not equal to itself");
+        assert!(same_triangles(
+            [&mesh].into_iter(),
+            [&mesh.clone()].into_iter()
+        ));
+    }
 }

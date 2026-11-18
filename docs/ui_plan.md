@@ -1138,6 +1138,11 @@ the space to say whether there was one (it now stops at the first), and the stat
 again (now counted once for each state of the drawing, `object_count` in `app/chrome.rs`). The frame on the large drawing
 at extents is now 9.5 ms (106 fps) with the readout on, from 58 ms.
 
+Debug-build crash (18-11-2026): the debug check that a kept layer equals a fresh one (every 256th frame) panicked on the
+large drawing because a degenerate shape gives a vertex at NaN, and `NaN != NaN`; vertices are now compared bit for bit
+(`same_vertices` in `layer_cache/capture.rs`). Found by running every sample drawing with the check on every frame in a
+debug build (none else differed). Release builds never ran the check.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
