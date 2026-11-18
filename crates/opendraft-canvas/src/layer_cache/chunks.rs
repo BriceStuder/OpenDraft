@@ -9,7 +9,9 @@ use egui::epaint::{Mesh, Vertex};
 use egui::{Painter, Shape, TextureHandle};
 use opendraft_core::EntityId;
 
-use super::{same_triangles, CacheStats, LayerKey};
+#[cfg(debug_assertions)]
+use super::same_triangles;
+use super::{CacheStats, LayerKey};
 
 /// Entities in a chunk. Small enough that rebuilding the chunk under the
 /// pointer takes well under a millisecond, large enough that a drawing is a
@@ -37,6 +39,7 @@ impl Piece {
         }
     }
 
+    #[cfg(debug_assertions)]
     fn matches(&self, fresh: &Piece) -> bool {
         same_triangles(
             self.meshes.iter().map(|m| &**m),
@@ -209,6 +212,7 @@ impl LayerCache {
     }
 
     /// Every chunk's entities, for checking the layer against a fresh one.
+    #[cfg(debug_assertions)]
     pub fn chunk_ids(&self) -> Vec<Vec<EntityId>> {
         self.layer
             .iter()
@@ -217,6 +221,7 @@ impl LayerCache {
     }
 
     /// The variants kept, as what they leave out, for the same check.
+    #[cfg(debug_assertions)]
     pub fn variants(&self) -> Vec<Wanted> {
         let Some(layer) = &self.layer else {
             return Vec::new();
@@ -233,6 +238,7 @@ impl LayerCache {
     }
 
     /// Whether chunk `n` as kept is `fresh`; with `excluded`, its variant.
+    #[cfg(debug_assertions)]
     pub fn matches(&self, n: usize, excluded: Option<&[EntityId]>, fresh: &Piece) -> bool {
         let Some(chunk) = self.layer.as_ref().and_then(|l| l.chunks.get(n)) else {
             return false;

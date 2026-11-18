@@ -30,7 +30,9 @@ mod capture;
 mod chunks;
 mod key;
 
-pub(crate) use capture::{capture, same_triangles, tessellate};
+#[cfg(debug_assertions)]
+pub(crate) use capture::same_triangles;
+pub(crate) use capture::{capture, tessellate};
 pub(crate) use chunks::{LayerCache, Piece, CHUNK_OBJECTS};
 pub(crate) use key::{Inputs, LayerKey};
 

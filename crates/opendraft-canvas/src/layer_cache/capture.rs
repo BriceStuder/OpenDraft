@@ -43,8 +43,10 @@ pub(crate) fn tessellate(ctx: &Context, shapes: Vec<ClippedShape>) -> Vec<Mesh> 
         .collect()
 }
 
-/// Whether two sets of meshes draw the same triangles. Texture ids are not
-/// compared: a text picture made again gets a new one.
+/// Whether two sets of meshes draw the same triangles (debug builds check the
+/// kept layer with it). Texture ids are not compared: a text picture made
+/// again gets a new one.
+#[cfg(debug_assertions)]
 pub(crate) fn same_triangles<'a>(
     a: impl ExactSizeIterator<Item = &'a Mesh>,
     b: impl ExactSizeIterator<Item = &'a Mesh>,
