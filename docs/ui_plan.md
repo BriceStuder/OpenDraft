@@ -1132,6 +1132,12 @@ large drawing at extents that took the kept triangles from 17.5 MB to about 6 MB
 looked the same to the eye); the rest of a frame is the ribbon (about 3 ms even with no drawing), the command line
 and egui's own work. It applies to painting directly too. Meant to become a setting with the other detail controls.
 
+Ribbon cost (18-11-2026): timing the ribbon showed 4 to 10 ms a frame on the large drawing but under 1 ms on an empty
+one; the cause was the Select All command's enabled test, `Document::has_objects_here`, which counted every object of
+the space to say whether there was one (it now stops at the first), and the status bar's object count walked them all
+again (now counted once for each state of the drawing, `object_count` in `app/chrome.rs`). The frame on the large drawing
+at extents is now 9.5 ms (106 fps) with the readout on, from 58 ms.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
