@@ -9,11 +9,14 @@ use std::time::{Duration, Instant};
 
 use super::*;
 use crate::layer_cache::{
-    camera_of, capture, chunk_count, draw_moved, move_between, tessellate, Advance, Inputs,
-    LayerCache, LayerKey, Motion, Piece, Slot, AUTO_SMOOTH_MS, CHUNK_OBJECTS,
+    camera_of, capture, chunk_count, covered, draw_moved, move_between, tessellate, Advance,
+    Inputs, LayerCache, LayerKey, Motion, Piece, Slot, AUTO_SMOOTH_MS, CHUNK_OBJECTS,
 };
 use egui::Painter;
 use opendraft_core::{Bounds, Object};
+
+/// The old picture is shown moved only while it covers this part of the screen.
+const MIN_COVERED: f32 = 0.5;
 
 /// Whether a kept layer drawn for the `hits`th time is checked against a fresh
 /// one: every 256th time (every time in tests), in debug builds.
@@ -189,11 +192,17 @@ impl View {
         if !cache.has_content_of(key) {
             return false;
         }
-        match self.cache_config.motion {
+        let smooth = match self.cache_config.motion {
             Motion::Exact => false,
             Motion::Smooth => true,
             Motion::Automatic => cache.stats().last_build_us > AUTO_SMOOTH_MS * 1000,
-        }
+        };
+        // An old picture that fills little of the screen (after a zoom out)
+        // shows the drawing as missing, which is worse than waiting.
+        let by = cache
+            .built_view()
+            .map(|from| move_between(&camera_of(from), &self.camera, frame.rect));
+        smooth && by.is_some_and(|by| covered(by, frame.rect) >= MIN_COVERED)
     }
 
     /// Make a layer for `key` now, in this frame.

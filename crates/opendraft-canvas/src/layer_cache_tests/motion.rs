@@ -187,3 +187,23 @@ fn exact_motion_and_a_quick_automatic_one_make_the_new_picture_at_once() {
         assert_eq!((auto.builds(), auto.view.cache_stats().moved), (2, 0));
     }
 }
+
+#[test]
+fn a_zoom_out_that_leaves_most_of_the_screen_empty_is_made_at_once() {
+    let doc = drawing(400);
+    let mut rig = smooth(1000);
+    let mut direct = Rig::new(CacheMode::Off, Some((1, 0)));
+    direct.pointer = -2000.0;
+    rig.frame(&doc, &none());
+    for view in [&mut rig.view, &mut direct.view] {
+        view.camera.zoom *= 0.3;
+    }
+    let (a, b) = (rig.frame(&doc, &none()), direct.frame(&doc, &none()));
+    let stats = rig.view.cache_stats();
+    assert_eq!(
+        stats.builds, 2,
+        "no waiting for a picture of a quarter of it"
+    );
+    assert_eq!(stats.moved, 0);
+    assert_eq!(as_set(&a), as_set(&b));
+}

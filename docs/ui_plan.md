@@ -1108,6 +1108,11 @@ whole model, release build: pointer-only 71.6 ms painting directly, 6.3 ms cache
 model and a wheel zoom of the sheet settles to the exact picture. Not done: the detail controls (phases 2.6 and
 2.7), a margin around the view, and a cheaper look for very large selections.
 
+Fix after trying it on the large drawing (18-11-2026): a kept picture holds only what was in view when it was made, so
+after a zoom out the moved old picture left most of the screen empty until the new one was made (about 320 ms). The old
+picture is now shown moved only while it covers at least half of the screen (`covered` in `layer_cache/moved.rs`);
+below that the new layer is made at once, which costs what painting directly did.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

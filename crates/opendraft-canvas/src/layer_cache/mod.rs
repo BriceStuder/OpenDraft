@@ -38,7 +38,7 @@ pub(crate) use capture::same_triangles;
 pub(crate) use capture::{capture, tessellate};
 pub(crate) use chunks::{chunk_count, LayerCache, Piece, CHUNK_OBJECTS};
 pub(crate) use key::{camera_of, Inputs, LayerKey};
-pub(crate) use moved::{draw_moved, move_between};
+pub(crate) use moved::{covered, draw_moved, move_between};
 pub(crate) use pending::Advance;
 pub(crate) use slots::{LayerCaches, Slot};
 
