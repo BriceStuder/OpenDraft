@@ -783,9 +783,12 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   Small text is drawn as textures held in the picture cache of `text_raster.rs`; the layer
   holds those handles so the cache evicting one cannot free a texture it still points at.
 - **Settings** (`CacheConfig`, `View::set_cache_config`): mode Automatic (drawings of
-  5,000 objects or more), On or Off, and a memory limit (default 512 MB); a layer over the
-  limit is not kept and is painted directly. The Performance page of Settings is planned
-  (see `docs/ui_plan.md`).
+  5,000 objects or more), On or Off, and a memory limit (default 512 MB, 64 MB to 2 GB); a
+  layer over the limit is not kept and is painted directly. They are the user's, on the
+  Performance page of Settings (`performance_settings.rs`, saved with `Settings`, never in a
+  drawing); the panel passes them to each view every frame. An optional readout over the
+  canvas (`frame_readout.rs`, off by default, nothing timed while off) shows the paint time,
+  the frame time, the cache's size, builds, chunk rebuilds and frames, and the object count.
 - **Checks**: in debug builds a kept layer is compared with a fresh one every 256th frame
   it is drawn (every frame in tests) and a difference is an assertion; the tests also show
   the kept picture equals the directly painted one, that each key input rebuilds it, and

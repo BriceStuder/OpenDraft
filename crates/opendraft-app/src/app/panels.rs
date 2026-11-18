@@ -250,6 +250,7 @@ impl PanelViewer<'_> {
         let sizes = self.state.settings.pointer_sizes();
         let crosshair = self.state.settings.crosshair();
         let zoom_speed = self.state.settings.zoom_speed;
+        let perf = self.state.settings.performance.clone();
         // `TK` holds each point to an axis from the one before.
         let ortho = match self.state.once.tracking_chain() {
             true => opendraft_canvas::Ortho {
@@ -273,6 +274,7 @@ impl PanelViewer<'_> {
         // The picture of the plain entities is kept while the drawing is the
         // same (see `opendraft_canvas::layer_cache`).
         doc.view.set_document_token(Some(doc.session.draw_token()));
+        doc.view.set_cache_config(perf.cache_config());
         doc.view.set_crosshair(crosshair);
         doc.view.set_zoom_speed(zoom_speed);
         doc.view.set_ortho(ortho);
@@ -280,6 +282,7 @@ impl PanelViewer<'_> {
         doc.view
             .set_temp_tracking_points(self.state.once.temps().to_vec());
         doc.view.set_snap_override(self.state.once.over().cloned());
+        let started = crate::frame_readout::Readout::start(perf.show_frame_time);
         let output = doc.view.show(
             ui,
             &self.style,
@@ -302,6 +305,16 @@ impl PanelViewer<'_> {
                 );
             }
         }
+        self.state.frame_readout.finish(started);
+        if let (true, Some(canvas)) = (perf.show_frame_time, output.rect) {
+            let doc = &self.state.docs[self.state.active];
+            let objects = doc.session.document().objects().len();
+            let stats = doc.view.cache_stats();
+            self.state
+                .frame_readout
+                .draw(ui, canvas, self.theme, stats, objects);
+        }
+        let doc = &mut self.state.docs[self.state.active];
         doc.dynamic_input.canvas = output.rect;
         doc.dynamic_input.cursor = output.preview_cursor.or(doc.dynamic_input.cursor);
         self.cursor = output.cursor;

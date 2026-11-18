@@ -43,7 +43,8 @@ pub const AUTO_MIN_OBJECTS: usize = 5_000;
 pub const DEFAULT_MEMORY_LIMIT: usize = 512 << 20;
 
 /// Whether the drawing's picture is kept between frames.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CacheMode {
     /// Kept for drawings of [`AUTO_MIN_OBJECTS`] or more.
     #[default]

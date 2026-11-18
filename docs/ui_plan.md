@@ -1053,6 +1053,16 @@ selected 342 ms (417k live highlights, 9.2M triangles; the same work as without 
 Phase 1's 4.9 ms was measured with a steadier pointer; these runs move it across the drawing.
 Not done: a cheaper look for very large selections.
 
+Phase 2.5 done (18-11-2026), with the controls that exist: the Performance page of Settings
+(`performance_settings.rs`, between Files and Automation) has the drawing cache (Automatic, Always
+on, Off), the memory limit (slider, 64 MB to 2 GB, default 512 MB), the off-by-default frame-time
+readout (`frame_readout.rs`) and Reset to defaults. Tried in the app on the large DWG: Off gives an 80 ms
+frame and 0 MB kept; Automatic 13 ms (vsync-bound) with 17 MB kept. Not built until phase 4 gives them
+something to control: the zoom and pan behaviour (Exact, Smooth, Automatic) and the settle delay. The page
+does not show the machine's memory (that needs a system-information dependency, and with it the licence
+lists of this repository and the template). `AppState`'s selection helpers moved to `state_selection.rs`
+to keep `state.rs` under the size rule.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
