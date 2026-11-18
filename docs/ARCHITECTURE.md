@@ -812,6 +812,12 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   others leave) and the 8 ms slice of a frame, and a slot not painted for 600 passes is let
   go. A viewport's clip rectangle is part of the key's view, not its content, because it moves
   with the sheet, so zooming or panning the sheet moves every viewport's picture.
+- **Large selections** (`layer_cache/selected.rs`): a selection of 256 or more objects has its
+  highlight kept as triangles too, under a key of the layer key, a hash of the selected ids and
+  the two highlight colours, made again only when one of those changes; the exclusion lists are
+  kept by the same hash and the hovered entity. A hovered entity, a small selection and any
+  highlight while an old picture is shown moved are still drawn live. Over the memory limit the
+  highlight is drawn live. The debug check compares it with a fresh one like the chunks.
 - **Not yet**: a pan shows blank strips at the edges until the new layer arrives (no margin
   is made around the view).
   Highlights are drawn live and over everything, so a very large selection (hundreds of

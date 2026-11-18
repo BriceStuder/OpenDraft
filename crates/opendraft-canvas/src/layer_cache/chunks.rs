@@ -61,7 +61,7 @@ impl Piece {
     }
 
     #[cfg(debug_assertions)]
-    fn matches(&self, fresh: &Piece) -> bool {
+    pub(super) fn matches(&self, fresh: &Piece) -> bool {
         same_triangles(
             self.meshes.iter().map(|m| &**m),
             fresh.meshes.iter().map(|m| &**m),
@@ -101,6 +101,10 @@ pub(crate) struct LayerCache {
     /// The view last seen, and since when it has not changed.
     pub(super) settle: Option<(View, Instant)>,
     pub(super) stats: CacheStats,
+    /// The highlight of a large selection (see `selected.rs`).
+    pub(super) selected: Option<super::selected::SelectedLayer>,
+    /// What the last large selection and hover left out of each chunk.
+    pub(super) excluded: Option<(u64, Option<EntityId>, Arc<Exclusions>)>,
 }
 
 impl LayerCache {
@@ -123,6 +127,8 @@ impl LayerCache {
         self.key = None;
         self.layer = None;
         self.pending = None;
+        self.selected = None;
+        self.excluded = None;
         self.stats.bytes = 0;
         self.stats.rebuilding = None;
     }
@@ -155,6 +161,8 @@ impl LayerCache {
         let bytes: usize = pieces.iter().map(Piece::bytes).sum();
         self.stats.builds += 1;
         self.key = Some(key);
+        self.selected = None;
+        self.excluded = None;
         if bytes > limit {
             self.layer = None;
             self.stats.bytes = 0;

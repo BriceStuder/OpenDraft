@@ -1143,6 +1143,16 @@ large drawing because a degenerate shape gives a vertex at NaN, and `NaN != NaN`
 (`same_vertices` in `layer_cache/capture.rs`). Found by running every sample drawing with the check on every frame in a
 debug build (none else differed). Release builds never ran the check.
 
+Selections (18-11-2026): with 38,355 of the large drawing's objects selected a frame took 43.7 ms and with all 417,486
+selected 471 ms, because each frame drew the glow and edge of every selected entity again and egui made triangles of them
+again, and built the exclusion lists. A selection of 256 or more is now kept as a picture (`layer_cache/selected.rs`,
+`View::draw_kept_selection`), made again only when the view, the selection or the highlight colours change, with its
+exclusion lists kept by a hash of the selection; hover stays live. Now 21 ms and 83 ms. What is left grows with the
+selection: the ribbon's layer, colour, linetype and lineweight lists and the Properties panel each build the list of
+selected objects every frame (about 20 ms each at 417,000), and the kept highlight is about 100 MB at 417,000 (dropping the
+soft edge halved it but made it differ from painting directly, so it was not kept). Not done: those two panels, and a
+cheaper look for huge selections.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

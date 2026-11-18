@@ -5,20 +5,46 @@
 use super::*;
 use opendraft_core::Object;
 
+/// Which highlights to draw.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Highlights {
+    All,
+    /// The selected entities only.
+    Selected,
+    /// The hovered entity only.
+    Hovered,
+}
+
 impl View {
     /// The selected and hovered entities, over the kept layer.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn paint_highlighted(
+        &self,
+        args: (&egui::Painter, Rect, &CanvasStyle, &Document),
+        space: Option<LayoutId>,
+        frozen: &[LayerId],
+        selection: &BTreeSet<EntityId>,
+        hover: Option<EntityId>,
+    ) {
+        self.paint_highlights(args, space, frozen, selection, hover, Highlights::All);
+    }
+
+    /// The part of the highlights `which` names.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn paint_highlights(
         &self,
         (painter, rect, style, document): (&egui::Painter, Rect, &CanvasStyle, &Document),
         space: Option<LayoutId>,
         frozen: &[LayerId],
         selection: &BTreeSet<EntityId>,
         hover: Option<EntityId>,
+        which: Highlights,
     ) {
         let visible = self.camera.visible_world(rect);
         let hovered = hover.filter(|h| !selection.contains(h));
-        for id in selection.iter().copied().chain(hovered) {
+        let chosen = (which != Highlights::Hovered).then(|| selection.iter().copied());
+        let hovered = hovered.filter(|_| which != Highlights::Selected);
+        for id in chosen.into_iter().flatten().chain(hovered) {
             let Some(object) = document.object(id) else {
                 continue;
             };

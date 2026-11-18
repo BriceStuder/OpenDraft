@@ -24,13 +24,15 @@
 //! (checks its own entries by content) and the picture cache of small text
 //! (kept alive by [`LayerCache`], see `text_raster::hold_textures`).
 //! Nothing else is read: pointer sizes and the other style colours are only
-//! used for grips, snaps and highlights, which are drawn live.
+//! used for grips, snaps and highlights, which are drawn live (or, for a
+//! large selection, kept by `selected.rs` under a key of its own).
 
 mod capture;
 mod chunks;
 mod key;
 mod moved;
 mod pending;
+mod selected;
 mod slots;
 
 #[cfg(debug_assertions)]
@@ -40,6 +42,7 @@ pub(crate) use chunks::{chunk_count, LayerCache, Piece, CHUNK_OBJECTS};
 pub(crate) use key::{camera_of, Inputs, LayerKey};
 pub(crate) use moved::{covered, draw_moved, move_between};
 pub(crate) use pending::Advance;
+pub(crate) use selected::{selection_hash, SelectedKey, KEEP_FROM};
 pub(crate) use slots::{LayerCaches, Slot};
 
 /// Drawings with fewer objects than this are painted directly in Automatic
@@ -126,6 +129,7 @@ impl CacheStats {
         CacheStats {
             builds: self.builds + other.builds,
             variant_builds: self.variant_builds + other.variant_builds,
+            selected_builds: self.selected_builds + other.selected_builds,
             hits: self.hits + other.hits,
             moved: self.moved + other.moved,
             bytes: self.bytes + other.bytes,
@@ -142,6 +146,8 @@ pub struct CacheStats {
     pub builds: u64,
     /// Chunks built again without a selected or hovered entity.
     pub variant_builds: u64,
+    /// Highlights of a large selection made as a kept picture.
+    pub selected_builds: u64,
     /// Frames drawn from a kept layer.
     pub hits: u64,
     /// Frames drawn from the old layer, moved, while a new one is made.

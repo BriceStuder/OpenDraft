@@ -123,3 +123,53 @@ fn highlights_off_screen_or_before_the_first_visible_entity_are_harmless() {
         assert_eq!(as_set(&a), as_set(&b));
     }
 }
+
+#[test]
+fn a_large_selection_is_kept_as_a_picture_and_made_again_only_when_it_changes() {
+    let doc = drawing(300);
+    let ids: Vec<EntityId> = doc.objects().iter().map(|o| o.id).collect();
+    let first: BTreeSet<EntityId> = ids[..40].iter().copied().collect();
+    let second: BTreeSet<EntityId> = ids[100..150].iter().copied().collect();
+    let mut kept = Rig::new(CacheMode::On, Some((1, 0)));
+    let mut direct = Rig::new(CacheMode::Off, Some((1, 0)));
+    // The pointer moves over the drawing, so something is hovered now and then.
+    for _ in 0..5 {
+        let (a, b) = (kept.frame(&doc, &first), direct.frame(&doc, &first));
+        assert_eq!(as_set(&a), as_set(&b));
+    }
+    assert_eq!(kept.view.cache_stats().selected_builds, 1, "made once");
+    for _ in 0..3 {
+        let (a, b) = (kept.frame(&doc, &second), direct.frame(&doc, &second));
+        assert_eq!(as_set(&a), as_set(&b));
+    }
+    assert_eq!(
+        kept.view.cache_stats().selected_builds,
+        2,
+        "and again for another"
+    );
+    // Down to a few, drawn live again, still the same.
+    let few = BTreeSet::from([ids[5], ids[6]]);
+    let (a, b) = (kept.frame(&doc, &few), direct.frame(&doc, &few));
+    assert_eq!(as_set(&a), as_set(&b));
+    assert_eq!(kept.view.cache_stats().selected_builds, 2);
+}
+
+#[test]
+fn a_selection_too_big_for_the_memory_limit_is_drawn_live() {
+    let doc = drawing(300);
+    let all: BTreeSet<EntityId> = doc.objects().iter().map(|o| o.id).collect();
+    let mut probe = Rig::new(CacheMode::On, Some((1, 0)));
+    probe.frame(&doc, &none());
+    let layer = probe.view.cache_stats().bytes;
+    let mut tight = Rig::new(CacheMode::On, Some((1, 0)));
+    tight.view.set_cache_config(CacheConfig {
+        memory_limit: layer + layer / 4,
+        ..exact(CacheMode::On)
+    });
+    let mut direct = Rig::new(CacheMode::Off, Some((1, 0)));
+    for _ in 0..3 {
+        let (a, b) = (tight.frame(&doc, &all), direct.frame(&doc, &all));
+        assert_eq!(as_set(&a), as_set(&b));
+    }
+    assert!(tight.view.cache_stats().bytes <= layer + layer / 4);
+}

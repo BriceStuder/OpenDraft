@@ -5,12 +5,15 @@
 //! [`Slot`]. What is kept and why is in `layer_cache`.
 
 use std::cell::RefMut;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use super::entity_paint::Highlights;
 use super::*;
 use crate::layer_cache::{
-    camera_of, capture, chunk_count, covered, draw_moved, move_between, tessellate, Advance,
-    Inputs, LayerCache, LayerKey, Motion, Piece, Slot, AUTO_SMOOTH_MS, CHUNK_OBJECTS,
+    camera_of, capture, chunk_count, covered, draw_moved, move_between, selection_hash, tessellate,
+    Advance, Inputs, LayerCache, LayerKey, Motion, Piece, SelectedKey, Slot, AUTO_SMOOTH_MS,
+    CHUNK_OBJECTS, KEEP_FROM,
 };
 use egui::Painter;
 use opendraft_core::{Bounds, Object};
@@ -148,14 +151,21 @@ impl View {
             }
         }
         if !settled {
-            self.build_now(&frame, key);
+            self.build_now(&frame, key.clone());
         }
         // Each chunk holding a selected or hovered entity is drawn without it.
         let hovered = hover.filter(|h| !selection.contains(h));
+        let large = selection.len() >= KEEP_FROM;
+        let hash = if large { selection_hash(selection) } else { 0 };
         let exclusions = {
             let highlighted = selection.iter().copied().chain(hovered);
-            let cache = self.cache(&frame);
-            cache.exclusions(highlighted, |id| document.position(id))
+            let mut cache = self.cache(&frame);
+            if large {
+                let position = |id| document.position(id);
+                cache.exclusions_for((hash, hovered), highlighted, position)
+            } else {
+                Arc::new(cache.exclusions(highlighted, |id| document.position(id)))
+            }
         };
         let missing = self.cache(&frame).missing(&exclusions);
         let limit = self.limit_for(&frame);
@@ -166,15 +176,25 @@ impl View {
         if !self.cache(&frame).draw(painter, &exclusions) {
             return direct();
         }
+        // A large selection is drawn from a kept picture, a small one live.
+        let kept = large && self.draw_kept_selection(&frame, &key, hash, selection);
+        if !large {
+            self.cache(&frame).drop_selected();
+        }
+        let which = if kept {
+            Highlights::Hovered
+        } else {
+            Highlights::All
+        };
         #[cfg(debug_assertions)]
         if have && verify_due(self.cache(&frame).stats().hits) {
             debug_assert!(
-                self.layer_matches_fresh(&frame),
+                self.layer_matches_fresh(&frame, selection),
                 "the kept layer differs from a fresh one: a painting input is missing from the key"
             );
         }
         let highlighted = (painter, rect, style, document);
-        self.paint_highlighted(highlighted, space, frozen, selection, hover);
+        self.paint_highlights(highlighted, space, frozen, selection, hover, which);
     }
 
     /// The kept layer of the frame's slot.
@@ -311,16 +331,52 @@ impl View {
         Piece::new(tessellate(ctx, shapes), textures)
     }
 
+    /// Draw the highlight of the selection from a kept picture, making it
+    /// first if there is none for this layer and selection; false when it
+    /// cannot be kept (the memory limit), and the highlight is to be drawn live.
+    fn draw_kept_selection(
+        &self,
+        frame: &Frame<'_>,
+        key: &LayerKey,
+        hash: u64,
+        selection: &BTreeSet<EntityId>,
+    ) -> bool {
+        let colours = [frame.style.selected, frame.style.selected_glow];
+        let kept_key = SelectedKey::new(key.clone(), hash, colours);
+        if !self.cache(frame).has_selected(&kept_key) {
+            let piece = self.make_selected(frame, selection);
+            let limit = self.limit_for(frame);
+            if !self.cache(frame).set_selected(kept_key, piece, limit) {
+                return false;
+            }
+        }
+        self.cache(frame).draw_selected(frame.painter)
+    }
+
+    /// The highlight of `selection` as triangles.
+    fn make_selected(&self, f: &Frame<'_>, selection: &BTreeSet<EntityId>) -> Piece {
+        let ctx = f.painter.ctx();
+        let (shapes, textures) = capture(ctx, f.painter.clip_rect(), |p| {
+            let args = (p, f.rect, f.style, f.document);
+            let which = Highlights::Selected;
+            self.paint_highlights(args, f.space, f.frozen, selection, None, which);
+        });
+        Piece::new(tessellate(ctx, shapes), textures)
+    }
+
     /// Whether the kept chunks and variants are what painting now would give.
     #[cfg(debug_assertions)]
-    fn layer_matches_fresh(&self, frame: &Frame<'_>) -> bool {
+    fn layer_matches_fresh(&self, frame: &Frame<'_>, selection: &BTreeSet<EntityId>) -> bool {
         let chunks = self.cache(frame).chunks();
         let whole = (0..chunks).all(|n| {
             let fresh = self.make_chunk(frame, n, &[]);
             self.cache(frame).matches(n, None, &fresh)
         });
+        let kept_selection = self.cache(frame).has_any_selected();
+        let selected = kept_selection.then(|| self.make_selected(frame, selection));
         let variants = self.cache(frame).variants();
         whole
+            && selected.is_none_or(|fresh| self.cache(frame).selected_matches(&fresh))
             && variants.iter().all(|v| {
                 let fresh = self.make_chunk(frame, v.chunk, &v.excluded);
                 self.cache(frame)
