@@ -1085,6 +1085,20 @@ found from its drawing-order position and the position at which each chunk start
 entity's colour is looked up after the too-small and hidden checks. A rebuild is now 94 to 119 ms
 (zoom extents 98 ms), about the cost of painting directly; the pointer-only frame is unchanged.
 
+Phases 4b to 4d done (18-11-2026): `LayerKey` is a content part and a view part; chunks are fixed ranges
+of the object list (so no spatial query, id lists or owner map are kept: an entity's chunk is its
+position divided by 2,048, and the chunk's objects come from `objects()[n * 2048..]`); a view-only change
+draws the old layer moved (`layer_cache/moved.rs`) while `pending.rs` makes the new one a few chunks a
+frame (8 ms) after the settle delay, restarting if the camera moves; edits, resizes and the other content
+changes still make the layer at once; if the old and the new would pass the memory limit together the new
+is made at once. The Performance page has "While zooming or panning" (Automatic, Smooth, Exact; Automatic
+means Smooth when the last layer took over 24 ms) and "Settle delay" (0 to 500 ms, default 100), and the
+readout shows "making the new picture: n%". Measured on the large DWG, release build: a pan drag costs 82 ms
+a frame in Exact and 9.2 ms (worst 13.8) in Smooth; after letting go the new exact picture is there in 17
+frames over about 280 ms with no frame over 23 ms. Tried in the app: Automatic picked Smooth for the large
+DWG; the picture after a zoom was the exact one. Not done: a margin around the view (a pan shows blank
+strips until the new layer arrives), layouts and viewports (phase 3), and the detail controls (2.6, 2.7).
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

@@ -28,6 +28,7 @@ mod infinite_paint;
 #[cfg(test)]
 mod input_tests;
 mod insert_paint;
+mod layer_paint;
 mod layout;
 mod paint;
 mod point_paint;

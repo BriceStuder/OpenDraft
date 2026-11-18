@@ -4,8 +4,10 @@
 //! and never part of a drawing.
 
 use eframe::egui;
-use opendraft_canvas::layer_cache::{AUTO_MIN_OBJECTS, DEFAULT_MEMORY_LIMIT};
-use opendraft_canvas::{CacheConfig, CacheMode};
+use opendraft_canvas::layer_cache::{
+    AUTO_MIN_OBJECTS, AUTO_SMOOTH_MS, DEFAULT_MEMORY_LIMIT, DEFAULT_SETTLE_MS,
+};
+use opendraft_canvas::{CacheConfig, CacheMode, Motion};
 use opendraft_ui::{widgets, Theme};
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +15,9 @@ use crate::settings::Settings;
 
 /// The least and most, in megabytes, the kept picture of one drawing may use.
 pub const MEMORY_LIMIT_MB_RANGE: (u32, u32) = (64, 2048);
+/// The least and most, in milliseconds, the view must stand still before the
+/// new picture of a pan or zoom is started.
+pub const SETTLE_MS_RANGE: (u32, u32) = (0, 500);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -21,6 +26,10 @@ pub struct PerformanceSettings {
     pub drawing_cache: CacheMode,
     /// The most the kept picture of one drawing may take.
     pub memory_limit_mb: u32,
+    /// What a pan or zoom shows while the new picture is made.
+    pub while_moving: Motion,
+    /// How long the view stands still before the new picture is started.
+    pub settle_delay_ms: u32,
     /// Show the frame time and cache use over the canvas.
     pub show_frame_time: bool,
 }
@@ -30,6 +39,8 @@ impl Default for PerformanceSettings {
         Self {
             drawing_cache: CacheMode::default(),
             memory_limit_mb: (DEFAULT_MEMORY_LIMIT >> 20) as u32,
+            while_moving: Motion::default(),
+            settle_delay_ms: DEFAULT_SETTLE_MS,
             show_frame_time: false,
         }
     }
@@ -41,12 +52,17 @@ impl PerformanceSettings {
         CacheConfig {
             mode: self.drawing_cache,
             memory_limit: (self.memory_limit_mb as usize) << 20,
+            motion: self.while_moving,
+            settle_ms: self.settle_delay_ms,
+            ..CacheConfig::default()
         }
     }
 
     pub fn sanitized(mut self) -> Self {
         let (min, max) = MEMORY_LIMIT_MB_RANGE;
         self.memory_limit_mb = self.memory_limit_mb.clamp(min, max);
+        let (least, most) = SETTLE_MS_RANGE;
+        self.settle_delay_ms = self.settle_delay_ms.clamp(least, most);
         self
     }
 }
@@ -100,6 +116,49 @@ pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         );
     });
     ui.add_space(6.0);
+    widgets::group_box(ui, theme, "While zooming or panning", |ui| {
+        hint(
+            ui,
+            theme,
+            "A new picture of a large drawing takes a moment to make. These choose what \
+             you see meanwhile.",
+        );
+        ui.add_space(4.0);
+        let automatic = format!(
+            "Automatic: the old picture, moved, when making one takes over {AUTO_SMOOTH_MS} ms"
+        );
+        ui.radio_value(&mut p.while_moving, Motion::Automatic, automatic);
+        ui.radio_value(
+            &mut p.while_moving,
+            Motion::Smooth,
+            "Smooth: always show the old picture, moved, until the new one is ready",
+        );
+        ui.radio_value(
+            &mut p.while_moving,
+            Motion::Exact,
+            "Exact: make a new picture every frame",
+        );
+        hint(
+            ui,
+            theme,
+            "The old picture is slightly off while you zoom (lines keep their old \
+             width) and leaves blank strips at the edges when you pan.",
+        );
+        ui.add_space(6.0);
+        let (least, most) = SETTLE_MS_RANGE;
+        ui.add_enabled_ui(p.while_moving != Motion::Exact, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Settle delay");
+                ui.add(egui::Slider::new(&mut p.settle_delay_ms, least..=most).suffix(" ms"));
+            });
+        });
+        hint(
+            ui,
+            theme,
+            "How long the view must stand still before the new picture is started.",
+        );
+    });
+    ui.add_space(6.0);
     widgets::group_box(ui, theme, "Diagnostics", |ui| {
         ui.checkbox(
             &mut p.show_frame_time,
@@ -132,6 +191,11 @@ mod tests {
 
     #[test]
     fn the_memory_limit_is_kept_in_range() {
+        let p = PerformanceSettings {
+            settle_delay_ms: 99_999,
+            ..Default::default()
+        };
+        assert_eq!(p.sanitized().settle_delay_ms, SETTLE_MS_RANGE.1);
         let (min, max) = MEMORY_LIMIT_MB_RANGE;
         for (given, want) in [(0, min), (1, min), (512, 512), (999_999, max)] {
             let p = PerformanceSettings {
@@ -161,6 +225,8 @@ mod tests {
             performance: PerformanceSettings {
                 drawing_cache: CacheMode::Off,
                 memory_limit_mb: 1024,
+                while_moving: Motion::Smooth,
+                settle_delay_ms: 250,
                 show_frame_time: true,
             },
             ..Settings::default()

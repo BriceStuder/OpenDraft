@@ -43,7 +43,7 @@ impl Readout {
             return Vec::new();
         };
         let fps = if frame_dt > 0.0 { 1.0 / frame_dt } else { 0.0 };
-        vec![
+        let mut lines = vec![
             format!(
                 "paint {paint:.1} ms   frame {:.1} ms ({fps:.0} fps)",
                 frame_dt * 1e3
@@ -56,7 +56,11 @@ impl Readout {
                 crate::text::plural(stats.hits as usize, "frame"),
             ),
             crate::text::plural(objects, "object"),
-        ]
+        ];
+        if let Some(percent) = stats.rebuilding {
+            lines.push(format!("making the new picture: {percent}%"));
+        }
+        lines
     }
 
     /// Draw the readout in the top right corner of `canvas`.
@@ -110,6 +114,7 @@ mod tests {
             variant_builds: 3,
             hits: 40,
             bytes: 26_000_000,
+            ..CacheStats::default()
         };
         let lines = readout.lines(0.01, stats, 1);
         assert!(lines[0].contains("ms") && lines[0].contains("100 fps"));
@@ -118,6 +123,13 @@ mod tests {
             "cache 26.0 MB, 1 build, 3 chunk rebuilds, 40 frames"
         );
         assert_eq!(lines[2], "1 object");
+        assert_eq!(lines.len(), 3);
+        let making = CacheStats {
+            rebuilding: Some(40),
+            ..stats
+        };
+        let lines = readout.lines(0.01, making, 1);
+        assert_eq!(lines[3], "making the new picture: 40%");
     }
 
     #[test]

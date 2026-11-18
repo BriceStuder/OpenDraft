@@ -29,12 +29,16 @@
 mod capture;
 mod chunks;
 mod key;
+mod moved;
+mod pending;
 
 #[cfg(debug_assertions)]
 pub(crate) use capture::same_triangles;
 pub(crate) use capture::{capture, tessellate};
-pub(crate) use chunks::{Built, LayerCache, Piece, CHUNK_OBJECTS};
-pub(crate) use key::{Inputs, LayerKey};
+pub(crate) use chunks::{chunk_count, LayerCache, Piece, CHUNK_OBJECTS};
+pub(crate) use key::{camera_of, Inputs, LayerKey};
+pub(crate) use moved::{draw_moved, move_between};
+pub(crate) use pending::Advance;
 
 /// Drawings with fewer objects than this are painted directly in Automatic
 /// mode: building and keeping a layer costs more than it saves.
@@ -55,12 +59,40 @@ pub enum CacheMode {
     Off,
 }
 
+/// What a pan or zoom shows while the new picture is made.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Motion {
+    /// A new picture at once, every frame (the frame takes as long as it takes).
+    Exact,
+    /// The old picture, moved, while the new one is made a few chunks a frame.
+    Smooth,
+    /// Smooth when making a picture is slow (see [`AUTO_SMOOTH_MS`]), else exact.
+    #[default]
+    Automatic,
+}
+
+/// In Automatic motion, a picture that took longer than this to make (in
+/// milliseconds) is made while the old one is shown moved.
+pub const AUTO_SMOOTH_MS: u64 = 24;
+/// How long the view must stand still before a new picture is started, unless
+/// the user sets another.
+pub const DEFAULT_SETTLE_MS: u32 = 100;
+/// How long one frame may spend making the new picture, in milliseconds.
+pub const DEFAULT_SLICE_MS: u32 = 8;
+
 /// How the cache behaves; set by the app from its settings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CacheConfig {
     pub mode: CacheMode,
     /// Bytes of triangles that may be kept; a layer over it is not kept.
     pub memory_limit: usize,
+    /// What a pan or zoom shows while the new picture is made.
+    pub motion: Motion,
+    /// Milliseconds the view stands still before a new picture is started.
+    pub settle_ms: u32,
+    /// Milliseconds one frame may spend making the new picture.
+    pub slice_ms: u32,
 }
 
 impl Default for CacheConfig {
@@ -68,6 +100,9 @@ impl Default for CacheConfig {
         Self {
             mode: CacheMode::default(),
             memory_limit: DEFAULT_MEMORY_LIMIT,
+            motion: Motion::default(),
+            settle_ms: DEFAULT_SETTLE_MS,
+            slice_ms: DEFAULT_SLICE_MS,
         }
     }
 }
@@ -92,6 +127,12 @@ pub struct CacheStats {
     pub variant_builds: u64,
     /// Frames drawn from a kept layer.
     pub hits: u64,
+    /// Frames drawn from the old layer, moved, while a new one is made.
+    pub moved: u64,
     /// Bytes of triangles kept now.
     pub bytes: usize,
+    /// How long the last layer took to make, in microseconds.
+    pub last_build_us: u64,
+    /// How much of a new layer is made, in percent, while one is being made.
+    pub rebuilding: Option<u8>,
 }

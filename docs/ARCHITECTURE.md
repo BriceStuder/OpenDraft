@@ -757,7 +757,7 @@ ignored by equality. Code that has an `Object` asks it; code with only a
 detached `Dimension` (previews, tests) uses `Dimension::picture`. Block
 references are not cached (see `docs/ui_plan.md`, "Picture cache").
 
-## Entity layer cache (phases 1 and 2 built)
+## Entity layer cache (phases 1, 2 and 4 built)
 
 Painting is immediate-mode, so a drawing of hundreds of thousands of entities cost
 tens of milliseconds a frame even when only the pointer moved. `opendraft-canvas`
@@ -772,8 +772,10 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   rectangles, line colour, point style, the hidden entity, display scale and egui's
   tessellation options, compared as exact bits. The audit of what plain painting reads is
   in `layer_cache/mod.rs`; a new input to painting must be added to the key.
-- **Chunks** (`layer_cache/chunks.rs`): the plain entities, in draw order, are kept in chunks
-  of 2,048. A chunk holding a selected or hovered entity is drawn from a variant made without
+- **Chunks** (`layer_cache/chunks.rs`): the plain entities are kept in chunks, each a fixed
+  range of 2,048 objects of the drawing's object list (so an object's chunk is its position
+  divided by 2,048, and a chunk can be made again alone from `objects()[n * 2048..]`, keeping
+  those that show through the view). A chunk holding a selected or hovered entity is drawn from a variant made without
   it (kept while the highlight stays, dropped when it goes), and the highlight is drawn live
   over the layer, so nothing sits under it. Hovering therefore remakes one small chunk, not
   the layer. Variants count against the memory limit; one that does not fit is not kept and
@@ -783,7 +785,8 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   Small text is drawn as textures held in the picture cache of `text_raster.rs`; the layer
   holds those handles so the cache evicting one cannot free a texture it still points at.
 - **Settings** (`CacheConfig`, `View::set_cache_config`): mode Automatic (drawings of
-  5,000 objects or more), On or Off, and a memory limit (default 512 MB, 64 MB to 2 GB); a
+  5,000 objects or more), On or Off, motion Exact, Smooth or Automatic with a settle delay
+  (0 to 500 ms), and a memory limit (default 512 MB, 64 MB to 2 GB); a
   layer over the limit is not kept and is painted directly. They are the user's, on the
   Performance page of Settings (`performance_settings.rs`, saved with `Settings`, never in a
   drawing); the panel passes them to each view every frame. An optional readout over the
@@ -793,9 +796,20 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   it is drawn (every frame in tests) and a difference is an assertion; the tests also show
   the kept picture equals the directly painted one, that each key input rebuilds it, and
   that a pointer-only frame builds nothing.
-- **Not yet**: paper-space layouts and viewports are painted directly; a pan or zoom
-  rebuilds the layer. Highlights are drawn live and over everything, so a very large
-  selection (hundreds of thousands) is as slow as it was.
+- **Pan and zoom** (`layer_cache/moved.rs`, `pending.rs`, `view/layer_paint.rs`): the key has
+  a content part (drawing, space, canvas, colours, ...) and a view part (the camera). When
+  only the view differs and the motion setting allows (Smooth, or Automatic when the last
+  layer took over 24 ms to make), the old layer is drawn moved (egui's `transform_range`, with
+  the clip rectangles put back) and the new one is made a slice of chunks a frame (8 ms) once
+  the view has stood still for the settle delay (100 ms); moving again starts it over, and
+  when done it replaces the old one. Anything in the content part changing (an edit, a
+  resize, a colour) still makes the new layer at once, because an old picture would show
+  what is no longer there. If the old and the new together would pass the memory limit, the
+  new is made at once. Exact motion makes a new layer every frame, as before.
+- **Not yet**: paper-space layouts and viewports are painted directly; a pan shows blank
+  strips at the edges until the new layer arrives (no margin is made around the view).
+  Highlights are drawn live and over everything, so a very large selection (hundreds of
+  thousands) is as slow as it was.
 
 ## Geometry in `opendraft-core` (built)
 

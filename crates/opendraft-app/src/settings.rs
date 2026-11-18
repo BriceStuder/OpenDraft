@@ -365,6 +365,8 @@ mod tests {
             performance: crate::performance_settings::PerformanceSettings {
                 drawing_cache: opendraft_canvas::CacheMode::Off,
                 memory_limit_mb: 1024,
+                while_moving: opendraft_canvas::Motion::Exact,
+                settle_delay_ms: 250,
                 show_frame_time: true,
             },
         };

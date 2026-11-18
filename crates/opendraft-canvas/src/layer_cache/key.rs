@@ -2,6 +2,11 @@
 //! its key equals the one for the frame being drawn, so a new input to the
 //! painting of plain entities must be added here (see the audit note in
 //! `layer_cache/mod.rs`).
+//!
+//! The key has two parts. The content is what the picture shows: the drawing
+//! and everything that changes how its entities are drawn. The view is the
+//! camera. A layer whose content is still right but whose view is not can be
+//! drawn moved until a new one is made (see `moved.rs`).
 
 use egui::epaint::TessellationOptions;
 use egui::{Color32, Rect};
@@ -9,15 +14,32 @@ use opendraft_core::{EntityId, LayerId, LayoutId, PointStyle};
 
 use crate::camera::Camera;
 
-/// The inputs of one cached layer. Floats are kept as their bits so that
-/// equal means identical, never "close".
+/// The camera as exact bits, so that equal means identical, never "close".
+pub(crate) type View = [u64; 3];
+
+pub(crate) fn view_of(camera: &Camera) -> View {
+    [
+        camera.center.x.to_bits(),
+        camera.center.y.to_bits(),
+        camera.zoom.to_bits(),
+    ]
+}
+
+/// The camera that has the bits `view`.
+pub(crate) fn camera_of(view: View) -> Camera {
+    Camera {
+        center: opendraft_core::Point::new(f64::from_bits(view[0]), f64::from_bits(view[1])),
+        zoom: f64::from_bits(view[2]),
+    }
+}
+
+/// What a layer shows, besides the camera. Floats are kept as their bits.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct LayerKey {
+struct Content {
     /// The drawing: its session and revision (`Session::draw_token`).
     token: (u64, u64),
     space: Option<LayoutId>,
     frozen: Vec<LayerId>,
-    camera: [u64; 3],
     canvas: [u32; 4],
     clip: [u32; 4],
     line: Color32,
@@ -25,6 +47,13 @@ pub(crate) struct LayerKey {
     hidden: Option<EntityId>,
     pixels_per_point: u32,
     tessellation: TessellationOptions,
+}
+
+/// The inputs of one cached layer.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LayerKey {
+    content: Content,
+    view: View,
 }
 
 fn bits(rect: Rect) -> [u32; 4] {
@@ -54,21 +83,28 @@ pub(crate) struct Inputs<'a> {
 impl LayerKey {
     pub fn new(i: Inputs<'_>) -> Self {
         Self {
-            token: i.token,
-            space: i.space,
-            frozen: i.frozen.to_vec(),
-            camera: [
-                i.camera.center.x.to_bits(),
-                i.camera.center.y.to_bits(),
-                i.camera.zoom.to_bits(),
-            ],
-            canvas: bits(i.canvas),
-            clip: bits(i.clip),
-            line: i.line,
-            point_style: i.point_style,
-            hidden: i.hidden,
-            pixels_per_point: i.pixels_per_point.to_bits(),
-            tessellation: i.tessellation,
+            content: Content {
+                token: i.token,
+                space: i.space,
+                frozen: i.frozen.to_vec(),
+                canvas: bits(i.canvas),
+                clip: bits(i.clip),
+                line: i.line,
+                point_style: i.point_style,
+                hidden: i.hidden,
+                pixels_per_point: i.pixels_per_point.to_bits(),
+                tessellation: i.tessellation,
+            },
+            view: view_of(i.camera),
         }
+    }
+
+    pub fn view(&self) -> View {
+        self.view
+    }
+
+    /// Whether `other` shows the same thing, from perhaps another camera.
+    pub fn same_content(&self, other: &LayerKey) -> bool {
+        self.content == other.content
     }
 }
