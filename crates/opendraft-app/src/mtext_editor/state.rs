@@ -68,6 +68,9 @@ pub struct MTextEditor {
     /// The drawing's text object this edit replaces, left out of the drawing
     /// while the draft is shown in its place.
     pub replaces: Option<opendraft_core::EntityId>,
+    /// One line of plain text (single-line TEXT): Enter accepts, there is no
+    /// toolbar, ruler or formatting, and a line break cannot be typed.
+    pub single_line: bool,
     /// A format chosen at a bare caret, taken by the next typed text.
     pending: CharEdit,
     /// Just before the closing brace of the group that text made, so more
@@ -102,6 +105,7 @@ impl MTextEditor {
             field_object: None,
             field_context: FieldContext::default(),
             replaces: None,
+            single_line: false,
             pending: CharEdit::default(),
             open_group: None,
             active_since: 0.0,

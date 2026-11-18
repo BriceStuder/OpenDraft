@@ -76,6 +76,8 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("annotate.mtext", InteractiveInApp, Mutation),
     ("annotate.text", InteractiveInApp, Mutation),
     ("annotate.mtedit", InteractiveInApp, Mutation),
+    ("annotate.textedit", InteractiveInApp, Mutation),
+    ("annotate.text_line", InteractiveInApp, Mutation),
     ("annotate.mleader", InteractiveInApp, Mutation),
     ("annotate.leader", InteractiveInApp, Mutation),
     ("dim.dim", InteractiveInApp, Mutation),

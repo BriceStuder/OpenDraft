@@ -50,6 +50,11 @@ pub fn trim_plan(
         .filter(|c| pieces[nearest].distance_to(*c) <= tolerance)
         .collect();
     let pieces = target.split_at(&bounds);
+    // If rounding left the clicked piece's ends out of `bounds`, the object
+    // comes back whole and trimming it would erase it.
+    if pieces.len() < 2 {
+        return Err("Object cannot be trimmed there.");
+    }
     let nearest = nearest_piece(&pieces, at).ok_or("Object cannot be trimmed there.")?;
     Ok(pieces
         .into_iter()

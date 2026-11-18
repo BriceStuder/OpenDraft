@@ -116,6 +116,40 @@ impl SingleLineText {
         self.validate()
     }
 
+    /// The words of an edited projection (see [`Self::projection`]): escapes
+    /// and the width and oblique codes are gone, and a line break is a space.
+    pub fn contents_of_projection(projected: &str) -> String {
+        crate::text::plain_text_of(projected, 0..projected.len()).replace(['\r', '\n'], " ")
+    }
+
+    /// The same text with new words. Its place, height, rotation, style and
+    /// justification stay; an Align or Fit text is fitted again between its
+    /// two points, so Align changes the height and Fit the width factor.
+    pub fn with_contents(
+        &self,
+        contents: impl Into<String>,
+        style: &TextStyle,
+    ) -> Result<Self, &'static str> {
+        let mut edited = self.clone();
+        edited.contents = contents.into();
+        if edited.contents.is_empty() {
+            return Err("the text is empty");
+        }
+        match self.alignment {
+            Some(alignment) => {
+                let width_factor = self.placement.width_factor;
+                edited.resolve_alignment(alignment.mode, alignment.second, style)?;
+                // Align keeps the width factor the text had.
+                if alignment.mode == TextAlignmentMode::Align {
+                    edited.placement.width_factor = width_factor;
+                    edited.placement.height /= width_factor;
+                }
+                edited.validate().map(|_| edited)
+            }
+            None => edited.validate().map(|_| edited),
+        }
+    }
+
     /// Move either alignment point, preserving the mode's scaling rule.
     pub fn with_alignment_points(&self, first: Point, second: Point) -> Option<Self> {
         let old = self.alignment?;
@@ -171,6 +205,20 @@ mod tests {
     }
 
     #[test]
+    fn the_words_come_back_from_a_projection_with_codes_and_escapes() {
+        let mut text =
+            SingleLineText::new(Point::default(), 2.0, r"A {b} \\ c", TextStyleId::STANDARD);
+        text.placement.width_factor = 0.8;
+        text.placement.oblique = 0.2;
+        let projected = text.projection().contents;
+        assert_ne!(projected, text.contents, "the projection carries codes");
+        assert_eq!(
+            SingleLineText::contents_of_projection(&projected),
+            text.contents
+        );
+    }
+
+    #[test]
     fn a_line_break_is_not_valid() {
         let text = SingleLineText::new(Point::default(), 2.5, "one\ntwo", TextStyleId::STANDARD);
         assert!(text.validate().is_err());
@@ -190,6 +238,64 @@ mod tests {
                 assert_eq!(text.placement.height, 2.0);
             }
         }
+    }
+
+    #[test]
+    fn new_contents_keep_the_placement_of_a_justified_text() {
+        let style = TextStyle::standard();
+        let mut text =
+            SingleLineText::new(Point::new(3.0, 4.0), 2.5, "ROOM 1", TextStyleId::STANDARD);
+        text.placement.rotation = 0.5;
+        text.placement.horizontal = TextHorizontal::Right;
+        text.placement.vertical = TextVertical::Top;
+        let edited = text.with_contents("ROOM 2", &style).unwrap();
+        assert_eq!(edited.contents, "ROOM 2");
+        assert_eq!(edited.placement, text.placement, "only the words change");
+        assert!(text.with_contents("", &style).is_err());
+        assert!(text.with_contents("two\nlines", &style).is_err());
+    }
+
+    #[test]
+    fn new_contents_refit_an_aligned_or_fitted_text_between_its_points() {
+        let style = TextStyle::standard();
+        for mode in [TextAlignmentMode::Align, TextAlignmentMode::Fit] {
+            let mut text =
+                SingleLineText::new(Point::default(), 2.0, "Short", TextStyleId::STANDARD);
+            text.resolve_alignment(mode, Point::new(12.0, 3.0), &style)
+                .unwrap();
+            let edited = text.with_contents("Much longer words", &style).unwrap();
+            let width = edited.projection().layout(&style).actual_width;
+            assert!(
+                (width - 12.0f64.hypot(3.0)).abs() < 1e-8,
+                "{mode:?}: {width}"
+            );
+            assert_eq!(edited.alignment, text.alignment);
+            assert_eq!(edited.placement.rotation, text.placement.rotation);
+            match mode {
+                TextAlignmentMode::Align => {
+                    assert!(edited.placement.height < text.placement.height);
+                    assert_eq!(edited.placement.width_factor, 1.0);
+                }
+                TextAlignmentMode::Fit => {
+                    assert_eq!(edited.placement.height, 2.0);
+                    assert!(edited.placement.width_factor < text.placement.width_factor);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn aligned_text_keeps_its_width_factor_when_its_words_change() {
+        let style = TextStyle::standard();
+        let mut text = SingleLineText::new(Point::default(), 2.0, "Short", TextStyleId::STANDARD);
+        text.resolve_alignment(TextAlignmentMode::Align, Point::new(10.0, 0.0), &style)
+            .unwrap();
+        text.placement.width_factor = 0.5;
+        text.placement.height *= 2.0;
+        let edited = text.with_contents("Longer words", &style).unwrap();
+        assert_eq!(edited.placement.width_factor, 0.5);
+        let width = edited.projection().layout(&style).actual_width;
+        assert!((width - 10.0).abs() < 1e-8, "{width}");
     }
 
     #[test]

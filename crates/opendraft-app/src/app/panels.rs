@@ -163,12 +163,14 @@ impl OpenDraftApp {
             self.state.click_select(click.entity, click.remove);
         }
         if let Some(id) = double_click {
-            // Double-clicking a multiline text edits it, as MTEDIT would, and
+            // Double-clicking a text edits it, as TEXTEDIT would, and
             // a block reference opens its block in the Block Editor, or its
             // attribute editor when it carries attributes.
             let doc = &mut self.state.docs[self.state.active];
             let command = match doc.session.document().get(id) {
-                Some(opendraft_core::Entity::MText(_)) => Some("annotate.mtedit"),
+                Some(opendraft_core::Entity::MText(_) | opendraft_core::Entity::Text(_)) => {
+                    Some("annotate.textedit")
+                }
                 Some(opendraft_core::Entity::Insert(i)) if !i.attributes.is_empty() => {
                     Some("block.attedit")
                 }
