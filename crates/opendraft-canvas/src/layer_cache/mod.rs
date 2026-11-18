@@ -5,7 +5,11 @@
 //! shapes and egui into triangles, even when only the pointer moved. This
 //! keeps the triangles of everything that is neither selected nor hovered and
 //! draws those instead, until something they depend on changes. Selected and
-//! hovered entities are drawn live on top.
+//! hovered entities are drawn live on top. The layer is kept in chunks of
+//! entities in draw order (`chunks.rs`); the chunk holding a highlighted
+//! entity is drawn from a variant made without it, kept while the highlight
+//! stays, so a highlight is drawn over nothing and hovering rebuilds one small
+//! chunk, not the layer.
 //!
 //! What they depend on is the [`LayerKey`]: the drawing (its session and
 //! revision, see `Session::draw_token`), the space, the layers frozen in the
@@ -23,14 +27,11 @@
 //! used for grips, snaps and highlights, which are drawn live.
 
 mod capture;
+mod chunks;
 mod key;
 
-use std::sync::Arc;
-
-use egui::epaint::Mesh;
-use egui::{Painter, Shape, TextureHandle};
-
 pub(crate) use capture::{capture, same_triangles, tessellate};
+pub(crate) use chunks::{LayerCache, Piece, CHUNK_OBJECTS};
 pub(crate) use key::{Inputs, LayerKey};
 
 /// Drawings with fewer objects than this are painted directly in Automatic
@@ -84,89 +85,10 @@ impl CacheConfig {
 pub struct CacheStats {
     /// Layers built, kept or not.
     pub builds: u64,
+    /// Chunks built again without a selected or hovered entity.
+    pub variant_builds: u64,
     /// Frames drawn from a kept layer.
     pub hits: u64,
     /// Bytes of triangles kept now.
     pub bytes: usize,
-}
-
-struct Kept {
-    meshes: Vec<Arc<Mesh>>,
-    /// The textures the meshes point at, so they outlive the picture cache.
-    _textures: Vec<TextureHandle>,
-}
-
-/// The kept layer, if there is one for `key`.
-#[derive(Default)]
-pub(crate) struct LayerCache {
-    key: Option<LayerKey>,
-    /// `None` with a key: it was too big to keep, so do not try again.
-    kept: Option<Kept>,
-    stats: CacheStats,
-}
-
-impl LayerCache {
-    pub fn stats(&self) -> CacheStats {
-        self.stats
-    }
-
-    /// Whether the cache was made for `key` (kept or too big to keep).
-    pub fn has(&self, key: &LayerKey) -> bool {
-        self.key.as_ref() == Some(key)
-    }
-
-    pub fn clear(&mut self) {
-        self.key = None;
-        self.kept = None;
-        self.stats.bytes = 0;
-    }
-
-    /// Keep `meshes` as the layer for `key`, unless they are over `limit`.
-    pub fn store(
-        &mut self,
-        key: LayerKey,
-        meshes: Vec<Mesh>,
-        textures: Vec<TextureHandle>,
-        limit: usize,
-    ) {
-        let bytes: usize = meshes
-            .iter()
-            .map(|m| {
-                m.vertices.len() * std::mem::size_of::<egui::epaint::Vertex>()
-                    + m.indices.len() * std::mem::size_of::<u32>()
-            })
-            .sum();
-        self.stats.builds += 1;
-        self.key = Some(key);
-        if bytes > limit {
-            self.kept = None;
-            self.stats.bytes = 0;
-            return;
-        }
-        self.stats.bytes = bytes;
-        self.kept = Some(Kept {
-            meshes: meshes.into_iter().map(Arc::new).collect(),
-            _textures: textures,
-        });
-    }
-
-    /// Draw the kept layer; false when there is none (too big to keep).
-    pub fn draw(&mut self, painter: &Painter) -> bool {
-        let Some(kept) = &self.kept else {
-            return false;
-        };
-        self.stats.hits += 1;
-        for mesh in &kept.meshes {
-            painter.add(Shape::Mesh(mesh.clone()));
-        }
-        true
-    }
-
-    /// Whether the kept meshes are what `fresh` is.
-    pub fn matches(&self, fresh: &[Mesh]) -> bool {
-        match &self.kept {
-            Some(kept) => same_triangles(kept.meshes.iter().map(|m| &**m), fresh.iter()),
-            None => true,
-        }
-    }
 }

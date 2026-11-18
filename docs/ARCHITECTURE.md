@@ -757,7 +757,7 @@ ignored by equality. Code that has an `Object` asks it; code with only a
 detached `Dimension` (previews, tests) uses `Dimension::picture`. Block
 references are not cached (see `docs/ui_plan.md`, "Picture cache").
 
-## Entity layer cache (phase 1 built)
+## Entity layer cache (phases 1 and 2 built)
 
 Painting is immediate-mode, so a drawing of hundreds of thousands of entities cost
 tens of milliseconds a frame even when only the pointer moved. `opendraft-canvas`
@@ -772,7 +772,13 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   rectangles, line colour, point style, the hidden entity, display scale and egui's
   tessellation options, compared as exact bits. The audit of what plain painting reads is
   in `layer_cache/mod.rs`; a new input to painting must be added to the key.
-- **Capture**: the plain entities are painted through the normal code into a scratch egui
+- **Chunks** (`layer_cache/chunks.rs`): the plain entities, in draw order, are kept in chunks
+  of 2,048. A chunk holding a selected or hovered entity is drawn from a variant made without
+  it (kept while the highlight stays, dropped when it goes), and the highlight is drawn live
+  over the layer, so nothing sits under it. Hovering therefore remakes one small chunk, not
+  the layer. Variants count against the memory limit; one that does not fit is not kept and
+  the chunk is drawn whole, as without a variant.
+- **Capture**: a chunk's entities are painted through the normal code into a scratch egui
   layer, taken out, tessellated once with `epaint::Tessellator` and kept as `Arc<Mesh>`.
   Small text is drawn as textures held in the picture cache of `text_raster.rs`; the layer
   holds those handles so the cache evicting one cannot free a texture it still points at.
@@ -785,7 +791,8 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   the kept picture equals the directly painted one, that each key input rebuilds it, and
   that a pointer-only frame builds nothing.
 - **Not yet**: paper-space layouts and viewports are painted directly; a pan or zoom
-  rebuilds the layer; a selected entity's plain version stays under its highlight.
+  rebuilds the layer. Highlights are drawn live and over everything, so a very large
+  selection (hundreds of thousands) is as slow as it was.
 
 ## Geometry in `opendraft-core` (built)
 

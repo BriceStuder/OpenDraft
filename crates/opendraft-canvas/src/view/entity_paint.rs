@@ -3,9 +3,8 @@
 //! ones drawn live over it.
 
 use super::*;
-use crate::layer_cache::{capture, tessellate, Inputs, LayerKey};
-use egui::epaint::Mesh;
-use egui::{Context, Painter, TextureHandle};
+use crate::layer_cache::{capture, tessellate, Inputs, LayerKey, Piece, CHUNK_OBJECTS};
+use egui::Painter;
 
 /// Whether a kept layer drawn for the `hits`th time is checked against a fresh
 /// one: every 256th time (every time in tests), in debug builds.
@@ -50,15 +49,40 @@ impl View {
             pixels_per_point: ctx.pixels_per_point(),
             tessellation: ctx.tessellation_options(|o| *o),
         });
+        let limit = self.cache_config.memory_limit;
         let have = self.layer_cache.borrow().has(&key);
         if !have {
-            let (meshes, textures) = self.build_layer(ctx, painter, rect, style, document, space);
-            let limit = self.cache_config.memory_limit;
+            let visible = self.camera.visible_world(rect);
+            let ids: Vec<EntityId> = document
+                .visible_in_rect(space, &[], visible)
+                .iter()
+                .map(|o| o.id)
+                .collect();
+            let chunks = ids
+                .chunks(CHUNK_OBJECTS)
+                .map(|c| {
+                    (
+                        c.to_vec(),
+                        self.build_piece(painter, rect, style, document, c, &[]),
+                    )
+                })
+                .collect();
+            self.layer_cache.borrow_mut().store(key, chunks, limit);
+        }
+        // Each chunk holding a selected or hovered entity is drawn without it.
+        let hovered = hover.filter(|h| !selection.contains(h));
+        let exclusions = {
+            let highlighted = selection.iter().copied().chain(hovered);
+            self.layer_cache.borrow().exclusions(highlighted)
+        };
+        let missing = self.layer_cache.borrow().missing(&exclusions);
+        for want in missing {
+            let piece = self.build_piece(painter, rect, style, document, &want.ids, &want.excluded);
             self.layer_cache
                 .borrow_mut()
-                .store(key, meshes, textures, limit);
+                .set_variant(want, piece, limit);
         }
-        if !self.layer_cache.borrow_mut().draw(painter) {
+        if !self.layer_cache.borrow_mut().draw(painter, &exclusions) {
             return direct();
         }
         #[cfg(debug_assertions)]
@@ -71,34 +95,52 @@ impl View {
         self.paint_highlighted(painter, rect, style, document, space, selection, hover);
     }
 
-    /// The plain entities of `space` as triangles, with the textures they use.
-    fn build_layer(
+    /// The plain entities `ids` (in draw order) but those in `excluded`
+    /// (sorted), as triangles with the textures they use.
+    fn build_piece(
         &self,
-        ctx: &Context,
         painter: &Painter,
         rect: Rect,
         style: &CanvasStyle,
         document: &Document,
-        space: Option<LayoutId>,
-    ) -> (Vec<Mesh>, Vec<TextureHandle>) {
+        ids: &[EntityId],
+        excluded: &[EntityId],
+    ) -> Piece {
+        let ctx = painter.ctx();
         let none = BTreeSet::new();
         let (shapes, textures) = capture(ctx, painter.clip_rect(), |p| {
-            self.paint_entities(p, rect, style, document, space, &[], &none, None);
+            for id in ids.iter().filter(|id| excluded.binary_search(id).is_err()) {
+                if let Some(object) = document.object(*id) {
+                    self.paint_object(p, rect, style, document, object, &[], &none, None);
+                }
+            }
         });
-        (tessellate(ctx, shapes), textures)
+        Piece::new(tessellate(ctx, shapes), textures)
     }
 
-    /// Whether the kept layer is what painting now would give.
-    pub(super) fn layer_matches_fresh(
+    /// Whether the kept chunks and variants are what painting now would give.
+    #[cfg(debug_assertions)]
+    fn layer_matches_fresh(
         &self,
         painter: &Painter,
         rect: Rect,
         style: &CanvasStyle,
         document: &Document,
     ) -> bool {
-        let space = document.active_layout();
-        let (fresh, _held) = self.build_layer(painter.ctx(), painter, rect, style, document, space);
-        self.layer_cache.borrow().matches(&fresh)
+        let whole = self.layer_cache.borrow().chunk_ids();
+        for (n, ids) in whole.iter().enumerate() {
+            let fresh = self.build_piece(painter, rect, style, document, ids, &[]);
+            if !self.layer_cache.borrow().matches(n, None, &fresh) {
+                return false;
+            }
+        }
+        let variants = self.layer_cache.borrow().variants();
+        variants.iter().all(|v| {
+            let fresh = self.build_piece(painter, rect, style, document, &v.ids, &v.excluded);
+            self.layer_cache
+                .borrow()
+                .matches(v.chunk, Some(&v.excluded), &fresh)
+        })
     }
 
     /// The selected and hovered entities, over the kept layer.

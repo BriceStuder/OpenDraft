@@ -1044,6 +1044,15 @@ zoom extents, release build, a frame where only the pointer moves went from 78 m
 959,124 triangles; one entity selected 4.3 ms; 10% (40k entities) selected 41 ms (was 95 ms). Not done in
 phase 1: layouts and viewports, REGEN (there is no such command yet), real-app check of the look.
 
+Phase 2 done (18-11-2026): chunks of 2,048 entities (`layer_cache/chunks.rs`); a chunk holding a
+selected or hovered entity is drawn from a variant without it, so the highlight has nothing under it
+(tests compare the triangles with painting directly, as a set). On the large DWG, release build:
+pointer only 6.4 ms, hover sweep 6.8 ms (worst 10 ms), 1 selected 5.7 ms, 10 selected 4.9 ms, 10%
+selected (40k) 49 ms (live highlights; 41 ms before chunking, the 7 ms is finding the chunks), all
+selected 342 ms (417k live highlights, 9.2M triangles; the same work as without the cache).
+Phase 1's 4.9 ms was measured with a steadier pointer; these runs move it across the drawing.
+Not done: a cheaper look for very large selections.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
