@@ -138,7 +138,12 @@ impl View {
                 }
             }
             Entity::Insert(i) => {
+                // Pieces off screen or under a pixel add only triangles.
+                let visible = self.camera.visible_world(rect);
                 for piece in i.picture() {
+                    if self.negligible(&piece, &visible) {
+                        continue;
+                    }
                     self.stroke_entity(painter, rect, &piece, stroke);
                 }
             }
