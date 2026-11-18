@@ -3,9 +3,11 @@
 //! one's job. Written against the `Editor` like the other commands; the
 //! geometry is `opendraft_core`'s `intersections`, `split_at` and `extended_to`.
 
-use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked};
+use opendraft_canvas::Region;
+use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked, Swept};
 use opendraft_core::{End, Entity, EntityId, Point};
 
+use crate::edges_sweep::{ask_fence, ask_window, change_swept, edges_for, put_back};
 use crate::text::plural;
 
 /// What is left of `target` when the piece nearest `at` is trimmed away
@@ -124,7 +126,7 @@ pub fn extend_plan(
 
 /// Which of the two commands is running.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Mode {
+pub(crate) enum Mode {
     Trim,
     Extend,
 }
@@ -139,8 +141,12 @@ impl Mode {
 }
 
 /// TRIM: choose cutting edges (Enter takes every object), then click the part
-/// of each object to remove. Shift-click extends instead. Each change is its
-/// own undo step; Undo takes back the last one; Enter or Esc ends.
+/// of each object to remove. Shift-click extends instead. A path dragged from
+/// empty space (or the Fence option) trims every object it crosses; a click
+/// in empty space starts a crossing window that
+/// trims every object it touches (see `edges_sweep.rs`). Each click or
+/// gesture is its own undo step; Undo takes back the last one; Enter or Esc
+/// ends.
 pub fn trim_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     edit_against_edges(
         ed,
@@ -185,22 +191,38 @@ fn edit_against_edges(
     }
     let mut changed = 0_usize;
     loop {
-        let mut options = Options::<Picked>::new(object_message);
+        // No Crossing option: a click in empty space starts the window.
+        let mut options = Options::<Swept>::new(object_message).keyword("Fence", "F");
         if changed > 0 {
             options = options.keyword("Undo", "U");
         }
-        match ed.ask_object(options) {
+        let doing = |shift: bool| if shift { mode.other() } else { mode };
+        let done = match ed.ask_object_or_sweep(options) {
             Err(Cancelled) | Ok(Answer::Enter) => return Ok(()),
-            Ok(Answer::Keyword(_)) => {
-                ed.undo()?;
-                changed -= 1;
-            }
-            Ok(Answer::Value(picked)) => {
-                let doing = if picked.shift { mode.other() } else { mode };
-                if change_one(ed, &edges, doing, picked)? {
-                    changed += 1;
+            Ok(Answer::Keyword(word)) => match word.as_str() {
+                "Fence" => match ask_fence(ed)? {
+                    Some(path) => change_swept(ed, &edges, mode, Region::Fence(path))? > 0,
+                    None => false,
+                },
+                _ => {
+                    ed.undo()?;
+                    changed -= 1;
+                    false
                 }
+            },
+            Ok(Answer::Value(Swept::Object(picked))) => {
+                change_one(ed, &edges, doing(picked.shift), picked)?
             }
+            Ok(Answer::Value(Swept::Missed { at, shift })) => {
+                let corners = ask_window(ed, at)?;
+                change_swept(ed, &edges, doing(shift), Region::Crossing(corners))? > 0
+            }
+            Ok(Answer::Value(Swept::Path { points, shift })) => {
+                change_swept(ed, &edges, doing(shift), Region::Fence(points))? > 0
+            }
+        };
+        if done {
+            changed += 1;
         }
     }
 }
@@ -216,26 +238,14 @@ fn change_one(
     let edges = edges.clone();
     let plan = ed.read(move |doc| {
         let target = doc.object(id)?;
-        let others: Vec<Entity> = match &edges {
-            Some(ids) => ids
-                .iter()
-                .filter(|other| **other != id)
-                .filter_map(|other| doc.object(*other))
-                .map(|o| o.entity.clone())
-                .collect(),
-            None => doc
-                .visible_objects()
-                .filter(|o| o.id != id)
-                .map(|o| o.entity.clone())
-                .collect(),
-        };
+        let others = edges_for(doc, &edges, id);
         let made = match mode {
             Mode::Trim => trim_plan(&target.entity, &others, at),
             Mode::Extend => extend_plan(&target.entity, &others, at),
         };
         Some(made.map(|left| (target.attrs.clone(), left)))
     })?;
-    let (attrs, mut left) = match plan {
+    let (attrs, left) = match plan {
         None => return Ok(false),
         Some(Err(why)) => {
             ed.say(why);
@@ -248,17 +258,7 @@ fn change_one(
         Mode::Extend => "Extend",
     };
     ed.transaction(name, move |tx| {
-        if left.is_empty() {
-            tx.remove(vec![id]);
-            return Ok(());
-        }
-        // The first piece keeps the object's identity and place in the draw
-        // order; any others are new objects on the same layer.
-        let first = left.remove(0);
-        tx.modify(id, move |_| first);
-        if !left.is_empty() {
-            tx.add_with(left.into_iter().map(|e| (e, attrs.clone())).collect());
-        }
+        put_back(tx, id, attrs, left);
         Ok(())
     })?;
     Ok(true)
@@ -562,9 +562,22 @@ mod tests {
             .unwrap()
             .contains("does not intersect"));
         assert!(state.command_running(), "still asking for the next object");
-        // A click on nothing does nothing.
+        // A click on nothing starts a crossing window; one that meets
+        // nothing changes nothing and says so.
         state.answer_object(p(1.0, 1.0), None, false);
         state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Specify opposite corner"));
+        state.answer_point(p(2.0, 2.0));
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l == "Nothing to trim there."));
         assert!(state.command_running());
         state.cmd_submit("");
         state.settle_command();

@@ -152,6 +152,7 @@ impl AppState {
                         marker: None,
                         pick: true,
                         pick_locked: false,
+                        sweep: false,
                     });
                 }
                 // After the base of `FRO` or the first of `M2P` the rubber
@@ -277,23 +278,6 @@ impl AppState {
                 self.docs[self.active].view.set_last_point(at);
             }
             self.reply(reply);
-        }
-    }
-
-    /// A click on the canvas while a command waits for an object: the object
-    /// under it, if there is one.
-    pub fn answer_object(
-        &mut self,
-        at: Point,
-        picked: Option<opendraft_core::EntityId>,
-        shift: bool,
-    ) {
-        let Some(ask) = self.waiting() else { return };
-        if ask.wants == Wants::Object {
-            if let Some(id) = picked {
-                self.docs[self.active].view.set_last_point(at);
-                self.reply(Reply::Object { id, at, shift });
-            }
         }
     }
 
@@ -428,6 +412,7 @@ fn canvas_prompt(ask: &Ask) -> Option<PointPrompt> {
         rubber_band: ask.rubber_band,
         pick: ask.wants == Wants::Object,
         pick_locked: ask.pick_locked,
+        sweep: ask.sweep,
         ghost: ask.ghost.clone(),
         snap_geometry: ask.snap_geometry.clone(),
         marker: ask.marker.clone(),
@@ -465,6 +450,7 @@ mod tests {
             rubber_band: true,
             marker: None,
             default_hint: None,
+            sweep: false,
             mtext: None,
             mtext_of: None,
             single_line: false,
