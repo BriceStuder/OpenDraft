@@ -17,6 +17,7 @@ mod panel_places;
 mod placement;
 mod pline_snap;
 mod text_styles;
+mod trim_window;
 mod units;
 mod wheel_double_click;
 
