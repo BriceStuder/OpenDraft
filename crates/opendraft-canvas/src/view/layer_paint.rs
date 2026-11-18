@@ -1,14 +1,16 @@
-//! Painting the model tab through the kept layer: the plain entities from kept
+//! Painting a space through its kept layer: the plain entities from kept
 //! triangles, a new layer made at once or a few chunks a frame while the old
-//! one is shown moved, and the highlights live over it. What is kept and why
-//! is in `layer_cache`.
+//! one is shown moved, and the highlights live over it. Each place the drawing
+//! is painted (the model tab, a viewport, the sheet) has its own layer, a
+//! [`Slot`]. What is kept and why is in `layer_cache`.
 
+use std::cell::RefMut;
 use std::time::{Duration, Instant};
 
 use super::*;
 use crate::layer_cache::{
     camera_of, capture, chunk_count, draw_moved, move_between, tessellate, Advance, Inputs,
-    LayerKey, Motion, Piece, AUTO_SMOOTH_MS, CHUNK_OBJECTS,
+    LayerCache, LayerKey, Motion, Piece, Slot, AUTO_SMOOTH_MS, CHUNK_OBJECTS,
 };
 use egui::Painter;
 use opendraft_core::{Bounds, Object};
@@ -20,12 +22,13 @@ fn verify_due(hits: u64) -> bool {
     hits.is_multiple_of(if cfg!(test) { 1 } else { 256 })
 }
 
-/// The objects of chunk `n` that show in `space` through `visible`, in draw
-/// order.
+/// The objects of chunk `n` that show in `space` through `visible`, leaving
+/// out the layers in `frozen`, in draw order.
 fn chunk_objects<'d>(
     document: &'d Document,
     n: usize,
     space: Option<LayoutId>,
+    frozen: &[LayerId],
     visible: &Bounds,
 ) -> Vec<&'d Object> {
     let all = document.objects();
@@ -33,27 +36,33 @@ fn chunk_objects<'d>(
     let Some(range) = all.get(from..(from + CHUNK_OBJECTS).min(all.len())) else {
         return Vec::new();
     };
-    let shows =
-        |o: &&Object| o.bounds().intersects(visible) && o.layout == space && document.is_visible(o);
+    let shows = |o: &&Object| {
+        o.bounds().intersects(visible)
+            && o.layout == space
+            && document.is_visible(o)
+            && !frozen.contains(&o.attrs.layer)
+    };
     range.iter().filter(shows).collect()
 }
 
-/// What a frame is drawn with, besides the document: the places to paint, the
-/// camera's view and the space.
+/// What a frame of one slot is painted with, besides the view: the places to
+/// paint, what to show, and the camera's view of it.
 #[derive(Clone, Copy)]
 struct Frame<'a> {
     painter: &'a Painter,
     rect: Rect,
     style: &'a CanvasStyle,
     document: &'a Document,
+    slot: Slot,
     space: Option<LayoutId>,
+    frozen: &'a [LayerId],
     visible: Bounds,
+    /// The egui pass, to tell slots that are in use from those that are not.
+    pass: u64,
 }
 
 impl View {
-    /// The entities of the space being edited, through the kept layer when
-    /// the app has said when the drawing changes and the settings want it.
-    #[allow(clippy::too_many_arguments)]
+    /// The entities of the space being edited in the model tab.
     pub(super) fn paint_model(
         &self,
         painter: &Painter,
@@ -64,8 +73,28 @@ impl View {
         hover: Option<EntityId>,
     ) {
         let space = document.active_layout();
+        let slot = Slot::Model;
+        let args = (painter, rect, style, document);
+        self.paint_space(slot, args, space, &[], selection, hover);
+    }
+
+    /// The entities of `space` but those on `frozen` layers, through the kept
+    /// layer of `slot` when the app has said when the drawing changes and the
+    /// settings want it, else directly. The camera is the one to paint
+    /// through now.
+    pub(super) fn paint_space(
+        &self,
+        slot: Slot,
+        (painter, rect, style, document): (&Painter, Rect, &CanvasStyle, &Document),
+        space: Option<LayoutId>,
+        frozen: &[LayerId],
+        selection: &BTreeSet<EntityId>,
+        hover: Option<EntityId>,
+    ) {
         let direct = || {
-            self.paint_entities(painter, rect, style, document, space, &[], selection, hover);
+            self.paint_entities(
+                painter, rect, style, document, space, frozen, selection, hover,
+            );
         };
         let cfg = self.cache_config;
         let wanted = cfg.wants(document.objects().len());
@@ -77,7 +106,7 @@ impl View {
         let key = LayerKey::new(Inputs {
             token,
             space,
-            frozen: &[],
+            frozen,
             camera: &self.camera,
             canvas: rect,
             clip: painter.clip_rect(),
@@ -92,14 +121,17 @@ impl View {
             rect,
             style,
             document,
+            slot,
             space,
+            frozen,
             visible: self.camera.visible_world(rect),
+            pass: ctx.cumulative_pass_nr(),
         };
-        let have = self.layer_cache.borrow().has(&key);
+        let have = self.cache(&frame).has(&key);
         let mut settled = have;
         if have {
-            self.layer_cache.borrow_mut().view_reached();
-        } else if self.shows_moved(&key) {
+            self.cache(&frame).view_reached();
+        } else if self.shows_moved(&frame, &key) {
             match self.advance_pending(&frame, &key) {
                 Advance::Done => settled = true,
                 Advance::NoRoom => {}
@@ -115,34 +147,45 @@ impl View {
         let hovered = hover.filter(|h| !selection.contains(h));
         let exclusions = {
             let highlighted = selection.iter().copied().chain(hovered);
-            self.layer_cache
-                .borrow()
-                .exclusions(highlighted, |id| document.position(id))
+            let cache = self.cache(&frame);
+            cache.exclusions(highlighted, |id| document.position(id))
         };
-        let missing = self.layer_cache.borrow().missing(&exclusions);
+        let missing = self.cache(&frame).missing(&exclusions);
+        let limit = self.limit_for(&frame);
         for want in missing {
             let piece = self.make_chunk(&frame, want.chunk, &want.excluded);
-            self.layer_cache
-                .borrow_mut()
-                .set_variant(want, piece, cfg.memory_limit);
+            self.cache(&frame).set_variant(want, piece, limit);
         }
-        if !self.layer_cache.borrow_mut().draw(painter, &exclusions) {
+        if !self.cache(&frame).draw(painter, &exclusions) {
             return direct();
         }
         #[cfg(debug_assertions)]
-        if have && verify_due(self.layer_cache.borrow().stats().hits) {
+        if have && verify_due(self.cache(&frame).stats().hits) {
             debug_assert!(
                 self.layer_matches_fresh(&frame),
                 "the kept layer differs from a fresh one: a painting input is missing from the key"
             );
         }
-        self.paint_highlighted(painter, rect, style, document, space, selection, hover);
+        let highlighted = (painter, rect, style, document);
+        self.paint_highlighted(highlighted, space, frozen, selection, hover);
+    }
+
+    /// The kept layer of the frame's slot.
+    fn cache(&self, frame: &Frame<'_>) -> RefMut<'_, LayerCache> {
+        let (slot, pass) = (frame.slot, frame.pass);
+        RefMut::map(self.layer_cache.borrow_mut(), |all| all.slot(slot, pass))
+    }
+
+    /// The memory this slot may use: what the limit leaves after the others.
+    fn limit_for(&self, frame: &Frame<'_>) -> usize {
+        let others = self.layer_cache.borrow().bytes_elsewhere(frame.slot);
+        self.cache_config.memory_limit.saturating_sub(others)
     }
 
     /// Whether, the kept layer being for another view, the old one is to be
     /// shown moved until a new one is made.
-    fn shows_moved(&self, key: &LayerKey) -> bool {
-        let cache = self.layer_cache.borrow();
+    fn shows_moved(&self, frame: &Frame<'_>, key: &LayerKey) -> bool {
+        let cache = self.cache(frame);
         if !cache.has_content_of(key) {
             return false;
         }
@@ -156,58 +199,55 @@ impl View {
     /// Make a layer for `key` now, in this frame.
     fn build_now(&self, frame: &Frame<'_>, key: LayerKey) {
         let started = Instant::now();
-        self.layer_cache.borrow_mut().drop_pending();
+        self.cache(frame).drop_pending();
         let total = chunk_count(frame.document.objects().len());
         let pieces = (0..total).map(|n| self.make_chunk(frame, n, &[])).collect();
-        let mut cache = self.layer_cache.borrow_mut();
-        cache.store(key, pieces, self.cache_config.memory_limit);
+        let limit = self.limit_for(frame);
+        let mut cache = self.cache(frame);
+        cache.store(key, pieces, limit);
         cache.note_build_time(started.elapsed());
     }
 
     /// Do a slice of the work of the layer for `key`, once the view has stood
-    /// still for the settle delay.
+    /// still for the settle delay. All the slots of a frame share one slice.
     fn advance_pending(&self, frame: &Frame<'_>, key: &LayerKey) -> Advance {
         let cfg = self.cache_config;
         let ctx = frame.painter.ctx();
-        let still = self
-            .layer_cache
-            .borrow_mut()
-            .stood_still(key.view(), Instant::now());
+        let still = self.cache(frame).stood_still(key.view(), Instant::now());
         let settle = Duration::from_millis(cfg.settle_ms.into());
         if still < settle {
             ctx.request_repaint_after(settle - still);
             return Advance::Waiting(settle - still);
         }
         let total = chunk_count(frame.document.objects().len());
-        self.layer_cache.borrow_mut().begin_pending(key, total);
+        self.cache(frame).begin_pending(key, total);
+        let limit = self.limit_for(frame);
         let started = Instant::now();
         let budget = Duration::from_millis(cfg.slice_ms.into());
+        let mut done = Advance::Going;
         loop {
             // A statement of its own, so the borrow ends before the push.
-            let next = self.layer_cache.borrow().pending_next();
+            let next = self.cache(frame).pending_next();
             let Some(n) = next else {
                 break;
             };
             let piece = self.make_chunk(frame, n, &[]);
-            let step = self
-                .layer_cache
-                .borrow_mut()
-                .pending_push(piece, cfg.memory_limit);
-            if step == Advance::NoRoom {
-                return step;
+            if self.cache(frame).pending_push(piece, limit) == Advance::NoRoom {
+                done = Advance::NoRoom;
+                break;
             }
-            if started.elapsed() >= budget {
+            // At least one chunk a frame, so a slot is never starved.
+            if self.slice_spent.get() + started.elapsed() >= budget {
                 break;
             }
         }
-        if self
-            .layer_cache
-            .borrow_mut()
-            .finish_pending(cfg.memory_limit)
-        {
-            self.layer_cache
-                .borrow_mut()
-                .note_build_time(started.elapsed());
+        self.slice_spent
+            .set(self.slice_spent.get() + started.elapsed());
+        if done == Advance::NoRoom {
+            return done;
+        }
+        if self.cache(frame).finish_pending(limit) {
+            self.cache(frame).note_build_time(started.elapsed());
             return Advance::Done;
         }
         ctx.request_repaint();
@@ -217,22 +257,22 @@ impl View {
     /// The old layer moved to the camera's view, with the highlights over it.
     fn paint_moved(&self, f: &Frame<'_>, selection: &BTreeSet<EntityId>, hover: Option<EntityId>) {
         let (meshes, from) = {
-            let cache = self.layer_cache.borrow();
+            let cache = self.cache(f);
             (cache.base_meshes(), cache.built_view())
         };
         if let (Some(meshes), Some(from)) = (meshes, from) {
             let by = move_between(&camera_of(from), &self.camera, f.rect);
             draw_moved(f.painter, &meshes, by);
-            self.layer_cache.borrow_mut().note_moved();
+            self.cache(f).note_moved();
         }
-        let (painter, rect, style, document) = (f.painter, f.rect, f.style, f.document);
-        self.paint_highlighted(painter, rect, style, document, f.space, selection, hover);
+        let args = (f.painter, f.rect, f.style, f.document);
+        self.paint_highlighted(args, f.space, f.frozen, selection, hover);
     }
 
     /// Chunk `n` of the plain entities, but those in `excluded` (sorted), as
     /// triangles with the textures they use.
     fn make_chunk(&self, f: &Frame<'_>, n: usize, excluded: &[EntityId]) -> Piece {
-        let objects = chunk_objects(f.document, n, f.space, &f.visible);
+        let objects = chunk_objects(f.document, n, f.space, f.frozen, &f.visible);
         if objects.is_empty() {
             return Piece::default();
         }
@@ -242,7 +282,8 @@ impl View {
             for object in &objects {
                 if excluded.binary_search(&object.id).is_err() {
                     let (rect, style, document) = (f.rect, f.style, f.document);
-                    self.paint_object(p, rect, style, document, object, &[], &none, None);
+                    let frozen = f.frozen;
+                    self.paint_object(p, rect, style, document, object, frozen, &none, None);
                 }
             }
         });
@@ -252,17 +293,16 @@ impl View {
     /// Whether the kept chunks and variants are what painting now would give.
     #[cfg(debug_assertions)]
     fn layer_matches_fresh(&self, frame: &Frame<'_>) -> bool {
-        let chunks = self.layer_cache.borrow().chunks();
+        let chunks = self.cache(frame).chunks();
         let whole = (0..chunks).all(|n| {
             let fresh = self.make_chunk(frame, n, &[]);
-            self.layer_cache.borrow().matches(n, None, &fresh)
+            self.cache(frame).matches(n, None, &fresh)
         });
-        let variants = self.layer_cache.borrow().variants();
+        let variants = self.cache(frame).variants();
         whole
             && variants.iter().all(|v| {
                 let fresh = self.make_chunk(frame, v.chunk, &v.excluded);
-                self.layer_cache
-                    .borrow()
+                self.cache(frame)
                     .matches(v.chunk, Some(&v.excluded), &fresh)
             })
     }

@@ -11,7 +11,7 @@ use crate::grid::{grid_step, line_indices};
 use crate::grips::{grip_at, keep_selected, press_grip, with_shared, GripHit};
 use crate::hatch_cache::HatchCache;
 use crate::hit::{pick_here, pick_visible_here};
-use crate::layer_cache::{CacheConfig, LayerCache};
+use crate::layer_cache::{CacheConfig, LayerCaches};
 use crate::select::Region;
 use crate::snap::SnapModes;
 use crate::snap_axis::Ortho;
@@ -126,7 +126,10 @@ pub struct View {
     /// What each hatch draws, kept between frames (see `hatch_cache.rs`).
     hatch_cache: std::cell::RefCell<HatchCache>,
     /// The plain entities as kept triangles (see `layer_cache`).
-    layer_cache: std::cell::RefCell<LayerCache>,
+    layer_cache: std::cell::RefCell<LayerCaches>,
+    /// What the slots have spent so far this frame making new layers, which
+    /// they share (see `layer_paint.rs`).
+    slice_spent: std::cell::Cell<std::time::Duration>,
     cache_config: CacheConfig,
     /// What the drawing is now, as `Session::draw_token` says; none until the
     /// app gives it, and then nothing is kept.
@@ -146,6 +149,7 @@ impl View {
         snap_modes: &SnapModes,
     ) -> CanvasOutput {
         let rect = ui.available_rect_before_wrap();
+        self.slice_spent.set(std::time::Duration::ZERO);
         self.point_style = document.point_style();
         opendraft_core::infinite::set_pixel_size(1.0 / self.camera.zoom);
         let response = ui.allocate_rect(rect, Sense::click_and_drag());

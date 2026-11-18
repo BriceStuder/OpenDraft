@@ -294,4 +294,5 @@ fn clearing_the_cache_builds_it_again() {
 }
 
 mod highlights;
+mod layouts;
 mod motion;

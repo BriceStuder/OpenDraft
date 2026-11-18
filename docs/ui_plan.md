@@ -1099,6 +1099,15 @@ frames over about 280 ms with no frame over 23 ms. Tried in the app: Automatic p
 DWG; the picture after a zoom was the exact one. Not done: a margin around the view (a pan shows blank
 strips until the new layer arrives), layouts and viewports (phase 3), and the detail controls (2.6, 2.7).
 
+Phase 3 done (18-11-2026): each viewport and the sheet have a kept layer of their own (`Slot` in
+`layer_cache/slots.rs`; `View::paint_space` in `view/layer_paint.rs`), sharing the memory limit and the
+frame's slice of making layers; a viewport's clip rectangle is part of the key's view (it moves with the sheet),
+so zooming the sheet moves every picture. Measured on the large DWG through a sheet whose viewport frames the
+whole model, release build: pointer-only 71.6 ms painting directly, 6.3 ms cached; a zoom gesture of the sheet
+104 ms directly, 89 ms in Exact and 7.1 ms (worst 10.4) in Smooth. Tried in the app: a new layout shows the
+model and a wheel zoom of the sheet settles to the exact picture. Not done: the detail controls (phases 2.6 and
+2.7), a margin around the view, and a cheaper look for very large selections.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

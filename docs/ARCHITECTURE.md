@@ -757,7 +757,7 @@ ignored by equality. Code that has an `Object` asks it; code with only a
 detached `Dimension` (previews, tests) uses `Dimension::picture`. Block
 references are not cached (see `docs/ui_plan.md`, "Picture cache").
 
-## Entity layer cache (phases 1, 2 and 4 built)
+## Entity layer cache (built; the detail controls are not)
 
 Painting is immediate-mode, so a drawing of hundreds of thousands of entities cost
 tens of milliseconds a frame even when only the pointer moved. `opendraft-canvas`
@@ -806,8 +806,14 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   resize, a colour) still makes the new layer at once, because an old picture would show
   what is no longer there. If the old and the new together would pass the memory limit, the
   new is made at once. Exact motion makes a new layer every frame, as before.
-- **Not yet**: paper-space layouts and viewports are painted directly; a pan shows blank
-  strips at the edges until the new layer arrives (no margin is made around the view).
+- **Slots** (`layer_cache/slots.rs`): each place the drawing is painted has its own kept
+  layer: the model tab, each viewport of a sheet (with that viewport's frozen layers left
+  out) and the sheet's own objects. They share the memory limit (a slot may use what the
+  others leave) and the 8 ms slice of a frame, and a slot not painted for 600 passes is let
+  go. A viewport's clip rectangle is part of the key's view, not its content, because it moves
+  with the sheet, so zooming or panning the sheet moves every viewport's picture.
+- **Not yet**: a pan shows blank strips at the edges until the new layer arrives (no margin
+  is made around the view).
   Highlights are drawn live and over everything, so a very large selection (hundreds of
   thousands) is as slow as it was.
 

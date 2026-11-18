@@ -10,11 +10,9 @@ impl View {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn paint_highlighted(
         &self,
-        painter: &egui::Painter,
-        rect: Rect,
-        style: &CanvasStyle,
-        document: &Document,
+        (painter, rect, style, document): (&egui::Painter, Rect, &CanvasStyle, &Document),
         space: Option<LayoutId>,
+        frozen: &[LayerId],
         selection: &BTreeSet<EntityId>,
         hover: Option<EntityId>,
     ) {
@@ -26,19 +24,13 @@ impl View {
             };
             if object.layout != space
                 || !document.is_visible(object)
+                || frozen.contains(&object.attrs.layer)
                 || !object.bounds().intersects(&visible)
             {
                 continue;
             }
             self.paint_object(
-                painter,
-                rect,
-                style,
-                document,
-                object,
-                &[],
-                selection,
-                hover,
+                painter, rect, style, document, object, frozen, selection, hover,
             );
         }
     }

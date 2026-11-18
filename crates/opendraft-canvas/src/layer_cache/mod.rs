@@ -31,6 +31,7 @@ mod chunks;
 mod key;
 mod moved;
 mod pending;
+mod slots;
 
 #[cfg(debug_assertions)]
 pub(crate) use capture::same_triangles;
@@ -39,6 +40,7 @@ pub(crate) use chunks::{chunk_count, LayerCache, Piece, CHUNK_OBJECTS};
 pub(crate) use key::{camera_of, Inputs, LayerKey};
 pub(crate) use moved::{draw_moved, move_between};
 pub(crate) use pending::Advance;
+pub(crate) use slots::{LayerCaches, Slot};
 
 /// Drawings with fewer objects than this are painted directly in Automatic
 /// mode: building and keeping a layer costs more than it saves.
@@ -114,6 +116,21 @@ impl CacheConfig {
             CacheMode::Automatic => objects >= AUTO_MIN_OBJECTS,
             CacheMode::On => true,
             CacheMode::Off => false,
+        }
+    }
+}
+
+impl CacheStats {
+    /// What two places painted through the cache have done together.
+    pub fn merged(self, other: CacheStats) -> CacheStats {
+        CacheStats {
+            builds: self.builds + other.builds,
+            variant_builds: self.variant_builds + other.variant_builds,
+            hits: self.hits + other.hits,
+            moved: self.moved + other.moved,
+            bytes: self.bytes + other.bytes,
+            last_build_us: self.last_build_us.max(other.last_build_us),
+            rebuilding: self.rebuilding.max(other.rebuilding),
         }
     }
 }
