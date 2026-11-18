@@ -15,6 +15,10 @@ use crate::layer_cache::{
 use egui::Painter;
 use opendraft_core::{Bounds, Object};
 
+/// A layer that took no longer than this to make is made in one frame once the
+/// view has settled, not a slice at a time.
+const AT_ONCE_US: u64 = 150_000;
+
 /// The old picture is shown moved only while it covers this part of the screen.
 const MIN_COVERED: f32 = 0.5;
 
@@ -232,7 +236,15 @@ impl View {
         self.cache(frame).begin_pending(key, total);
         let limit = self.limit_for(frame);
         let started = Instant::now();
-        let budget = Duration::from_millis(cfg.slice_ms.into());
+        // Once the view is still, a layer known to be quick to make is made
+        // in one go: a hitch nobody is moving through beats many slow frames.
+        // (A slice of 0 keeps to one chunk a frame, for tests.)
+        let quick = self.cache(frame).stats().last_build_us <= AT_ONCE_US;
+        let budget = match cfg.slice_ms {
+            0 => Duration::ZERO,
+            _ if quick => Duration::MAX,
+            ms => Duration::from_millis(ms.into()),
+        };
         let mut done = Advance::Going;
         loop {
             // A statement of its own, so the borrow ends before the push.

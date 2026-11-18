@@ -1119,6 +1119,14 @@ Second fix (18-11-2026): timing a rebuild of the large drawing showed 372 block 
 300,000 pieces, cleared when the token changes) and their boxes are the cached ones. A rebuild after a zoom out went
 from 72 ms to 36 ms; the first build of a drawing still pays for the expansion once.
 
+Third fix (18-11-2026), from trying the large drawing in the real app with the frame-time readout on: painting the
+canvas took 2 to 6 ms but the frame 58 ms, because the Layers panel asked `Document::layer_in_use` for every layer in
+every frame and each unused layer scanned all 417,000 objects (41 ms). `Document::layers_in_use` finds them in one
+pass and the panel keeps the answer for each state of the drawing (`layer_cells::layers_in_use`); the frame is now
+about 22 ms. Also: once the view has settled, a layer whose last build took 150 ms or less is made in one frame
+instead of a slice at a time (a rebuild's length was frames times (slice plus the frame's own cost), so on a slower
+machine the blurred old picture stayed for seconds), and a slice is 25 ms, not 8.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

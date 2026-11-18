@@ -81,7 +81,7 @@ pub const AUTO_SMOOTH_MS: u64 = 24;
 /// the user sets another.
 pub const DEFAULT_SETTLE_MS: u32 = 100;
 /// How long one frame may spend making the new picture, in milliseconds.
-pub const DEFAULT_SLICE_MS: u32 = 8;
+pub const DEFAULT_SLICE_MS: u32 = 25;
 
 /// How the cache behaves; set by the app from its settings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

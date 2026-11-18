@@ -378,9 +378,10 @@ impl PanelViewer<'_> {
     }
 
     fn layers(&mut self, ui: &mut egui::Ui) {
-        let document = &self.state.docs[self.state.active].session.document();
+        let doc = &self.state.docs[self.state.active];
+        let (document, token) = (doc.session.document(), doc.session.draw_token());
         let viewport = self.state.target_viewport_ref();
-        if let Some(edit) = crate::layers_ui::show(ui, self.theme, document, viewport) {
+        if let Some(edit) = crate::layers_ui::show(ui, self.theme, document, token, viewport) {
             self.state.apply_layer_edit(edit);
         }
     }
