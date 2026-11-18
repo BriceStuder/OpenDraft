@@ -270,6 +270,9 @@ impl PanelViewer<'_> {
                 .set_input_exclusions(vec![ui.available_rect_before_wrap()]);
         }
         doc.view.set_pointer_sizes(sizes);
+        // The picture of the plain entities is kept while the drawing is the
+        // same (see `opendraft_canvas::layer_cache`).
+        doc.view.set_document_token(Some(doc.session.draw_token()));
         doc.view.set_crosshair(crosshair);
         doc.view.set_zoom_speed(zoom_speed);
         doc.view.set_ortho(ortho);

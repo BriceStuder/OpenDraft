@@ -46,6 +46,28 @@ struct Kept {
 
 thread_local! {
     static PICTURES: RefCell<HashMap<u64, Kept>> = RefCell::new(HashMap::new());
+    /// While a layer is being kept (see `layer_cache`), the textures its
+    /// text pictures use, so that the picture cache letting one go does not
+    /// free a texture the kept meshes still point at.
+    static HELD: RefCell<Option<Vec<TextureHandle>>> = const { RefCell::new(None) };
+}
+
+/// Start holding the textures of the pictures drawn from now on.
+pub fn hold_textures() {
+    HELD.with(|h| *h.borrow_mut() = Some(Vec::new()));
+}
+
+/// Stop holding, and hand over what was held.
+pub fn release_textures() -> Vec<TextureHandle> {
+    HELD.with(|h| h.borrow_mut().take()).unwrap_or_default()
+}
+
+fn hold(texture: &TextureHandle) {
+    HELD.with(|h| {
+        if let Some(held) = h.borrow_mut().as_mut() {
+            held.push(texture.clone());
+        }
+    });
 }
 
 /// Rasterise `tris` at `scale` pixels per layout unit, with a pixel of margin.
@@ -155,6 +177,7 @@ pub fn paint_picture(
         let mut cache = cache.borrow_mut();
         if let Some(k) = cache.get_mut(&key) {
             k.drawn = now;
+            hold(&k.texture);
             return Some((k.texture.id(), k.left, k.top, k.width, k.height));
         }
         let picture = rasterise(&tris(), scale)?;
@@ -169,6 +192,7 @@ pub fn paint_picture(
                 cache.clear();
             }
         }
+        hold(&texture);
         let id = texture.id();
         let out = (id, picture.left, picture.top, picture.width, picture.height);
         cache.insert(

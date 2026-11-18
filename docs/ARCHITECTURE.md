@@ -757,6 +757,36 @@ ignored by equality. Code that has an `Object` asks it; code with only a
 detached `Dimension` (previews, tests) uses `Dimension::picture`. Block
 references are not cached (see `docs/ui_plan.md`, "Picture cache").
 
+## Entity layer cache (phase 1 built)
+
+Painting is immediate-mode, so a drawing of hundreds of thousands of entities cost
+tens of milliseconds a frame even when only the pointer moved. `opendraft-canvas`
+(`layer_cache/`, `view/entity_paint.rs`) keeps the plain entities (neither selected nor
+hovered) of the space being edited as tessellated egui meshes and draws those instead;
+selected and hovered entities are painted live over them, as AutoCAD draws highlights.
+- **Used only when told**: the app gives each view `Session::draw_token()` (session id,
+  unique in the process, plus the revision, which moves on every edit, undo, redo and
+  viewport pan) with `View::set_document_token`. Without a token nothing is kept, so any
+  other caller of `View::show` paints as before.
+- **Key** (`layer_cache/key.rs`): token, space, frozen layers, camera, canvas and clip
+  rectangles, line colour, point style, the hidden entity, display scale and egui's
+  tessellation options, compared as exact bits. The audit of what plain painting reads is
+  in `layer_cache/mod.rs`; a new input to painting must be added to the key.
+- **Capture**: the plain entities are painted through the normal code into a scratch egui
+  layer, taken out, tessellated once with `epaint::Tessellator` and kept as `Arc<Mesh>`.
+  Small text is drawn as textures held in the picture cache of `text_raster.rs`; the layer
+  holds those handles so the cache evicting one cannot free a texture it still points at.
+- **Settings** (`CacheConfig`, `View::set_cache_config`): mode Automatic (drawings of
+  5,000 objects or more), On or Off, and a memory limit (default 512 MB); a layer over the
+  limit is not kept and is painted directly. The Performance page of Settings is planned
+  (see `docs/ui_plan.md`).
+- **Checks**: in debug builds a kept layer is compared with a fresh one every 256th frame
+  it is drawn (every frame in tests) and a difference is an assertion; the tests also show
+  the kept picture equals the directly painted one, that each key input rebuilds it, and
+  that a pointer-only frame builds nothing.
+- **Not yet**: paper-space layouts and viewports are painted directly; a pan or zoom
+  rebuilds the layer; a selected entity's plain version stays under its highlight.
+
 ## Geometry in `opendraft-core` (built)
 
 Modify commands are thin: the maths is pure, tested, and lives in `opendraft-core`,

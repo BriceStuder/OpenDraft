@@ -11,6 +11,7 @@ use crate::grid::{grid_step, line_indices};
 use crate::grips::{grip_at, keep_selected, press_grip, with_shared, GripHit};
 use crate::hatch_cache::HatchCache;
 use crate::hit::{pick_here, pick_visible_here};
+use crate::layer_cache::{CacheConfig, LayerCache};
 use crate::select::Region;
 use crate::snap::SnapModes;
 use crate::snap_axis::Ortho;
@@ -21,6 +22,7 @@ mod acquire;
 mod backdrop;
 mod crosshair;
 mod dash_paint;
+mod entity_paint;
 mod hatch_paint;
 mod infinite_paint;
 #[cfg(test)]
@@ -34,7 +36,7 @@ mod snap_marker;
 mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
-mod text_raster;
+pub(crate) mod text_raster;
 pub use text_paint::paint_text;
 mod types;
 
@@ -122,6 +124,12 @@ pub struct View {
     selected_viewport: Option<ViewportId>,
     /// What each hatch draws, kept between frames (see `hatch_cache.rs`).
     hatch_cache: std::cell::RefCell<HatchCache>,
+    /// The plain entities as kept triangles (see `layer_cache`).
+    layer_cache: std::cell::RefCell<LayerCache>,
+    cache_config: CacheConfig,
+    /// What the drawing is now, as `Session::draw_token` says; none until the
+    /// app gives it, and then nothing is kept.
+    document_token: Option<(u64, u64)>,
 }
 
 impl View {
@@ -359,16 +367,7 @@ impl View {
                 self.paint_grid(&painter, rect, style, grid);
             }
             self.paint_axes(&painter, rect, style);
-            self.paint_entities(
-                &painter,
-                rect,
-                style,
-                document,
-                document.active_layout(),
-                &[],
-                selection,
-                hover,
-            );
+            self.paint_model(&painter, rect, style, document, selection, hover);
         }
         // Inside a viewport the model is only drawn within its window.
         let painter = match self.clip {

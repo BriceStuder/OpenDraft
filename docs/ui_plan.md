@@ -1037,6 +1037,13 @@ Phases and exit tests:
 Settings are per user (in `Settings`), never in the drawing; per-drawing overrides were considered
 and rejected.
 
+Phase 1 done (18-11-2026): the whole-layer cache for the model tab (`opendraft-canvas/src/layer_cache/`,
+`view/entity_paint.rs`, `Session::draw_token`, `View::set_document_token` and `set_cache_config`; the
+Performance page is not built yet, so the app uses the defaults: Automatic, 512 MB). On the large DWG at
+zoom extents, release build, a frame where only the pointer moves went from 78 ms to 4.9 ms with the same
+959,124 triangles; one entity selected 4.3 ms; 10% (40k entities) selected 41 ms (was 95 ms). Not done in
+phase 1: layouts and viewports, REGEN (there is no such command yet), real-app check of the look.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

@@ -8,6 +8,9 @@ mod hatch_cache;
 mod hit;
 #[cfg(test)]
 mod indexed_tests;
+pub mod layer_cache;
+#[cfg(test)]
+mod layer_cache_tests;
 #[cfg(test)]
 mod picture_tests;
 pub mod preview;
@@ -21,6 +24,7 @@ pub use grid::{grid_step, line_indices};
 pub use grips::{grip_at, gripped, keep_selected, press_grip, GripHit, GRIP_OBJECT_LIMIT};
 pub use hatch_cache::HatchCache;
 pub use hit::{distance_to_entity, pick};
+pub use layer_cache::{CacheConfig, CacheMode, CacheStats};
 pub use select::{select, select_in, Region};
 pub use snap::{
     candidates, snap, snap_all, Acquired, Guide, Origin, Probe, SnapId, SnapKind, SnapModes,

@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use opendraft_core::{Document, LayerId, Layout, LayoutId};
 
 use crate::transaction::Batch;
@@ -27,7 +29,6 @@ pub enum HistoryError {
 
 /// A document together with its undo history. All edits go through
 /// [`Session::perform`] so they can be undone.
-#[derive(Default)]
 pub struct Session {
     pub(crate) document: Document,
     pub(crate) history: History,
@@ -37,6 +38,22 @@ pub struct Session {
     /// position it never returns to an earlier value, so it can tell an
     /// external reader that the drawing moved on since it was read.
     revision: u64,
+    /// Tells this session from every other in the process, so that two
+    /// drawings never share a [`draw_token`](Self::draw_token).
+    uid: u64,
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        static NEXT_UID: AtomicU64 = AtomicU64::new(1);
+        Self {
+            document: Document::default(),
+            history: History::default(),
+            saved_at: 0,
+            revision: 0,
+            uid: NEXT_UID.fetch_add(1, Ordering::Relaxed),
+        }
+    }
 }
 
 impl Session {
@@ -73,6 +90,13 @@ impl Session {
     /// It is not a file version and starts again from 0 for a new session.
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    /// What a cache of this drawing's picture is keyed by: the session, which
+    /// is unique in the process, and the revision, which moves with every edit,
+    /// undo and redo. Equal tokens mean the drawing has not changed.
+    pub fn draw_token(&self) -> (u64, u64) {
+        (self.uid, self.revision)
     }
 
     /// A session for a drawing just opened from a file: unmodified.
@@ -332,6 +356,20 @@ mod tests {
         session.mark_saved();
         session.undo();
         assert!(session.is_modified());
+    }
+
+    #[test]
+    fn the_draw_token_follows_the_revision_and_is_unique_to_a_session() {
+        let (mut a, b) = (Session::default(), Session::default());
+        assert_ne!(
+            a.draw_token(),
+            b.draw_token(),
+            "same revision, other drawing"
+        );
+        let before = a.draw_token();
+        add(&mut a);
+        assert_eq!(a.draw_token().0, before.0);
+        assert!(a.draw_token().1 > before.1);
     }
 
     #[test]
