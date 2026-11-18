@@ -24,6 +24,7 @@ mod crosshair;
 mod dash_paint;
 mod entity_paint;
 mod hatch_paint;
+mod image_paint;
 mod infinite_paint;
 #[cfg(test)]
 mod input_tests;

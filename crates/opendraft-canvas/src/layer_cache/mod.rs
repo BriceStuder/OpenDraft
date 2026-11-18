@@ -27,14 +27,19 @@
 //! used for grips, snaps and highlights, which are drawn live (or, for a
 //! large selection, kept by `selected.rs` under a key of its own).
 
+mod bitmap;
 mod capture;
 mod chunks;
 mod key;
 mod moved;
 mod pending;
+mod raster;
+#[cfg(test)]
+mod raster_tests;
 mod selected;
 mod slots;
 
+pub(crate) use bitmap::Geometry;
 #[cfg(debug_assertions)]
 pub(crate) use capture::same_triangles;
 pub(crate) use capture::{capture, tessellate};
@@ -78,6 +83,18 @@ pub enum Motion {
     Automatic,
 }
 
+/// How the kept picture of the drawing is drawn in a frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Render {
+    /// As an image made from the triangles: a frame costs one rectangle
+    /// however many objects there are, and the triangles are not kept.
+    #[default]
+    Image,
+    /// As the kept triangles, drawn by egui in every frame.
+    Triangles,
+}
+
 /// In Automatic motion, a picture that took longer than this to make (in
 /// milliseconds) is made while the old one is shown moved.
 pub const AUTO_SMOOTH_MS: u64 = 24;
@@ -95,6 +112,8 @@ pub struct CacheConfig {
     pub memory_limit: usize,
     /// What a pan or zoom shows while the new picture is made.
     pub motion: Motion,
+    /// How the kept picture is drawn in a frame.
+    pub render: Render,
     /// Milliseconds the view stands still before a new picture is started.
     pub settle_ms: u32,
     /// Milliseconds one frame may spend making the new picture.
@@ -107,6 +126,7 @@ impl Default for CacheConfig {
             mode: CacheMode::default(),
             memory_limit: DEFAULT_MEMORY_LIMIT,
             motion: Motion::default(),
+            render: Render::default(),
             settle_ms: DEFAULT_SETTLE_MS,
             slice_ms: DEFAULT_SLICE_MS,
         }

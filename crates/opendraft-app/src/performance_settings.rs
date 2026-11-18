@@ -7,7 +7,7 @@ use eframe::egui;
 use opendraft_canvas::layer_cache::{
     AUTO_MIN_OBJECTS, AUTO_SMOOTH_MS, DEFAULT_MEMORY_LIMIT, DEFAULT_SETTLE_MS,
 };
-use opendraft_canvas::{CacheConfig, CacheMode, Motion};
+use opendraft_canvas::{CacheConfig, CacheMode, Motion, Render};
 use opendraft_ui::{widgets, Theme};
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +30,8 @@ pub struct PerformanceSettings {
     pub while_moving: Motion,
     /// How long the view stands still before the new picture is started.
     pub settle_delay_ms: u32,
+    /// How the kept picture is drawn in a frame.
+    pub draw_as: Render,
     /// Show the frame time and cache use over the canvas.
     pub show_frame_time: bool,
 }
@@ -41,6 +43,7 @@ impl Default for PerformanceSettings {
             memory_limit_mb: (DEFAULT_MEMORY_LIMIT >> 20) as u32,
             while_moving: Motion::default(),
             settle_delay_ms: DEFAULT_SETTLE_MS,
+            draw_as: Render::default(),
             show_frame_time: false,
         }
     }
@@ -54,6 +57,7 @@ impl PerformanceSettings {
             memory_limit: (self.memory_limit_mb as usize) << 20,
             motion: self.while_moving,
             settle_ms: self.settle_delay_ms,
+            render: self.draw_as,
             ..CacheConfig::default()
         }
     }
@@ -97,6 +101,17 @@ pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
             ui,
             theme,
             "Turn it off if a drawing ever looks wrong, and tell us what you saw.",
+        );
+        ui.add_space(6.0);
+        ui.radio_value(
+            &mut p.draw_as,
+            Render::Image,
+            "Draw it as an image: the fastest, and uses little memory",
+        );
+        ui.radio_value(
+            &mut p.draw_as,
+            Render::Triangles,
+            "Draw it as triangles: exact, but slower for large drawings",
         );
         ui.add_space(6.0);
         let (min, max) = MEMORY_LIMIT_MB_RANGE;
@@ -227,6 +242,7 @@ mod tests {
                 memory_limit_mb: 1024,
                 while_moving: Motion::Smooth,
                 settle_delay_ms: 250,
+                draw_as: Render::Triangles,
                 show_frame_time: true,
             },
             ..Settings::default()

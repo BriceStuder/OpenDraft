@@ -5,6 +5,8 @@
 //! [`Slot`]. What is kept and why is in `layer_cache`.
 
 use std::cell::RefMut;
+
+use crate::Render;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -28,7 +30,7 @@ const MIN_COVERED: f32 = 0.5;
 /// Whether a kept layer drawn for the `hits`th time is checked against a fresh
 /// one: every 256th time (every time in tests), in debug builds.
 #[cfg(debug_assertions)]
-fn verify_due(hits: u64) -> bool {
+pub(super) fn verify_due(hits: u64) -> bool {
     hits.is_multiple_of(if cfg!(test) { 1 } else { 256 })
 }
 
@@ -58,17 +60,17 @@ fn chunk_objects<'d>(
 /// What a frame of one slot is painted with, besides the view: the places to
 /// paint, what to show, and the camera's view of it.
 #[derive(Clone, Copy)]
-struct Frame<'a> {
-    painter: &'a Painter,
-    rect: Rect,
-    style: &'a CanvasStyle,
-    document: &'a Document,
-    slot: Slot,
-    space: Option<LayoutId>,
-    frozen: &'a [LayerId],
-    visible: Bounds,
+pub(super) struct Frame<'a> {
+    pub(super) painter: &'a Painter,
+    pub(super) rect: Rect,
+    pub(super) style: &'a CanvasStyle,
+    pub(super) document: &'a Document,
+    pub(super) slot: Slot,
+    pub(super) space: Option<LayoutId>,
+    pub(super) frozen: &'a [LayerId],
+    pub(super) visible: Bounds,
     /// The egui pass, to tell slots that are in use from those that are not.
-    pass: u64,
+    pub(super) pass: u64,
 }
 
 impl View {
@@ -153,6 +155,9 @@ impl View {
         if !settled {
             self.build_now(&frame, key.clone());
         }
+        if self.cache(&frame).has_bitmap() {
+            return self.paint_image(&frame, &key, have, selection, hover);
+        }
         // Each chunk holding a selected or hovered entity is drawn without it.
         let hovered = hover.filter(|h| !selection.contains(h));
         let large = selection.len() >= KEEP_FROM;
@@ -198,13 +203,13 @@ impl View {
     }
 
     /// The kept layer of the frame's slot.
-    fn cache(&self, frame: &Frame<'_>) -> RefMut<'_, LayerCache> {
+    pub(super) fn cache(&self, frame: &Frame<'_>) -> RefMut<'_, LayerCache> {
         let (slot, pass) = (frame.slot, frame.pass);
         RefMut::map(self.layer_cache.borrow_mut(), |all| all.slot(slot, pass))
     }
 
     /// The memory this slot may use: what the limit leaves after the others.
-    fn limit_for(&self, frame: &Frame<'_>) -> usize {
+    pub(super) fn limit_for(&self, frame: &Frame<'_>) -> usize {
         let others = self.layer_cache.borrow().bytes_elsewhere(frame.slot);
         self.cache_config.memory_limit.saturating_sub(others)
     }
@@ -235,9 +240,9 @@ impl View {
         self.cache(frame).drop_pending();
         let total = chunk_count(frame.document.objects().len());
         let pieces = (0..total).map(|n| self.make_chunk(frame, n, &[])).collect();
-        let limit = self.limit_for(frame);
+        let plan = self.keep_plan(frame);
         let mut cache = self.cache(frame);
-        cache.store(key, pieces, limit);
+        plan.into(&mut cache, key, pieces);
         cache.note_build_time(started.elapsed());
     }
 
@@ -254,7 +259,8 @@ impl View {
         }
         let total = chunk_count(frame.document.objects().len());
         self.cache(frame).begin_pending(key, total);
-        let limit = self.limit_for(frame);
+        let plan = self.keep_plan(frame);
+        let limit = plan.limit;
         let started = Instant::now();
         // Once the view is still, a layer known to be quick to make is made
         // in one go: a hitch nobody is moving through beats many slow frames.
@@ -287,7 +293,10 @@ impl View {
         if done == Advance::NoRoom {
             return done;
         }
-        if self.cache(frame).finish_pending(limit) {
+        if self
+            .cache(frame)
+            .finish_pending(move |c, k, p| plan.into(c, k, p))
+        {
             self.cache(frame).note_build_time(started.elapsed());
             return Advance::Done;
         }
@@ -301,9 +310,12 @@ impl View {
             let cache = self.cache(f);
             (cache.base_meshes(), cache.built_view())
         };
-        if let (Some(meshes), Some(from)) = (meshes, from) {
+        if let Some(from) = from {
             let by = move_between(&camera_of(from), &self.camera, f.rect);
-            draw_moved(f.painter, &meshes, by);
+            let drawn = self.cache(f).draw_bitmap(f.painter, Some(by));
+            if let (false, Some(meshes)) = (drawn, meshes) {
+                draw_moved(f.painter, &meshes, by);
+            }
             self.cache(f).note_moved();
         }
         let args = (f.painter, f.rect, f.style, f.document);
@@ -312,7 +324,7 @@ impl View {
 
     /// Chunk `n` of the plain entities, but those in `excluded` (sorted), as
     /// triangles with the textures they use.
-    fn make_chunk(&self, f: &Frame<'_>, n: usize, excluded: &[EntityId]) -> Piece {
+    pub(super) fn make_chunk(&self, f: &Frame<'_>, n: usize, excluded: &[EntityId]) -> Piece {
         let objects = chunk_objects(f.document, n, f.space, f.frozen, &f.visible);
         if objects.is_empty() {
             return Piece::default();
@@ -334,7 +346,7 @@ impl View {
     /// Draw the highlight of the selection from a kept picture, making it
     /// first if there is none for this layer and selection; false when it
     /// cannot be kept (the memory limit), and the highlight is to be drawn live.
-    fn draw_kept_selection(
+    pub(super) fn draw_kept_selection(
         &self,
         frame: &Frame<'_>,
         key: &LayerKey,
@@ -345,16 +357,26 @@ impl View {
         let kept_key = SelectedKey::new(key.clone(), hash, colours);
         if !self.cache(frame).has_selected(&kept_key) {
             let piece = self.make_selected(frame, selection);
-            let limit = self.limit_for(frame);
-            if !self.cache(frame).set_selected(kept_key, piece, limit) {
-                return false;
+            let plan = self.keep_plan(frame);
+            let name = format!("{}_selected", plan.name);
+            match plan.render {
+                Render::Image => {
+                    let at = (&plan.ctx, name.as_str());
+                    let mut cache = self.cache(frame);
+                    cache.set_selected_image(at, kept_key, piece, plan.geometry);
+                }
+                Render::Triangles => {
+                    if !self.cache(frame).set_selected(kept_key, piece, plan.limit) {
+                        return false;
+                    }
+                }
             }
         }
         self.cache(frame).draw_selected(frame.painter)
     }
 
     /// The highlight of `selection` as triangles.
-    fn make_selected(&self, f: &Frame<'_>, selection: &BTreeSet<EntityId>) -> Piece {
+    pub(super) fn make_selected(&self, f: &Frame<'_>, selection: &BTreeSet<EntityId>) -> Piece {
         let ctx = f.painter.ctx();
         let (shapes, textures) = capture(ctx, f.painter.clip_rect(), |p| {
             let args = (p, f.rect, f.style, f.document);
@@ -372,11 +394,12 @@ impl View {
             let fresh = self.make_chunk(frame, n, &[]);
             self.cache(frame).matches(n, None, &fresh)
         });
+        let geometry = self.keep_plan(frame).geometry;
         let kept_selection = self.cache(frame).has_any_selected();
         let selected = kept_selection.then(|| self.make_selected(frame, selection));
         let variants = self.cache(frame).variants();
         whole
-            && selected.is_none_or(|fresh| self.cache(frame).selected_matches(&fresh))
+            && selected.is_none_or(|fresh| self.cache(frame).selected_matches(&fresh, geometry))
             && variants.iter().all(|v| {
                 let fresh = self.make_chunk(frame, v.chunk, &v.excluded);
                 self.cache(frame)

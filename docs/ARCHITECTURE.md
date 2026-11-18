@@ -812,6 +812,17 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   others leave) and the 8 ms slice of a frame, and a slot not painted for 600 passes is let
   go. A viewport's clip rectangle is part of the key's view, not its content, because it moves
   with the sheet, so zooming or panning the sheet moves every viewport's picture.
+- **Image mode** (`layer_cache/raster.rs`, `bitmap.rs`, `view/image_paint.rs`; `Render::Image`, the
+  default): once a layer's triangles are made they are drawn into an image by a software
+  rasteriser (the triangles egui would draw, with their soft edges as the anti-aliasing, blended
+  as egui blends: premultiplied, "over", in gamma space; tiles shared by up to eight threads, the
+  same result for any number), shown as one rectangle in a frame, and let go, so a layer costs
+  the screen's pixels in memory and a frame costs one rectangle whatever the drawing holds. A
+  pan or zoom moves the rectangle while a new one is made. What cannot be drawn flat (small text
+  pictures) stays as triangles over the image. Selected and hovered entities are drawn over the
+  image, not in place of what they cover (no chunk variants are made); a large selection has an
+  image of its own. `Render::Triangles` keeps the triangles and draws them as before; a change of
+  setting makes the layer again. Debug builds compare the image with a fresh one like the chunks.
 - **Large selections** (`layer_cache/selected.rs`): a selection of 256 or more objects has its
   highlight kept as triangles too, under a key of the layer key, a hash of the selected ids and
   the two highlight colours, made again only when one of those changes; the exclusion lists are

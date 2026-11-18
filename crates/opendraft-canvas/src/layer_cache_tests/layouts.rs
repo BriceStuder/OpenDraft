@@ -9,7 +9,7 @@ use opendraft_core::{Attributes, Layer, LayoutId};
 /// A drawing with a sheet whose one viewport shows the model. Lines on the
 /// layer called "Hidden" are frozen in that viewport; so are lines drawn on the
 /// sheet itself.
-fn sheet_drawing() -> (Document, LayoutId) {
+pub(super) fn sheet_drawing() -> (Document, LayoutId) {
     let mut doc = drawing(400);
     let hidden = doc.allocate_layer_id();
     doc.push_layer(Layer::new(hidden, "Hidden"));
@@ -37,7 +37,7 @@ fn sheet_drawing() -> (Document, LayoutId) {
     (doc, id)
 }
 
-fn on_sheet(mode: CacheMode, layout: LayoutId) -> Rig {
+pub(super) fn on_sheet(mode: CacheMode, layout: LayoutId) -> Rig {
     let mut rig = Rig::new(mode, Some((1, 0)));
     rig.view.set_space(Space::Paper(layout));
     rig.pointer = -2000.0;
@@ -90,6 +90,7 @@ fn zooming_the_sheet_moves_the_pictures_and_makes_new_ones() {
     let (doc, layout) = sheet_drawing();
     let mut rig = on_sheet(CacheMode::On, layout);
     rig.view.set_cache_config(CacheConfig {
+        render: Render::Triangles,
         mode: CacheMode::On,
         motion: Motion::Smooth,
         settle_ms: 0,

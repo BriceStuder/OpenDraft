@@ -88,8 +88,12 @@ impl LayerCache {
         Advance::Going
     }
 
-    /// If every chunk is made, make the new layer the kept one.
-    pub fn finish_pending(&mut self, limit: usize) -> bool {
+    /// If every chunk is made, make the new layer the kept one, by `keep`
+    /// (given the cache, the key and the pieces).
+    pub fn finish_pending(
+        &mut self,
+        keep: impl FnOnce(&mut LayerCache, LayerKey, Vec<Piece>),
+    ) -> bool {
         if self.pending_next().is_some() {
             return false;
         }
@@ -97,7 +101,7 @@ impl LayerCache {
             return false;
         };
         self.stats.rebuilding = None;
-        self.store(p.key, p.pieces, limit);
+        keep(self, p.key, p.pieces);
         true
     }
 }

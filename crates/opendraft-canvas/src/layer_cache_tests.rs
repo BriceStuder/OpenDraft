@@ -12,7 +12,9 @@ use egui::{Color32, Context, Event, Pos2, RawInput, Rect, Vec2};
 use opendraft_core::{Document, Entity, EntityId, MText, Point, PointStyle, TextStyleId};
 
 use crate::layer_cache::AUTO_MIN_OBJECTS;
-use crate::{CacheConfig, CacheMode, Camera, CanvasStyle, GridSettings, Motion, SnapModes, View};
+use crate::{
+    CacheConfig, CacheMode, Camera, CanvasStyle, GridSettings, Motion, Render, SnapModes, View,
+};
 
 const SCREEN: Vec2 = Vec2::new(1000.0, 700.0);
 
@@ -65,6 +67,7 @@ fn camera() -> Camera {
 /// A new picture at once, whatever the camera does: slicing has tests of its own.
 fn exact(mode: CacheMode) -> CacheConfig {
     CacheConfig {
+        render: Render::Triangles,
         mode,
         motion: Motion::Exact,
         ..CacheConfig::default()
@@ -294,5 +297,6 @@ fn clearing_the_cache_builds_it_again() {
 }
 
 mod highlights;
+mod image;
 mod layouts;
 mod motion;

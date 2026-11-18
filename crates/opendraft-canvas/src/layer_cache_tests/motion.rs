@@ -9,6 +9,7 @@ use super::*;
 fn smooth(settle_ms: u32) -> Rig {
     let mut rig = Rig::new(CacheMode::On, Some((1, 0)));
     rig.view.set_cache_config(CacheConfig {
+        render: Render::Triangles,
         mode: CacheMode::On,
         motion: Motion::Smooth,
         settle_ms,
@@ -148,6 +149,7 @@ fn without_room_for_the_old_and_the_new_together_the_new_is_made_at_once() {
     let mut rig = smooth(0);
     let limit = base + base / 2;
     rig.view.set_cache_config(CacheConfig {
+        render: Render::Triangles,
         mode: CacheMode::On,
         motion: Motion::Smooth,
         settle_ms: 0,
@@ -175,6 +177,7 @@ fn exact_motion_and_a_quick_automatic_one_make_the_new_picture_at_once() {
     assert_eq!((exact.builds(), exact.view.cache_stats().moved), (2, 0));
     let mut auto = Rig::new(CacheMode::On, Some((1, 0)));
     auto.view.set_cache_config(CacheConfig {
+        render: Render::Triangles,
         mode: CacheMode::On,
         ..CacheConfig::default()
     });

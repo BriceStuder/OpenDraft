@@ -1156,6 +1156,21 @@ and the GPU drawing those triangles every frame, about 0.5 ms for each MB. Dropp
 it but made it differ from painting directly (and so from the debug check), so it was not kept. An earlier version of
 this note quoted 21 and 83 ms: those were measured with that soft-edge change in.
 
+Image mode (18-11-2026): the kept triangles were still copied by egui and drawn by the GPU in every frame (about
+0.5 ms for each MB: 6 MB for the large drawing, 25 MB with 38,000 selected, 250 MB with all selected). A spike showed that a
+plain software rasteriser draws the 428,000 triangles of the large drawing at extents in 53 ms on one thread and about
+20 ms on 16, to the same picture, so the layer is now drawn into an image (`layer_cache/raster.rs`) and the triangles let
+go; the image is one rectangle in a frame (`bitmap.rs`, `view/image_paint.rs`), and a large selection's highlight is an
+image too. Setting: Performance, "Draw it as an image / as triangles". Measured in the app (release, readout on) on the
+large drawing at extents: nothing selected 13.6 ms with 1.9 MB kept (it was 9.5 ms with 6 MB; the two readings were taken
+in different runs and the frame is mostly the interface now), 38,355 selected 12.8 ms with 3.8 MB (25 ms, 24.6 MB as
+triangles; 43.7 ms before any of this), all 417,486 selected 21.7 ms with 3.8 MB (196 ms, 250 MB; 471 ms before).
+Zoom in and out and a new layout tab were looked at and are right. Not done: the image is made on the thread that draws
+(about 20 to 50 ms, spread over eight threads, once for each new view), so a rebuild is still a short hitch, and the
+image covers only the screen, so a pan shows blank strips until the new one is made; making the triangles and the image
+in the background and with a margin around the view are the next steps. An old-picture move draws the image scaled, so it
+is soft until the new one arrives.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

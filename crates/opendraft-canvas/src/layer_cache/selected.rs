@@ -11,7 +11,9 @@ use std::sync::Arc;
 use egui::{Color32, Painter, Shape};
 use opendraft_core::EntityId;
 
+use super::bitmap::{make, Bitmap};
 use super::chunks::{Exclusions, LayerCache, Piece};
+use super::Geometry;
 use super::LayerKey;
 
 /// Selections of at least this many entities are kept as a picture; smaller
@@ -50,7 +52,22 @@ impl SelectedKey {
 
 pub(super) struct SelectedLayer {
     key: SelectedKey,
-    piece: Piece,
+    shown: Shown,
+}
+
+/// A kept highlight: as triangles or as an image of them.
+enum Shown {
+    Triangles(Piece),
+    Image(Bitmap),
+}
+
+impl Shown {
+    fn bytes(&self) -> usize {
+        match self {
+            Shown::Triangles(piece) => piece.bytes(),
+            Shown::Image(bitmap) => bitmap.bytes(),
+        }
+    }
 }
 
 impl LayerCache {
@@ -67,13 +84,31 @@ impl LayerCache {
             return false;
         }
         self.stats.bytes += piece.bytes();
-        self.selected = Some(SelectedLayer { key, piece });
+        let shown = Shown::Triangles(piece);
+        self.selected = Some(SelectedLayer { key, shown });
         true
+    }
+
+    /// Keep the highlight for `key` as an image made from `piece`; the
+    /// triangles are not kept.
+    pub fn set_selected_image(
+        &mut self,
+        (ctx, name): (&egui::Context, &str),
+        key: SelectedKey,
+        piece: Piece,
+        geometry: Geometry,
+    ) {
+        self.drop_selected();
+        self.stats.selected_builds += 1;
+        let bitmap = make(ctx, name, &[piece], geometry);
+        self.stats.bytes += bitmap.bytes();
+        let shown = Shown::Image(bitmap);
+        self.selected = Some(SelectedLayer { key, shown });
     }
 
     pub fn drop_selected(&mut self) {
         if let Some(old) = self.selected.take() {
-            self.stats.bytes = self.stats.bytes.saturating_sub(old.piece.bytes());
+            self.stats.bytes = self.stats.bytes.saturating_sub(old.shown.bytes());
         }
     }
 
@@ -82,8 +117,13 @@ impl LayerCache {
         let Some(kept) = &self.selected else {
             return false;
         };
-        for mesh in kept.piece.meshes() {
-            painter.add(Shape::Mesh(mesh.clone()));
+        match &kept.shown {
+            Shown::Triangles(piece) => {
+                for mesh in piece.meshes() {
+                    painter.add(Shape::Mesh(mesh.clone()));
+                }
+            }
+            Shown::Image(bitmap) => bitmap.draw(painter, None),
         }
         true
     }
@@ -114,9 +154,10 @@ impl LayerCache {
 
     /// Whether the kept highlight is `fresh`.
     #[cfg(debug_assertions)]
-    pub fn selected_matches(&self, fresh: &Piece) -> bool {
-        self.selected
-            .as_ref()
-            .is_none_or(|s| s.piece.matches(fresh))
+    pub fn selected_matches(&self, fresh: &Piece, geometry: Geometry) -> bool {
+        self.selected.as_ref().is_none_or(|s| match &s.shown {
+            Shown::Triangles(piece) => piece.matches(fresh),
+            Shown::Image(bitmap) => bitmap.matches(std::slice::from_ref(fresh), geometry),
+        })
     }
 }

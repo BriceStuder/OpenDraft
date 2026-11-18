@@ -60,6 +60,10 @@ impl Piece {
         &self.meshes
     }
 
+    pub fn textures(&self) -> &[TextureHandle] {
+        &self._textures
+    }
+
     #[cfg(debug_assertions)]
     pub(super) fn matches(&self, fresh: &Piece) -> bool {
         same_triangles(
@@ -75,7 +79,7 @@ struct Variant {
     piece: Piece,
 }
 
-struct Chunk {
+pub(super) struct Chunk {
     base: Piece,
     variant: Option<Variant>,
 }
@@ -95,7 +99,7 @@ pub(crate) struct Wanted {
 pub(crate) struct LayerCache {
     pub(super) key: Option<LayerKey>,
     /// `None` with a key: it was too big to keep, so do not try again.
-    layer: Option<Vec<Chunk>>,
+    pub(super) layer: Option<Vec<Chunk>>,
     /// The next layer, being made while this one is drawn moved.
     pub(super) pending: Option<Pending>,
     /// The view last seen, and since when it has not changed.
@@ -105,6 +109,8 @@ pub(crate) struct LayerCache {
     pub(super) selected: Option<super::selected::SelectedLayer>,
     /// What the last large selection and hover left out of each chunk.
     pub(super) excluded: Option<(u64, Option<EntityId>, Arc<Exclusions>)>,
+    /// The layer as an image, when it is kept as one (see `bitmap.rs`).
+    pub(super) bitmap: Option<super::bitmap::Bitmap>,
 }
 
 impl LayerCache {
@@ -129,6 +135,7 @@ impl LayerCache {
         self.pending = None;
         self.selected = None;
         self.excluded = None;
+        self.bitmap = None;
         self.stats.bytes = 0;
         self.stats.rebuilding = None;
     }
@@ -163,6 +170,7 @@ impl LayerCache {
         self.key = Some(key);
         self.selected = None;
         self.excluded = None;
+        self.bitmap = None;
         if bytes > limit {
             self.layer = None;
             self.stats.bytes = 0;

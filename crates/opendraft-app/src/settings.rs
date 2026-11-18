@@ -367,6 +367,7 @@ mod tests {
                 memory_limit_mb: 1024,
                 while_moving: opendraft_canvas::Motion::Exact,
                 settle_delay_ms: 250,
+                draw_as: opendraft_canvas::Render::Triangles,
                 show_frame_time: true,
             },
         };
