@@ -3,7 +3,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use opendraft_core::{overkill, Document, EntityId, MText, Point};
 
 use crate::prompt::{
-    Answer, Cancelled, Hint, NumberOrPoint, Options, Picked, Prompt, Reply, Wants,
+    Answer, Cancelled, Hint, NumberOrPoint, Options, Picked, Prompt, Reply, Swept, Wants,
 };
 use crate::{Context, Session, Transaction};
 
@@ -51,6 +51,7 @@ pub struct Editor {
 }
 
 mod dialog_asks;
+mod sweep_ask;
 
 pub use dialog_asks::{AttributeEditorAnswer, FieldAnswer};
 

@@ -46,7 +46,7 @@ pub use paste_action::{PasteDrawing, WarningSink};
 pub use point_style_action::SetPointStyle;
 pub use prompt::{
     Answer, BlockDialogButton, Cancelled, DynamicDimensions, Ghost, GhostStyle, Hint, Keyword,
-    Marker, NumberOptions, NumberOrPoint, Options, Picked, PointOptions, Prompt, Reply,
+    Marker, NumberOptions, NumberOrPoint, Options, Picked, PointOptions, Prompt, Reply, Swept,
     TextOptions, Wants,
 };
 pub use properties_action::SetProperties;

@@ -126,6 +126,10 @@ pub struct PointPrompt {
     /// Objects on locked layers can be picked too (see
     /// `opendraft_commands::Options::pick_locked`).
     pub pick_locked: bool,
+    /// A press on no object is held until the release: a drag reports a
+    /// path, a click is reported where it was pressed, with no object (see
+    /// `opendraft_commands::Options::sweep`).
+    pub sweep: bool,
 }
 
 #[derive(Default)]
@@ -143,6 +147,8 @@ pub struct CanvasOutput {
     pub prompted: Option<Point>,
     /// The object under `prompted`, when the prompt asked for one.
     pub picked: Option<EntityId>,
+    /// A path dragged from empty space at a sweep prompt, in drawing units.
+    pub path: Option<Vec<Point>>,
     /// Shift was held for the click in `picked`.
     pub pick_shift: bool,
     /// Grips pressed to edit, the one pressed first (nothing is selected or

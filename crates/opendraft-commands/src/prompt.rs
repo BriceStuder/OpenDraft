@@ -97,6 +97,9 @@ pub struct Options<T> {
     /// ask fails with `Cancelled`) without ending the command, for a command
     /// that returns to a dialog.
     pub esc_backs: bool,
+    /// For an object prompt: a click in empty space, or a drag started
+    /// there, answers it too (TRIM's crossing window and freehand path).
+    pub sweep: bool,
 }
 
 pub type PointOptions = Options<Point>;
@@ -119,6 +122,7 @@ impl<T> Options<T> {
             allow_empty: false,
             pick_locked: false,
             esc_backs: false,
+            sweep: false,
         }
     }
 
@@ -182,6 +186,13 @@ impl<T> Options<T> {
     /// Let an object prompt pick objects on locked layers.
     pub fn pick_locked(mut self) -> Self {
         self.pick_locked = true;
+        self
+    }
+
+    /// Let an object prompt be answered by a click in empty space or a path
+    /// dragged from there (see [`Options::sweep`]).
+    pub fn sweep(mut self) -> Self {
+        self.sweep = true;
         self
     }
 
@@ -282,6 +293,8 @@ pub struct Prompt {
     pub pick_locked: bool,
     /// See [`Options::esc_backs`].
     pub esc_backs: bool,
+    /// See [`Options::sweep`].
+    pub sweep: bool,
     /// For [`Wants::MTextEditor`]: the text to edit.
     pub mtext: Option<Box<MText>>,
     /// For [`Wants::MTextEditor`]: the text object being edited, if there is
@@ -319,6 +332,7 @@ impl Prompt {
             allow_empty: options.allow_empty,
             pick_locked: options.pick_locked,
             esc_backs: options.esc_backs,
+            sweep: options.sweep,
             mtext: None,
             mtext_of: None,
             single_line: false,
@@ -374,6 +388,16 @@ pub enum Reply {
         at: Point,
         shift: bool,
     },
+    /// At a [`Options::sweep`] prompt: a click in empty space.
+    Missed {
+        at: Point,
+        shift: bool,
+    },
+    /// At a [`Options::sweep`] prompt: a path dragged from empty space.
+    Path {
+        points: Vec<Point>,
+        shift: bool,
+    },
     /// Enter with nothing typed.
     Enter,
     Cancel,
@@ -389,6 +413,16 @@ pub struct Picked {
     pub id: EntityId,
     pub at: Point,
     pub shift: bool,
+}
+
+/// The answer to `Editor::ask_object_or_sweep`: an object clicked, a click
+/// in empty space, or a path dragged from there; each says whether Shift
+/// was held.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Swept {
+    Object(Picked),
+    Missed { at: Point, shift: bool },
+    Path { points: Vec<Point>, shift: bool },
 }
 
 /// The answer to `Editor::ask_angle_or_point` and `ask_distance_or_point`: a

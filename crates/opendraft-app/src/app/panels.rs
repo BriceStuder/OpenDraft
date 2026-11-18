@@ -51,6 +51,7 @@ impl OpenDraftApp {
             region: None,
             prompted: None,
             picked: None,
+            path: None,
             pick_shift: false,
             grips: Vec::new(),
             prompt_enter: false,
@@ -78,6 +79,7 @@ impl OpenDraftApp {
             region,
             prompted,
             picked,
+            path,
             pick_shift,
             grips,
             prompt_enter,
@@ -110,10 +112,20 @@ impl OpenDraftApp {
                 self.state.docs[self.state.active].dynamic_input.cursor = Some(at);
                 self.state.commit_dynamic_input();
             } else {
-                self.state.answer_point(at);
-                self.state.answer_object(at, picked, pick_shift);
+                // One answer per click: once a point is taken, the next
+                // prompt may want an object, and must not get this click too.
+                let wants_object = self.state.waiting().map(|a| a.wants)
+                    == Some(opendraft_commands::Wants::Object);
+                if wants_object {
+                    self.state.answer_object(at, picked, pick_shift);
+                } else {
+                    self.state.answer_point(at);
+                }
                 self.state.answer_field_pick(picked);
             }
+        }
+        if let Some(points) = path {
+            self.state.answer_path(points, pick_shift);
         }
         if refused {
             self.state.refuse_one_shot();
@@ -191,6 +203,7 @@ pub(super) struct PanelViewer<'a> {
     pub(super) region: Option<RegionSelect>,
     pub(super) prompted: Option<opendraft_core::Point>,
     pub(super) picked: Option<opendraft_core::EntityId>,
+    pub(super) path: Option<Vec<opendraft_core::Point>>,
     pub(super) pick_shift: bool,
     pub(super) grips: Vec<opendraft_canvas::GripHit>,
     pub(super) prompt_enter: bool,
@@ -308,6 +321,7 @@ impl PanelViewer<'_> {
         self.region = output.select;
         self.prompted = output.prompted;
         self.picked = output.picked;
+        self.path = output.path;
         self.pick_shift = output.pick_shift;
         self.grips = output.grips;
         self.prompt_enter = output.prompt_enter;
