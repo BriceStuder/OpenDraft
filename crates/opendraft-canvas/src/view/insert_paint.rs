@@ -36,7 +36,7 @@ impl View {
     }
 
     /// A piece of a block reference that need not be drawn: off screen, or
-    /// smaller than a pixel (points excepted, whose mode gives them a size).
+    /// smaller than `MIN_DRAW_PX` (points excepted, whose mode gives them a size).
     pub(super) fn negligible(&self, entity: &Entity, visible: &opendraft_core::Bounds) -> bool {
         let point = matches!(entity, Entity::Point { .. });
         self.negligible_box(&entity.bounds(), point, visible)
@@ -75,7 +75,7 @@ mod tests {
         assert!(view.negligible(&line((10.0, 10.0), (10.2, 10.0)), &visible));
         assert!(view.negligible(&line((500.0, 500.0), (550.0, 500.0)), &visible));
         // Zoomed in, the same short piece is worth drawing.
-        view.camera.zoom = 10.0;
+        view.camera.zoom = 20.0;
         assert!(!view.negligible(&line((10.0, 10.0), (10.2, 10.0)), &visible));
         // A point has no size of its own.
         let point = Entity::Point {

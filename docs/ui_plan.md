@@ -1127,6 +1127,11 @@ about 22 ms. Also: once the view has settled, a layer whose last build took 150 
 instead of a slice at a time (a rebuild's length was frames times (slice plus the frame's own cost), so on a slower
 machine the blurred old picture stayed for seconds), and a slice is 25 ms, not 8.
 
+Zoomed out (18-11-2026): `MIN_DRAW_PX`, the size under which an object is not drawn, went from 0.75 to 2 px. On the
+large drawing at extents that took the kept triangles from 17.5 MB to about 6 MB and the frame from 22 to 16 ms (3 px
+looked the same to the eye); the rest of a frame is the ribbon (about 3 ms even with no drawing), the command line
+and egui's own work. It applies to painting directly too. Meant to become a setting with the other detail controls.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

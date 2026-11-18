@@ -58,7 +58,7 @@ const WHEEL_ZOOM_RATE: f32 = 0.003;
 /// Width of the translucent highlight under selected/hovered entities.
 const HIGHLIGHT_WIDTH: f32 = 6.0;
 /// Entities smaller than this on screen are not drawn.
-const MIN_DRAW_PX: f64 = 0.75;
+const MIN_DRAW_PX: f64 = 2.0;
 /// A drag shorter than this (screen points) is not a selection box.
 const BOX_MIN_PX: f32 = 4.0;
 /// Factor for the Zoom In / Zoom Out commands.
