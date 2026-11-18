@@ -424,8 +424,6 @@ fn all() -> Vec<Command<AppState>> {
             s.layout_request = Some(LayoutRequest::Toggle(PanelTab::Layers))
         })
         .transparent(),
-        cmd("layer.hide", "Hide", |s| s.hide_selected_layers()).when(|s| !s.selection().is_empty()),
-        cmd("layer.lock", "Lock", |s| s.lock_selected_layers()).when(|s| !s.selection().is_empty()),
         cmd("layer.show", "Show", |s| s.show_all_layers()).when(|s| s.any_layer_hidden()),
         cmd("manage.settings", "Settings", |s| s.show_settings = true)
             .transparent()
@@ -561,7 +559,6 @@ mod tests {
             "file.open",
             "file.new",
             "file.close",
-            "layer.hide",
         ] {
             assert!(!registry.is_enabled(id, &state), "{id} must wait");
         }
@@ -570,6 +567,8 @@ mod tests {
             "view.zoom_in",
             "view.grid",
             "manage.settings",
+            // A layer command, like LAYFRZ.
+            "layer.hide",
         ] {
             assert!(registry.is_enabled(id, &state), "{id} may run alongside");
         }
