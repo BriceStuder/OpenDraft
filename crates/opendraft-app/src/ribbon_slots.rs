@@ -20,7 +20,7 @@ pub const LINEWEIGHT_LIST: &str = "properties.lineweight";
 pub const LINETYPE_LIST: &str = "properties.linetype";
 
 /// The light bulb, sun and open padlock, in AutoCAD's yellow.
-const SWITCH_ON: Color32 = Color32::from_rgb(240, 196, 64);
+pub(crate) const SWITCH_ON: Color32 = Color32::from_rgb(240, 196, 64);
 const ROW_H: f32 = 22.0;
 /// Width of one switch icon in the layer list.
 const SWITCH_W: f32 = 20.0;
@@ -237,10 +237,11 @@ fn switch_tip(layer: &Layer, flag: LayerFlag) -> &'static str {
     }
 }
 
-/// The bulb, sun and padlock of a layer, and their colours: yellow when the
+/// The bulb, sun and padlock of a layer (in this list and the Layers
+/// panel), and their colours: yellow when the
 /// layer can be seen and edited (on, thawed, unlocked), `weak` grey when not,
 /// so a locked layer stands out as the off and frozen ones do.
-fn switch_glyphs(layer: &Layer, weak: Color32) -> [(char, Color32); 3] {
+pub(crate) fn switch_glyphs(layer: &Layer, weak: Color32) -> [(char, Color32); 3] {
     [
         if layer.on {
             (icons::LAYER_LIST_ON, SWITCH_ON)
