@@ -88,6 +88,7 @@ mod io;
 mod join;
 mod layer_cells;
 mod layer_cmd;
+mod layer_switch;
 mod layers;
 mod layers_ui;
 mod layout_cmd;
