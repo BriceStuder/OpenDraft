@@ -179,8 +179,9 @@ fn header(ui: &mut Ui, theme: &Theme, shape: Layout) {
         );
     };
     text(cols.name, "Name");
-    glyph(cols.on, icons::LAYER_PANEL_ON);
-    glyph(cols.freeze, icons::LAYER_PANEL_FROZEN);
+    // The same bulb, sun and padlock as the ribbon's layer list.
+    glyph(cols.on, icons::LAYER_LIST_ON);
+    glyph(cols.freeze, icons::LAYER_LIST_THAWED);
     if shape.vp {
         ui.painter().text(
             cols.vp_freeze.center(),
@@ -190,7 +191,7 @@ fn header(ui: &mut Ui, theme: &Theme, shape: Layout) {
             c.text_weak,
         );
     }
-    glyph(cols.lock, icons::LAYER_PANEL_LOCKED);
+    glyph(cols.lock, icons::LAYER_LIST_UNLOCKED);
     text(cols.color, "Color");
     if wide {
         text(cols.linetype, "Linetype");
@@ -316,71 +317,68 @@ fn row(
         }
     }
 
-    // Switches.
-    let switch = |ui: &mut Ui, cell: Rect, name: &str, icon: char, lit: bool, tip: &str| {
-        let response = ui.interact(cell, id.with(name), Sense::click());
-        let color = if lit {
-            c.text
-        } else if response.hovered() {
-            c.text_weak
-        } else {
-            c.text_disabled
+    // Switches: the ribbon list's bulb, sun and padlock, yellow while the
+    // layer can be seen and edited, grey when not.
+    let [on_glyph, thaw_glyph, lock_glyph] = crate::ribbon_slots::switch_glyphs(layer, c.text_weak);
+    let switch =
+        |ui: &mut Ui, cell: Rect, name: &str, (icon, color): (char, egui::Color32), tip: &str| {
+            let response = ui.interact(cell, id.with(name), Sense::click());
+            if response.hovered() {
+                ui.painter().rect_stroke(
+                    cell.shrink(1.0),
+                    2.0,
+                    egui::Stroke::new(1.0_f32, c.border),
+                    egui::StrokeKind::Inside,
+                );
+            }
+            opendraft_ui::icon_set::paint(
+                ui.painter(),
+                cell.center(),
+                Align2::CENTER_CENTER,
+                icon,
+                14.0,
+                color,
+            );
+            response.on_hover_text(tip).clicked()
         };
-        opendraft_ui::icon_set::paint(
-            ui.painter(),
-            cell.center(),
-            Align2::CENTER_CENTER,
-            icon,
-            14.0,
-            color,
-        );
-        response.on_hover_text(tip).clicked()
-    };
-    let (on_icon, on_tip) = if layer.on {
-        (icons::LAYER_PANEL_ON, "On: click to turn off")
+    let on_tip = if layer.on {
+        "On: click to turn off"
     } else {
-        (icons::LAYER_PANEL_OFF, "Off: click to turn on")
+        "Off: click to turn on"
     };
-    if switch(ui, cols.on, "on", on_icon, layer.on, on_tip) {
+    if switch(ui, cols.on, "on", on_glyph, on_tip) {
         result.edit = Some(LayerEdit::Toggle(layer.id, LayerFlag::On));
     }
-    if switch(
-        ui,
-        cols.freeze,
-        "freeze",
-        icons::LAYER_PANEL_FROZEN,
-        layer.frozen,
-        if layer.frozen {
-            "Frozen: click to thaw"
-        } else {
-            "Click to freeze"
-        },
-    ) {
+    let freeze_tip = if layer.frozen {
+        "Frozen: click to thaw"
+    } else {
+        "Thawed: click to freeze"
+    };
+    if switch(ui, cols.freeze, "freeze", thaw_glyph, freeze_tip) {
         result.edit = Some(LayerEdit::Toggle(layer.id, LayerFlag::Frozen));
     }
     if let Some(frozen) = vp_frozen {
-        let tip = if frozen {
-            "Frozen in this viewport: click to thaw"
+        let (glyph, tip) = if frozen {
+            (
+                (icons::LAYER_LIST_FROZEN, c.text_weak),
+                "Frozen in this viewport: click to thaw",
+            )
         } else {
-            "Click to freeze in this viewport only"
+            (
+                (icons::LAYER_LIST_THAWED, crate::ribbon_slots::SWITCH_ON),
+                "Click to freeze in this viewport only",
+            )
         };
-        if switch(
-            ui,
-            cols.vp_freeze,
-            "vp_freeze",
-            icons::LAYER_PANEL_VP_FROZEN,
-            frozen,
-            tip,
-        ) {
+        if switch(ui, cols.vp_freeze, "vp_freeze", glyph, tip) {
             result.edit = Some(LayerEdit::ToggleInViewport(layer.id));
         }
     }
-    let (lock_icon, lock_tip) = if layer.locked {
-        (icons::LAYER_PANEL_LOCKED, "Locked: click to unlock")
+    let lock_tip = if layer.locked {
+        "Locked: click to unlock"
     } else {
-        (icons::LAYER_PANEL_UNLOCKED, "Unlocked: click to lock")
+        "Unlocked: click to lock"
     };
-    if switch(ui, cols.lock, "lock", lock_icon, layer.locked, lock_tip) {
+    if switch(ui, cols.lock, "lock", lock_glyph, lock_tip) {
         result.edit = Some(LayerEdit::Toggle(layer.id, LayerFlag::Locked));
     }
 
