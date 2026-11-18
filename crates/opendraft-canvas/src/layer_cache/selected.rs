@@ -20,7 +20,7 @@ pub(crate) const KEEP_FROM: usize = if cfg!(test) { 8 } else { 256 };
 
 /// A number that is the same for the same set of ids and, but for a chance of
 /// one in 2^64, differs for another. Cheap: one multiply for each id.
-pub(crate) fn selection_hash(selection: &BTreeSet<EntityId>) -> u64 {
+pub fn selection_hash(selection: &BTreeSet<EntityId>) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325_u64 ^ selection.len() as u64;
     for id in selection {
         h = (h ^ id.0).wrapping_mul(0x0000_0100_0000_01b3);

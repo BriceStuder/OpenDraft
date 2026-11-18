@@ -1147,11 +1147,14 @@ Selections (18-11-2026): with 38,355 of the large drawing's objects selected a f
 selected 471 ms, because each frame drew the glow and edge of every selected entity again and egui made triangles of them
 again, and built the exclusion lists. A selection of 256 or more is now kept as a picture (`layer_cache/selected.rs`,
 `View::draw_kept_selection`), made again only when the view, the selection or the highlight colours change, with its
-exclusion lists kept by a hash of the selection; hover stays live. Now 21 ms and 83 ms. What is left grows with the
-selection: the ribbon's layer, colour, linetype and lineweight lists and the Properties panel each build the list of
-selected objects every frame (about 20 ms each at 417,000), and the kept highlight is about 100 MB at 417,000 (dropping the
-soft edge halved it but made it differ from painting directly, so it was not kept). Not done: those two panels, and a
-cheaper look for huge selections.
+exclusion lists kept by a hash of the selection; hover stays live. The ribbon's property lists and the Properties
+panel each looked up every selected object in every frame (about 20 ms each at 417,000); `selected_objects::of` keeps
+the positions for each state of the drawing and selection, so a frame indexes them directly (Properties about 1 ms and
+the ribbon under 2 ms at 33,000). Measured in the app (release, readout on): 33,000 selected 23.5 ms (the app's own work
+about 8 ms of it), all 417,486 selected 126 ms with 255 MB of kept triangles (it was 471 ms). What is left is egui copying
+and the GPU drawing those triangles every frame, about 0.5 ms for each MB. Dropping the soft edge of the highlight halved
+it but made it differ from painting directly (and so from the debug check), so it was not kept. An earlier version of
+this note quoted 21 and 83 ms: those were measured with that soft-edge change in.
 
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can

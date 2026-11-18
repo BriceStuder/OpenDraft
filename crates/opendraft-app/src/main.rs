@@ -150,6 +150,7 @@ mod reveal;
 mod ribbon_def;
 mod ribbon_slots;
 mod scale_rotate;
+mod selected_objects;
 mod selection;
 mod settings;
 mod settings_tracking;
