@@ -1001,3 +1001,52 @@ Built from `private_material/block_attributed_and_data_fields_specification.md` 
 The in-place editor is the multiline editor in a single-line mode: `Prompt::single_line` (set by `Editor::edit_line`) becomes `MTextEditor::single_line`. Enter accepts (Ctrl+Enter too), Tab and the bold, italic, underline and field keys do nothing, pasted line breaks and tabs become spaces, and the toolbar, ruler, resize grips and the Paragraph and Field dialogs are not shown. The draft is the text's own projection (`SingleLineText::projection`), so it is drawn where, how high, how turned and how justified the text will be; `SingleLineText::contents_of_projection` gets the plain words back. Empty words or Esc add nothing, and an accepted line is one undo step. An Align text is drawn at the usual height while typed, then fitted between its two points.
 `TEXTEDIT` (`annotate.textedit`, aliases `ED` and `DDEDIT`, in `text_edit_cmd.rs`; commands registered in `text_commands.rs`) asks `Select an annotation object or [Undo/Mode]` and refuses other objects. A single text or multiline text already selected (or double-clicked) is edited once and the command ends. Otherwise it repeats, as AutoCAD's does in its default Multiple mode: each text picked is edited and the prompt returns, until Enter. Undo takes back the last edit made in this run ("Nothing to undo" when there is none); Mode (Single or Multiple, remembered with the other text settings as `text_memory::Memory::multiple`) makes it end after one text. Esc in the editor ends the command, keeping the edits already made. A multiline text opens the in-place editor, as `MTEDIT` does (`mtext::edit_mtext_with_id`; `MTEDIT` stays for multiline text and is labelled Edit MText). A single-line text opens the same single-line editor on its own place, and the drawing leaves the text out while its draft shows. Only the words change, as one undo step ("Edit text"): the same words or Esc change nothing, and `SingleLineText::with_contents` keeps place, height, rotation, style and justification, fitting an Align or Fit text again between its points (Align changes the height and keeps the width factor, Fit the width factor). Double-clicking a single-line or multiline text with no command running runs TEXTEDIT.
 **Not done:** a Contents row in Properties (Properties rows hold numbers only), TEXTEDIT on attribute definitions and dimensions, a ribbon item for it, an editor box that shows at a readable size for a very small or large text on screen. Not yet driven in the real app.
+
+## Entity layer cache and a Performance settings page (planned 18-11-2026; branch `perf/entity-layer-cache`)
+
+Why: a 400k-entity drawing with 372 block references (the user's large DWG, 18.7 MB) took
+about 113 ms a frame at zoom extents, because painting is immediate-mode and redoes every
+entity (and every piece of every block reference) each frame, even when only the pointer moved.
+First step, done: pieces of block references are skipped off screen and under a pixel
+(`View::negligible`), 113 ms to 74 ms, 2.74M to 0.96M triangles.
+
+Plan: keep the tessellated plain entities as reusable meshes (`opendraft-canvas/src/layer_cache/`),
+rebuilt only when the key changes (document token = session uid + `Session::revision`, space and
+frozen layers, camera and canvas size, style colours, point style, display scale, and every
+Performance setting that changes the picture). Selected and hovered entities are drawn live on top
+(AutoCAD draws highlights on top; today a later entity can paint over a selected one). Plain
+entities are grouped in chunks of about 2,000 in draw order so a chunk holding a highlighted entity
+is rebuilt without it. Safety: a debug-build verifier that compares cached with fresh output, a
+random-edit equality test, `REGEN` clearing the cache, a memory cap with least-recently-used
+eviction.
+
+Phases and exit tests:
+0. Spike (done, below).
+1. Whole-layer cache, model space, with the key and the verifier. Pointer-only frames at or under
+   8 ms on the reference drawing; one unit test per key field.
+2. Highlight overlay by chunk exclusion; highlights look as before.
+2.5. Performance page (Settings): drawing cache Automatic / Always on / Off; memory limit (64 MB
+   to 2 GB, default 512 MB); zoom and pan behaviour Exact / Smooth / Automatic; settle delay; an
+   off-by-default frame-time and cache readout (no timing work while off).
+2.6. Skip-tiny-objects threshold (`MIN_DRAW_PX`), curve smoothness, anti-aliasing.
+2.7. Small-text and dense-hatch thresholds.
+3. Paper space and viewports: one slot per space and viewport.
+4. Pan and zoom: margin around the view, translate small pans, rebuild after zooming settles,
+   maybe across several frames or on a worker thread.
+5. Optional: rebuild only chunks the `Changes` touched, and an insert-piece cache.
+Settings are per user (in `Settings`), never in the drawing; per-drawing overrides were considered
+and rejected.
+
+Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
+- `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
+  be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
+- `egui_glow` has no 16-bit index limit, so chunks need not stay under 65k vertices.
+- Cost split of a full frame: about 63 ms building shapes, about 14.5 ms tessellating (960k triangles,
+  26 MB of meshes). A frame that only submits the cached meshes: 0.34 ms plus 7.4 ms in egui's own
+  tessellation pass (it copies the vertices), against about 74 ms now. GPU upload of those 26 MB each
+  frame is not measured. The remaining 7 ms is the floor for this design; going lower needs fewer
+  triangles (the phase 2.6 settings) or keeping them on the GPU (custom GL callbacks), which this
+  plan does not do.
+- Small text is rasterised into textures held in a 512-entry cache (`text_raster.rs`). Cached meshes
+  that point at those textures must keep them alive (or the text must be left out of the cached layer
+  and drawn live); phase 1 decides which.
