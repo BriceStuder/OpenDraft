@@ -205,37 +205,6 @@ impl AppState {
         self.perform(ModifyLayers::new(name, changed));
     }
 
-    /// The layers the selected objects are on, in display order.
-    fn selected_layers(&self) -> Vec<LayerId> {
-        let doc = &self.docs[self.active];
-        doc.session
-            .document()
-            .layers()
-            .iter()
-            .map(|l| l.id)
-            .filter(|&id| {
-                doc.selection
-                    .iter()
-                    .filter_map(|&o| doc.session.document().object(o))
-                    .any(|o| o.attrs.layer == id)
-            })
-            .collect()
-    }
-
-    /// Turn off the layers of the selected objects (hides them).
-    pub fn hide_selected_layers(&mut self) {
-        let layers = self.selected_layers();
-        self.message = format!("Turned off {}", plural(layers.len(), "layer"));
-        self.edit_layers("Turn layers off", layers, |l| l.on = false);
-    }
-
-    /// Lock the layers of the selected objects.
-    pub fn lock_selected_layers(&mut self) {
-        let layers = self.selected_layers();
-        self.message = format!("Locked {}", plural(layers.len(), "layer"));
-        self.edit_layers("Lock layers", layers, |l| l.locked = true);
-    }
-
     /// Turn every layer back on.
     pub fn show_all_layers(&mut self) {
         let layers: Vec<LayerId> = self
@@ -387,7 +356,8 @@ mod tests {
         let mut state = AppState::new();
         state.add_entity(circle());
         state.select_all();
-        state.lock_selected_layers();
+        state.start_command("LAYLCK", crate::layer_switch::lock_layers);
+        state.settle_command();
         assert!(state.selection().is_empty());
         assert!(layer_named(&state, "0").locked);
         state.select_all();
@@ -413,8 +383,12 @@ mod tests {
     fn hide_selected_layers_then_show_all() {
         let mut state = AppState::new();
         state.add_entity(circle());
+        // Layer 0 is current: LAYOFF asks first.
         state.select_all();
-        state.hide_selected_layers();
+        state.start_command("LAYOFF", crate::layer_switch::turn_off_layers);
+        state.settle_command();
+        state.answer_keyword("Yes");
+        state.settle_command();
         assert!(state.any_layer_hidden());
         state.show_all_layers();
         assert!(!state.any_layer_hidden());
