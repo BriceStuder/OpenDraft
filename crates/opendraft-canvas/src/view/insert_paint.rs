@@ -18,7 +18,8 @@ impl View {
     ) {
         let visible = self.camera.visible_world(rect);
         for piece in pieces.iter().filter(|p| !frozen.contains(&p.attrs.layer)) {
-            if self.negligible(&piece.entity, &visible) {
+            let point = matches!(piece.entity, Entity::Point { .. });
+            if self.negligible_box(&piece.bounds(), point, &visible) {
                 continue;
             }
             let line = match document.color_of(piece) {
@@ -37,9 +38,18 @@ impl View {
     /// A piece of a block reference that need not be drawn: off screen, or
     /// smaller than a pixel (points excepted, whose mode gives them a size).
     pub(super) fn negligible(&self, entity: &Entity, visible: &opendraft_core::Bounds) -> bool {
-        let bounds = entity.bounds();
-        let size = (bounds.max.x - bounds.min.x).max(bounds.max.y - bounds.min.y);
         let point = matches!(entity, Entity::Point { .. });
+        self.negligible_box(&entity.bounds(), point, visible)
+    }
+
+    /// [`negligible`](Self::negligible) for a box already known.
+    pub(super) fn negligible_box(
+        &self,
+        bounds: &opendraft_core::Bounds,
+        point: bool,
+        visible: &opendraft_core::Bounds,
+    ) -> bool {
+        let size = (bounds.max.x - bounds.min.x).max(bounds.max.y - bounds.min.y);
         !bounds.intersects(visible) || (!point && size * self.camera.zoom < MIN_DRAW_PX)
     }
 }

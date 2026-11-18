@@ -129,7 +129,11 @@ impl View {
             return;
         }
         let plain = !selection.contains(id) && hover != Some(*id);
-        if let Some(pieces) = plain.then(|| document.insert_pieces(object)).flatten() {
+        let pieces = plain.then(|| {
+            let mut kept = self.insert_pieces.borrow_mut();
+            kept.of(self.document_token, document, object)
+        });
+        if let Some(pieces) = pieces.flatten() {
             self.paint_insert_pieces(painter, rect, style, document, &pieces, frozen);
             return;
         }

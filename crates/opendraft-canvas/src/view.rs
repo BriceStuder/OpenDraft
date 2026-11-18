@@ -28,6 +28,7 @@ mod infinite_paint;
 #[cfg(test)]
 mod input_tests;
 mod insert_paint;
+mod insert_pieces;
 mod layer_paint;
 mod layout;
 mod paint;
@@ -130,6 +131,8 @@ pub struct View {
     /// What the slots have spent so far this frame making new layers, which
     /// they share (see `layer_paint.rs`).
     slice_spent: std::cell::Cell<std::time::Duration>,
+    /// What each block reference draws, kept while the drawing is as it was.
+    insert_pieces: std::cell::RefCell<insert_pieces::InsertPieces>,
     cache_config: CacheConfig,
     /// What the drawing is now, as `Session::draw_token` says; none until the
     /// app gives it, and then nothing is kept.

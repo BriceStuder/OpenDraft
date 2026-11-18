@@ -1113,6 +1113,12 @@ after a zoom out the moved old picture left most of the screen empty until the n
 picture is now shown moved only while it covers at least half of the screen (`covered` in `layer_cache/moved.rs`);
 below that the new layer is made at once, which costs what painting directly did.
 
+Second fix (18-11-2026): timing a rebuild of the large drawing showed 372 block references taking about 50 of its
+66 ms, because each rebuild expanded every reference again (`Document::insert_pieces`, 140 to 190 us each) while the
+2,000 or so plain lines cost 16 ms. The pieces are now kept per state of the drawing (`view/insert_pieces.rs`, at most
+300,000 pieces, cleared when the token changes) and their boxes are the cached ones. A rebuild after a zoom out went
+from 72 ms to 36 ms; the first build of a drawing still pays for the expansion once.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
