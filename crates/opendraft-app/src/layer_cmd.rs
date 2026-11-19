@@ -1,6 +1,6 @@
 //! The layer tools of the Home tab's Layers panel, worded as AutoCAD's:
-//! LAYFRZ, LAYTHW, LAYULK, LAYMCUR and LAYMCH. (LAYOFF, LAYON and LAYLCK
-//! work on the selection: `layers.rs`.)
+//! LAYTHW, LAYULK, LAYMCUR and LAYMCH. (LAYOFF, LAYFRZ and LAYLCK are in
+//! `layer_switch.rs`; LAYON works on every layer: `layers.rs`.)
 
 use opendraft_commands::{
     Answer, Cancelled, Command, Editor, ModifyAttributes, ModifyLayers, Options, Picked,
@@ -8,6 +8,7 @@ use opendraft_commands::{
 };
 use opendraft_core::{EntityId, Layer, LayerId};
 
+use crate::layer_switch;
 use crate::state::AppState;
 use crate::text::plural;
 
@@ -23,7 +24,14 @@ pub fn commands() -> Vec<Command<AppState>> {
         };
     }
     vec![
-        editor!("layer.freeze", "Freeze", "LAYFRZ", freeze_layers),
+        editor!("layer.hide", "Off", "LAYOFF", layer_switch::turn_off_layers),
+        editor!(
+            "layer.freeze",
+            "Freeze",
+            "LAYFRZ",
+            layer_switch::freeze_layers
+        ),
+        editor!("layer.lock", "Lock", "LAYLCK", layer_switch::lock_layers),
         editor!("layer.unlock", "Unlock", "LAYULK", unlock_layer),
         editor!(
             "layer.make_current",
@@ -78,51 +86,6 @@ fn change_layer(ed: &Editor, name: &'static str, layer: Layer) -> Result<(), Can
         tx.perform(ModifyLayers::new(name, vec![layer]));
         Ok(())
     })
-}
-
-/// LAYFRZ: freeze the layer of each object picked until Enter. The current
-/// layer cannot be frozen. Undo thaws the layer frozen last.
-pub fn freeze_layers(ed: &mut Editor) -> Result<(), Cancelled> {
-    let mut frozen = 0;
-    loop {
-        let options =
-            Options::<Picked>::new("Select an object on the layer to be frozen or [Undo]")
-                .keyword("Undo", "U")
-                .allow_empty();
-        match ed.ask_object(options)? {
-            Answer::Value(Picked { id, .. }) => {
-                let current = ed.read(|doc| doc.current_layer())?;
-                let Some(layer) = layer_of(ed, id)? else {
-                    continue;
-                };
-                if layer.id == current {
-                    ed.say(format!(
-                        "Cannot freeze layer \"{}\". It is the current layer.",
-                        layer.name
-                    ));
-                    continue;
-                }
-                let name = layer.name.clone();
-                change_layer(
-                    ed,
-                    "Freeze layer",
-                    Layer {
-                        frozen: true,
-                        ..layer
-                    },
-                )?;
-                frozen += 1;
-                ed.say(format!("Layer \"{name}\" has been frozen."));
-            }
-            Answer::Keyword(_) if frozen > 0 => {
-                ed.undo()?;
-                frozen -= 1;
-                ed.say("Layer thawed again.");
-            }
-            Answer::Keyword(_) => ed.say("Nothing to undo."),
-            Answer::Enter => return Ok(()),
-        }
-    }
 }
 
 /// LAYULK: unlock the layer of the object picked; objects on locked layers
@@ -303,26 +266,6 @@ mod tests {
 
     fn said(state: &AppState) -> &str {
         state.cmdline.log.last().map_or("", String::as_str)
-    }
-
-    #[test]
-    fn freeze_freezes_each_picked_layer_but_not_the_current_one() {
-        let (mut state, ids, walls) = drawing();
-        state.start_command("LAYFRZ", freeze_layers);
-        state.settle_command();
-        pick(&mut state, ids[0]);
-        assert!(said(&state).contains("It is the current layer"));
-        assert!(!layer(&state, LayerId::DEFAULT).frozen);
-        pick(&mut state, ids[1]);
-        assert!(layer(&state, walls).frozen);
-        assert_eq!(said(&state), "Layer \"Layer1\" has been frozen.");
-        // Undo thaws it again, inside the command.
-        state.answer_keyword("Undo");
-        state.settle_command();
-        assert!(!layer(&state, walls).frozen);
-        state.answer_enter();
-        state.settle_command();
-        assert!(!state.command_running());
     }
 
     #[test]

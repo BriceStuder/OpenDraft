@@ -169,8 +169,8 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("manage.crash_log", Denied, Ui),
     // Layers: the layer batch tool does these with checks.
     ("layer.properties", Denied, Ui),
-    ("layer.hide", Denied, Mutation),
-    ("layer.lock", Denied, Mutation),
+    ("layer.hide", InteractiveInApp, Mutation),
+    ("layer.lock", InteractiveInApp, Mutation),
     ("layer.show", Denied, Mutation),
     ("layer.thaw_all", Denied, Mutation),
     ("layer.freeze", InteractiveInApp, Mutation),
