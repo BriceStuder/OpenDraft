@@ -130,7 +130,8 @@ impl AppState {
 
     /// Open a drawing in a tab (or switch to it if it is already open). The
     /// file is read in the background and appears when it is ready; a failure
-    /// is reported in the status bar then. Returns whether the open started.
+    /// is reported in the status bar then. A large file is asked about first
+    /// (`large_file.rs`). Returns whether the open started.
     pub fn open_path(&mut self, path: &Path) -> bool {
         if let Some(i) = self
             .docs
@@ -143,7 +144,9 @@ impl AppState {
             self.message = format!("{} is already open", self.docs[i].title);
             return true;
         }
-        self.begin_open(path);
+        if !self.hold_if_large(path) {
+            self.begin_open(path);
+        }
         true
     }
 

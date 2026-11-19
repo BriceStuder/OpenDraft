@@ -1235,3 +1235,8 @@ Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - Small text is rasterised into textures held in a 512-entry cache (`text_raster.rs`). Cached meshes
   that point at those textures must keep them alive (or the text must be left out of the cached layer
   and drawn live); phase 1 decides which.
+
+## Large DWG objects, and a warning before large files open (done 19-11-2026; issue #118)
+A user's DWG (about 35 MB) was refused with "this DWG exceeds the safe object size limit"; we do not have the file. `DwgLimits::max_single_object_bytes` was the specification's 16 MiB, but an object is read in place from its section (a borrowed slice) and every allocation inside it is bounded by its own count limit (strings, points, handles), so the cap guarded nothing and refused real drawings where one entity (a long polyline, an embedded image or proxy data) is larger. It is now 512 MiB, the same as `max_section_bytes`.
+While OpenDraft is early in development, opening any file over 20 MiB (`large_file::WARN_BYTES`) first asks "\"<name>\" is N MB. Open it anyway?" (Open or Cancel; Esc and the close button cancel; Cancel says "Did not open <name>"). The question sits in `open_path`, so the Open dialog, recent files, Home, drag and drop and the command line all get it; several large files dropped at once are asked about one at a time; the automation host's opens skip it. Tests in `large_file.rs`.
+**Not done:** not checked against the reporter's file (we have no copy); if the object is not just large but misread, the open will now fail later with a "damaged" message instead. Not yet driven in the real app. Remove the warning (or make it a setting) once large drawings are fast.

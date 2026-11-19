@@ -32,7 +32,11 @@ impl Default for DwgLimits {
             max_section_pages: 1_000_000,
             max_page_bytes: 16 * MIB,
             max_objects: 5_000_000,
-            max_single_object_bytes: 16 * MIB,
+            // An object is read in place from its section, so its size
+            // allocates nothing: the section's bound is the real one. The
+            // specification's 16 MiB refused real drawings (issue #118),
+            // where one entity (a long polyline, an embedded image) can be larger.
+            max_single_object_bytes: 512 * MIB,
             max_string_code_units: 8_000_000,
             max_collection_items: 10_000_000,
             max_handle_bytes: 8,

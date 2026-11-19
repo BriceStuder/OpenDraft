@@ -171,7 +171,9 @@ Rules that follow:
   before it is read into memory). The app opens through `load_cancellable`,
   which checks the size, reads, then dispatches, and passes the open job's
   Cancel flag; `FORMATS` is native, DXF, DWG, and the Open dialog's filters
-  come from it.
+  come from it. Before that, `AppState::open_path` asks about any file over
+  20 MiB (`opendraft-app/src/large_file.rs`, "Open it anyway?"); it warns and
+  never refuses. Automation opens skip the question.
   `.odraft` is also bounded by what it holds, not only by bytes: its long lists
   (objects, table rows, objects in a block, points of a shape) are cut off
   while they are read (`opendraft-files/src/native/limits.rs`), well above any real
@@ -180,7 +182,9 @@ Rules that follow:
   the same lifecycle as DXF: opening a `.dwg` installs an unsaved drawing with
   no file of its own and says "Imported", Save asks for an `.odraft` name, and
   `write` refuses (no Export DWG command exists). Files over the reader's
-  1 GiB limit are refused before they are read.
+  1 GiB limit are refused before they are read. Its limits (`DwgLimits`) bound
+  what a read allocates; one object may be as large as a section (512 MiB),
+  since it is read in place and its size allocates nothing.
 - **DXF** (`opendraft-files/src/dxf/`) is an exchange format, so it is treated as one:
   opening a `.dxf` is an *import* (a new unsaved drawing with no file of its
   own, so Save asks for an `.odraft` name) and `file.export_dxf` writes a copy
