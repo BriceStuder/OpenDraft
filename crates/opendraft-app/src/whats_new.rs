@@ -20,6 +20,15 @@ pub struct Note {
 
 const NOTES: &[Note] = &[
     Note {
+        version: "0.4.0",
+        title: "Editing text in place, quicker trimming and smoother panning",
+        changes: &[
+            "TEXT is typed straight into the drawing, and TEXTEDIT edits single-line text where it is.",
+            "TRIM and EXTEND: drag for a fence or click for a crossing window, and trim both sides of an object in one go.",
+            "Large drawings pan and zoom more smoothly, double-clicking the wheel zooms to extents, and DWG files with very large objects now open.",
+        ],
+    },
+    Note {
         version: "0.3.0",
         title: "Drawings are now .odraft files",
         changes: &[
