@@ -54,28 +54,29 @@ If that looks familiar, you are home.
 - **Scriptable by AI.** An optional, off-by-default [MCP server](./docs/mcp.md) lets an assistant inspect and draw in your open drawings, with every change undoable.
 - **Free for good.** GPL-3.0-or-later, no subscription, no telemetry.
 
-> **Status:** OpenDraft is in early development (0.1). It already covers a large part of everyday 2D drafting, but features, commands and the `.odraft` format may still change. See the [roadmap](#roadmap) for what is missing.
+> **Status:** OpenDraft is in early development. It already covers a large part of everyday 2D drafting, but features, commands and the `.odraft` format may still change. See the [roadmap](#roadmap) for what is missing.
 
 > **Your drawings:** the native `.odraft` format is still in development (format version 0) and changes between releases without a conversion, so a drawing saved by one version may not open in a later one; the error then says which version saved it. To keep a drawing safe, also save a DXF copy (File > Save As, DXF), which any version and other CAD programs can read.
 
 ## 🧰 What it can do
 
 **✏️ Drawing**
-- Line, Circle (centre/radius/diameter, 2P, 3P, TTR, TTT), Arc, Ellipse, Rectangle, Polygon, Polyline (with arc segments), Spline (fit points or control vertices) and Hatch (patterns, solid, boundary detection and Edit Hatch)
+- Line, Construction line, Ray, Circle (centre/radius/diameter, 2P, 3P, TTR, TTT), Arc, Ellipse, Rectangle, Polygon, Donut, Point, Polyline (with arc segments), Spline (fit points or control vertices), Boundary and Hatch (patterns, solid, boundary detection and Edit Hatch)
+- Divide and Measure, and Distance and Area to measure what you have drawn
 - Typed or clicked input for points, distances and angles, with dynamic input and a live preview while you draw
 
 **🔧 Modify**
-- Move, Copy, Rotate, Mirror, Scale, Stretch, Trim, Extend, Lengthen, Offset, Fillet, Chamfer, Join, Break, Explode, Erase, rectangular, polar and path Arrays, and Match Properties
+- Move, Copy, Rotate, Mirror, Scale, Stretch, Trim, Extend, Lengthen, Offset, Fillet, Chamfer, Join, Break, Explode, Erase, Overkill, rectangular, polar and path Arrays, and Match Properties
 - Cut, copy and paste (with base point, as block, to original coordinates), also between drawings
 - Window, crossing and fence selection, Power Select (`QSELECT`), grips to stretch, move, rotate, scale, mirror or copy, and a Properties panel for editing entity attributes
 
 **🔤 Annotation**
-- Multiline text with an in-place editor and text styles, including the OD Roman stroke font
+- Single-line and multiline text, typed and edited in place, with text styles (including the OD Roman stroke font) and fields that fill in from the drawing's properties
 - Dimensions (linear, aligned, radius, diameter, arc length) with dimension styles, plus Multileaders and Leaders with their styles
 
 **🧱 Blocks and layouts**
-- Create and Insert blocks, a Block Editor (`BEDIT`), Purge
-- Paper-space layouts with viewports and plotting
+- Create and Insert blocks, block attributes, a Block Editor (`BEDIT`), Purge
+- Paper-space layouts with viewports, and plotting to PDF, SVG or a printer with a preview
 
 **🎯 Canvas and interaction**
 - Zoom and pan, grid, ortho and polar tracking, and the full set of object snaps (endpoint, midpoint, centre, intersection, perpendicular, tangent, nearest, parallel, extension and more) with object snap tracking
@@ -219,11 +220,11 @@ Dependencies point downward: the document knows nothing about the UI. Read [docs
 
 Work follows the standard 2D drafting command set; `docs/ui_plan.md` has the detailed to-do list. [`docs/ROADMAP.md`](./docs/ROADMAP.md) is the plan for what comes first and why: Linux as a first-class platform, trust in files, what makers need, and community.
 
-- Next: the remaining draw commands (Point, Donut, Boundary, Construction line, Ray), Distance and Area, Overkill and associative arrays
+- Next: associative arrays, groups and tables
 - Spline editing (trim, extend, break, join, offset)
-- The rest of dimensions (associativity, a styles table, real DXF dimensions), block attributes and dynamic blocks
+- The rest of dimensions (associativity, real DXF dimensions), the rest of block attributes, and dynamic blocks
 - Linetypes from `.lin` files, hatch gap tolerance and gradients
-- DWG export, PDF and SVG export
+- DWG export
 - Linux: real-hardware and desktop-environment testing (CI covers six distributions on a virtual display); publishing to Flathub and the AUR
 - Plugin system for third-party commands
 
