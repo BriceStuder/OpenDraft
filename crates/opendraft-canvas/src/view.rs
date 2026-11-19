@@ -11,6 +11,7 @@ use crate::grid::{grid_step, line_indices};
 use crate::grips::{grip_at, keep_selected, press_grip, with_shared, GripHit};
 use crate::hatch_cache::HatchCache;
 use crate::hit::{pick_here, pick_visible_here};
+use crate::layer_cache::{CacheConfig, LayerCaches};
 use crate::select::Region;
 use crate::snap::SnapModes;
 use crate::snap_axis::Ortho;
@@ -19,15 +20,22 @@ use crosshair::CursorShape;
 mod accessors;
 mod acquire;
 mod backdrop;
+mod background;
+mod builder;
 mod crosshair;
 mod dash_paint;
+mod entity_paint;
 mod hatch_paint;
+mod image_paint;
 mod infinite_paint;
 #[cfg(test)]
 mod input_tests;
 mod insert_paint;
+mod insert_pieces;
+mod layer_paint;
 mod layout;
 mod paint;
+mod path_stroke;
 mod point_paint;
 mod snap_choice;
 mod snap_marker;
@@ -35,7 +43,7 @@ mod sweep;
 mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
-mod text_raster;
+pub(crate) mod text_raster;
 pub use text_paint::paint_text;
 mod types;
 
@@ -54,8 +62,6 @@ const GRID_MAJOR_EVERY: i64 = 5;
 const WHEEL_ZOOM_RATE: f32 = 0.003;
 /// Width of the translucent highlight under selected/hovered entities.
 const HIGHLIGHT_WIDTH: f32 = 6.0;
-/// Entities smaller than this on screen are not drawn.
-const MIN_DRAW_PX: f64 = 0.75;
 /// A drag shorter than this (screen points) is not a selection box.
 const BOX_MIN_PX: f32 = 4.0;
 /// Factor for the Zoom In / Zoom Out commands.
@@ -126,6 +132,21 @@ pub struct View {
     selected_viewport: Option<ViewportId>,
     /// What each hatch draws, kept between frames (see `hatch_cache.rs`).
     hatch_cache: std::cell::RefCell<HatchCache>,
+    /// The plain entities as kept triangles (see `layer_cache`).
+    layer_cache: std::cell::RefCell<LayerCaches>,
+    /// What the slots have spent so far this frame making new layers, which
+    /// they share (see `layer_paint.rs`).
+    slice_spent: std::cell::Cell<std::time::Duration>,
+    /// What each block reference draws, kept while the drawing is as it was.
+    insert_pieces: std::cell::RefCell<insert_pieces::InsertPieces>,
+    cache_config: CacheConfig,
+    /// What the drawing is now, as `Session::draw_token` says; none until the
+    /// app gives it, and then nothing is kept.
+    document_token: Option<(u64, u64)>,
+    /// The drawing, for making its picture in the background (`builder.rs`);
+    /// weak, so that an edit while no picture is being made copies nothing.
+    shared_document: std::sync::Weak<Document>,
+    builder: std::cell::RefCell<Option<builder::Builder>>,
 }
 
 impl View {
@@ -141,6 +162,7 @@ impl View {
         snap_modes: &SnapModes,
     ) -> CanvasOutput {
         let rect = ui.available_rect_before_wrap();
+        self.slice_spent.set(std::time::Duration::ZERO);
         self.point_style = document.point_style();
         opendraft_core::infinite::set_pixel_size(1.0 / self.camera.zoom);
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
@@ -181,26 +203,8 @@ impl View {
         let pointer = ui
             .input(|i| i.pointer.latest_pos())
             .filter(|p| rect.contains(*p) && !self.blocked(*p) && !Self::covered(ui.ctx(), *p));
-        // With an editor over the drawing the wheel still zooms, over the
-        // editor too, but not over a toolbar, menu or dialog above it.
-        let wheel_at = if self.wheel_through {
-            let ctx = ui.ctx();
-            ui.input(|i| i.pointer.latest_pos()).filter(|p| {
-                rect.contains(*p)
-                    && ctx
-                        .layer_id_at(*p)
-                        .is_none_or(|l| l.order == egui::Order::Background)
-            })
-        } else {
-            pointer
-        };
-        let over = response.hovered() || (self.wheel_through && wheel_at.is_some());
-        if let (true, Some(pos), false) = (over, wheel_at, in_layout) {
-            let (scroll, pinch) = ui.input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));
-            let factor = f64::from((scroll * self.wheel_rate()).exp() * pinch);
-            if (factor - 1.0).abs() > 1e-9 {
-                self.camera.zoom_at(pos, rect, factor);
-            }
+        if !in_layout {
+            self.wheel_zoom(ui, rect, response.hovered(), pointer);
         }
 
         let tolerance = self.sizes.pick / self.camera.zoom;
@@ -369,16 +373,7 @@ impl View {
                 self.paint_grid(&painter, rect, style, grid);
             }
             self.paint_axes(&painter, rect, style);
-            self.paint_entities(
-                &painter,
-                rect,
-                style,
-                document,
-                document.active_layout(),
-                &[],
-                selection,
-                hover,
-            );
+            self.paint_model(&painter, rect, style, document, selection, hover);
         }
         // Inside a viewport the model is only drawn within its window.
         let painter = match self.clip {

@@ -20,6 +20,9 @@ enum MenuChoice {
     Recent(usize),
 }
 
+/// The state of the drawing and the space edited, for a kept count.
+type CountKey = ((u64, u64), Option<opendraft_core::LayoutId>);
+
 impl OpenDraftApp {
     /// App menu button, quick access toolbar and title.
     pub(super) fn title_bar(&mut self, ctx: &egui::Context) {
@@ -136,6 +139,25 @@ impl OpenDraftApp {
         })
     }
 
+    /// How many objects the space being edited holds, counted once for each
+    /// state of the drawing: counting walks every object, which the status bar
+    /// cannot afford in each frame of a big drawing.
+    fn object_count(&self, ctx: &egui::Context) -> usize {
+        let doc = &self.state.docs[self.state.active];
+        let key = (
+            doc.session.draw_token(),
+            doc.session.document().active_layout(),
+        );
+        let id = egui::Id::new("status_object_count");
+        let kept: Option<(CountKey, usize)> = ctx.data(|d| d.get_temp(id));
+        if let Some((_, count)) = kept.filter(|(k, _)| *k == key) {
+            return count;
+        }
+        let count = doc.session.document().len_here();
+        ctx.data_mut(|d| d.insert_temp(id, (key, count)));
+        count
+    }
+
     pub(super) fn ribbon(&mut self, ctx: &egui::Context) {
         // The Block Editor brings its own tab, and it opens on it.
         let editing = self.state.in_block_editor();
@@ -235,7 +257,7 @@ impl OpenDraftApp {
                         toggled = self.mode_toggles(ui);
                         ui.separator();
                         if !self.state.home {
-                            let count = self.state.session().document().len_here();
+                            let count = self.object_count(ui.ctx());
                             ui.label(
                                 egui::RichText::new(plural(count, "object"))
                                     .color(self.theme.colors.text_weak),

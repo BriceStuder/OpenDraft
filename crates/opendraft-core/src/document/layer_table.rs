@@ -89,6 +89,31 @@ impl Document {
         }) || self.blocks.iter().any(|b| b.uses_layer(id))
     }
 
+    /// The layers that [`layer_in_use`](Self::layer_in_use) says are in use,
+    /// found in one pass over the objects instead of one for each layer.
+    pub fn layers_in_use(&self) -> std::collections::HashSet<LayerId> {
+        let mut used: std::collections::HashSet<LayerId> =
+            self.objects.iter().map(|o| o.attrs.layer).collect();
+        let inserts: Vec<_> = self
+            .objects
+            .iter()
+            .filter_map(|o| match &o.entity {
+                crate::Entity::Insert(i) => Some(i),
+                _ => None,
+            })
+            .collect();
+        for layer in &self.layers {
+            let id = layer.id;
+            if !used.contains(&id)
+                && (inserts.iter().any(|i| i.uses_layer_for_attributes(id))
+                    || self.blocks.iter().any(|b| b.uses_layer(id)))
+            {
+                used.insert(id);
+            }
+        }
+        used
+    }
+
     /// Why a layer cannot be deleted, or `None` when it can.
     pub fn layer_delete_blocker(&self, id: LayerId) -> Option<&'static str> {
         if id == LayerId::DEFAULT {
@@ -141,5 +166,31 @@ impl Document {
             .enumerate()
             .map(|(i, l)| (l.id, i))
             .collect();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Attributes, Entity, Point};
+
+    #[test]
+    fn the_one_pass_answer_is_the_per_layer_answer() {
+        let mut doc = Document::default();
+        let (used, unused) = (doc.allocate_layer_id(), doc.allocate_layer_id());
+        doc.push_layer(Layer::new(used, "Used"));
+        doc.push_layer(Layer::new(unused, "Unused"));
+        doc.add_with(
+            Entity::Line {
+                start: Point::new(0.0, 0.0),
+                end: Point::new(1.0, 0.0),
+            },
+            Attributes::on_layer(used),
+        );
+        let set = doc.layers_in_use();
+        for layer in doc.layers() {
+            assert_eq!(set.contains(&layer.id), doc.layer_in_use(layer.id));
+        }
+        assert!(set.contains(&used) && !set.contains(&unused));
     }
 }

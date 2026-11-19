@@ -1005,3 +1005,233 @@ Built from `private_material/block_attributed_and_data_fields_specification.md` 
 The in-place editor is the multiline editor in a single-line mode: `Prompt::single_line` (set by `Editor::edit_line`) becomes `MTextEditor::single_line`. Enter accepts (Ctrl+Enter too), Tab and the bold, italic, underline and field keys do nothing, pasted line breaks and tabs become spaces, and the toolbar, ruler, resize grips and the Paragraph and Field dialogs are not shown. The draft is the text's own projection (`SingleLineText::projection`), so it is drawn where, how high, how turned and how justified the text will be; `SingleLineText::contents_of_projection` gets the plain words back. Empty words or Esc add nothing, and an accepted line is one undo step. An Align text is drawn at the usual height while typed, then fitted between its two points.
 `TEXTEDIT` (`annotate.textedit`, aliases `ED` and `DDEDIT`, in `text_edit_cmd.rs`; commands registered in `text_commands.rs`) asks `Select an annotation object or [Undo/Mode]` and refuses other objects. A single text or multiline text already selected (or double-clicked) is edited once and the command ends. Otherwise it repeats, as AutoCAD's does in its default Multiple mode: each text picked is edited and the prompt returns, until Enter. Undo takes back the last edit made in this run ("Nothing to undo" when there is none); Mode (Single or Multiple, remembered with the other text settings as `text_memory::Memory::multiple`) makes it end after one text. Esc in the editor ends the command, keeping the edits already made. A multiline text opens the in-place editor, as `MTEDIT` does (`mtext::edit_mtext_with_id`; `MTEDIT` stays for multiline text and is labelled Edit MText). A single-line text opens the same single-line editor on its own place, and the drawing leaves the text out while its draft shows. Only the words change, as one undo step ("Edit text"): the same words or Esc change nothing, and `SingleLineText::with_contents` keeps place, height, rotation, style and justification, fitting an Align or Fit text again between its points (Align changes the height and keeps the width factor, Fit the width factor). Double-clicking a single-line or multiline text with no command running runs TEXTEDIT.
 **Not done:** a Contents row in Properties (Properties rows hold numbers only), TEXTEDIT on attribute definitions and dimensions, a ribbon item for it, an editor box that shows at a readable size for a very small or large text on screen. Not yet driven in the real app.
+
+## Entity layer cache and a Performance settings page (planned 18-11-2026; branch `perf/entity-layer-cache`)
+
+Why: a 400k-entity drawing with 372 block references (the user's large DWG, 18.7 MB) took
+about 113 ms a frame at zoom extents, because painting is immediate-mode and redoes every
+entity (and every piece of every block reference) each frame, even when only the pointer moved.
+First step, done: pieces of block references are skipped off screen and under a pixel
+(`View::negligible`), 113 ms to 74 ms, 2.74M to 0.96M triangles.
+
+Plan: keep the tessellated plain entities as reusable meshes (`opendraft-canvas/src/layer_cache/`),
+rebuilt only when the key changes (document token = session uid + `Session::revision`, space and
+frozen layers, camera and canvas size, style colours, point style, display scale, and every
+Performance setting that changes the picture). Selected and hovered entities are drawn live on top
+(AutoCAD draws highlights on top; today a later entity can paint over a selected one). Plain
+entities are grouped in chunks of about 2,000 in draw order so a chunk holding a highlighted entity
+is rebuilt without it. Safety: a debug-build verifier that compares cached with fresh output, a
+random-edit equality test, `REGEN` clearing the cache, a memory cap with least-recently-used
+eviction.
+
+Phases and exit tests:
+0. Spike (done, below).
+1. Whole-layer cache, model space, with the key and the verifier. Pointer-only frames at or under
+   8 ms on the reference drawing; one unit test per key field.
+2. Highlight overlay by chunk exclusion; highlights look as before.
+2.5. Performance page (Settings): drawing cache Automatic / Always on / Off; memory limit (64 MB
+   to 2 GB, default 512 MB); zoom and pan behaviour Exact / Smooth / Automatic; settle delay; an
+   off-by-default frame-time and cache readout (no timing work while off).
+2.6. Skip-tiny-objects threshold (`MIN_DRAW_PX`), curve smoothness, anti-aliasing.
+2.7. Small-text and dense-hatch thresholds.
+3. Paper space and viewports: one slot per space and viewport.
+4. Pan and zoom: margin around the view, translate small pans, rebuild after zooming settles,
+   maybe across several frames or on a worker thread.
+5. Optional: rebuild only chunks the `Changes` touched, and an insert-piece cache.
+Settings are per user (in `Settings`), never in the drawing; per-drawing overrides were considered
+and rejected.
+
+Phase 1 done (18-11-2026): the whole-layer cache for the model tab (`opendraft-canvas/src/layer_cache/`,
+`view/entity_paint.rs`, `Session::draw_token`, `View::set_document_token` and `set_cache_config`; the
+Performance page is not built yet, so the app uses the defaults: Automatic, 512 MB). On the large DWG at
+zoom extents, release build, a frame where only the pointer moves went from 78 ms to 4.9 ms with the same
+959,124 triangles; one entity selected 4.3 ms; 10% (40k entities) selected 41 ms (was 95 ms). Not done in
+phase 1: layouts and viewports, REGEN (there is no such command yet), real-app check of the look.
+
+Phase 2 done (18-11-2026): chunks of 2,048 entities (`layer_cache/chunks.rs`); a chunk holding a
+selected or hovered entity is drawn from a variant without it, so the highlight has nothing under it
+(tests compare the triangles with painting directly, as a set). On the large DWG, release build:
+pointer only 6.4 ms, hover sweep 6.8 ms (worst 10 ms), 1 selected 5.7 ms, 10 selected 4.9 ms, 10%
+selected (40k) 49 ms (live highlights; 41 ms before chunking, the 7 ms is finding the chunks), all
+selected 342 ms (417k live highlights, 9.2M triangles; the same work as without the cache).
+Phase 1's 4.9 ms was measured with a steadier pointer; these runs move it across the drawing.
+Not done: a cheaper look for very large selections.
+
+Phase 2.5 done (18-11-2026), with the controls that exist: the Performance page of Settings
+(`performance_settings.rs`, between Files and Automation) has the drawing cache (Automatic, Always
+on, Off), the memory limit (slider, 64 MB to 2 GB, default 512 MB), the off-by-default frame-time
+readout (`frame_readout.rs`) and Reset to defaults. Tried in the app on the large DWG: Off gives an 80 ms
+frame and 0 MB kept; Automatic 13 ms (vsync-bound) with 17 MB kept. Not built until phase 4 gives them
+something to control: the zoom and pan behaviour (Exact, Smooth, Automatic) and the settle delay. The page
+does not show the machine's memory (that needs a system-information dependency, and with it the licence
+lists of this repository and the template). `AppState`'s selection helpers moved to `state_selection.rs`
+to keep `state.rs` under the size rule.
+
+Phase 4 plan (18-11-2026): a pan or zoom changes the camera, which is in the key, so the layer was
+rebuilt at once, about 100 ms on the large DWG. Design: when only the camera changed, draw the
+kept layer moved (a layer transform for a pan, a scale for a zoom) and rebuild the new one in time
+slices (about 8 ms a frame, after a settle delay, restarting if the camera moves again) and swap when
+it is done; edits, layer changes and the other key inputs still rebuild at once, because an old picture
+would show a deleted entity. Phases: 4a spike (done, below), 4b0 cheaper rebuild (done, below), 4b split
+the key into content and view and draw the old layer moved, 4c the time-sliced builder, 4d the
+settings (While zooming or panning: Exact, Smooth, Automatic, default Automatic; Settle delay, default
+100 ms) and a "rebuilding n%" line in the readout. Not in the first version: a margin around the view,
+so a pan shows blank strips until the new layer arrives.
+
+Phase 4a findings (release build, the large DWG): drawing the kept layer moved costs 8.7 ms with egui's
+layer transform (`Context::set_transform_layer`) and 10.5 ms with hand-made transformed copies, against
+7.4 ms unmoved, so a gesture frame can be about 9 ms. A full rebuild was 175 to 180 ms, not the 70 ms
+assumed: 120 ms of it was painting, of which about 55 ms was the chunk builder looking each entity up
+by id, and the rest an id-to-chunk map of 417k entries.
+
+Phase 4b0 done: chunks are built from the objects the query already returned, an entity's chunk is
+found from its drawing-order position and the position at which each chunk starts (no map), and an
+entity's colour is looked up after the too-small and hidden checks. A rebuild is now 94 to 119 ms
+(zoom extents 98 ms), about the cost of painting directly; the pointer-only frame is unchanged.
+
+Phases 4b to 4d done (18-11-2026): `LayerKey` is a content part and a view part; chunks are fixed ranges
+of the object list (so no spatial query, id lists or owner map are kept: an entity's chunk is its
+position divided by 2,048, and the chunk's objects come from `objects()[n * 2048..]`); a view-only change
+draws the old layer moved (`layer_cache/moved.rs`) while `pending.rs` makes the new one a few chunks a
+frame (8 ms) after the settle delay, restarting if the camera moves; edits, resizes and the other content
+changes still make the layer at once; if the old and the new would pass the memory limit together the new
+is made at once. The Performance page has "While zooming or panning" (Automatic, Smooth, Exact; Automatic
+means Smooth when the last layer took over 24 ms) and "Settle delay" (0 to 500 ms, default 100), and the
+readout shows "making the new picture: n%". Measured on the large DWG, release build: a pan drag costs 82 ms
+a frame in Exact and 9.2 ms (worst 13.8) in Smooth; after letting go the new exact picture is there in 17
+frames over about 280 ms with no frame over 23 ms. Tried in the app: Automatic picked Smooth for the large
+DWG; the picture after a zoom was the exact one. Not done: a margin around the view (a pan shows blank
+strips until the new layer arrives), layouts and viewports (phase 3), and the detail controls (2.6, 2.7).
+
+Phase 3 done (18-11-2026): each viewport and the sheet have a kept layer of their own (`Slot` in
+`layer_cache/slots.rs`; `View::paint_space` in `view/layer_paint.rs`), sharing the memory limit and the
+frame's slice of making layers; a viewport's clip rectangle is part of the key's view (it moves with the sheet),
+so zooming the sheet moves every picture. Measured on the large DWG through a sheet whose viewport frames the
+whole model, release build: pointer-only 71.6 ms painting directly, 6.3 ms cached; a zoom gesture of the sheet
+104 ms directly, 89 ms in Exact and 7.1 ms (worst 10.4) in Smooth. Tried in the app: a new layout shows the
+model and a wheel zoom of the sheet settles to the exact picture. Not done: the detail controls (phases 2.6 and
+2.7), a margin around the view, and a cheaper look for very large selections.
+
+Fix after trying it on the large drawing (18-11-2026): a kept picture holds only what was in view when it was made, so
+after a zoom out the moved old picture left most of the screen empty until the new one was made (about 320 ms). The old
+picture is now shown moved only while it covers at least half of the screen (`covered` in `layer_cache/moved.rs`);
+below that the new layer is made at once, which costs what painting directly did.
+
+Second fix (18-11-2026): timing a rebuild of the large drawing showed 372 block references taking about 50 of its
+66 ms, because each rebuild expanded every reference again (`Document::insert_pieces`, 140 to 190 us each) while the
+2,000 or so plain lines cost 16 ms. The pieces are now kept per state of the drawing (`view/insert_pieces.rs`, at most
+300,000 pieces, cleared when the token changes) and their boxes are the cached ones. A rebuild after a zoom out went
+from 72 ms to 36 ms; the first build of a drawing still pays for the expansion once.
+
+Third fix (18-11-2026), from trying the large drawing in the real app with the frame-time readout on: painting the
+canvas took 2 to 6 ms but the frame 58 ms, because the Layers panel asked `Document::layer_in_use` for every layer in
+every frame and each unused layer scanned all 417,000 objects (41 ms). `Document::layers_in_use` finds them in one
+pass and the panel keeps the answer for each state of the drawing (`layer_cells::layers_in_use`); the frame is now
+about 22 ms. Also: once the view has settled, a layer whose last build took 150 ms or less is made in one frame
+instead of a slice at a time (a rebuild's length was frames times (slice plus the frame's own cost), so on a slower
+machine the blurred old picture stayed for seconds), and a slice is 25 ms, not 8.
+
+Zoomed out (18-11-2026): `MIN_DRAW_PX`, the size under which an object is not drawn, went from 0.75 to 2 px. On the
+large drawing at extents that took the kept triangles from 17.5 MB to about 6 MB and the frame from 22 to 16 ms (3 px
+looked the same to the eye); the rest of a frame is the ribbon (about 3 ms even with no drawing), the command line
+and egui's own work. It applies to painting directly too. Meant to become a setting with the other detail controls.
+
+Ribbon cost (18-11-2026): timing the ribbon showed 4 to 10 ms a frame on the large drawing but under 1 ms on an empty
+one; the cause was the Select All command's enabled test, `Document::has_objects_here`, which counted every object of
+the space to say whether there was one (it now stops at the first), and the status bar's object count walked them all
+again (now counted once for each state of the drawing, `object_count` in `app/chrome.rs`). The frame on the large drawing
+at extents is now 9.5 ms (106 fps) with the readout on, from 58 ms.
+
+Debug-build crash (18-11-2026): the debug check that a kept layer equals a fresh one (every 256th frame) panicked on the
+large drawing because a degenerate shape gives a vertex at NaN, and `NaN != NaN`; vertices are now compared bit for bit
+(`same_vertices` in `layer_cache/capture.rs`). Found by running every sample drawing with the check on every frame in a
+debug build (none else differed). Release builds never ran the check.
+
+Selections (18-11-2026): with 38,355 of the large drawing's objects selected a frame took 43.7 ms and with all 417,486
+selected 471 ms, because each frame drew the glow and edge of every selected entity again and egui made triangles of them
+again, and built the exclusion lists. A selection of 256 or more is now kept as a picture (`layer_cache/selected.rs`,
+`View::draw_kept_selection`), made again only when the view, the selection or the highlight colours change, with its
+exclusion lists kept by a hash of the selection; hover stays live. The ribbon's property lists and the Properties
+panel each looked up every selected object in every frame (about 20 ms each at 417,000); `selected_objects::of` keeps
+the positions for each state of the drawing and selection, so a frame indexes them directly (Properties about 1 ms and
+the ribbon under 2 ms at 33,000). Measured in the app (release, readout on): 33,000 selected 23.5 ms (the app's own work
+about 8 ms of it), all 417,486 selected 126 ms with 255 MB of kept triangles (it was 471 ms). What is left is egui copying
+and the GPU drawing those triangles every frame, about 0.5 ms for each MB. Dropping the soft edge of the highlight halved
+it but made it differ from painting directly (and so from the debug check), so it was not kept. An earlier version of
+this note quoted 21 and 83 ms: those were measured with that soft-edge change in.
+
+Image mode (18-11-2026): the kept triangles were still copied by egui and drawn by the GPU in every frame (about
+0.5 ms for each MB: 6 MB for the large drawing, 25 MB with 38,000 selected, 250 MB with all selected). A spike showed that a
+plain software rasteriser draws the 428,000 triangles of the large drawing at extents in 53 ms on one thread and about
+20 ms on 16, to the same picture, so the layer is now drawn into an image (`layer_cache/raster.rs`) and the triangles let
+go; the image is one rectangle in a frame (`bitmap.rs`, `view/image_paint.rs`), and a large selection's highlight is an
+image too. Setting: Performance, "Draw it as an image / as triangles". Measured in the app (release, readout on) on the
+large drawing at extents: nothing selected 13.6 ms with 1.9 MB kept (it was 9.5 ms with 6 MB; the two readings were taken
+in different runs and the frame is mostly the interface now), 38,355 selected 12.8 ms with 3.8 MB (25 ms, 24.6 MB as
+triangles; 43.7 ms before any of this), all 417,486 selected 21.7 ms with 3.8 MB (196 ms, 250 MB; 471 ms before).
+Zoom in and out and a new layout tab were looked at and are right. Not done: the image is made on the thread that draws
+(about 20 to 50 ms, spread over eight threads, once for each new view), so a rebuild is still a short hitch, and the
+image covers only the screen, so a pan shows blank strips until the new one is made; making the triangles and the image
+in the background and with a margin around the view are the next steps. An old-picture move draws the image scaled, so it
+is soft until the new one arrives.
+
+Zoom latency (19-11-2026): a wheel notch on the large drawing took about 340 ms (release) and over a second (debug)
+to show a sharp picture. Timeline of one notch: egui's smoothed wheel delta kept the camera creeping for about
+170 ms, each step restarting the settle delay (100 ms), then the rebuild (about 55 ms in release: painting 20 ms,
+triangles 5 ms, the image 27 ms; 550 ms in debug, where our crates were unoptimised, and over the 150 ms "at once"
+limit, so it was also spread over frames 25 ms at a time). Now a notch zooms at once (`raw_scroll_delta`; same zoom
+per notch), the default settle delay is 50 ms (a saved setting keeps its own value), `opendraft-canvas` and
+`opendraft-core` are optimised in dev builds, and the rasteriser draws each row of a triangle only between its
+edges. Measured notch to sharp picture: release 340 to 130 ms (96 ms with a 30 ms settle); debug about 1 s to
+200 ms.
+
+Background pictures, a margin and a parallel rasteriser (19-11-2026): the three next steps above, done.
+- The rasteriser readies and bins its triangles on every thread (one run of meshes each; a tile draws the runs in
+  order): a rebuild at extents 52 to 46 ms.
+- A new picture for a moved view is made on a thread of its own (`view/builder.rs`, `view/background.rs`). Painting
+  needed no rewrite into plain shapes after all: the thread paints with a `View` and an egui context of its own and
+  makes triangles with the screen context's tessellator; only the small text pictures and the image are loaded into
+  the screen's context. `Session` keeps the drawing in an `Arc` so the thread can read it without a copy. Measured on
+  the large drawing (release, the scratch probe used for this note): a wheel notch is sharp after 50 to 67 ms with no
+  frame over 4 ms (it was 115 to 180 ms with frames of 50 to 113 ms on this thread); a drag gets new pictures while
+  it moves and is sharp 17 to 67 ms after letting go. The thread's first picture is slower (about 115 ms) while its
+  caches warm.
+- A picture kept as an image reaches a tenth of the canvas past each side (`IMAGE_MARGIN`). 20% cost a rebuild at
+  1.6x zoom 79 ms against 43 without; 10% costs 68 ms and arrives as soon, so 10% was kept: with pictures coming
+  while a drag moves, the margin only has to cover one picture's time.
+- Checked in the app (debug build, the large DWG): frames stay at 16 ms (vsync) through wheel zooms and a middle
+  drag, and the picture is sharp in the next screenshots.
+Streak across the view (19-11-2026, found by James in `private_material/render_issue_1.odraft`): a closed cyan
+polyline that runs out along a bulge arc, a hair (1e-7) across, straight back along the chord and a hair to its
+start. Zoomed out until the arc's sag is under the half-pixel tolerance it is drawn as its chord, so the path
+doubles back exactly; egui's join there averages two opposite sides, the result is rounding noise, and the corner
+lands at infinity or anywhere across the screen. It was never selectable (picking uses the real geometry) and came
+and went with the view (the noise is in the f32 screen positions); it was there before the image work too. Fix:
+`view/path_stroke.rs` drops points on top of the one before and cuts outlines where they turn back. A scan of every
+object of the file at 450 views each found it without the fix and nothing with it; `layer_cache_tests/spikes.rs`
+keeps that outline as a test. The same scan of the large DWG found no other entity drawing far outside its bounds,
+but text bounds are short of what is drawn by up to about 165 px at some zooms, and polylines with a width draw past
+their bounds by the width: both small, both left for later.
+
+Small objects back (19-11-2026): James found small objects went too early when zooming out. The 2 px cutoff was for
+kept triangles, which cost every frame; an image costs its pixels, so with the picture kept as an image (the default)
+the cutoff is 0.75 px again and only `Render::Triangles` keeps 2 px (`View::min_draw_px`). Cost on the large drawing
+(release): a rebuild at extents 46 to 84 ms (made in the background after a pan or zoom, but on this thread after an
+edit), a wheel notch out sharp after 66 ms against 50; frames unchanged.
+
+Not done: a picture is not started early for a zoom about to happen, the thread's caches start cold for each
+drawing, and a hatch whose "not drawn" note uses egui's fonts sends its whole drawing back to slices on this thread.
+
+Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
+- `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
+  be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.
+- `egui_glow` has no 16-bit index limit, so chunks need not stay under 65k vertices.
+- Cost split of a full frame: about 63 ms building shapes, about 14.5 ms tessellating (960k triangles,
+  26 MB of meshes). A frame that only submits the cached meshes: 0.34 ms plus 7.4 ms in egui's own
+  tessellation pass (it copies the vertices), against about 74 ms now. GPU upload of those 26 MB each
+  frame is not measured. The remaining 7 ms is the floor for this design; going lower needs fewer
+  triangles (the phase 2.6 settings) or keeping them on the GPU (custom GL callbacks), which this
+  plan does not do.
+- Small text is rasterised into textures held in a 512-entry cache (`text_raster.rs`). Cached meshes
+  that point at those textures must keep them alive (or the text must be left out of the cached layer
+  and drawn live); phase 1 decides which.

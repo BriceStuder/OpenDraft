@@ -54,11 +54,7 @@ pub fn show(
 ) -> Option<SlotEdit> {
     let doc = &state.docs[state.active];
     let document = doc.session.document();
-    let selected: Vec<&Object> = doc
-        .selection
-        .iter()
-        .filter_map(|&id| document.object(id))
-        .collect();
+    let selected: Vec<&Object> = crate::selected_objects::of(ui.ctx(), doc);
     let mut edit = None;
     for &(slot, rect) in slots {
         let id = egui::Id::new(("ribbon_slot", slot));

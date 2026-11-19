@@ -59,7 +59,7 @@ impl View {
             .iter()
             .map(|p| self.camera.world_to_screen(*p, rect))
             .collect();
-        painter.add(Shape::closed_line(path, stroke));
+        super::path_stroke::stroke_path(painter, path, true, stroke);
     }
 
     /// Paints `hatch` in `color`. `id` names its cache entry (`None` for a
@@ -148,6 +148,7 @@ impl View {
                     self.outline(painter, rect, contour, stroke);
                 }
                 if let Some(b) = boundary.first().and_then(|c| c.first()) {
+                    FONT_USED.set(true);
                     painter.text(
                         self.camera.world_to_screen(*b, rect),
                         egui::Align2::LEFT_BOTTOM,
@@ -159,4 +160,16 @@ impl View {
             }
         }
     }
+}
+
+thread_local! {
+    /// Set when a hatch's note is written with egui's fonts. Its glyphs point
+    /// into the font atlas of the painter's context, so a picture made on a
+    /// context of its own (in the background) cannot hold them.
+    static FONT_USED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether egui's fonts were used since the last call, and start again.
+pub(super) fn took_font() -> bool {
+    FONT_USED.replace(false)
 }

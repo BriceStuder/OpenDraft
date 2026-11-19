@@ -107,18 +107,14 @@ impl View {
             let Some(pieces) = dash_path(&points, closed, elements, scale) else {
                 // Too short to hold a repeat: one unbroken line.
                 let path: Vec<Pos2> = points.iter().map(|p| to_screen(*p)).collect();
-                painter.add(if closed {
-                    egui::Shape::closed_line(path, stroke)
-                } else {
-                    egui::Shape::line(path, stroke)
-                });
+                super::path_stroke::stroke_path(painter, path, closed, stroke);
                 continue;
             };
             for piece in pieces {
                 match piece {
                     Piece::Dash(run) => {
                         let path: Vec<Pos2> = run.iter().map(|p| to_screen(*p)).collect();
-                        painter.add(egui::Shape::line(path, stroke));
+                        super::path_stroke::stroke_path(painter, path, false, stroke);
                     }
                     Piece::Dot { at, .. } => {
                         painter.circle_filled(

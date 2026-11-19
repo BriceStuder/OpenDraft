@@ -46,6 +46,37 @@ struct Kept {
 
 thread_local! {
     static PICTURES: RefCell<HashMap<u64, Kept>> = RefCell::new(HashMap::new());
+    /// While a layer is being kept (see `layer_cache`), the textures its
+    /// text pictures use, so that the picture cache letting one go does not
+    /// free a texture the kept meshes still point at.
+    static HELD: RefCell<Option<Vec<TextureHandle>>> = const { RefCell::new(None) };
+    /// Where this thread's pictures are loaded, when not where they are
+    /// painted: a thread that makes the drawing's picture in the background
+    /// paints on a context of its own, but the textures must be the screen's.
+    static TEXTURES: RefCell<Option<egui::Context>> = const { RefCell::new(None) };
+}
+
+/// Load the pictures this thread makes into `ctx` from now on.
+pub fn load_into(ctx: egui::Context) {
+    TEXTURES.with(|t| *t.borrow_mut() = Some(ctx));
+}
+
+/// Start holding the textures of the pictures drawn from now on.
+pub fn hold_textures() {
+    HELD.with(|h| *h.borrow_mut() = Some(Vec::new()));
+}
+
+/// Stop holding, and hand over what was held.
+pub fn release_textures() -> Vec<TextureHandle> {
+    HELD.with(|h| h.borrow_mut().take()).unwrap_or_default()
+}
+
+fn hold(texture: &TextureHandle) {
+    HELD.with(|h| {
+        if let Some(held) = h.borrow_mut().as_mut() {
+            held.push(texture.clone());
+        }
+    });
 }
 
 /// Rasterise `tris` at `scale` pixels per layout unit, with a pixel of margin.
@@ -149,12 +180,14 @@ pub fn paint_picture(
     tris: impl FnOnce() -> Vec<Tri>,
     to_screen: &dyn Fn(f64, f64) -> Pos2,
 ) {
-    let ctx = painter.ctx();
+    let ctx = TEXTURES.with(|t| t.borrow().clone());
+    let ctx = ctx.as_ref().unwrap_or(painter.ctx());
     let now = ctx.cumulative_pass_nr();
     let found = PICTURES.with(|cache| {
         let mut cache = cache.borrow_mut();
         if let Some(k) = cache.get_mut(&key) {
             k.drawn = now;
+            hold(&k.texture);
             return Some((k.texture.id(), k.left, k.top, k.width, k.height));
         }
         let picture = rasterise(&tris(), scale)?;
@@ -169,6 +202,7 @@ pub fn paint_picture(
                 cache.clear();
             }
         }
+        hold(&texture);
         let id = texture.id();
         let out = (id, picture.left, picture.top, picture.width, picture.height);
         cache.insert(
