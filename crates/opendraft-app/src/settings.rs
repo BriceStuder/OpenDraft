@@ -90,7 +90,7 @@ impl Default for Settings {
             snap: SnapModes::default(),
             ortho: Ortho::default(),
             tracking: Tracking::default(),
-            pick_size: 6,
+            pick_size: 4,
             snap_aperture: 12,
             grip_size: 7,
             crosshair_size: 5,

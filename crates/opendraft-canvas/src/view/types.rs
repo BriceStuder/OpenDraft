@@ -44,7 +44,7 @@ pub struct PointerSizes {
 impl Default for PointerSizes {
     fn default() -> Self {
         Self {
-            pick: 6.0,
+            pick: 4.0,
             snap: 12.0,
             grip: 7.0,
         }

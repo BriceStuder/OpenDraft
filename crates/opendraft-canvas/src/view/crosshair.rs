@@ -52,6 +52,13 @@ pub(super) fn arms(size: u32, canvas: Vec2) -> Vec2 {
     }
 }
 
+fn arm_segments(center: f32, extent: f32, gap: f32) -> Option<[(f32, f32); 2]> {
+    (extent > gap).then_some([
+        (center - extent, center - gap),
+        (center + gap, center + extent),
+    ])
+}
+
 fn paint(
     painter: &Painter,
     canvas: Rect,
@@ -63,8 +70,15 @@ fn paint(
     let stroke = Stroke::new(1.0_f32, crosshair.color.unwrap_or(DEFAULT_COLOR));
     if shape != CursorShape::PickBox {
         let arm = arms(crosshair.size, canvas.size());
-        painter.hline((at.x - arm.x)..=(at.x + arm.x), at.y, stroke);
-        painter.vline(at.x, (at.y - arm.y)..=(at.y + arm.y), stroke);
+        let gap = pick as f32 + stroke.width * 0.5;
+        if let Some([(left, left_end), (right_start, right)]) = arm_segments(at.x, arm.x, gap) {
+            painter.hline(left..=left_end, at.y, stroke);
+            painter.hline(right_start..=right, at.y, stroke);
+        }
+        if let Some([(top, top_end), (bottom_start, bottom)]) = arm_segments(at.y, arm.y, gap) {
+            painter.vline(at.x, top..=top_end, stroke);
+            painter.vline(at.x, bottom_start..=bottom, stroke);
+        }
     }
     if shape != CursorShape::Crosshair {
         let half = pick as f32;
@@ -215,6 +229,15 @@ mod tests {
             canvas,
             "reaches either edge from anywhere"
         );
+    }
+
+    #[test]
+    fn crosshair_arms_leave_the_pickbox_clear() {
+        assert_eq!(
+            arm_segments(100.0, 40.0, 6.5),
+            Some([(60.0, 93.5), (106.5, 140.0)])
+        );
+        assert_eq!(arm_segments(100.0, 6.5, 6.5), None);
     }
 
     #[test]

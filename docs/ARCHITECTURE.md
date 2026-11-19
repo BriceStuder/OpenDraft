@@ -508,7 +508,8 @@ variables with their values. Names are upper case and matched ignoring case.
 - **The list is the app's.** `opendraft-app/src/sysvars.rs` binds the variables to
   `Settings` and the open drawing, so a variable that mirrors a setting is
   saved with the user's settings for free. Built: `GRIDMODE`, `GRIDUNIT`,
-  `OSMODE`, `SNAPMODE`, `SAVETIME`, `CURSORSIZE`, `PICKBOX`, `APERTURE`, `GRIPSIZE` (pixel radii of the pick, snap and grip targets; see `PointerSizes` in `opendraft-canvas`), `FILLETRAD`, `CHAMFERA`, `CHAMFERB`,
+  `OSMODE`, `SNAPMODE`, `SAVETIME`, `CURSORSIZE`, `PICKBOX` (defaults to a 4 px pick-box radius; Settings > Drafting > Sizes), `APERTURE`,
+  `GRIPSIZE` (pixel radii of the pick, snap and grip targets; see `PointerSizes` in `opendraft-canvas`), `FILLETRAD`, `CHAMFERA`, `CHAMFERB`,
   `CHAMFERC`, `CHAMFERD`, `CHAMMODE`, `TRIMMODE` (the last seven live in the
   `CommandDefaults` (`corner_memory.rs`) and are saved with the user's
   settings, not the drawing), and read-only `CMDACTIVE`, `DWGNAME`.
