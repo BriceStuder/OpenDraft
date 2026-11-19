@@ -19,8 +19,8 @@ pub const COLOR_LIST: &str = "properties.color";
 pub const LINEWEIGHT_LIST: &str = "properties.lineweight";
 pub const LINETYPE_LIST: &str = "properties.linetype";
 
-/// The light bulb and sun when on, in AutoCAD's yellow.
-const SWITCH_ON: Color32 = Color32::from_rgb(240, 196, 64);
+/// The light bulb, sun and open padlock, in AutoCAD's yellow.
+pub(crate) const SWITCH_ON: Color32 = Color32::from_rgb(240, 196, 64);
 const ROW_H: f32 = 22.0;
 /// Width of one switch icon in the layer list.
 const SWITCH_W: f32 = 20.0;
@@ -237,28 +237,35 @@ fn switch_tip(layer: &Layer, flag: LayerFlag) -> &'static str {
     }
 }
 
-/// A layer's switches, colour and name across `rect`, as AutoCAD's list.
-fn layer_row_contents(ui: &Ui, theme: &Theme, rect: Rect, layer: &Layer, text: Color32) {
-    let c = &theme.colors;
-    let glyphs = [
+/// The bulb, sun and padlock of a layer (in this list and the Layers
+/// panel), and their colours: yellow when the
+/// layer can be seen and edited (on, thawed, unlocked), `weak` grey when not,
+/// so a locked layer stands out as the off and frozen ones do.
+pub(crate) fn switch_glyphs(layer: &Layer, weak: Color32) -> [(char, Color32); 3] {
+    [
         if layer.on {
             (icons::LAYER_LIST_ON, SWITCH_ON)
         } else {
-            (icons::LAYER_LIST_OFF, c.text_weak)
+            (icons::LAYER_LIST_OFF, weak)
         },
         if layer.frozen {
-            (icons::LAYER_LIST_FROZEN, c.text_weak)
+            (icons::LAYER_LIST_FROZEN, weak)
         } else {
             (icons::LAYER_LIST_THAWED, SWITCH_ON)
         },
         if layer.locked {
-            (icons::LAYER_LIST_LOCKED, text)
+            (icons::LAYER_LIST_LOCKED, weak)
         } else {
-            (icons::LAYER_LIST_UNLOCKED, text)
+            (icons::LAYER_LIST_UNLOCKED, SWITCH_ON)
         },
-    ];
+    ]
+}
+
+/// A layer's switches, colour and name across `rect`, as AutoCAD's list.
+fn layer_row_contents(ui: &Ui, theme: &Theme, rect: Rect, layer: &Layer, text: Color32) {
+    let c = &theme.colors;
     let painter = ui.painter();
-    for (i, (glyph, color)) in glyphs.into_iter().enumerate() {
+    for (i, (glyph, color)) in switch_glyphs(layer, c.text_weak).into_iter().enumerate() {
         opendraft_ui::icon_set::paint(
             painter,
             egui::pos2(
@@ -294,4 +301,22 @@ fn layer_row_contents(ui: &Ui, theme: &Theme, rect: Rect, layer: &Layer, text: C
         FontId::proportional(theme.font_size_body),
         text,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_padlock_is_yellow_when_open_and_grey_when_locked_like_the_bulb_and_sun() {
+        let grey = Color32::GRAY;
+        let mut layer = Layer::new(opendraft_core::LayerId::DEFAULT, "0");
+        let colours = |l: &Layer| switch_glyphs(l, grey).map(|(_, c)| c);
+        assert_eq!(colours(&layer), [SWITCH_ON; 3], "on, thawed, unlocked");
+        layer.locked = true;
+        assert_eq!(colours(&layer)[2], grey);
+        layer.on = false;
+        layer.frozen = true;
+        assert_eq!(colours(&layer), [grey; 3]);
+    }
 }
