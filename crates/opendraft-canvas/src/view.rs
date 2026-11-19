@@ -203,29 +203,8 @@ impl View {
         let pointer = ui
             .input(|i| i.pointer.latest_pos())
             .filter(|p| rect.contains(*p) && !self.blocked(*p) && !Self::covered(ui.ctx(), *p));
-        // With an editor over the drawing the wheel still zooms, over the
-        // editor too, but not over a toolbar, menu or dialog above it.
-        let wheel_at = if self.wheel_through {
-            let ctx = ui.ctx();
-            ui.input(|i| i.pointer.latest_pos()).filter(|p| {
-                rect.contains(*p)
-                    && ctx
-                        .layer_id_at(*p)
-                        .is_none_or(|l| l.order == egui::Order::Background)
-            })
-        } else {
-            pointer
-        };
-        let over = response.hovered() || (self.wheel_through && wheel_at.is_some());
-        if let (true, Some(pos), false) = (over, wheel_at, in_layout) {
-            // The whole notch at once, as AutoCAD does: egui's smoothed delta
-            // creeps on for a sixth of a second, and the sharp picture waits for
-            // the view to stand still.
-            let (scroll, pinch) = ui.input(|i| (i.raw_scroll_delta.y, i.zoom_delta()));
-            let factor = f64::from((scroll * self.wheel_rate()).exp() * pinch);
-            if (factor - 1.0).abs() > 1e-9 {
-                self.camera.zoom_at(pos, rect, factor);
-            }
+        if !in_layout {
+            self.wheel_zoom(ui, rect, response.hovered(), pointer);
         }
 
         let tolerance = self.sizes.pick / self.camera.zoom;
