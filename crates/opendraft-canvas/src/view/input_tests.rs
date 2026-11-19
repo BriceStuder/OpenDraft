@@ -157,6 +157,36 @@ fn the_release_of_a_press_that_ended_a_command_is_not_a_click() {
 }
 
 #[test]
+fn a_press_on_nothing_at_a_sweep_prompt_is_a_path_when_dragged_and_a_click_when_not() {
+    let ctx = Context::default();
+    let mut view = View::default();
+    view.set_point_prompt(Some(crate::PointPrompt {
+        pick: true,
+        sweep: true,
+        ..Default::default()
+    }));
+    let (from, mid, to) = (pos2(100.0, 100.0), pos2(200.0, 120.0), pos2(300.0, 100.0));
+    frame(&mut view, &ctx, vec![Event::PointerMoved(from)]);
+    let pressed = frame(&mut view, &ctx, vec![button(from, true)]);
+    assert!(
+        pressed.prompted.is_none(),
+        "the press waits for the release"
+    );
+    frame(&mut view, &ctx, vec![Event::PointerMoved(mid)]);
+    frame(&mut view, &ctx, vec![Event::PointerMoved(to)]);
+    let released = frame(&mut view, &ctx, vec![button(to, false)]);
+    let path = released.path.expect("the drag is a path");
+    assert_eq!(path.len(), 3, "from, through and to");
+    assert!(released.prompted.is_none() && released.select.is_none());
+    // Pressed and released in place: a click on nothing, where it was.
+    frame(&mut view, &ctx, vec![Event::PointerMoved(from)]);
+    frame(&mut view, &ctx, vec![button(from, true)]);
+    let clicked = frame(&mut view, &ctx, vec![button(from, false)]);
+    assert!(clicked.prompted.is_some() && clicked.picked.is_none());
+    assert!(clicked.path.is_none());
+}
+
+#[test]
 fn an_unblocked_canvas_drag_still_selects() {
     let ctx = Context::default();
     let mut view = View::default();

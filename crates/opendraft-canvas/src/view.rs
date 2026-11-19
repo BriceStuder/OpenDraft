@@ -31,6 +31,7 @@ mod paint;
 mod point_paint;
 mod snap_choice;
 mod snap_marker;
+mod sweep;
 mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
@@ -87,6 +88,9 @@ pub struct View {
     trailing: Option<Point>,
     /// Screen start and current position of a selection box drag.
     drag: Option<(Pos2, Pos2)>,
+    /// Screen path of a press in empty space at a sweep prompt, while the
+    /// button is down (see `sweep.rs`).
+    sweep: Option<Vec<Pos2>>,
     request: Option<Request>,
     /// Set while a running command waits for a point.
     point_prompt: Option<PointPrompt>,
@@ -291,14 +295,20 @@ impl View {
         let mut select = None;
         let mut prompted = None;
         let mut picked = None;
+        let mut path = None;
         let mut prompt_enter = false;
         let mut snap_menu = None;
         let mut context_menu = None;
+        let sweeps = picking && self.point_prompt.as_ref().is_some_and(|p| p.sweep);
+        if !sweeps {
+            self.sweep = None;
+        }
         if prompting {
             prompted = placed;
             if picking {
                 picked = placed.and_then(|c| pick_object(document, c, tolerance));
             }
+            path = self.sweep_answer(ui, rect, sweeps && picked.is_none(), &mut prompted);
             (prompt_enter, snap_menu) = self.right_release(ui, rect);
         } else {
             context_menu = self.right_released(ui, rect).0;
@@ -391,6 +401,7 @@ impl View {
             self.paint_snap_marker(&painter, rect, style, snap_modes, snapped, cursor);
         }
         self.paint_selection_box(&painter, style);
+        self.paint_sweep(&painter, style);
         if let (true, Some(at)) = (response.hovered(), pointer) {
             let shape = CursorShape::for_state(prompting, picking, self.selecting_objects);
             let boxed = prompting && !picking && snap_modes.aperture_box;
@@ -415,6 +426,7 @@ impl View {
             grips,
             prompted,
             picked,
+            path,
             pick_shift: shift,
             prompt_enter,
             snap_menu,

@@ -80,6 +80,7 @@ impl AppState {
                 allow_empty: false,
                 pick_locked: false,
                 esc_backs: false,
+                sweep: false,
                 mtext: None,
                 mtext_of: None,
                 single_line: false,
@@ -112,6 +113,7 @@ impl AppState {
             allow_empty: false,
             pick_locked: false,
             esc_backs: false,
+            sweep: false,
             mtext: None,
             mtext_of: None,
             single_line: false,
@@ -228,6 +230,7 @@ impl OpenDraftApp {
         // With several snap points under the pointer and no field being typed
         // in, Tab is the canvas's: it cycles the snap points.
         let doc = &mut self.state.docs[self.state.active];
+        let uid = doc.uid;
         let cycles = doc.view.snap_cycles() && !doc.dynamic_input.editing;
         let input = &mut doc.dynamic_input;
         if input.signature != signature {
@@ -256,6 +259,30 @@ impl OpenDraftApp {
         });
         if typed && !input.editing {
             input.begin(fields.first().copied().unwrap_or(Field::Keyword));
+            // At a prompt with no fields (an object prompt, say) the keyword
+            // box only appears now, too late for this frame's typing: take
+            // it into the draft here, or the first letter is lost.
+            if fields.is_empty() {
+                let text: String = ctx.input_mut(|i| {
+                    let mut text = String::new();
+                    i.events.retain(|e| match e {
+                        Event::Text(t) | Event::Paste(t) => {
+                            text.push_str(t);
+                            false
+                        }
+                        _ => true,
+                    });
+                    text
+                });
+                input.draft.push_str(&text);
+                let id = field_id(uid, Field::Keyword);
+                let mut state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
+                let end = egui::text::CCursor::new(input.draft.chars().count());
+                state
+                    .cursor
+                    .set_char_range(Some(egui::text::CCursorRange::one(end)));
+                state.store(ctx, id);
+            }
         }
         // A last character and Enter/Tab can arrive in one frame. Let TextEdit
         // apply that character before acting on the navigation key next frame.

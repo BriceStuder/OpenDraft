@@ -12,9 +12,11 @@ mod home_keyboard;
 mod home_layout;
 mod linetypes;
 mod mleader_styles;
+mod object_prompt_typing;
 mod placement;
 mod pline_snap;
 mod text_styles;
+mod trim_window;
 mod units;
 mod wheel_double_click;
 
