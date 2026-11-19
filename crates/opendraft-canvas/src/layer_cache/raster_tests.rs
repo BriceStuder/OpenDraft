@@ -163,3 +163,76 @@ fn a_vertex_that_is_not_a_number_draws_nothing() {
     let done = rasterise(&[Arc::new(mesh)], [8, 8], pos2(0.0, 0.0), 1.0, 1);
     assert!(done.image.pixels.iter().all(|&b| b == 0));
 }
+
+#[test]
+fn a_thin_triangle_reaching_far_off_screen_draws_only_where_it_is() {
+    // A line a pixel thick that runs out to millions of pixels each way, as a
+    // long line seen from close up does. Single precision edge maths at that
+    // size draws rows that the triangle does not touch.
+    let white = Color32::WHITE;
+    let mut mesh = Mesh::default();
+    let at = |x: f32, y: f32| Vertex {
+        pos: pos2(x, y),
+        uv: pos2(0.0, 0.0),
+        color: white,
+    };
+    mesh.vertices.extend([
+        at(-8_000_000.0, 50.0),
+        at(8_000_000.0, 50.0),
+        at(8_000_000.0, 51.0),
+        at(-8_000_000.0, 51.0),
+    ]);
+    mesh.indices.extend([0, 1, 2, 0, 2, 3]);
+    let done = rasterise(&[Arc::new(mesh)], [120, 100], pos2(0.0, 0.0), 1.0, 1);
+    for y in 0..100 {
+        let filled = (0..120).filter(|&x| done.image.at(x, y)[3] > 0).count();
+        let want = if y == 50 { 120 } else { 0 };
+        assert_eq!(filled, want, "row {y}");
+    }
+}
+
+#[test]
+fn a_triangle_with_a_corner_far_off_screen_is_the_same_as_its_visible_part() {
+    // Cut at the edge of the picture by hand, the same shape has the same pixels.
+    let red = Color32::from_rgb(200, 0, 0);
+    let make = |far: f32| {
+        let at = |x: f32, y: f32| Vertex {
+            pos: pos2(x, y),
+            uv: pos2(0.0, 0.0),
+            color: red,
+        };
+        let mut mesh = Mesh::default();
+        mesh.vertices
+            .extend([at(10.0, 10.0), at(far, 10.0), at(10.0, far)]);
+        mesh.indices.extend([0, 1, 2]);
+        rasterise(&[Arc::new(mesh)], [64, 64], pos2(0.0, 0.0), 1.0, 1).image
+    };
+    // The diagonal x + y = far + 10 is beyond the picture in both, so each
+    // fills the whole quarter from the corner at (10, 10).
+    assert!(make(1_000.0) == make(5_000_000.0));
+}
+
+#[test]
+fn a_long_sliver_that_covers_no_pixel_centre_draws_nothing() {
+    // Thinner than a thousandth of a pixel and a hundred thousand long, lying
+    // between two rows of pixel centres: nothing of it is on a pixel, but
+    // rounding in single precision once drew a streak along it.
+    let white = Color32::WHITE;
+    let at = |x: f32, y: f32| Vertex {
+        pos: pos2(x, y),
+        uv: pos2(0.0, 0.0),
+        color: white,
+    };
+    let mut mesh = Mesh::default();
+    mesh.vertices.extend([
+        at(-50_000.0, 50.0),
+        at(70_000.0, 50.0),
+        at(10_000.0, 50.000004),
+    ]);
+    mesh.indices.extend([0, 1, 2]);
+    let done = rasterise(&[Arc::new(mesh)], [120, 100], pos2(0.0, 0.0), 1.0, 1);
+    assert!(
+        done.image.pixels.iter().all(|&b| b == 0),
+        "a streak was drawn"
+    );
+}
