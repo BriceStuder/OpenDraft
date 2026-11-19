@@ -25,15 +25,33 @@ pub(crate) fn capture(
     (shapes, textures)
 }
 
-/// The triangles of `shapes`, made as egui would make them this frame.
-pub(crate) fn tessellate(ctx: &Context, shapes: Vec<ClippedShape>) -> Vec<Mesh> {
-    let options = ctx.tessellation_options(|o| *o);
-    let (size, discs) = ctx.fonts(|f| {
-        let atlas = f.texture_atlas();
-        let atlas = atlas.lock();
-        (atlas.size(), atlas.prepared_discs())
-    });
-    Tessellator::new(ctx.pixels_per_point(), options, size, discs)
+/// What egui makes triangles with this frame, read from the context once so
+/// that triangles can be made on another thread exactly as egui would make
+/// them here.
+#[derive(Clone)]
+pub(crate) struct Tess(Tessellator);
+
+impl Tess {
+    pub fn of(ctx: &Context) -> Self {
+        let options = ctx.tessellation_options(|o| *o);
+        let (size, discs) = ctx.fonts(|f| {
+            let atlas = f.texture_atlas();
+            let atlas = atlas.lock();
+            (atlas.size(), atlas.prepared_discs())
+        });
+        Self(Tessellator::new(
+            ctx.pixels_per_point(),
+            options,
+            size,
+            discs,
+        ))
+    }
+}
+
+/// The triangles of `shapes`, made as egui would make them with `tess`.
+pub(crate) fn tessellate(tess: &Tess, shapes: Vec<ClippedShape>) -> Vec<Mesh> {
+    tess.0
+        .clone()
         .tessellate_shapes(shapes)
         .into_iter()
         .filter_map(|p| match p.primitive {

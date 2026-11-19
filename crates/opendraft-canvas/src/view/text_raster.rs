@@ -50,6 +50,15 @@ thread_local! {
     /// text pictures use, so that the picture cache letting one go does not
     /// free a texture the kept meshes still point at.
     static HELD: RefCell<Option<Vec<TextureHandle>>> = const { RefCell::new(None) };
+    /// Where this thread's pictures are loaded, when not where they are
+    /// painted: a thread that makes the drawing's picture in the background
+    /// paints on a context of its own, but the textures must be the screen's.
+    static TEXTURES: RefCell<Option<egui::Context>> = const { RefCell::new(None) };
+}
+
+/// Load the pictures this thread makes into `ctx` from now on.
+pub fn load_into(ctx: egui::Context) {
+    TEXTURES.with(|t| *t.borrow_mut() = Some(ctx));
 }
 
 /// Start holding the textures of the pictures drawn from now on.
@@ -171,7 +180,8 @@ pub fn paint_picture(
     tris: impl FnOnce() -> Vec<Tri>,
     to_screen: &dyn Fn(f64, f64) -> Pos2,
 ) {
-    let ctx = painter.ctx();
+    let ctx = TEXTURES.with(|t| t.borrow().clone());
+    let ctx = ctx.as_ref().unwrap_or(painter.ctx());
     let now = ctx.cumulative_pass_nr();
     let found = PICTURES.with(|cache| {
         let mut cache = cache.borrow_mut();

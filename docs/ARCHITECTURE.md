@@ -306,7 +306,7 @@ select by clicking or dragging a box when no command is waiting for a point.
 | Name | Meaning |
 |---|---|
 | `Document` (`opendraft-core`) | The drawing data: objects, layers. Pure, no UI. |
-| `Session` | A `Document` plus its undo history. Headless and testable. |
+| `Session` | A `Document` (shared, see "Background pictures") plus its undo history. Headless and testable. |
 | `Doc` (`opendraft-app`) | An open window: a `Session` plus view and selection. |
 | `Editor` | What a running command is handed to talk to the user and to edit. |
 | `Runner` | The UI side of a running command: its thread, its pending prompt. |
@@ -801,7 +801,7 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   only the view differs and the motion setting allows (Smooth, or Automatic when the last
   layer took over 24 ms to make), the old layer is drawn moved (egui's `transform_range`, with
   the clip rectangles put back) and the new one is made a slice of chunks a frame (8 ms) once
-  the view has stood still for the settle delay (100 ms); moving again starts it over, and
+  the view has stood still for the settle delay (50 ms); moving again starts it over, and
   when done it replaces the old one. Anything in the content part changing (an edit, a
   resize, a colour) still makes the new layer at once, because an old picture would show
   what is no longer there. If the old and the new together would pass the memory limit, the
@@ -823,14 +823,48 @@ selected and hovered entities are painted live over them, as AutoCAD draws highl
   image, not in place of what they cover (no chunk variants are made); a large selection has an
   image of its own. `Render::Triangles` keeps the triangles and draws them as before; a change of
   setting makes the layer again. Debug builds compare the image with a fresh one like the chunks.
+  Each row of a triangle is drawn only between where its edges cross it (widened by two pixels,
+  the exact test deciding them), not across its whole box, which for a slanted line is mostly empty.
+  The meshes are cut into one run per thread, each readied and sorted into tiles on its thread,
+  and a tile draws the runs in order, so the picture is the same for any number of threads.
+  An image reaches past each side of the canvas by a tenth of it (`IMAGE_MARGIN`; the `Frame`
+  carries the wider rectangle and clip, centred so the camera's mapping is unchanged), so a pan
+  shows drawing, not a blank strip, until the new picture comes; whether an old picture covers
+  enough of the screen to be shown moved counts the margin.
+- **Background pictures** (`view/builder.rs`, `view/background.rs`): when the app shares the
+  drawing (`View::set_shared_document`, a `Weak` of `Session::shared_document`) and the layer is
+  kept as an image, a new picture for a moved view is made on a thread of its own, at once (no
+  settle delay), while the old one is shown moved; Automatic motion then always shows it moved.
+  The thread keeps its own `View` (so its hatch and block reference caches stay warm) and paints
+  on an egui context of its own, because a context's shapes are taken by the frame that ends
+  next; the triangles are made with the screen context's tessellator (`Tess`), small text
+  pictures are loaded into the screen's context (`text_raster::load_into`), and so is the image,
+  which is all that comes back. Only the newest picture asked for each slot is made; one being
+  made is finished, so a pan that never stands still still gets new pictures, and one that comes
+  back for a view other than the current one is kept if it shows the same content. A picture
+  that needed egui's fonts (a hatch's "not drawn" note: its glyphs are in the other context's
+  atlas) comes back empty and that content is made on the screen's thread from then on, as is a
+  picture whose job panicked. Edits, the first picture and a zoom out too far to show moved are
+  still made at once on the screen's thread. `Session` keeps the drawing as `Arc<Document>`
+  and edits through `Arc::make_mut`: the view holds it weakly, so an edit copies the drawing
+  (about 34 ms for 417,000 objects) only when it lands while a picture is being made from it.
+- **Outlines through egui** (`view/path_stroke.rs`): the outlines of polylines, arcs, ellipses,
+  splines, dashes and hatch boundaries are stroked through `stroke_path`, which drops points within
+  0.05 px of the one before and cuts a path where it turns back on itself (within about a degree),
+  stroking each part alone. egui joins segments by averaging their sides; at a reversal that average
+  is rounding noise and the join's corner can land anywhere, even at infinity: a streak across the
+  view that is not in the drawing, cannot be picked and comes and goes with the view.
+- **Wheel zoom**: a notch zooms at once (`raw_scroll_delta`), as AutoCAD does, not over egui's
+  smoothed delta, which creeps on for about 170 ms and so held back the settle delay and the
+  sharp picture.
 - **Large selections** (`layer_cache/selected.rs`): a selection of 256 or more objects has its
   highlight kept as triangles too, under a key of the layer key, a hash of the selected ids and
   the two highlight colours, made again only when one of those changes; the exclusion lists are
   kept by the same hash and the hovered entity. A hovered entity, a small selection and any
   highlight while an old picture is shown moved are still drawn live. Over the memory limit the
   highlight is drawn live. The debug check compares it with a fresh one like the chunks.
-- **Not yet**: a pan shows blank strips at the edges until the new layer arrives (no margin
-  is made around the view).
+- **Not yet**: a pan faster than the margin per picture still shows a blank strip for a
+  moment; kept triangles (`Render::Triangles`) are still made here, a slice a frame.
   Highlights are drawn live and over everything, so a very large selection (hundreds of
   thousands) is as slow as it was.
 

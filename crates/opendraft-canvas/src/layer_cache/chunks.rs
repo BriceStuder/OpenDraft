@@ -111,6 +111,9 @@ pub(crate) struct LayerCache {
     pub(super) excluded: Option<(u64, Option<EntityId>, Arc<Exclusions>)>,
     /// The layer as an image, when it is kept as one (see `bitmap.rs`).
     pub(super) bitmap: Option<super::bitmap::Bitmap>,
+    /// A picture the background could not make: pictures of the same
+    /// drawing and settings are made on the screen's thread.
+    pub(super) refused: Option<LayerKey>,
 }
 
 impl LayerCache {

@@ -296,7 +296,9 @@ fn clearing_the_cache_builds_it_again() {
     assert_eq!(rig.builds(), 2);
 }
 
+mod background;
 mod highlights;
 mod image;
 mod layouts;
 mod motion;
+mod spikes;

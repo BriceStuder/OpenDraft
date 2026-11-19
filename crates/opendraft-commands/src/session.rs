@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use opendraft_core::{Document, LayerId, Layout, LayoutId};
 
@@ -30,7 +31,10 @@ pub enum HistoryError {
 /// A document together with its undo history. All edits go through
 /// [`Session::perform`] so they can be undone.
 pub struct Session {
-    pub(crate) document: Document,
+    /// Shared so that the canvas can make a picture of it on another thread
+    /// without copying it; an edit copies it only if such a picture is being
+    /// made from it at that moment (see [`Session::shared_document`]).
+    pub(crate) document: Arc<Document>,
     pub(crate) history: History,
     /// Where the history stood when the drawing was last saved (or opened).
     saved_at: u64,
@@ -47,7 +51,7 @@ impl Default for Session {
     fn default() -> Self {
         static NEXT_UID: AtomicU64 = AtomicU64::new(1);
         Self {
-            document: Document::default(),
+            document: Arc::default(),
             history: History::default(),
             saved_at: 0,
             revision: 0,
@@ -61,28 +65,44 @@ impl Session {
         &self.document
     }
 
+    /// The drawing as it is now, to read on another thread: it stays as it
+    /// is, whatever is edited afterwards.
+    pub fn shared_document(&self) -> Arc<Document> {
+        Arc::clone(&self.document)
+    }
+
+    /// The drawing, to change. Copied first if a reader holds it.
+    pub(crate) fn document_mut(&mut self) -> &mut Document {
+        Arc::make_mut(&mut self.document)
+    }
+
     pub fn history(&self) -> &History {
         &self.history
     }
 
     /// Reserve an id for a layer about to be added.
     pub fn allocate_layer_id(&mut self) -> LayerId {
-        self.document.allocate_layer_id()
+        self.document_mut().allocate_layer_id()
     }
 
     /// Tell the document which space the view is in, and which layers the
     /// viewport being worked through has frozen. Not an edit: no revision,
     /// no history.
     pub fn set_active_space(&mut self, layout: Option<LayoutId>, frozen: Vec<LayerId>) {
-        self.document.set_active_layout(layout);
-        self.document.set_active_frozen(frozen);
+        // Run every frame: change nothing (and so copy nothing) when the
+        // space is as it was.
+        if self.document.active_layout() != layout || self.document.active_frozen() != frozen {
+            let document = self.document_mut();
+            document.set_active_layout(layout);
+            document.set_active_frozen(frozen);
+        }
     }
 
     /// Store layouts changed by panning or zooming a viewport. The drawing
     /// differs afterwards (the revision moves) but, like AutoCAD's zoom, it is
     /// not an undo step.
     pub fn store_view_layouts(&mut self, layouts: Vec<Layout>) {
-        self.document.set_layouts(layouts);
+        self.document_mut().set_layouts(layouts);
         self.revision += 1;
     }
 
@@ -102,7 +122,7 @@ impl Session {
     /// A session for a drawing just opened from a file: unmodified.
     pub fn with_document(document: Document) -> Self {
         Self {
-            document,
+            document: Arc::new(document),
             ..Self::default()
         }
     }
@@ -111,7 +131,7 @@ impl Session {
     /// no saved file, so it counts as modified until it is saved.
     pub fn recovered(document: Document) -> Self {
         Self {
-            document,
+            document: Arc::new(document),
             saved_at: u64::MAX,
             ..Self::default()
         }
@@ -138,14 +158,14 @@ impl Session {
     /// Run `action` and report what it changed.
     pub fn perform(&mut self, action: impl Action + 'static) -> Changes {
         let mut action: Box<dyn Action> = Box::new(action);
-        action.apply(&mut self.document);
+        action.apply(self.document_mut());
         // Associative hatches that follow what it changed join its undo step.
         let follow = crate::associations::updates(&self.document, &action.changes());
         let changes = if follow.is_empty() {
             self.history.record(action)
         } else {
             let mut update = ModifyEntities::new("Update associations", follow);
-            update.apply(&mut self.document);
+            update.apply(self.document_mut());
             let name = action.name();
             self.history.record(Box::new(Batch {
                 name,
@@ -174,7 +194,7 @@ impl Session {
         name: &str,
         edit: impl FnOnce(&mut Transaction) -> Result<T, E>,
     ) -> Result<T, E> {
-        let mut tx = Transaction::new(&mut self.document);
+        let mut tx = Transaction::new(Arc::make_mut(&mut self.document));
         match tx.run(edit) {
             Ok(value) => {
                 if let Some(batch) = tx.finish(name) {
@@ -202,7 +222,7 @@ impl Session {
         provenance: Provenance,
         edit: impl FnOnce(&mut Transaction) -> Result<T, E>,
     ) -> Result<(T, Changes), CheckedError<E>> {
-        let mut tx = Transaction::new(&mut self.document);
+        let mut tx = Transaction::new(Arc::make_mut(&mut self.document));
         let value = match tx.run(edit) {
             Ok(value) => value,
             Err(error) => {
@@ -214,7 +234,7 @@ impl Session {
             return Ok((value, Changes::default()));
         };
         if let Err(error) = self.document.validate() {
-            batch.revert(&mut self.document);
+            batch.revert(self.document_mut());
             return Err(CheckedError::Invalid(error.to_string()));
         }
         let changes = self.history.record_by(batch, provenance);
@@ -244,14 +264,14 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> Option<Step> {
-        let step = self.history.undo(&mut self.document);
+        let step = self.history.undo(Arc::make_mut(&mut self.document));
         self.revision += u64::from(step.is_some());
         self.debug_check();
         step
     }
 
     pub fn redo(&mut self) -> Option<Step> {
-        let step = self.history.redo(&mut self.document);
+        let step = self.history.redo(Arc::make_mut(&mut self.document));
         self.revision += u64::from(step.is_some());
         self.debug_check();
         step
@@ -285,6 +305,34 @@ mod tests {
             start: Point::new(0.0, 0.0),
             end: Point::new(1.0, 1.0),
         }));
+    }
+
+    #[test]
+    fn a_shared_drawing_stays_as_it_was_when_the_drawing_is_edited() {
+        let mut session = Session::default();
+        add(&mut session);
+        let shared = session.shared_document();
+        add(&mut session);
+        session.undo();
+        session.undo();
+        assert_eq!(shared.len(), 1, "the copy read elsewhere is unchanged");
+        assert!(session.document().is_empty());
+        // Held only weakly, the drawing is moved, not copied, by an edit.
+        let weak = Arc::downgrade(&session.shared_document());
+        add(&mut session);
+        assert!(weak.upgrade().is_none());
+    }
+
+    #[test]
+    fn telling_the_session_the_space_it_is_in_again_changes_nothing() {
+        let mut session = Session::default();
+        session.set_active_space(None, Vec::new());
+        let shared = session.shared_document();
+        session.set_active_space(None, Vec::new());
+        assert!(
+            Arc::ptr_eq(&shared, &session.shared_document()),
+            "not copied"
+        );
     }
 
     #[test]

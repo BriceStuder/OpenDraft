@@ -214,7 +214,8 @@ impl View {
             }
         }
         if let (true, Some(at)) = (response.hovered(), pointer) {
-            let (scroll, pinch) = ui.input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));
+            // The whole notch at once (see `View::show`).
+            let (scroll, pinch) = ui.input(|i| (i.raw_scroll_delta.y, i.zoom_delta()));
             let factor = f64::from((scroll * wheel_rate).exp() * pinch);
             if (factor - 1.0).abs() > 1e-9 {
                 self.zoom_view(&mut vp, &mut edited, rect, at, factor);

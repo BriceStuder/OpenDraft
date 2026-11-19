@@ -39,10 +39,10 @@ mod raster_tests;
 mod selected;
 mod slots;
 
-pub(crate) use bitmap::Geometry;
+pub(crate) use bitmap::{make as make_image, Bitmap, Geometry};
 #[cfg(debug_assertions)]
 pub(crate) use capture::same_triangles;
-pub(crate) use capture::{capture, tessellate};
+pub(crate) use capture::{capture, tessellate, Tess};
 pub(crate) use chunks::{chunk_count, LayerCache, Piece, CHUNK_OBJECTS};
 pub(crate) use key::{camera_of, Inputs, LayerKey};
 pub(crate) use moved::{covered, draw_moved, move_between};
@@ -95,12 +95,19 @@ pub enum Render {
     Triangles,
 }
 
+/// How far a picture kept as an image reaches past each side of the canvas,
+/// as a part of the canvas, so that a pan shows that much of the drawing
+/// before the new picture comes. An image costs its pixels, not its contents,
+/// so this is cheap to draw; it makes a picture about 1.4 times the screen's.
+pub(crate) const IMAGE_MARGIN: f32 = 0.1;
+
 /// In Automatic motion, a picture that took longer than this to make (in
 /// milliseconds) is made while the old one is shown moved.
 pub const AUTO_SMOOTH_MS: u64 = 24;
 /// How long the view must stand still before a new picture is started, unless
-/// the user sets another.
-pub const DEFAULT_SETTLE_MS: u32 = 100;
+/// the user sets another. Long enough to span the gap between the notches of a
+/// wheel turned quickly, so a picture is not made between each.
+pub const DEFAULT_SETTLE_MS: u32 = 50;
 /// How long one frame may spend making the new picture, in milliseconds.
 pub const DEFAULT_SLICE_MS: u32 = 25;
 

@@ -1171,6 +1171,53 @@ image covers only the screen, so a pan shows blank strips until the new one is m
 in the background and with a margin around the view are the next steps. An old-picture move draws the image scaled, so it
 is soft until the new one arrives.
 
+Zoom latency (19-11-2026): a wheel notch on the large drawing took about 340 ms (release) and over a second (debug)
+to show a sharp picture. Timeline of one notch: egui's smoothed wheel delta kept the camera creeping for about
+170 ms, each step restarting the settle delay (100 ms), then the rebuild (about 55 ms in release: painting 20 ms,
+triangles 5 ms, the image 27 ms; 550 ms in debug, where our crates were unoptimised, and over the 150 ms "at once"
+limit, so it was also spread over frames 25 ms at a time). Now a notch zooms at once (`raw_scroll_delta`; same zoom
+per notch), the default settle delay is 50 ms (a saved setting keeps its own value), `opendraft-canvas` and
+`opendraft-core` are optimised in dev builds, and the rasteriser draws each row of a triangle only between its
+edges. Measured notch to sharp picture: release 340 to 130 ms (96 ms with a 30 ms settle); debug about 1 s to
+200 ms.
+
+Background pictures, a margin and a parallel rasteriser (19-11-2026): the three next steps above, done.
+- The rasteriser readies and bins its triangles on every thread (one run of meshes each; a tile draws the runs in
+  order): a rebuild at extents 52 to 46 ms.
+- A new picture for a moved view is made on a thread of its own (`view/builder.rs`, `view/background.rs`). Painting
+  needed no rewrite into plain shapes after all: the thread paints with a `View` and an egui context of its own and
+  makes triangles with the screen context's tessellator; only the small text pictures and the image are loaded into
+  the screen's context. `Session` keeps the drawing in an `Arc` so the thread can read it without a copy. Measured on
+  the large drawing (release, the scratch probe used for this note): a wheel notch is sharp after 50 to 67 ms with no
+  frame over 4 ms (it was 115 to 180 ms with frames of 50 to 113 ms on this thread); a drag gets new pictures while
+  it moves and is sharp 17 to 67 ms after letting go. The thread's first picture is slower (about 115 ms) while its
+  caches warm.
+- A picture kept as an image reaches a tenth of the canvas past each side (`IMAGE_MARGIN`). 20% cost a rebuild at
+  1.6x zoom 79 ms against 43 without; 10% costs 68 ms and arrives as soon, so 10% was kept: with pictures coming
+  while a drag moves, the margin only has to cover one picture's time.
+- Checked in the app (debug build, the large DWG): frames stay at 16 ms (vsync) through wheel zooms and a middle
+  drag, and the picture is sharp in the next screenshots.
+Streak across the view (19-11-2026, found by James in `private_material/render_issue_1.odraft`): a closed cyan
+polyline that runs out along a bulge arc, a hair (1e-7) across, straight back along the chord and a hair to its
+start. Zoomed out until the arc's sag is under the half-pixel tolerance it is drawn as its chord, so the path
+doubles back exactly; egui's join there averages two opposite sides, the result is rounding noise, and the corner
+lands at infinity or anywhere across the screen. It was never selectable (picking uses the real geometry) and came
+and went with the view (the noise is in the f32 screen positions); it was there before the image work too. Fix:
+`view/path_stroke.rs` drops points on top of the one before and cuts outlines where they turn back. A scan of every
+object of the file at 450 views each found it without the fix and nothing with it; `layer_cache_tests/spikes.rs`
+keeps that outline as a test. The same scan of the large DWG found no other entity drawing far outside its bounds,
+but text bounds are short of what is drawn by up to about 165 px at some zooms, and polylines with a width draw past
+their bounds by the width: both small, both left for later.
+
+Small objects back (19-11-2026): James found small objects went too early when zooming out. The 2 px cutoff was for
+kept triangles, which cost every frame; an image costs its pixels, so with the picture kept as an image (the default)
+the cutoff is 0.75 px again and only `Render::Triangles` keeps 2 px (`View::min_draw_px`). Cost on the large drawing
+(release): a rebuild at extents 46 to 84 ms (made in the background after a pan or zoom, but on this thread after an
+edit), a wheel notch out sharp after 66 ms against 50; frames unchanged.
+
+Not done: a picture is not started early for a zoom about to happen, the thread's caches start cold for each
+drawing, and a hatch whose "not drawn" note uses egui's fonts sends its whole drawing back to slices on this thread.
+
 Phase 0 findings (18-11-2026, release build, the large DWG at zoom extents):
 - `egui::epaint::Tessellator` is public and `tessellate_shapes` gives plain `Mesh`es, so a layer can
   be tessellated once and submitted as `Shape::Mesh(Arc<Mesh>)`. Empty prepared discs are fine.

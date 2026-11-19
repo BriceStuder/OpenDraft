@@ -5,6 +5,12 @@
 use super::highlights::as_set;
 use super::*;
 
+/// The bytes of one image: the screen and its margin (`IMAGE_MARGIN`).
+fn image_bytes() -> usize {
+    let wide = SCREEN + 2.0 * (SCREEN * crate::layer_cache::IMAGE_MARGIN).round();
+    (wide.x * wide.y) as usize * 4
+}
+
 /// A view that keeps its layer as an image.
 fn image_rig() -> Rig {
     let mut rig = Rig::new(CacheMode::On, Some((1, 0)));
@@ -30,8 +36,7 @@ fn an_image_is_made_once_and_costs_few_triangles_to_draw() {
     let stats = image.view.cache_stats();
     assert_eq!(stats.builds, 1);
     assert_eq!(stats.hits, 4);
-    let pixels = (SCREEN.x * SCREEN.y) as usize * 4;
-    assert_eq!(stats.bytes, pixels, "the image is what is kept");
+    assert_eq!(stats.bytes, image_bytes(), "the image is what is kept");
     assert!(
         a.len() * 4 < b.len(),
         "{} vertices to draw the image, {} the triangles",
@@ -85,7 +90,7 @@ fn a_zoom_shows_the_old_image_moved_and_ends_on_a_new_one() {
     let stats = rig.view.cache_stats();
     assert!(stats.moved > 0, "the old image was shown moved");
     assert_eq!(stats.builds, 2);
-    assert_eq!(stats.bytes, (SCREEN.x * SCREEN.y) as usize * 4);
+    assert_eq!(stats.bytes, image_bytes());
 }
 
 #[test]
@@ -117,6 +122,30 @@ fn a_sheet_keeps_an_image_for_each_viewport_and_for_the_sheet() {
     let stats = rig.view.cache_stats();
     assert_eq!(stats.builds, 2, "one for the viewport, one for the sheet");
     assert_eq!(stats.hits, 8);
-    let pixels = (SCREEN.x * SCREEN.y) as usize * 4;
-    assert_eq!(stats.bytes, 2 * pixels, "two images");
+    assert_eq!(stats.bytes, 2 * image_bytes(), "two images");
+}
+
+#[test]
+fn a_pan_within_the_margin_leaves_no_blank_strip() {
+    let doc = drawing(300);
+    let mut rig = image_rig();
+    rig.view.set_cache_config(CacheConfig {
+        render: Render::Image,
+        motion: Motion::Smooth,
+        ..exact(CacheMode::On)
+    });
+    rig.frame(&doc, &none());
+    // A twentieth of the screen to the right: half the margin.
+    let shift = SCREEN.x / 20.0;
+    rig.view.camera.center.x -= f64::from(shift) / rig.view.camera.zoom;
+    let shown = rig.frame(&doc, &none());
+    assert_eq!(rig.view.cache_stats().moved, 1, "the old image, moved");
+    // Moved right, the picture would leave a strip on the left; with the
+    // margin it still reaches well past that edge (a line's soft edge only
+    // reaches half a point past it).
+    let left = shown
+        .iter()
+        .map(|v| f32::from_bits(v[0]))
+        .fold(f32::MAX, f32::min);
+    assert!(left < -shift / 2.0, "it reaches to {left}");
 }

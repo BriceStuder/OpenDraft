@@ -19,11 +19,11 @@ pub(crate) fn move_between(from: &Camera, to: &Camera, rect: Rect) -> TSTransfor
     TSTransform::new(now.to_vec2() - was.to_vec2() * scale, scale)
 }
 
-/// The part of `rect` (0 to 1) that the old picture covers once moved by
-/// `by`: the picture holds only what was in view when it was made, so after a
-/// zoom out most of the screen is empty.
-pub(crate) fn covered(by: TSTransform, rect: Rect) -> f32 {
-    let old = Rect::from_min_max(by * rect.min, by * rect.max);
+/// The part of the screen `rect` (0 to 1) that the old picture, of `picture`,
+/// covers once moved by `by`: the picture holds only what was in view (and its
+/// margin) when it was made, so after a zoom out most of the screen is empty.
+pub(crate) fn covered(by: TSTransform, picture: Rect, rect: Rect) -> f32 {
+    let old = Rect::from_min_max(by * picture.min, by * picture.max);
     let shared = old.intersect(rect);
     if shared.is_negative() || rect.area() <= 0.0 {
         return 0.0;
@@ -62,16 +62,20 @@ mod tests {
     fn a_zoom_out_leaves_most_of_the_screen_uncovered() {
         let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(800.0, 600.0));
         let still = TSTransform::IDENTITY;
-        assert!((covered(still, rect) - 1.0).abs() < 1e-6);
+        assert!((covered(still, rect, rect) - 1.0).abs() < 1e-6);
         let centre = rect.center().to_vec2();
         let out = |s: f32| TSTransform::new(centre * (1.0 - s), s);
-        assert!((covered(out(0.5), rect) - 0.25).abs() < 1e-4);
+        assert!((covered(out(0.5), rect, rect) - 0.25).abs() < 1e-4);
         assert!(
-            (covered(out(2.0), rect) - 1.0).abs() < 1e-6,
+            (covered(out(2.0), rect, rect) - 1.0).abs() < 1e-6,
             "zooming in keeps it all"
         );
         let away = TSTransform::new(egui::vec2(5000.0, 0.0), 1.0);
-        assert_eq!(covered(away, rect), 0.0);
+        assert_eq!(covered(away, rect, rect), 0.0);
+        // A picture with a margin of half the screen on each side still
+        // covers it all after zooming out to a half.
+        let wide = rect.expand2(rect.size() / 2.0);
+        assert!((covered(out(0.5), wide, rect) - 1.0).abs() < 1e-4);
     }
 
     #[test]

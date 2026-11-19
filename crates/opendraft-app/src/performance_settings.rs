@@ -140,7 +140,8 @@ pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         );
         ui.add_space(4.0);
         let automatic = format!(
-            "Automatic: the old picture, moved, when making one takes over {AUTO_SMOOTH_MS} ms"
+            "Automatic: the old picture, moved (drawn as triangles, only when making one \
+             takes over {AUTO_SMOOTH_MS} ms)"
         );
         ui.radio_value(&mut p.while_moving, Motion::Automatic, automatic);
         ui.radio_value(
@@ -157,11 +158,14 @@ pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
             ui,
             theme,
             "The old picture is slightly off while you zoom (lines keep their old \
-             width) and leaves blank strips at the edges when you pan.",
+             width). Drawn as an image, the new one is made in the background and reaches a \
+             little past the edges, so a pan seldom shows a blank strip; drawn as triangles, \
+             it is made a little each frame and a pan leaves blank strips until it is done.",
         );
         ui.add_space(6.0);
         let (least, most) = SETTLE_MS_RANGE;
-        ui.add_enabled_ui(p.while_moving != Motion::Exact, |ui| {
+        let sliced = p.while_moving != Motion::Exact && p.draw_as == Render::Triangles;
+        ui.add_enabled_ui(sliced, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Settle delay");
                 ui.add(egui::Slider::new(&mut p.settle_delay_ms, least..=most).suffix(" ms"));
@@ -170,7 +174,8 @@ pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         hint(
             ui,
             theme,
-            "How long the view must stand still before the new picture is started.",
+            "Drawn as triangles: how long the view must stand still before the new picture \
+             is started. Drawn as an image it is started at once, in the background.",
         );
     });
     ui.add_space(6.0);

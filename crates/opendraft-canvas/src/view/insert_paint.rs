@@ -3,6 +3,14 @@
 
 use super::*;
 
+/// Entities smaller than this on screen (pixels) are not drawn, unless the
+/// picture is kept as triangles (see [`View::min_draw_px`]).
+const MIN_DRAW_PX: f64 = 0.75;
+/// Kept as triangles, every triangle costs every frame, so objects smaller
+/// than this are left out: at the large drawing's extents 6 MB of triangles
+/// against 17.5 MB at `MIN_DRAW_PX`.
+const MIN_DRAW_PX_TRIANGLES: f64 = 2.0;
+
 impl View {
     /// Paint the pieces of a block reference that is neither selected nor
     /// hovered (those are drawn whole in the highlight colour). Pieces on
@@ -36,7 +44,7 @@ impl View {
     }
 
     /// A piece of a block reference that need not be drawn: off screen, or
-    /// smaller than `MIN_DRAW_PX` (points excepted, whose mode gives them a size).
+    /// smaller than `min_draw_px` (points excepted, whose mode gives them a size).
     pub(super) fn negligible(&self, entity: &Entity, visible: &opendraft_core::Bounds) -> bool {
         let point = matches!(entity, Entity::Point { .. });
         self.negligible_box(&entity.bounds(), point, visible)
@@ -50,7 +58,17 @@ impl View {
         visible: &opendraft_core::Bounds,
     ) -> bool {
         let size = (bounds.max.x - bounds.min.x).max(bounds.max.y - bounds.min.y);
-        !bounds.intersects(visible) || (!point && size * self.camera.zoom < MIN_DRAW_PX)
+        !bounds.intersects(visible) || (!point && size * self.camera.zoom < self.min_draw_px())
+    }
+
+    /// The size on screen, in pixels, under which an object is not drawn: a
+    /// little under a pixel, or 2 when the picture is kept as triangles, which
+    /// cost every frame (an image costs its pixels, however much is in it).
+    pub(super) fn min_draw_px(&self) -> f64 {
+        match self.cache_config.render {
+            crate::Render::Image => MIN_DRAW_PX,
+            crate::Render::Triangles => MIN_DRAW_PX_TRIANGLES,
+        }
     }
 }
 

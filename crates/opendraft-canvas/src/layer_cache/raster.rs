@@ -65,14 +65,28 @@ pub(crate) fn rasterise(
     scale: f32,
     threads: usize,
 ) -> Rastered {
-    let mut tris = Vec::new();
-    let mut leftover = Vec::new();
-    for mesh in meshes {
-        split(mesh, origin, scale, &mut tris, &mut leftover);
-    }
     let [w, h] = size;
     let (tiles_x, tiles_y) = (w.div_ceil(TILE), h.div_ceil(TILE));
-    let bins = bin(&tris, size, tiles_x, tiles_y);
+    // Each thread readies and bins a run of the meshes; a tile then draws the
+    // runs in order, so the order of the triangles is kept.
+    let runs: Vec<Run> = std::thread::scope(|s| {
+        let ready = |part: &[Arc<Mesh>]| {
+            let mut run = Run::default();
+            for mesh in part {
+                split(mesh, origin, scale, &mut run.tris, &mut run.leftover);
+            }
+            run.bins = bin(&run.tris, size, tiles_x, tiles_y);
+            run
+        };
+        let parts = parts(meshes, threads.max(1));
+        let others: Vec<_> = (parts.iter().skip(1))
+            .map(|&p| s.spawn(move || ready(p)))
+            .collect();
+        let first = parts.first().map(|p| ready(p)).unwrap_or_default();
+        // A thread that panicked has drawn nothing (`Run::default`).
+        let joined = others.into_iter().map(|h| h.join().unwrap_or_default());
+        std::iter::once(first).chain(joined).collect()
+    });
     let next = AtomicUsize::new(0);
     let done: Vec<Mutex<Vec<u8>>> = (0..tiles_x * tiles_y)
         .map(|_| Mutex::new(Vec::new()))
@@ -83,7 +97,12 @@ pub(crate) fn rasterise(
             break;
         }
         let bounds = tile_bounds(n, tiles_x, size);
-        let pixels = draw_tile(&tris, &bins[n], bounds);
+        let mut pixels = vec![0u8; (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]) * 4];
+        // An empty run (no meshes, or a thread that failed) has no bins.
+        for run in &runs {
+            let list = run.bins.get(n).map_or(&[][..], Vec::as_slice);
+            draw_tile(&mut pixels, &run.tris, list, bounds);
+        }
         if let Ok(mut slot) = done[n].lock() {
             *slot = pixels;
         }
@@ -105,8 +124,35 @@ pub(crate) fn rasterise(
     }
     Rastered {
         image: Image { size, pixels },
-        leftover,
+        leftover: runs.into_iter().flat_map(|r| r.leftover).collect(),
     }
+}
+
+/// What one thread readied of a run of meshes: its flat triangles, the
+/// triangles that touch each tile, and what cannot be drawn here.
+#[derive(Default)]
+struct Run {
+    tris: Vec<Tri>,
+    bins: Vec<Vec<u32>>,
+    leftover: Vec<Arc<Mesh>>,
+}
+
+/// `meshes` cut into at most `n` runs, in order, of about as many triangles.
+fn parts(meshes: &[Arc<Mesh>], n: usize) -> Vec<&[Arc<Mesh>]> {
+    let total: usize = meshes.iter().map(|m| m.indices.len()).sum();
+    let share = total.div_ceil(n).max(1);
+    let (mut out, mut from, mut held) = (Vec::new(), 0, 0);
+    for (i, mesh) in meshes.iter().enumerate() {
+        held += mesh.indices.len();
+        if held >= share {
+            out.push(&meshes[from..=i]);
+            (from, held) = (i + 1, 0);
+        }
+    }
+    if from < meshes.len() {
+        out.push(&meshes[from..]);
+    }
+    out
 }
 
 /// Sort the triangles of `mesh` into those drawn here and those left over.
@@ -184,10 +230,9 @@ fn tile_bounds(n: usize, tiles_x: usize, [w, h]: [usize; 2]) -> [usize; 4] {
     [x0, y0, (x0 + TILE).min(w), (y0 + TILE).min(h)]
 }
 
-/// The pixels of one tile: its triangles, in order, blended over nothing.
-fn draw_tile(tris: &[Tri], list: &[u32], [x0, y0, x1, y1]: [usize; 4]) -> Vec<u8> {
+/// Blend the triangles `list` of `tris`, in order, over the pixels of a tile.
+fn draw_tile(pixels: &mut [u8], tris: &[Tri], list: &[u32], [x0, y0, x1, y1]: [usize; 4]) {
     let width = x1 - x0;
-    let mut pixels = vec![0u8; width * (y1 - y0) * 4];
     for &i in list {
         let t = &tris[i as usize];
         let (lo, hi) = extent(t);
@@ -209,7 +254,10 @@ fn draw_tile(tris: &[Tri], list: &[u32], [x0, y0, x1, y1]: [usize; 4]) -> Vec<u8
         }
         let inv = 1.0 / area;
         for y in from_y..=to_y {
-            for x in from_x..=to_x {
+            let Some((first, last)) = span(&[a, b, c], y as f32 + 0.5, from_x, to_x) else {
+                continue;
+            };
+            for x in first..=last {
                 let p = [x as f32 + 0.5, y as f32 + 0.5];
                 let e0 = edge(b, c, p);
                 let e1 = edge(c, a, p);
@@ -228,8 +276,36 @@ fn draw_tile(tris: &[Tri], list: &[u32], [x0, y0, x1, y1]: [usize; 4]) -> Vec<u8
             }
         }
     }
-    pixels
 }
+
+/// The pixels of a row, `from` to `to`, that may be inside the triangle `t`
+/// (wound as `draw_tile` winds it) at height `y`: where each edge crosses the
+/// row, widened by [`SPAN_MARGIN`] so that rounding never leaves out a pixel
+/// the exact test would take. A thin slanted triangle, which most lines are,
+/// covers little of its box, so this saves testing most of it.
+fn span(t: &[[f32; 2]; 3], y: f32, from: usize, to: usize) -> Option<(usize, usize)> {
+    let (mut lo, mut hi) = (from as f32, to as f32);
+    for (p, q) in [(t[1], t[2]), (t[2], t[0]), (t[0], t[1])] {
+        let dy = q[1] - p[1];
+        if dy == 0.0 {
+            continue;
+        }
+        // The pixel whose centre the edge crosses: inside is before it when
+        // the edge goes down the screen, after it when it goes up.
+        let cross = p[0] + (q[0] - p[0]) * (y - p[1]) / dy - 0.5;
+        if dy > 0.0 {
+            hi = hi.min(cross.floor() + SPAN_MARGIN);
+        } else {
+            lo = lo.max(cross.ceil() - SPAN_MARGIN);
+        }
+    }
+    // A crossing that is not a number (a near-flat edge) narrows nothing.
+    let (lo, hi) = (lo.max(from as f32), hi.min(to as f32));
+    (lo <= hi).then_some((lo as usize, hi as usize))
+}
+
+/// Pixels added at each end of a row's span; the exact test decides them.
+const SPAN_MARGIN: f32 = 2.0;
 
 /// Twice the area of the triangle `p`, `q` and `r`, signed: positive when `r`
 /// is on the inner side of the edge `p` to `q`.
@@ -246,4 +322,83 @@ fn inside(e: f32, p: [f32; 2], q: [f32; 2]) -> bool {
     }
     let (dx, dy) = (q[0] - p[0], q[1] - p[1]);
     dy < 0.0 || (dy == 0.0 && dx > 0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A tiny deterministic generator, so a failure can be run again.
+    struct Lcg(u64);
+
+    impl Lcg {
+        fn next(&mut self) -> f32 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (self.0 >> 40) as f32 / (1u64 << 24) as f32
+        }
+    }
+
+    #[test]
+    fn nothing_to_draw_is_a_clear_picture() {
+        for threads in [1, 4] {
+            let done = rasterise(&[], [70, 70], Pos2::ZERO, 1.0, threads);
+            assert!(done.image.pixels.iter().all(|&b| b == 0));
+        }
+    }
+
+    #[test]
+    fn the_runs_keep_every_mesh_in_order_and_what_is_left_over_too() {
+        let picture = |n: u32| {
+            let mut mesh = Mesh::with_texture(TextureId::Managed(u64::from(n) + 1));
+            let uv = egui::Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0));
+            let at = egui::Rect::from_min_max(Pos2::ZERO, egui::pos2(4.0, 4.0));
+            mesh.add_rect_with_uv(at, uv, Color32::WHITE);
+            Arc::new(mesh)
+        };
+        let meshes: Vec<_> = (0..23).map(picture).collect();
+        for n in [1, 2, 5, 23, 40] {
+            let runs = parts(&meshes, n);
+            assert!(runs.len() <= n);
+            let back: Vec<_> = runs.concat();
+            assert_eq!(back.len(), meshes.len());
+            let done = rasterise(&meshes, [8, 8], Pos2::ZERO, 1.0, n);
+            let ids: Vec<_> = done.leftover.iter().map(|m| m.texture_id).collect();
+            let want: Vec<_> = meshes.iter().map(|m| m.texture_id).collect();
+            assert_eq!(ids, want, "{n} threads");
+        }
+    }
+
+    #[test]
+    fn a_row_span_holds_every_pixel_the_exact_test_takes() {
+        let mut rng = Lcg(3);
+        // Small, long and thin, and reaching millions of pixels off the tile.
+        for reach in [8.0, 300.0, 50_000.0, 8_000_000.0] {
+            for n in 0..3_000 {
+                let mut corner = || [(rng.next() - 0.3) * reach, (rng.next() - 0.3) * reach];
+                let [a, mut b, mut c] = [corner(), corner(), corner()];
+                // Every other one a sliver, as the sides of a line are.
+                if n % 2 == 0 {
+                    c = [b[0] + rng.next() * 1.5, b[1] - rng.next() * 1.5];
+                }
+                if edge(a, b, c) < 0.0 {
+                    std::mem::swap(&mut b, &mut c);
+                }
+                for y in 0..64 {
+                    let py = y as f32 + 0.5;
+                    let span = span(&[a, b, c], py, 0, 63);
+                    for x in 0..64 {
+                        let p = [x as f32 + 0.5, py];
+                        let taken = inside(edge(b, c, p), b, c)
+                            && inside(edge(c, a, p), c, a)
+                            && inside(edge(a, b, p), a, b);
+                        let spanned = span.is_some_and(|(lo, hi)| (lo..=hi).contains(&x));
+                        assert!(!taken || spanned, "{a:?} {b:?} {c:?} pixel {x},{y}");
+                    }
+                }
+            }
+        }
+    }
 }

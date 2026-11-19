@@ -8,7 +8,8 @@ use super::entity_paint::Highlights;
 use super::layer_paint::Frame;
 use super::*;
 use crate::layer_cache::{
-    chunk_count, selection_hash, Geometry, LayerCache, LayerKey, Piece, Render, KEEP_FROM,
+    chunk_count, selection_hash, Geometry, LayerCache, LayerKey, Piece, Render, IMAGE_MARGIN,
+    KEEP_FROM,
 };
 use opendraft_core::EntityId;
 
@@ -33,6 +34,15 @@ impl Keep {
 }
 
 impl View {
+    /// The margin round the canvas a new picture covers (see [`IMAGE_MARGIN`]):
+    /// none for kept triangles, which cost every frame however far they reach.
+    pub(super) fn margin(&self, canvas: Rect) -> egui::Vec2 {
+        match self.cache_config.render {
+            Render::Image => (canvas.size() * IMAGE_MARGIN).round(),
+            Render::Triangles => egui::Vec2::ZERO,
+        }
+    }
+
     /// How the frame's new layer is to be kept.
     pub(super) fn keep_plan(&self, frame: &Frame<'_>) -> Keep {
         let ctx = frame.painter.ctx().clone();

@@ -119,6 +119,12 @@ impl View {
         self.document_token = token;
     }
 
+    /// The drawing `show` is given, shared, so that its picture can be made
+    /// on another thread (see `builder.rs`). Without it, it is made here.
+    pub fn set_shared_document(&mut self, document: std::sync::Weak<opendraft_core::Document>) {
+        self.shared_document = document;
+    }
+
     /// How the kept picture behaves (the Performance settings).
     pub fn set_cache_config(&mut self, config: CacheConfig) {
         if config != self.cache_config {

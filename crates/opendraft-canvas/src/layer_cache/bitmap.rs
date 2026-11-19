@@ -40,7 +40,7 @@ impl Geometry {
 }
 
 /// The image of a layer.
-pub(super) struct Bitmap {
+pub(crate) struct Bitmap {
     texture: TextureHandle,
     /// Where it is drawn, in points.
     rect: Rect,
@@ -70,6 +70,11 @@ impl LayerCache {
         geometry: Geometry,
     ) {
         let bitmap = make(ctx, name, &pieces, geometry);
+        self.install_image(key, bitmap);
+    }
+
+    /// Keep `bitmap`, made for `key` (perhaps on another thread), as the layer.
+    pub fn install_image(&mut self, key: LayerKey, bitmap: Bitmap) {
         self.stats.builds += 1;
         self.stats.bytes = bitmap.bytes();
         self.key = Some(key);
@@ -153,7 +158,7 @@ fn meshes_of(pieces: &[Piece]) -> Vec<Arc<Mesh>> {
         .collect()
 }
 
-pub(super) fn make(ctx: &Context, name: &str, pieces: &[Piece], geometry: Geometry) -> Bitmap {
+pub(crate) fn make(ctx: &Context, name: &str, pieces: &[Piece], geometry: Geometry) -> Bitmap {
     let (origin, size) = geometry.placed();
     let done = rasterise(&meshes_of(pieces), size, origin, geometry.scale, threads());
     let picture = ColorImage::from_rgba_premultiplied(size, &done.image.pixels);

@@ -405,6 +405,11 @@ impl Document {
         self.active_frozen = layers;
     }
 
+    /// The layers hidden from the object queries (see `set_active_frozen`).
+    pub fn active_frozen(&self) -> &[LayerId] {
+        &self.active_frozen
+    }
+
     /// Ids of the objects on a layout's sheet.
     pub fn objects_of_layout(&self, layout: LayoutId) -> Vec<EntityId> {
         self.objects

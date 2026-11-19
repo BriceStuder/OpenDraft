@@ -44,3 +44,12 @@ opendraft-agent = { path = "crates/opendraft-agent" }
 # incremental debug builds.
 [profile.dev.package."*"]
 opt-level = 2
+
+# But the drawing's picture is made by the canvas from core's geometry, and
+# unoptimised that takes ten times as long (a zoom on the large sample drawing:
+# 600 ms to a sharp picture, against 200 ms); about half a second more to build.
+[profile.dev.package.opendraft-canvas]
+opt-level = 2
+
+[profile.dev.package.opendraft-core]
+opt-level = 2

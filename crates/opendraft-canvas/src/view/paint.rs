@@ -1,5 +1,6 @@
 //! Painting the viewport: entities and the overlays above them.
 
+use super::path_stroke::stroke_path;
 use super::*;
 use crate::grips::gripped;
 
@@ -204,7 +205,7 @@ impl View {
                     .into_iter()
                     .map(to_screen)
                     .collect();
-                painter.add(egui::Shape::line(path, stroke));
+                stroke_path(painter, path, false, stroke);
             }
             Entity::Ellipse(e) => {
                 // Half a pixel of sag is invisible, so that is the tolerance.
@@ -213,12 +214,10 @@ impl View {
                     .into_iter()
                     .map(to_screen)
                     .collect();
-                painter.add(if e.is_full() {
+                if e.is_full() {
                     path.pop(); // the last point repeats the first
-                    egui::Shape::closed_line(path, stroke)
-                } else {
-                    egui::Shape::line(path, stroke)
-                });
+                }
+                stroke_path(painter, path, e.is_full(), stroke);
             }
             Entity::Spline(s) => {
                 let mut path: Vec<Pos2> = s
@@ -226,12 +225,11 @@ impl View {
                     .into_iter()
                     .map(to_screen)
                     .collect();
-                painter.add(if s.closed && path.len() > 2 {
+                let closed = s.closed && path.len() > 2;
+                if closed {
                     path.pop(); // the last point repeats the first
-                    egui::Shape::closed_line(path, stroke)
-                } else {
-                    egui::Shape::line(path, stroke)
-                });
+                }
+                stroke_path(painter, path, closed, stroke);
             }
             Entity::Rectangle { min, max } => {
                 painter.rect_stroke(
@@ -251,11 +249,7 @@ impl View {
                 let tolerance = 0.5 / self.camera.zoom;
                 let flat = bulge::flatten_path(points, bulges, *closed, tolerance);
                 let path: Vec<Pos2> = flat.iter().map(|p| to_screen(*p)).collect();
-                painter.add(if *closed {
-                    egui::Shape::closed_line(path, stroke)
-                } else {
-                    egui::Shape::line(path, stroke)
-                });
+                stroke_path(painter, path, *closed, stroke);
                 // Wide segments are filled in the stroke's colour.
                 let wide = width::triangles(points, bulges, widths, *closed, tolerance);
                 if !wide.is_empty() {

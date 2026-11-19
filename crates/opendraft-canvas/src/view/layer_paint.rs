@@ -14,7 +14,7 @@ use super::entity_paint::Highlights;
 use super::*;
 use crate::layer_cache::{
     camera_of, capture, chunk_count, covered, draw_moved, move_between, selection_hash, tessellate,
-    Advance, Inputs, LayerCache, LayerKey, Motion, Piece, SelectedKey, Slot, AUTO_SMOOTH_MS,
+    Advance, Inputs, LayerCache, LayerKey, Motion, Piece, SelectedKey, Slot, Tess, AUTO_SMOOTH_MS,
     CHUNK_OBJECTS, KEEP_FROM,
 };
 use egui::Painter;
@@ -62,7 +62,13 @@ fn chunk_objects<'d>(
 #[derive(Clone, Copy)]
 pub(super) struct Frame<'a> {
     pub(super) painter: &'a Painter,
+    /// What a new picture covers: the canvas and, for an image, a margin
+    /// round it (`View::margin`), so that a pan shows what is next to it.
     pub(super) rect: Rect,
+    /// The canvas on screen.
+    pub(super) canvas: Rect,
+    /// What a new picture is clipped to: the painter's clip and the margin.
+    pub(super) clip: Rect,
     pub(super) style: &'a CanvasStyle,
     pub(super) document: &'a Document,
     pub(super) slot: Slot,
@@ -71,6 +77,8 @@ pub(super) struct Frame<'a> {
     pub(super) visible: Bounds,
     /// The egui pass, to tell slots that are in use from those that are not.
     pub(super) pass: u64,
+    /// How triangles are made (read from the drawing's context).
+    pub(super) tess: &'a Tess,
 }
 
 impl View {
@@ -128,22 +136,31 @@ impl View {
             pixels_per_point: ctx.pixels_per_point(),
             tessellation: ctx.tessellation_options(|o| *o),
         });
+        let tess = Tess::of(ctx);
+        let margin = self.margin(rect);
         let frame = Frame {
             painter,
-            rect,
+            rect: rect.expand2(margin),
+            canvas: rect,
+            clip: painter.clip_rect().expand2(margin),
             style,
             document,
             slot,
             space,
             frozen,
-            visible: self.camera.visible_world(rect),
+            visible: self.camera.visible_world(rect.expand2(margin)),
             pass: ctx.cumulative_pass_nr(),
+            tess: &tess,
         };
+        self.take_built(&frame, &key);
         let have = self.cache(&frame).has(&key);
         let mut settled = have;
         if have {
             self.cache(&frame).view_reached();
         } else if self.shows_moved(&frame, &key) {
+            if self.ask_background(&frame, &key) {
+                return self.paint_moved(&frame, selection, hover);
+            }
             match self.advance_pending(&frame, &key) {
                 Advance::Done => settled = true,
                 Advance::NoRoom => {}
@@ -217,6 +234,8 @@ impl View {
     /// Whether, the kept layer being for another view, the old one is to be
     /// shown moved until a new one is made.
     fn shows_moved(&self, frame: &Frame<'_>, key: &LayerKey) -> bool {
+        // Made in the background, a new picture costs this thread nothing.
+        let background = self.background(frame, key).is_some();
         let cache = self.cache(frame);
         if !cache.has_content_of(key) {
             return false;
@@ -224,14 +243,14 @@ impl View {
         let smooth = match self.cache_config.motion {
             Motion::Exact => false,
             Motion::Smooth => true,
-            Motion::Automatic => cache.stats().last_build_us > AUTO_SMOOTH_MS * 1000,
+            Motion::Automatic => background || cache.stats().last_build_us > AUTO_SMOOTH_MS * 1000,
         };
         // An old picture that fills little of the screen (after a zoom out)
         // shows the drawing as missing, which is worse than waiting.
         let by = cache
             .built_view()
             .map(|from| move_between(&camera_of(from), &self.camera, frame.rect));
-        smooth && by.is_some_and(|by| covered(by, frame.rect) >= MIN_COVERED)
+        smooth && by.is_some_and(|by| covered(by, frame.rect, frame.canvas) >= MIN_COVERED)
     }
 
     /// Make a layer for `key` now, in this frame.
@@ -331,7 +350,7 @@ impl View {
         }
         let ctx = f.painter.ctx();
         let none = BTreeSet::new();
-        let (shapes, textures) = capture(ctx, f.painter.clip_rect(), |p| {
+        let (shapes, textures) = capture(ctx, f.clip, |p| {
             for object in &objects {
                 if excluded.binary_search(&object.id).is_err() {
                     let (rect, style, document) = (f.rect, f.style, f.document);
@@ -340,7 +359,7 @@ impl View {
                 }
             }
         });
-        Piece::new(tessellate(ctx, shapes), textures)
+        Piece::new(tessellate(f.tess, shapes), textures)
     }
 
     /// Draw the highlight of the selection from a kept picture, making it
@@ -378,12 +397,12 @@ impl View {
     /// The highlight of `selection` as triangles.
     pub(super) fn make_selected(&self, f: &Frame<'_>, selection: &BTreeSet<EntityId>) -> Piece {
         let ctx = f.painter.ctx();
-        let (shapes, textures) = capture(ctx, f.painter.clip_rect(), |p| {
+        let (shapes, textures) = capture(ctx, f.clip, |p| {
             let args = (p, f.rect, f.style, f.document);
             let which = Highlights::Selected;
             self.paint_highlights(args, f.space, f.frozen, selection, None, which);
         });
-        Piece::new(tessellate(ctx, shapes), textures)
+        Piece::new(tessellate(f.tess, shapes), textures)
     }
 
     /// Whether the kept chunks and variants are what painting now would give.

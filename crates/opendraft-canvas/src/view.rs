@@ -20,6 +20,8 @@ use crosshair::CursorShape;
 mod accessors;
 mod acquire;
 mod backdrop;
+mod background;
+mod builder;
 mod crosshair;
 mod dash_paint;
 mod entity_paint;
@@ -33,6 +35,7 @@ mod insert_pieces;
 mod layer_paint;
 mod layout;
 mod paint;
+mod path_stroke;
 mod point_paint;
 mod snap_choice;
 mod snap_marker;
@@ -58,8 +61,6 @@ const GRID_MAJOR_EVERY: i64 = 5;
 const WHEEL_ZOOM_RATE: f32 = 0.003;
 /// Width of the translucent highlight under selected/hovered entities.
 const HIGHLIGHT_WIDTH: f32 = 6.0;
-/// Entities smaller than this on screen are not drawn.
-const MIN_DRAW_PX: f64 = 2.0;
 /// A drag shorter than this (screen points) is not a selection box.
 const BOX_MIN_PX: f32 = 4.0;
 /// Factor for the Zoom In / Zoom Out commands.
@@ -138,6 +139,10 @@ pub struct View {
     /// What the drawing is now, as `Session::draw_token` says; none until the
     /// app gives it, and then nothing is kept.
     document_token: Option<(u64, u64)>,
+    /// The drawing, for making its picture in the background (`builder.rs`);
+    /// weak, so that an edit while no picture is being made copies nothing.
+    shared_document: std::sync::Weak<Document>,
+    builder: std::cell::RefCell<Option<builder::Builder>>,
 }
 
 impl View {
@@ -209,7 +214,10 @@ impl View {
         };
         let over = response.hovered() || (self.wheel_through && wheel_at.is_some());
         if let (true, Some(pos), false) = (over, wheel_at, in_layout) {
-            let (scroll, pinch) = ui.input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));
+            // The whole notch at once, as AutoCAD does: egui's smoothed delta
+            // creeps on for a sixth of a second, and the sharp picture waits for
+            // the view to stand still.
+            let (scroll, pinch) = ui.input(|i| (i.raw_scroll_delta.y, i.zoom_delta()));
             let factor = f64::from((scroll * self.wheel_rate()).exp() * pinch);
             if (factor - 1.0).abs() > 1e-9 {
                 self.camera.zoom_at(pos, rect, factor);

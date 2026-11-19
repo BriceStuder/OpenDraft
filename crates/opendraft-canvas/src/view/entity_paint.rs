@@ -102,7 +102,7 @@ impl View {
             (bounds.max.x - bounds.min.x).max(bounds.max.y - bounds.min.y) * self.camera.zoom;
         // A point has no size of its own: its mode gives it one.
         let sized = !matches!(entity, Entity::Point { .. });
-        if sized && on_screen < MIN_DRAW_PX && !selection.contains(id) {
+        if sized && on_screen < self.min_draw_px() && !selection.contains(id) {
             return;
         }
         if self.hidden == Some(*id) {

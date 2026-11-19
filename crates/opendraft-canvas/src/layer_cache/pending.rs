@@ -46,6 +46,18 @@ impl LayerCache {
         }
     }
 
+    /// Make pictures that show what `key` shows on the screen's thread: the
+    /// background could not make one.
+    pub fn refuse_background(&mut self, key: LayerKey) {
+        self.refused = Some(key);
+    }
+
+    /// Whether pictures that show what `key` shows are made on the screen's
+    /// thread (see `refuse_background`).
+    pub fn refused(&self, key: &LayerKey) -> bool {
+        self.refused.as_ref().is_some_and(|k| k.same_content(key))
+    }
+
     pub fn drop_pending(&mut self) {
         self.pending = None;
         self.stats.rebuilding = None;

@@ -274,6 +274,11 @@ impl PanelViewer<'_> {
         // The picture of the plain entities is kept while the drawing is the
         // same (see `opendraft_canvas::layer_cache`).
         doc.view.set_document_token(Some(doc.session.draw_token()));
+        // Shared, so that a new picture after a pan or zoom is made off this
+        // thread; weak, so that an edit copies the drawing only while one is.
+        let shared = doc.session.shared_document();
+        doc.view
+            .set_shared_document(std::sync::Arc::downgrade(&shared));
         doc.view.set_cache_config(perf.cache_config());
         doc.view.set_crosshair(crosshair);
         doc.view.set_zoom_speed(zoom_speed);
