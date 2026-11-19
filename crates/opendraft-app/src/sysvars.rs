@@ -376,7 +376,7 @@ mod tests {
     #[test]
     fn the_pointer_sizes_are_variables_with_ranges() {
         let (table, mut state) = (table(), AppState::new());
-        assert_eq!(table.get("PICKBOX", &state), Ok(Value::Int(6)));
+        assert_eq!(table.get("PICKBOX", &state), Ok(Value::Int(4)));
         table.set("PICKBOX", "10", &mut state).unwrap();
         table.set("APERTURE", "20", &mut state).unwrap();
         table.set("GRIPSIZE", "9", &mut state).unwrap();

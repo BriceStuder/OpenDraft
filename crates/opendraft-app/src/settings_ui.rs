@@ -216,7 +216,7 @@ fn crosshair(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
 fn sizes(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
     widgets::group_box(ui, theme, "Sizes", |ui| {
         for (label, value, (min, max)) in [
-            ("Pick size", &mut draft.pick_size, PICK_SIZE_RANGE),
+            ("Pick box radius", &mut draft.pick_size, PICK_SIZE_RANGE),
             (
                 "Snap aperture",
                 &mut draft.snap_aperture,
