@@ -175,6 +175,8 @@ pub struct AppState {
     pub(crate) saving: Vec<u64>,
     /// Files being read right now.
     pub(crate) opening: Vec<PathBuf>,
+    /// Large files waiting for the user to say whether to open them.
+    pub(crate) large_opens: Vec<crate::large_file::LargeOpen>,
     /// A pass of recovery copies is being written; the next one waits.
     pub(crate) autosaving: bool,
     /// Block Editor requests from commands (see `block_editor.rs`).
@@ -249,6 +251,7 @@ impl AppState {
             io: crate::files::default_io(),
             saving: Vec::new(),
             opening: Vec::new(),
+            large_opens: Vec::new(),
             autosaving: false,
             block_requests: Default::default(),
             file_ops: Default::default(),

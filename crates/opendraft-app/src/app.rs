@@ -416,6 +416,7 @@ impl eframe::App for OpenDraftApp {
         self.context_menu(ctx);
         self.tool_windows(ctx);
         self.confirm_dialog(ctx);
+        self.large_open_dialog(ctx);
         self.block_close_dialog(ctx);
         self.consent_dialog(ctx);
         self.autosave_when_due(ctx);

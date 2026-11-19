@@ -88,6 +88,7 @@ mod insert_cmd;
 mod interact;
 mod io;
 mod join;
+mod large_file;
 mod layer_cells;
 mod layer_cmd;
 mod layer_switch;
