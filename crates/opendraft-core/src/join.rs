@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn a_line_doubling_back_on_a_line_is_the_line_it_covers() {
-        // AutoCAD 2020: 0 to 4, then 4 back to 1, gives one line from 0 to 4.
+        // AutoCAD 2027: 0 to 4, then 4 back to 1, gives one line from 0 to 4.
         let items = [
             line(p(0.0, 0.0), p(4.0, 0.0)),
             line(p(4.0, 0.0), p(1.0, 0.0)),
@@ -442,6 +442,8 @@ mod tests {
 
     #[test]
     fn a_circle_does_not_stop_lines_on_one_line_joining() {
+        // AutoCAD 2027 joins nothing here; leaving out what JOIN cannot use
+        // is more useful, and it is what JOIN does with such objects anyway.
         let items = [
             line(p(0.0, 0.0), p(4.0, 0.0)),
             Entity::Circle {
@@ -457,7 +459,7 @@ mod tests {
 
     #[test]
     fn beside_a_corner_a_line_apart_is_left_out() {
-        // AutoCAD 2020: the corner becomes a polyline, the line on the far
+        // AutoCAD 2027: the corner becomes a polyline, the line on the far
         // side of the gap stays as it is.
         let items = [
             line(p(0.0, 0.0), p(5.0, 0.0)),
@@ -472,7 +474,7 @@ mod tests {
 
     #[test]
     fn lines_apart_beside_a_line_across_them_join_nothing() {
-        // AutoCAD 2020: the third line touches the first in its middle, not
+        // AutoCAD 2027: the third line touches the first in its middle, not
         // at an end, so nothing joins, not even the two lines on one line.
         let items = [
             line(p(0.0, 0.0), p(5.0, 0.0)),
@@ -484,7 +486,7 @@ mod tests {
 
     #[test]
     fn a_closed_outline_with_a_notch_is_one_closed_polyline() {
-        // AutoCAD 2020: the two pieces of the top edge stay on either side
+        // AutoCAD 2027: the two pieces of the top edge stay on either side
         // of the notch.
         let corners = [
             p(0.0, 0.0),
