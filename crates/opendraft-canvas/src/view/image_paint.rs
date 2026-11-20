@@ -8,8 +8,7 @@ use super::entity_paint::Highlights;
 use super::layer_paint::Frame;
 use super::*;
 use crate::layer_cache::{
-    chunk_count, selection_hash, Geometry, LayerCache, LayerKey, Piece, Render, IMAGE_MARGIN,
-    KEEP_FROM,
+    selection_hash, Geometry, LayerCache, LayerKey, Piece, Render, IMAGE_MARGIN, KEEP_FROM,
 };
 use opendraft_core::EntityId;
 
@@ -98,7 +97,7 @@ impl View {
     /// would give.
     #[cfg(debug_assertions)]
     fn image_matches_fresh(&self, frame: &Frame<'_>, selection: &BTreeSet<EntityId>) -> bool {
-        let total = chunk_count(frame.document.objects().len());
+        let total = crate::layer_cache::chunk_count(frame.document.objects().len());
         let pieces: Vec<Piece> = (0..total).map(|n| self.make_chunk(frame, n, &[])).collect();
         let geometry = self.keep_plan(frame).geometry;
         let kept_selection = self.cache(frame).has_any_selected();

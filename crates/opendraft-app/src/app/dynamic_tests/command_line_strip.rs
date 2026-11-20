@@ -6,7 +6,11 @@ use crate::dock::{LayoutRequest, PanelTab, Strip};
 /// the panel's place once laid out.
 fn strip_app() -> (OpenDraftApp, egui::Context, Rect, f64) {
     let (mut app, ctx) = (app(), egui::Context::default());
-    dock::apply(&mut app.dock, LayoutRequest::Toggle(PanelTab::CommandLine));
+    dock::apply(
+        &mut app.dock,
+        &mut app.places,
+        LayoutRequest::Toggle(PanelTab::CommandLine),
+    );
     app.dock.main_surface_mut().split_below(
         egui_dock::NodeIndex::root(),
         0.74,

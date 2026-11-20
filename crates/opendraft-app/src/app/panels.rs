@@ -73,6 +73,8 @@ impl OpenDraftApp {
         };
         let style = dock::style(&self.theme, &ctx.style(), least);
         let shares = dock::split_shares(&self.dock);
+        // Before the dock is shown, where a panel may be closed by its tab.
+        self.places.note(&self.dock, Some(ctx));
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(self.theme.colors.window_bg))
             .show(ctx, |ui| {
