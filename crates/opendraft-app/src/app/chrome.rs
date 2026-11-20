@@ -207,7 +207,7 @@ impl OpenDraftApp {
         egui::TopBottomPanel::top("document_tabs")
             .frame(
                 egui::Frame::new()
-                    .fill(self.theme.colors.window_bg)
+                    .fill(self.theme.colors.tab_strip())
                     .inner_margin(egui::Margin {
                         left: 8,
                         right: 8,

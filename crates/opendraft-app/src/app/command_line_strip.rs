@@ -49,6 +49,22 @@ impl StripRows {
     }
 }
 
+/// Rows in the grip's group of dots, and the step between dots.
+const GRIP_ROWS: usize = 3;
+const DOT_STEP: f32 = 4.0;
+
+/// Where the grip's dots go: two columns of `GRIP_ROWS`, at the top of
+/// `handle`, just under the close button, however tall the strip is; as
+/// many rows as fit when it is too short for them all.
+fn grip_dots(handle: egui::Rect) -> Vec<egui::Pos2> {
+    let x = handle.center().x;
+    (0..GRIP_ROWS)
+        .map(|row| handle.top() + 4.0 + row as f32 * DOT_STEP)
+        .take_while(|&y| y < handle.bottom() - 3.0)
+        .flat_map(|y| [-2.0_f32, 2.0].map(|dx| egui::pos2(x + dx, y)))
+        .collect()
+}
+
 /// The parts of a strip.
 struct Parts {
     /// The dock's tab bar, which the strip covers.
@@ -107,7 +123,8 @@ impl PanelViewer<'_> {
             .on_hover_cursor(egui::CursorIcon::Default);
         let painter = over.painter().clone();
         painter.rect_filled(whole, 0.0, colors.sidebar_bg);
-        painter.rect_filled(grip, 0.0, colors.window_bg);
+        painter.rect_filled(grip, 0.0, colors.tab_strip());
+        painter.rect_filled(tabs, 0.0, colors.tab_strip());
 
         let (close_rect, handle_rect) = grip.split_top_bottom_at_y(grip.top() + GRIP_WIDTH);
         let handle = over
@@ -132,14 +149,10 @@ impl PanelViewer<'_> {
         for dy in [-3.5_f32, 3.5] {
             painter.line_segment([c + egui::vec2(-3.5, dy), c + egui::vec2(3.5, -dy)], cross);
         }
-        // Two columns of dots, as on a toolbar handle.
+        // A small group of dots marks the handle; all of it can be dragged.
         let dots = weak_or_text(handle.hovered() || handle.dragged());
-        let mut y = handle_rect.top() + 4.0;
-        while y < handle_rect.bottom() - 3.0 {
-            for dx in [-2.0_f32, 2.0] {
-                painter.circle_filled(egui::pos2(handle_rect.center().x + dx, y), 0.9, dots);
-            }
-            y += 4.0;
+        for at in grip_dots(handle_rect) {
+            painter.circle_filled(at, 0.9, dots);
         }
 
         if close.clicked() {
@@ -208,6 +221,20 @@ mod tests {
         assert_eq!((parts.tabs.left(), parts.tabs.right()), (10.0, 810.0));
         assert_eq!(parts.grip.bottom(), 574.0);
         assert_eq!(parts.line.bottom(), 574.0);
+    }
+
+    #[test]
+    fn the_grip_has_six_dots_at_the_top_however_tall_the_strip() {
+        for height in [60.0, 400.0] {
+            let handle =
+                egui::Rect::from_min_size(egui::pos2(0.0, 100.0), egui::vec2(18.0, height));
+            let dots = grip_dots(handle);
+            assert_eq!(dots.len(), 2 * GRIP_ROWS);
+            assert!(dots.iter().all(|d| d.y < 100.0 + 14.0));
+        }
+        // Too short for all three rows: only the rows that fit.
+        let short = egui::Rect::from_min_size(egui::pos2(0.0, 100.0), egui::vec2(18.0, 10.0));
+        assert_eq!(grip_dots(short).len(), 2);
     }
 
     #[test]

@@ -77,7 +77,9 @@ fn common(a: NodeIndex, b: NodeIndex) -> NodeIndex {
 fn window_rect(ctx: &egui::Context, surface: SurfaceIndex) -> Option<egui::Rect> {
     let id = egui::Id::from(format!("window {surface:?}"));
     let outside = ctx.memory(|m| m.area_rect(id))?;
-    let frame = egui::Frame::window(&ctx.style());
+    let mut style = (*ctx.style()).clone();
+    super::drag::floating_frame(&mut style);
+    let frame = egui::Frame::window(&style);
     let inside = outside.size() - frame.total_margin().sum();
     (outside.is_finite() && inside.min_elem() > 0.0)
         .then(|| egui::Rect::from_min_size(outside.min, inside))

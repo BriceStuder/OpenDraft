@@ -251,7 +251,7 @@ fn ribbon_tabs(ui: &mut Ui, theme: &Theme, selected: &mut usize, titles: &[&str]
         se: 0,
     };
     Frame::new()
-        .fill(c.window_bg)
+        .fill(c.tab_strip())
         .inner_margin(Margin {
             left: 8,
             right: 8,
