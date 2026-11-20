@@ -134,6 +134,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](edit-undo.svg) | `edit-undo.svg` | undo-2 | app.rs, app/context_menu.rs |
 | ![](file-new.svg) | `file-new.svg` | file | app.rs, app/home_page/start.rs |
 | ![](file-open.svg) | `file-open.svg` | folder-open | app.rs, app/home_page/start.rs |
+| ![](file-plot.svg) | `file-plot.svg` | printer | app.rs |
 | ![](file-save.svg) | `file-save.svg` | save | app.rs, theme.rs |
 | ![](format-linetype.svg) | `format-linetype.svg` | ellipsis | Linetypes |
 | ![](format-properties.svg) | `format-properties.svg` | file-text | Properties |

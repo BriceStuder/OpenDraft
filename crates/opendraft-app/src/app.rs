@@ -66,6 +66,7 @@ const QUICK_ACCESS: &[(char, &str)] = &[
     (icons::FILE_NEW, "file.new"),
     (icons::FILE_OPEN, "file.open"),
     (icons::FILE_SAVE, "file.save"),
+    (icons::FILE_PLOT, "file.plot"),
     (icons::EDIT_UNDO, "edit.undo"),
     (icons::EDIT_REDO, "edit.redo"),
 ];
