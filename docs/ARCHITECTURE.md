@@ -722,6 +722,10 @@ only the camera turns.
 - **Saved.** A viewport's twist is `Viewport::twist` in `.odraft` and DXF
   group 51 (degrees), with the view centre in the viewport's own axes. The
   Model tab's twist is a view setting like its zoom: it is not saved.
+- **The viewport controls.** The `[-][Top][2D Wireframe]` label in the drawing's
+  top left corner; `VPCONTROL` (0 or 1) and Settings > Display > Navigation, under
+  the gizmo's box, hide it (`Settings::show_viewport_controls`, on by default).
+  Its `[-]` menu and view choices are not built.
 - **The navigation gizmo.** In the top right of the drawing (the View ribbon's Gizmo
   toggle, `NAVGIZMO` and Settings > Display > Navigation turn it off;
   `Settings::show_nav_gizmo`), shown in the Model tab and
