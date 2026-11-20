@@ -18,6 +18,7 @@ mod dim_manager;
 mod dim_preview;
 mod dim_style_dialog;
 mod dim_style_tabs;
+mod drawing_tab;
 mod dynamic_boxes;
 mod dynamic_input;
 mod dynamic_overlay;
