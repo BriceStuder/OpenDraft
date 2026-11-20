@@ -11,6 +11,7 @@ mod ctrl;
 mod dim_styles;
 mod home_keyboard;
 mod home_layout;
+mod idle_at_prompt;
 mod linetypes;
 mod mleader_styles;
 mod object_prompt_typing;
