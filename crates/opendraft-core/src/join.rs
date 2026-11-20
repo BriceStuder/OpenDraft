@@ -5,6 +5,11 @@
 //! arc keeps its curve as a bulge). Two special cases give back a simpler
 //! object: lines that all lie on one line become a single line, and arcs of
 //! one circle become a single arc (or a circle, when they close the loop).
+//!
+//! As in AutoCAD, lines that all lie on one line join even where they do not
+//! touch: across a gap, overlapping or doubling back, they become the one line
+//! from end to end. That holds only when they are all the selection has to
+//! join; beside other objects, only ends that meet are joined.
 
 use std::f64::consts::TAU;
 
@@ -104,8 +109,12 @@ fn distance(a: Point, b: Point) -> f64 {
 /// Join whatever of `items` meets end to end (ends within `tolerance`).
 /// Objects that meet nothing are left out, as are those that cannot join
 /// (circles, rectangles, closed polylines). A single open polyline whose ends
-/// meet is closed.
+/// meet is closed. Lines that are all on one line join whether they meet or
+/// not (see the module notes).
 pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
+    if let Some(line) = on_one_line(items, tolerance) {
+        return vec![line];
+    }
     let chains: Vec<Option<Chain>> = items.iter().map(Chain::of).collect();
     let mut taken = vec![false; items.len()];
     let mut made = Vec::new();
@@ -130,6 +139,54 @@ pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
     }
     made.extend(crate::ellipse::join::join_elliptical_arcs(items, tolerance));
     made
+}
+
+/// The one line covering every line of `items`, when the objects JOIN can use
+/// are at least two lines, all on one line (within `tolerance`), touching or
+/// not. Objects JOIN cannot use (circles, closed polylines...) do not count.
+/// The line runs the way the first one does, from the farthest end to the
+/// farthest end.
+fn on_one_line(items: &[Entity], tolerance: f64) -> Option<Merged> {
+    let mut lines: Vec<(usize, Point, Point)> = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        match item {
+            Entity::Line { start, end } if distance(*start, *end) > 0.0 => {
+                lines.push((i, *start, *end));
+            }
+            Entity::Ellipse(e) if !e.is_full() => return None,
+            other if Chain::of(other).is_some() => return None,
+            _ => {}
+        }
+    }
+    if lines.len() < 2 {
+        return None;
+    }
+    let &(_, a, b) = lines
+        .iter()
+        .max_by(|x, y| distance(x.1, x.2).total_cmp(&distance(y.1, y.2)))?;
+    let length = distance(a, b);
+    if length <= tolerance {
+        return None;
+    }
+    let (mut ux, mut uy) = ((b.x - a.x) / length, (b.y - a.y) / length);
+    let (_, s, e) = lines[0];
+    if (e.x - s.x) * ux + (e.y - s.y) * uy < 0.0 {
+        (ux, uy) = (-ux, -uy);
+    }
+    let ends: Vec<Point> = lines.iter().flat_map(|&(_, s, e)| [s, e]).collect();
+    if ends
+        .iter()
+        .any(|p| ((p.x - a.x) * uy - (p.y - a.y) * ux).abs() > tolerance)
+    {
+        return None;
+    }
+    let along = |p: &&Point| (p.x - a.x) * ux + (p.y - a.y) * uy;
+    let start = *ends.iter().min_by(|p, q| along(p).total_cmp(&along(q)))?;
+    let end = *ends.iter().max_by(|p, q| along(p).total_cmp(&along(q)))?;
+    Some(Merged {
+        used: lines.iter().map(|l| l.0).collect(),
+        entity: Entity::Line { start, end },
+    })
 }
 
 /// Add the first untaken piece that meets an end of `chain` and return its
@@ -306,13 +363,148 @@ mod tests {
     }
 
     #[test]
-    fn a_line_doubling_back_is_not_one_line() {
+    fn a_line_doubling_back_on_a_line_is_the_line_it_covers() {
+        // AutoCAD 2020: 0 to 4, then 4 back to 1, gives one line from 0 to 4.
         let items = [
             line(p(0.0, 0.0), p(4.0, 0.0)),
             line(p(4.0, 0.0), p(1.0, 0.0)),
         ];
         let made = join(&items, 1e-6);
+        assert_eq!(made[0].entity, line(p(0.0, 0.0), p(4.0, 0.0)));
+    }
+
+    #[test]
+    fn a_polyline_doubling_back_on_a_line_stays_a_polyline() {
+        let back = Entity::Polyline {
+            points: vec![p(4.0, 0.0), p(1.0, 0.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: Vec::new(),
+        };
+        let made = join(&[line(p(0.0, 0.0), p(4.0, 0.0)), back], 1e-6);
         assert!(matches!(made[0].entity, Entity::Polyline { .. }));
+    }
+
+    #[test]
+    fn lines_on_one_line_join_across_a_gap() {
+        let items = [
+            line(p(0.0, 0.0), p(4.0, 0.0)),
+            line(p(6.0, 0.0), p(9.0, 0.0)),
+        ];
+        let made = join(&items, 1e-6);
+        assert_eq!(made.len(), 1);
+        assert_eq!(made[0].used, vec![0, 1]);
+        assert_eq!(made[0].entity, line(p(0.0, 0.0), p(9.0, 0.0)));
+    }
+
+    #[test]
+    fn overlapping_lines_on_one_line_join() {
+        let items = [
+            line(p(0.0, 0.0), p(6.0, 0.0)),
+            line(p(9.0, 0.0), p(4.0, 0.0)),
+        ];
+        let made = join(&items, 1e-6);
+        assert_eq!(made[0].entity, line(p(0.0, 0.0), p(9.0, 0.0)));
+    }
+
+    #[test]
+    fn the_same_line_twice_is_one_line() {
+        let items = [
+            line(p(1.0, 2.0), p(5.0, 7.0)),
+            line(p(1.0, 2.0), p(5.0, 7.0)),
+        ];
+        let made = join(&items, 1e-6);
+        assert_eq!(made[0].used, vec![0, 1]);
+        assert_eq!(made[0].entity, line(p(1.0, 2.0), p(5.0, 7.0)));
+    }
+
+    #[test]
+    fn the_joined_line_runs_the_way_the_first_one_does() {
+        // Slanted, with the first line drawn downwards and the longest last.
+        let items = [
+            line(p(9.0, 12.0), p(6.0, 8.0)),
+            line(p(0.0, 0.0), p(3.0, 4.0)),
+            line(p(-3.0, -4.0), p(-12.0, -16.0)),
+        ];
+        let made = join(&items, 1e-6);
+        assert_eq!(made[0].used, vec![0, 1, 2]);
+        assert_eq!(made[0].entity, line(p(9.0, 12.0), p(-12.0, -16.0)));
+    }
+
+    #[test]
+    fn parallel_lines_apart_do_not_join() {
+        let items = [
+            line(p(0.0, 0.0), p(4.0, 0.0)),
+            line(p(6.0, 0.001), p(9.0, 0.001)),
+        ];
+        assert!(join(&items, 1e-6).is_empty());
+    }
+
+    #[test]
+    fn a_circle_does_not_stop_lines_on_one_line_joining() {
+        let items = [
+            line(p(0.0, 0.0), p(4.0, 0.0)),
+            Entity::Circle {
+                center: p(20.0, 20.0),
+                radius: 1.0,
+            },
+            line(p(6.0, 0.0), p(9.0, 0.0)),
+        ];
+        let made = join(&items, 1e-6);
+        assert_eq!(made[0].used, vec![0, 2]);
+        assert_eq!(made[0].entity, line(p(0.0, 0.0), p(9.0, 0.0)));
+    }
+
+    #[test]
+    fn beside_a_corner_a_line_apart_is_left_out() {
+        // AutoCAD 2020: the corner becomes a polyline, the line on the far
+        // side of the gap stays as it is.
+        let items = [
+            line(p(0.0, 0.0), p(5.0, 0.0)),
+            line(p(5.0, 0.0), p(5.0, 5.0)),
+            line(p(8.0, 0.0), p(12.0, 0.0)),
+        ];
+        let made = join(&items, 1e-6);
+        assert_eq!(made.len(), 1);
+        assert_eq!(made[0].used, vec![0, 1]);
+        assert!(matches!(&made[0].entity, Entity::Polyline { points, .. } if points.len() == 3));
+    }
+
+    #[test]
+    fn lines_apart_beside_a_line_across_them_join_nothing() {
+        // AutoCAD 2020: the third line touches the first in its middle, not
+        // at an end, so nothing joins, not even the two lines on one line.
+        let items = [
+            line(p(0.0, 0.0), p(5.0, 0.0)),
+            line(p(8.0, 0.0), p(12.0, 0.0)),
+            line(p(2.0, 0.0), p(2.0, 5.0)),
+        ];
+        assert!(join(&items, 1e-6).is_empty());
+    }
+
+    #[test]
+    fn a_closed_outline_with_a_notch_is_one_closed_polyline() {
+        // AutoCAD 2020: the two pieces of the top edge stay on either side
+        // of the notch.
+        let corners = [
+            p(0.0, 0.0),
+            p(10.0, 0.0),
+            p(10.0, 10.0),
+            p(7.0, 10.0),
+            p(7.0, 8.0),
+            p(3.0, 8.0),
+            p(3.0, 10.0),
+            p(0.0, 10.0),
+        ];
+        let items: Vec<Entity> = (0..corners.len())
+            .map(|i| line(corners[i], corners[(i + 1) % corners.len()]))
+            .collect();
+        let made = join(&items, 1e-6);
+        assert_eq!(made.len(), 1);
+        assert!(matches!(
+            &made[0].entity,
+            Entity::Polyline { points, closed: true, .. } if points.len() == 8
+        ));
     }
 
     #[test]
@@ -402,7 +594,7 @@ mod tests {
     fn things_that_do_not_meet_are_left_alone() {
         let items = [
             line(p(0.0, 0.0), p(1.0, 0.0)),
-            line(p(5.0, 0.0), p(6.0, 0.0)),
+            line(p(5.0, 0.0), p(5.0, 1.0)),
             Entity::Circle {
                 center: p(0.0, 0.0),
                 radius: 1.0,
