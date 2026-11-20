@@ -13,9 +13,11 @@ use crate::{Bounds, Color, Document, Entity, LayoutId, Point};
 
 mod model_space;
 mod outlines;
+mod page;
 mod settings;
 
 use outlines::dashed_outlines;
+pub use page::{page_as_read, plot_page};
 
 /// How far a flattened curve may stray from the true one, in paper millimetres.
 pub(crate) const TOLERANCE_MM: f64 = 0.02;

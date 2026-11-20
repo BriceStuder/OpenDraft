@@ -23,6 +23,20 @@ pub struct PlotControlState {
     pub reason: Option<&'static str>,
 }
 
+impl crate::layouts::PageDraft {
+    /// The page as it is read (width, height and margins: left, bottom,
+    /// right, top, in mm), as the preview and a plot file show it: turned a
+    /// quarter when the plot is turned a quarter on its paper.
+    pub fn page_as_read(&self) -> (f64, f64, [f64; 4]) {
+        opendraft_core::plot::page_as_read(
+            self.width,
+            self.height,
+            self.plot.margins_mm,
+            self.plot.rotation,
+        )
+    }
+}
+
 /// Fit and centring need a plot area of their own: a layout is plotted at its
 /// configured scale from the printable corner.
 pub fn control_state(settings: &PlotSettings, model_space: bool) -> PlotControlState {

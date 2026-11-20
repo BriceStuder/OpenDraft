@@ -82,7 +82,9 @@ fn preview_column(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, draft: &PageDr
         let (canvas, _) = ui.allocate_exact_size(size, egui::Sense::hover());
         let painter = ui.painter_at(canvas);
         painter.rect_filled(canvas, 2.0, ui.visuals().extreme_bg_color);
-        let (pw, ph) = (draft.width.max(1.0) as f32, draft.height.max(1.0) as f32);
+        // The page as it is read, as the plot file shows it.
+        let (width, height, m) = draft.page_as_read();
+        let (pw, ph) = (width.max(1.0) as f32, height.max(1.0) as f32);
         let scale = ((canvas.width() - 28.0) / pw)
             .min((canvas.height() - 54.0) / ph)
             .max(0.0);
@@ -96,7 +98,6 @@ fn preview_column(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, draft: &PageDr
             egui::Stroke::new(1.0_f32, egui::Color32::from_gray(100)),
             egui::StrokeKind::Inside,
         );
-        let m = draft.plot.margins_mm;
         let printable = egui::Rect::from_min_max(
             paper.min + egui::vec2(m[0] as f32 * scale, m[3] as f32 * scale),
             paper.max - egui::vec2(m[2] as f32 * scale, m[1] as f32 * scale),
@@ -122,7 +123,7 @@ fn preview_column(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, draft: &PageDr
         painter.text(
             egui::pos2(canvas.center().x, paper.max.y + 10.0),
             egui::Align2::CENTER_TOP,
-            format!("{:.0} × {:.0} mm", draft.width, draft.height),
+            format!("{width:.0} × {height:.0} mm"),
             egui::FontId::proportional(12.0),
             ui.visuals().text_color(),
         );
