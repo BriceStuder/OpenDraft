@@ -10,8 +10,10 @@ use serde::{Deserialize, Serialize};
 use crate::state::AppState;
 
 mod places;
+mod sizes;
 
 pub use places::Places;
+pub use sizes::{keep_minimum_sizes, split_shares};
 
 // Bumped when a new default panel is added, so saved layouts pick it up.
 const LAYOUT_KEY: &str = "dock_layout_v4";
@@ -50,6 +52,8 @@ pub enum LayoutRequest {
     Reset,
     /// Show the panel if hidden, hide it if shown.
     Toggle(PanelTab),
+    /// Take a docked panel out into a window of its own.
+    Float(PanelTab),
 }
 
 /// Share of the window width kept by the Properties column on the left.
@@ -82,15 +86,102 @@ pub fn default_layout() -> DockState<PanelTab> {
 
 /// Height in points of the command line strip when only the input shows
 /// (tab bar plus one input row).
-const COLLAPSED_HEIGHT: f32 = 68.0;
+pub const COLLAPSED_HEIGHT: f32 = 68.0;
 
-/// Collapse the command line to its input row, or restore it. `saved`
-/// remembers the expanded share between the two. Does nothing if the panel
-/// is not one half of a vertical split.
+/// Height of the tab bar above every panel.
+pub const TAB_BAR_HEIGHT: f32 = 24.0;
+
+/// The least width or height a dragged separator leaves a panel.
+const PANEL_MIN: f32 = 175.0;
+
+/// The least height it leaves the command line with its tab bar. As a
+/// strip the app measures it: two lines of history above the input row.
+pub const COMMAND_LINE_MIN_HEIGHT: f32 = 74.0;
+
+/// The command line docked above or below the drawing with no other tab
+/// beside it. It is then drawn like AutoCAD's: no tab bar, and a narrow grip
+/// down its left edge instead.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Strip {
+    Above,
+    Below,
+}
+
+/// The other half of the split `node` is in.
+fn sibling(node: NodeIndex) -> Option<NodeIndex> {
+    let parent = node.parent()?;
+    Some(if node == parent.left() {
+        parent.right()
+    } else {
+        parent.left()
+    })
+}
+
+/// Whether the command line shows as a strip, and on which side of the
+/// drawing.
+pub fn command_line_strip(dock: &DockState<PanelTab>) -> Option<Strip> {
+    let (surface, node, _) = dock.find_tab(&PanelTab::CommandLine)?;
+    let (_, canvas, _) = dock.find_tab(&PanelTab::Canvas)?;
+    let (parent, other) = (node.parent()?, sibling(node)?);
+    let tree = dock.main_surface();
+    if surface != egui_dock::SurfaceIndex::main()
+        || tree[node].tabs_count() != 1
+        || !matches!(tree[parent], egui_dock::Node::Vertical { .. })
+    {
+        return None;
+    }
+    // The other half of the split holds the drawing.
+    std::iter::successors(Some(canvas), |n| n.parent())
+        .any(|n| n == other)
+        .then_some(match node == parent.left() {
+            true => Strip::Above,
+            false => Strip::Below,
+        })
+}
+
+/// A strip dropped along the whole window moves to the drawing's own column,
+/// so the panels beside the drawing keep their full height, as in AutoCAD.
+pub fn tuck_command_line(dock: &mut DockState<PanelTab>) {
+    let Some(strip) = command_line_strip(dock) else {
+        return;
+    };
+    let (Some(found), Some((_, canvas, _))) = (
+        dock.find_tab(&PanelTab::CommandLine),
+        dock.find_tab(&PanelTab::Canvas),
+    ) else {
+        return;
+    };
+    if sibling(found.1) == Some(canvas) {
+        return;
+    }
+    let tree = dock.main_surface();
+    let height = |node: NodeIndex| tree[node].rect().map_or(0.0, |r| r.height());
+    // The drawing gets back the height the strip leaves, then shares it.
+    let (own, drawing) = (height(found.1), height(canvas));
+    let share = match own > 0.0 && drawing > 0.0 {
+        true => own / (own + drawing),
+        false => 1.0 - BELOW_SPLIT,
+    };
+    dock.remove_tab(found);
+    let Some((_, canvas, _)) = dock.find_tab(&PanelTab::Canvas) else {
+        return;
+    };
+    // The fraction is the top half's share.
+    let (tree, tabs) = (dock.main_surface_mut(), vec![PanelTab::CommandLine]);
+    match strip {
+        Strip::Above => tree.split_above(canvas, share, tabs),
+        Strip::Below => tree.split_below(canvas, 1.0 - share, tabs),
+    };
+}
+
+/// Collapse the command line to its input row (`collapsed` points high), or
+/// restore it. `saved` remembers the expanded share between the two. Does
+/// nothing if the panel is not one half of a vertical split.
 pub fn resize_command_line(
     dock: &mut DockState<PanelTab>,
     collapse: bool,
     saved: &mut Option<f32>,
+    collapsed: f32,
 ) {
     let Some((surface, node, _)) = dock.find_tab(&PanelTab::CommandLine) else {
         return;
@@ -102,9 +193,9 @@ pub fn resize_command_line(
     let on_top = node.0 % 2 == 1;
     if let egui_dock::Node::Vertical { rect, fraction, .. } = &mut dock.main_surface_mut()[parent] {
         if collapse {
-            if rect.height() > COLLAPSED_HEIGHT {
+            if rect.height() > collapsed {
                 saved.get_or_insert(*fraction);
-                let share = COLLAPSED_HEIGHT / rect.height();
+                let share = collapsed / rect.height();
                 *fraction = (if on_top { share } else { 1.0 - share }).clamp(0.02, 0.98);
             }
         } else {
@@ -134,7 +225,25 @@ pub fn apply(dock: &mut DockState<PanelTab>, places: &mut Places, request: Layou
                 restore(dock, panel);
             }
         }
+        LayoutRequest::Float(panel) => float(dock, panel),
     }
+}
+
+/// Move a panel docked in the main area to a window just above its place.
+fn float(dock: &mut DockState<PanelTab>, panel: PanelTab) {
+    let Some(found) = dock.find_tab(&panel) else {
+        return;
+    };
+    if !panel.closeable() || found.0 != egui_dock::SurfaceIndex::main() {
+        return;
+    }
+    let from = dock.main_surface()[found.1]
+        .rect()
+        .unwrap_or(egui::Rect::ZERO);
+    // A docked panel's window opens at 0.8 of the size asked for.
+    let size = egui::vec2(from.width().clamp(400.0, 800.0), 300.0);
+    let at = egui::pos2(from.left() + 40.0, (from.top() - size.y).max(40.0));
+    dock.detach_tab(found, egui::Rect::from_min_size(at, size));
 }
 
 /// Put a hidden panel that has no place to return to (see [`Places`]) where
@@ -203,8 +312,9 @@ pub fn save(dock: &DockState<PanelTab>, places: &Places, storage: &mut dyn efram
     places.save(storage);
 }
 
-/// Dock chrome in the app's flat dark style.
-pub fn style(theme: &Theme, egui_style: &egui::Style) -> egui_dock::Style {
+/// Dock chrome in the app's flat dark style. A dragged separator leaves a
+/// panel at least `least` points.
+pub fn style(theme: &Theme, egui_style: &egui::Style, least: f32) -> egui_dock::Style {
     let c = &theme.colors;
     let mut style = egui_dock::Style::from_egui(egui_style);
     style.main_surface_border_stroke = egui::Stroke::NONE;
@@ -212,9 +322,12 @@ pub fn style(theme: &Theme, egui_style: &egui::Style) -> egui_dock::Style {
     style.separator.color_hovered = c.accent;
     style.separator.color_dragged = c.accent;
     style.separator.width = 1.0;
+    // The dock has one limit for every separator; `keep_minimum_sizes`
+    // raises it again for all panels but the command line.
+    style.separator.extra = least.min(PANEL_MIN);
     style.tab_bar.bg_fill = c.window_bg;
     style.tab_bar.hline_color = c.divider;
-    style.tab_bar.height = 24.0;
+    style.tab_bar.height = TAB_BAR_HEIGHT;
     // Compact drop targets (the default is 100 px per button).
     style.overlay.max_button_size = 34.0;
     style.overlay.button_spacing = 4.0;
@@ -355,10 +468,207 @@ mod tests {
             _ => panic!("not a vertical split"),
         };
         let mut saved = None;
-        resize_command_line(&mut dock, true, &mut saved);
+        resize_command_line(&mut dock, true, &mut saved, COLLAPSED_HEIGHT);
         assert!((fraction(&dock) - 0.1).abs() < 1e-6);
-        resize_command_line(&mut dock, false, &mut saved);
+        resize_command_line(&mut dock, false, &mut saved, COLLAPSED_HEIGHT);
         assert_eq!(fraction(&dock), SIDE_SPLIT);
+    }
+
+    /// The default layout with the command line moved under everything.
+    fn docked_below() -> DockState<PanelTab> {
+        let mut dock = default_layout();
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
+        dock.main_surface_mut().split_below(
+            NodeIndex::root(),
+            BELOW_SPLIT,
+            vec![PanelTab::CommandLine],
+        );
+        dock
+    }
+
+    fn set_rect(dock: &mut DockState<PanelTab>, node: NodeIndex, size: egui::Vec2) {
+        match &mut dock.main_surface_mut()[node] {
+            egui_dock::Node::Vertical { rect, .. }
+            | egui_dock::Node::Horizontal { rect, .. }
+            | egui_dock::Node::Leaf { rect, .. } => {
+                *rect = egui::Rect::from_min_size(egui::pos2(0.0, 500.0), size);
+            }
+            egui_dock::Node::Empty => panic!("an empty node"),
+        }
+    }
+
+    fn set_share(dock: &mut DockState<PanelTab>, node: NodeIndex, share: f32) {
+        match &mut dock.main_surface_mut()[node] {
+            egui_dock::Node::Vertical { fraction, .. }
+            | egui_dock::Node::Horizontal { fraction, .. } => *fraction = share,
+            _ => panic!("not a split"),
+        }
+    }
+
+    #[test]
+    fn the_command_line_is_a_strip_only_above_or_below_the_drawing() {
+        // Above Layers in the side column: an ordinary panel.
+        assert_eq!(command_line_strip(&default_layout()), None);
+        let mut dock = docked_below();
+        assert_eq!(command_line_strip(&dock), Some(Strip::Below));
+        // Sharing its place with another tab, it needs its tab bar.
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::Layers),
+        );
+        let (surface, node, _) = dock.find_tab(&PanelTab::CommandLine).unwrap();
+        dock.set_focused_node_and_surface((surface, node));
+        dock.push_to_focused_leaf(PanelTab::Layers);
+        assert_eq!(command_line_strip(&dock), None);
+        // Nor in a window of its own.
+        let mut dock = docked_below();
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::CommandLine),
+        );
+        assert_eq!(command_line_strip(&dock), None);
+    }
+
+    #[test]
+    fn the_command_line_is_a_strip_right_under_the_drawing_too() {
+        let mut dock = default_layout();
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Toggle(PanelTab::CommandLine),
+        );
+        let canvas = node_of(&dock, PanelTab::Canvas);
+        dock.main_surface_mut()
+            .split_below(canvas, BELOW_SPLIT, vec![PanelTab::CommandLine]);
+        assert_eq!(command_line_strip(&dock), Some(Strip::Below));
+        let before = ron::to_string(&dock).unwrap();
+        tuck_command_line(&mut dock);
+        assert_eq!(ron::to_string(&dock).unwrap(), before, "already there");
+    }
+
+    #[test]
+    fn a_strip_along_the_whole_window_moves_under_the_drawing_alone() {
+        for (side, share) in [(Strip::Below, 0.8), (Strip::Above, 0.2)] {
+            let mut dock = default_layout();
+            apply(
+                &mut dock,
+                &mut Places::default(),
+                LayoutRequest::Toggle(PanelTab::CommandLine),
+            );
+            let (tree, tabs) = (dock.main_surface_mut(), vec![PanelTab::CommandLine]);
+            match side {
+                Strip::Below => tree.split_below(NodeIndex::root(), BELOW_SPLIT, tabs),
+                Strip::Above => tree.split_above(NodeIndex::root(), BELOW_SPLIT, tabs),
+            };
+            // As laid out: the strip 150 points high, the drawing 600.
+            let size = egui::vec2(1200.0, 150.0);
+            let node = node_of(&dock, PanelTab::CommandLine);
+            set_rect(&mut dock, node, size);
+            let size = egui::vec2(900.0, 600.0);
+            let node = node_of(&dock, PanelTab::Canvas);
+            set_rect(&mut dock, node, size);
+
+            tuck_command_line(&mut dock);
+            assert_eq!(command_line_strip(&dock), Some(side));
+            let (line, canvas) = (
+                node_of(&dock, PanelTab::CommandLine),
+                node_of(&dock, PanelTab::Canvas),
+            );
+            assert_eq!(sibling(line), Some(canvas));
+            // Properties and Layers are no longer above or below it.
+            let column = line.parent().unwrap();
+            for panel in [PanelTab::Properties, PanelTab::Layers] {
+                let node = node_of(&dock, panel);
+                let mut up = std::iter::successors(Some(node), |n| n.parent());
+                assert!(!up.any(|n| n == column), "{panel:?}");
+            }
+            // It keeps its height, which the drawing gives up.
+            let top_share = split_shares(&dock)[column.0].unwrap();
+            assert!((top_share - share).abs() < 1e-6, "{side:?}");
+            assert!(is_valid(&dock));
+        }
+    }
+
+    #[test]
+    fn a_separator_may_shrink_the_command_line_to_three_lines_but_no_other_panel() {
+        let mut dock = docked_below();
+        let root = NodeIndex::root();
+        set_rect(&mut dock, root, egui::vec2(1200.0, 800.0));
+        let before = split_shares(&dock);
+        // Dragged right down: the command line keeps its least height.
+        set_share(&mut dock, root, 0.99);
+        keep_minimum_sizes(&mut dock, &before, 80.0);
+        let share = split_shares(&dock)[0].unwrap();
+        assert!((share - (1.0 - 80.0 / 800.0)).abs() < 1e-6);
+        // Dragged right up: what is above keeps the usual least height.
+        set_share(&mut dock, root, 0.01);
+        keep_minimum_sizes(&mut dock, &before, 80.0);
+        let share = split_shares(&dock)[0].unwrap();
+        assert!((share - PANEL_MIN / 800.0).abs() < 1e-6);
+
+        // Properties beside the rest: the usual least width on both sides.
+        let side = root.left();
+        set_rect(&mut dock, side, egui::vec2(1200.0, 600.0));
+        let before = split_shares(&dock);
+        set_share(&mut dock, side, 0.01);
+        keep_minimum_sizes(&mut dock, &before, 80.0);
+        let share = split_shares(&dock)[side.0].unwrap();
+        assert!((share - PANEL_MIN / 1200.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn separators_that_did_not_move_are_left_alone() {
+        let mut dock = docked_below();
+        set_rect(&mut dock, NodeIndex::root(), egui::vec2(1200.0, 800.0));
+        set_share(&mut dock, NodeIndex::root(), 0.99);
+        let before = split_shares(&dock);
+        keep_minimum_sizes(&mut dock, &before, 80.0);
+        assert_eq!(split_shares(&dock), before);
+    }
+
+    #[test]
+    fn the_strip_collapses_to_its_input_row_without_a_tab_bar() {
+        let mut dock = docked_below();
+        set_rect(&mut dock, NodeIndex::root(), egui::vec2(1200.0, 800.0));
+        let mut saved = None;
+        resize_command_line(&mut dock, true, &mut saved, 40.0);
+        let share = split_shares(&dock)[0].unwrap();
+        assert!((share - (1.0 - 40.0 / 800.0)).abs() < 1e-6);
+        resize_command_line(&mut dock, false, &mut saved, 40.0);
+        assert_eq!(split_shares(&dock)[0], Some(BELOW_SPLIT));
+    }
+
+    #[test]
+    fn a_docked_panel_floats_into_a_window_and_stays_open() {
+        let mut dock = docked_below();
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::CommandLine),
+        );
+        let (surface, ..) = dock.find_tab(&PanelTab::CommandLine).unwrap();
+        assert_ne!(surface, egui_dock::SurfaceIndex::main());
+        assert!(is_valid(&dock));
+        // Asking again, or for the drawing, changes nothing.
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::CommandLine),
+        );
+        apply(
+            &mut dock,
+            &mut Places::default(),
+            LayoutRequest::Float(PanelTab::Canvas),
+        );
+        let (canvas, ..) = dock.find_tab(&PanelTab::Canvas).unwrap();
+        assert_eq!(canvas, egui_dock::SurfaceIndex::main());
+        assert_eq!(dock.iter_surfaces().count(), 2);
     }
 
     #[test]
