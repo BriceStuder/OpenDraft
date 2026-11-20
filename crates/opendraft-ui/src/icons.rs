@@ -159,6 +159,7 @@ icons! {
     EDIT_UNDO = '\u{e2a0}';
     FILE_NEW = '\u{e0c4}';
     FILE_OPEN = '\u{e246}';
+    FILE_PLOT = '\u{e144}';
     FILE_SAVE = '\u{e150}';
     FORMAT_LINETYPE = '\u{e0ba}';
     FORMAT_PROPERTIES = '\u{e0d0}';
