@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to OpenDraft! Contributions of all sizes are welcome: bug reports, documentation, tests and code.
 
-For anything larger than a small fix, please [open an issue](https://github.com/JamesHodgkins/OpenDraft/issues) first so we can agree on the approach before you spend time on it.
+For anything larger than a small fix, please [open an issue](https://github.com/OpenEngineeringSoftware/OpenDraft/issues) first so we can agree on the approach before you spend time on it.
 
 ## 1. Fork and clone
 
@@ -134,10 +134,10 @@ After a release is published, the packages that are not built here need their ow
 
 The Linux packages are built on Ubuntu 22.04. The release workflow installs the `.deb` on a bare Ubuntu 22.04 and runs the whole smoke test (`scripts/linux_smoke.py`) against it; `docs/linux.md` says what that does and does not prove.
 
-Before tagging a release, decide what the Home page's "What's new" card says. `crates/opendraft-app/src/whats_new.rs` holds one `Note` per version, keyed by the exact `CARGO_PKG_VERSION`: a short title and at most three plain-language changes users will notice (capabilities and workflow, not refactors or dependency updates). Add one when the release has changes worth announcing; leave it out when it does not, and the card simply does not show. The card's "View release notes" opens `https://github.com/JamesHodgkins/OpenDraft/releases/tag/v<version>`, so publish the release with that tag.
+Before tagging a release, decide what the Home page's "What's new" card says. `crates/opendraft-app/src/whats_new.rs` holds one `Note` per version, keyed by the exact `CARGO_PKG_VERSION`: a short title and at most three plain-language changes users will notice (capabilities and workflow, not refactors or dependency updates). Add one when the release has changes worth announcing; leave it out when it does not, and the card simply does not show. The card's "View release notes" opens `https://github.com/OpenEngineeringSoftware/OpenDraft/releases/tag/v<version>`, so publish the release with that tag.
 
 ## Getting help
 
-If you have a question, ask it in [Discussions](https://github.com/JamesHodgkins/OpenDraft/discussions) (Q&A). Bugs and feature requests have [issue forms](https://github.com/JamesHodgkins/OpenDraft/issues/new/choose), and security problems go through the [security policy](./SECURITY.md).
+If you have a question, ask it in [Discussions](https://github.com/OpenEngineeringSoftware/OpenDraft/discussions) (Q&A). Bugs and feature requests have [issue forms](https://github.com/OpenEngineeringSoftware/OpenDraft/issues/new/choose), and security problems go through the [security policy](./SECURITY.md).
 
 Thank you for contributing to OpenDraft!

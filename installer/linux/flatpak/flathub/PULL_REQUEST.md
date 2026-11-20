@@ -6,7 +6,7 @@ Text to paste into the Flathub pull request (title: `Add uk.openengineering.open
 
 OpenDraft: a free, open-source (GPL-3.0-or-later) 2D CAD application written in Rust on egui. It opens DXF and DWG drawings, has an AutoCAD-style ribbon and command line, and keeps its own `.odraft` format.
 
-- Homepage and source: https://github.com/JamesHodgkins/OpenDraft
+- Homepage and source: https://github.com/OpenEngineeringSoftware/OpenDraft
 - I am the author and maintainer of the project and the submitter of this pull request.
 - The application id `uk.openengineering.opendraft` is on a domain I control (`openengineering.uk`); I will verify it through the developer portal after this is accepted.
 - It builds offline from the tagged release: crates come from `cargo-sources.json`, generated from the tag's `Cargo.lock` with `flatpak-cargo-generator`.

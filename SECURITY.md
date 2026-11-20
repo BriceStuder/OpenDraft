@@ -21,7 +21,7 @@ OpenDraft opens files it did not make and talks to other programs, so these matt
 - The assistant interface (`opendraft-mcp` and the endpoint the app opens when you turn it on): anything that lets a program or user reach drawings or files you have not allowed.
 - The update check (it contacts GitHub only after you allow it) and the installers and packages.
 
-A bug that only produces a wrong drawing or a wrong measurement is not a security problem; report it as an ordinary [bug](https://github.com/JamesHodgkins/OpenDraft/issues/new/choose).
+A bug that only produces a wrong drawing or a wrong measurement is not a security problem; report it as an ordinary [bug](https://github.com/OpenEngineeringSoftware/OpenDraft/issues/new/choose).
 
 ## Supported versions
 

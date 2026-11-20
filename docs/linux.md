@@ -7,7 +7,7 @@ OpenDraft is a native Linux program: it needs no interpreter and no runtime, and
 | How | Good for | Notes |
 |---|---|---|
 | **Flatpak** | Any distribution | `installer/linux/flatpak/` (see its README). Sandboxed; the assistant connection needs the one extra step described there |
-| **AppImage** | Any distribution, no root | One file from the [releases](https://github.com/JamesHodgkins/OpenDraft/releases). Make it executable and run it |
+| **AppImage** | Any distribution, no root | One file from the [releases](https://github.com/OpenEngineeringSoftware/OpenDraft/releases). Make it executable and run it |
 | **.deb** | Debian, Ubuntu, Mint | `sudo apt install ./OpenDraft-<version>-linux-amd64.deb`. Adds the menu entry, icons and the `.odraft` file type |
 | **Arch (AUR)** | Arch and derivatives | The `PKGBUILD` is in `installer/linux/arch/` |
 | **Archive** | Anything else | `OpenDraft-<version>-linux.tar.gz`: `opendraft` and `opendraft-mcp` side by side. Needs the libraries below |

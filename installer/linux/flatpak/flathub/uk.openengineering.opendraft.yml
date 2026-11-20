@@ -62,7 +62,7 @@ modules:
     sources:
       # The release this submission is for.
       - type: git
-        url: https://github.com/JamesHodgkins/OpenDraft.git
+        url: https://github.com/OpenEngineeringSoftware/OpenDraft.git
         tag: v0.3.0
         commit: 52cae6f7571daa8aee189e9411d9498df9829685
       # Generated from that release's Cargo.lock by flatpak-cargo-generator.

@@ -11,7 +11,7 @@ pkgver=0.4.0
 pkgrel=1
 pkgdesc='Free, open-source 2D CAD with an AutoCAD-style command line'
 arch=('x86_64')
-url='https://github.com/JamesHodgkins/OpenDraft'
+url='https://github.com/OpenEngineeringSoftware/OpenDraft'
 license=('GPL-3.0-or-later')
 depends=(
   'gcc-libs'
