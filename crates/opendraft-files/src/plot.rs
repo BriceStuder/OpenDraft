@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
 use opendraft_core::plot::{
-    plot_sheet, Painted, PlotError, PlotFill, PlotPath, PlotSheet, PlotSpace,
+    plot_page, Painted, PlotError, PlotFill, PlotPath, PlotSheet, PlotSpace,
 };
 use opendraft_core::Document;
 
@@ -43,7 +43,9 @@ pub fn plot_cancellable(
         .extension()
         .and_then(|e| e.to_str())
         .map(str::to_ascii_lowercase);
-    let sheet = plot_sheet(document, space).map_err(|e| match e {
+    // A file is read, not fed through a printer: its page is turned the way
+    // the plot is.
+    let sheet = plot_page(document, space).map_err(|e| match e {
         PlotError::NoLayout | PlotError::Invalid(_) => FileError::Invalid(e.to_string()),
         PlotError::TooDetailed
         | PlotError::HatchTooDense
@@ -316,6 +318,22 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let mut document = Document::default();
+        // AutoCAD's landscape: A4 that feeds portrait, the plot turned a
+        // quarter on it. The file's page is landscape, the way it is read.
+        document.add(opendraft_core::Entity::Line {
+            start: opendraft_core::Point::new(0.0, 0.0),
+            end: opendraft_core::Point::new(400.0, 200.0),
+        });
+        let mut model = document.model_plot().clone();
+        (model.paper_width_mm, model.paper_height_mm) = (210.0, 297.0);
+        model.rotation = opendraft_core::PlotRotation::CounterClockwise90;
+        document.set_model_plot(model);
+        let landscape = dir.join("model.pdf");
+        let never = AtomicBool::new(false);
+        plot_cancellable(&landscape, &document, PlotSpace::Model, &never).unwrap();
+        let text = String::from_utf8_lossy(&std::fs::read(&landscape).unwrap()).into_owned();
+        assert!(text.contains("/MediaBox [0 0 841.89 595.276]"), "{text}");
+        std::fs::remove_file(&landscape).unwrap();
         let id = document.allocate_layout_id();
         document.set_layouts(vec![opendraft_core::Layout {
             id,
@@ -325,7 +343,6 @@ mod tests {
             plot: opendraft_core::PlotSettings::for_layout(297.0, 210.0),
             viewports: Vec::new(),
         }]);
-        let never = AtomicBool::new(false);
         for name in ["sheet.pdf", "sheet.SVG"] {
             let path = dir.join(name);
             assert_eq!(

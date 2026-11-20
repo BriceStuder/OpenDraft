@@ -52,6 +52,13 @@ impl AppState {
         self.runner.is_some()
     }
 
+    /// Whether the running command is busy between prompts, so its next
+    /// prompt or its end may arrive at any moment. False while it waits for
+    /// the user: only input changes anything then.
+    pub fn command_working(&self) -> bool {
+        self.runner.as_ref().is_some_and(|r| r.prompt().is_none())
+    }
+
     /// Whether the running command is the one called `name`.
     pub fn is_running(&self, name: &str) -> bool {
         self.runner.as_ref().is_some_and(|r| r.name() == name)

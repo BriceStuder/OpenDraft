@@ -11,6 +11,13 @@ impl Document {
         &self.layers
     }
 
+    /// Layers as lists show them: by name, ignoring case, numbers by value.
+    pub fn layers_by_name(&self) -> Vec<&Layer> {
+        let mut layers: Vec<&Layer> = self.layers.iter().collect();
+        layers.sort_by(|a, b| crate::name_order::compare(&a.name, &b.name));
+        layers
+    }
+
     pub fn layer(&self, id: LayerId) -> Option<&Layer> {
         let &i = self.layer_positions.get(&id)?;
         Some(&self.layers[i])
@@ -192,5 +199,26 @@ mod tests {
             assert_eq!(set.contains(&layer.id), doc.layer_in_use(layer.id));
         }
         assert!(set.contains(&used) && !set.contains(&unused));
+    }
+
+    #[test]
+    fn lists_show_layers_by_name_but_the_table_keeps_its_order() {
+        let mut doc = Document::default();
+        for name in ["walls", "Level 10", "Doors", "Level 2"] {
+            let id = doc.allocate_layer_id();
+            doc.push_layer(Layer::new(id, name));
+        }
+        let names = |layers: Vec<&Layer>| -> Vec<String> {
+            layers.iter().map(|l| l.name.clone()).collect()
+        };
+        assert_eq!(
+            names(doc.layers_by_name()),
+            ["0", "Doors", "Level 2", "Level 10", "walls"]
+        );
+        assert_eq!(
+            names(doc.layers().iter().collect()),
+            ["0", "walls", "Level 10", "Doors", "Level 2"],
+            "the file and undo still see the order layers were made in"
+        );
     }
 }

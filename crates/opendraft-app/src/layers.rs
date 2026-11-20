@@ -51,15 +51,18 @@ impl LayerFlag {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LayerEdit {
     New,
-    Delete(LayerId),
+    /// Delete the layers that can be; say why the others stay.
+    Delete(Vec<LayerId>),
     SetCurrent(LayerId),
     Rename(LayerId, String),
     Toggle(LayerId, LayerFlag),
-    SetColor(LayerId, Color),
-    SetLinetype(LayerId, LinetypeId),
-    SetLineweight(LayerId, Lineweight),
-    /// Freeze or thaw a layer in the viewport being worked on (VP Freeze).
-    ToggleInViewport(LayerId),
+    /// Turn a switch to one value on several layers (the panel's selection).
+    SetFlag(Vec<LayerId>, LayerFlag, bool),
+    SetColor(Vec<LayerId>, Color),
+    SetLinetype(Vec<LayerId>, LinetypeId),
+    SetLineweight(Vec<LayerId>, Lineweight),
+    /// Freeze (`true`) or thaw layers in the viewport being worked on.
+    SetInViewport(Vec<LayerId>, bool),
 }
 
 /// A change to the selected objects' display attributes (Properties panel).
@@ -103,20 +106,21 @@ impl AppState {
             LayerEdit::New => {
                 self.new_layer();
             }
-            LayerEdit::Delete(id) => self.delete_layer(id),
+            LayerEdit::Delete(ids) => self.delete_layers(&ids),
             LayerEdit::SetCurrent(id) => self.set_current_layer(id),
             LayerEdit::Rename(id, name) => self.rename_layer(id, &name),
             LayerEdit::Toggle(id, flag) => self.toggle_layer(id, flag),
-            LayerEdit::SetColor(id, color) => {
-                self.edit_layers("Change layer colour", [id], |l| l.color = color)
+            LayerEdit::SetFlag(ids, flag, value) => self.set_layer_flag(&ids, flag, value),
+            LayerEdit::SetColor(ids, color) => {
+                self.edit_layers("Change layer colour", ids, |l| l.color = color)
             }
-            LayerEdit::SetLinetype(id, linetype) => {
-                self.edit_layers("Change layer linetype", [id], |l| l.linetype = linetype)
+            LayerEdit::SetLinetype(ids, linetype) => {
+                self.edit_layers("Change layer linetype", ids, |l| l.linetype = linetype)
             }
-            LayerEdit::SetLineweight(id, weight) => {
-                self.edit_layers("Change layer lineweight", [id], |l| l.lineweight = weight)
+            LayerEdit::SetLineweight(ids, weight) => {
+                self.edit_layers("Change layer lineweight", ids, |l| l.lineweight = weight)
             }
-            LayerEdit::ToggleInViewport(id) => self.toggle_layer_in_viewport(id),
+            LayerEdit::SetInViewport(ids, freeze) => self.set_layers_in_viewport(&ids, freeze),
         }
     }
 
@@ -130,13 +134,35 @@ impl AppState {
         id
     }
 
-    pub fn delete_layer(&mut self, id: LayerId) {
-        if let Some(reason) = self.session().document().layer_delete_blocker(id) {
+    /// Delete the layers that can be, as one undo step. The message says how
+    /// many went and, when some stay, why the first of them does.
+    pub fn delete_layers(&mut self, ids: &[LayerId]) {
+        let document = self.session().document();
+        let mut deletable = Vec::new();
+        let mut blocked = Vec::new();
+        for &id in ids {
+            match document.layer_delete_blocker(id) {
+                Some(reason) => blocked.push(reason),
+                None => deletable.push(id),
+            }
+        }
+        let Some(&reason) = blocked.first() else {
+            if deletable.is_empty() {
+                return;
+            }
+            self.message = format!("Deleted {}", plural(deletable.len(), "layer"));
+            return self.perform(RemoveLayer::many(deletable));
+        };
+        if deletable.is_empty() {
             self.message = reason.to_owned();
             return;
         }
-        self.message = "Deleted layer".to_owned();
-        self.perform(RemoveLayer::new(id));
+        self.message = format!(
+            "Deleted {}; {} kept: {reason}",
+            plural(deletable.len(), "layer"),
+            blocked.len()
+        );
+        self.perform(RemoveLayer::many(deletable));
     }
 
     pub fn set_current_layer(&mut self, id: LayerId) {
@@ -179,6 +205,21 @@ impl AppState {
             return;
         }
         self.edit_layers(flag.action_name(value), [id], |l| flag.set(l, value));
+    }
+
+    /// Turn `flag` to `value` on every layer in `ids` (one undo step). The
+    /// current layer is left thawed.
+    pub fn set_layer_flag(&mut self, ids: &[LayerId], flag: LayerFlag, value: bool) {
+        let current = self.session().document().current_layer();
+        let skip_current = flag == LayerFlag::Frozen && value && ids.contains(&current);
+        if skip_current {
+            self.message = "The current layer cannot be frozen".to_owned();
+        }
+        let ids = ids
+            .iter()
+            .copied()
+            .filter(|&id| !(skip_current && id == current));
+        self.edit_layers(flag.action_name(value), ids, |l| flag.set(l, value));
     }
 
     /// Apply `change` to the given layers as one undo step. Does nothing when
@@ -374,7 +415,7 @@ mod tests {
         state.set_current_layer(walls);
         state.toggle_layer(walls, LayerFlag::Frozen);
         assert!(!state.session().document().layer(walls).unwrap().frozen);
-        state.delete_layer(walls);
+        state.delete_layers(&[walls]);
         assert!(state.session().document().layer(walls).is_some());
         assert!(state.message.contains("current layer"));
     }
@@ -460,5 +501,65 @@ mod tests {
         state.undo();
         let doc = &state.session().document();
         assert!(doc.objects().iter().all(|o| o.attrs.linetype_scale == 1.0));
+    }
+
+    #[test]
+    fn a_switch_on_several_layers_is_one_step_and_spares_the_current_one() {
+        let mut state = AppState::new();
+        let a = state.new_layer();
+        let b = state.new_layer();
+        let ids = [LayerId::DEFAULT, a, b];
+        state.apply_layer_edit(LayerEdit::SetFlag(ids.to_vec(), LayerFlag::Frozen, true));
+        let doc = state.session().document();
+        assert!(!doc.layer(LayerId::DEFAULT).unwrap().frozen, "current");
+        assert!(doc.layer(a).unwrap().frozen && doc.layer(b).unwrap().frozen);
+        assert!(state.message.contains("current layer"));
+        state.undo();
+        let doc = state.session().document();
+        assert!(!doc.layer(a).unwrap().frozen && !doc.layer(b).unwrap().frozen);
+
+        state.apply_layer_edit(LayerEdit::SetFlag(ids.to_vec(), LayerFlag::Locked, true));
+        assert!(state.session().document().layers().iter().all(|l| l.locked));
+    }
+
+    #[test]
+    fn colour_linetype_and_weight_reach_every_layer_given() {
+        let mut state = AppState::new();
+        let a = state.new_layer();
+        let b = state.new_layer();
+        let red = Color::Rgb(255, 0, 0);
+        state.apply_layer_edit(LayerEdit::SetColor(vec![a, b], red));
+        state.apply_layer_edit(LayerEdit::SetLineweight(vec![a, b], Lineweight(50)));
+        let doc = state.session().document();
+        for id in [a, b] {
+            assert_eq!(doc.layer(id).unwrap().color, red);
+            assert_eq!(doc.layer(id).unwrap().lineweight, Lineweight(50));
+        }
+        assert_ne!(doc.layer(LayerId::DEFAULT).unwrap().color, red);
+        state.undo();
+        state.undo();
+        assert_ne!(state.session().document().layer(a).unwrap().color, red);
+    }
+
+    #[test]
+    fn deleting_several_layers_keeps_the_ones_that_must_stay() {
+        let mut state = AppState::new();
+        let used = state.new_layer();
+        let empty1 = state.new_layer();
+        let empty2 = state.new_layer();
+        state.set_current_layer(used);
+        state.add_entity(circle());
+        state.set_current_layer(LayerId::DEFAULT);
+        state.delete_layers(&[LayerId::DEFAULT, used, empty1, empty2]);
+        let doc = state.session().document();
+        assert!(doc.layer(empty1).is_none() && doc.layer(empty2).is_none());
+        assert!(doc.layer(used).is_some() && doc.layer(LayerId::DEFAULT).is_some());
+        assert!(state.message.starts_with("Deleted 2 layers; 2 kept"));
+        state.undo();
+        let doc = state.session().document();
+        assert!(doc.layer(empty1).is_some() && doc.layer(empty2).is_some());
+
+        state.delete_layers(&[LayerId::DEFAULT]);
+        assert_eq!(state.session().document().layers().len(), 4);
     }
 }

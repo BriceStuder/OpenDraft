@@ -7,9 +7,8 @@ use std::io::Cursor;
 use std::sync::mpsc::{channel, Receiver};
 use std::time::{Duration, Instant};
 
-use opendraft_core::plot::{plot_sheet, PlotSpace};
+use opendraft_core::plot::{plot_page, plot_sheet, PlotSpace};
 use opendraft_core::plot_plan::validate_plot;
-use opendraft_core::plot_settings::{DEVICE_PDF, DEVICE_SVG};
 use opendraft_core::Document;
 
 use crate::layouts::PageDraft;
@@ -32,6 +31,8 @@ pub struct PlotPreview {
     pub rgba: Vec<u8>,
     /// What the plot could not show faithfully.
     pub notes: Vec<String>,
+    /// The sheet drawn, to draw part of it larger when the preview is zoomed.
+    pub sheet: std::sync::Arc<opendraft_core::plot::PlotSheet>,
 }
 
 /// What the printers of the machine are, found off the UI thread.
@@ -41,52 +42,7 @@ pub enum Printers {
     Failed(String),
 }
 
-/// Where the plot goes: one of OpenDraft's own file devices, or a printer.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Target {
-    /// A PDF file, asked for when Plot is pressed.
-    Pdf,
-    /// An SVG file, asked for when Plot is pressed.
-    Svg,
-    Printer(PrinterId),
-}
-
-impl Target {
-    /// The device as a page setup names it.
-    pub fn device_name(&self) -> String {
-        match self {
-            Self::Pdf => DEVICE_PDF.to_owned(),
-            Self::Svg => DEVICE_SVG.to_owned(),
-            Self::Printer(printer) => printer.0.clone(),
-        }
-    }
-
-    /// OpenDraft's own devices by name; a printer is found among the
-    /// machine's once they are known.
-    pub fn builtin(name: &str) -> Option<Self> {
-        match name {
-            DEVICE_PDF => Some(Self::Pdf),
-            DEVICE_SVG => Some(Self::Svg),
-            _ => None,
-        }
-    }
-}
-
-/// The device to start on: the layout's own, else the one used last. A
-/// printer is only named (to be found once the printers are known).
-pub fn initial_device(layout_device: &str, last: &str) -> (Target, Option<String>) {
-    for name in [layout_device, last] {
-        if let Some(target) = Target::builtin(name) {
-            return (target, None);
-        }
-        // Not a device: what a layout holds when none was chosen, or the
-        // name an earlier version gave to both file devices.
-        if !name.is_empty() && name != "none_device" && name != "OpenDraft PDF/SVG" {
-            return (Target::Pdf, Some(name.to_owned()));
-        }
-    }
-    (Target::Pdf, None)
-}
+pub use crate::plot_target::{initial_device, Target};
 
 impl PlotDialog {
     /// Once the printers are known, go back to the one used last time if it
@@ -128,6 +84,8 @@ pub struct PlotDialog {
     pub printers: Printers,
     /// Write the draft to the layout when Plot is pressed.
     pub save_changes: bool,
+    /// Open a PDF or SVG file in the system's viewer once it is written.
+    pub view_when_done: bool,
     pub preview: Option<PlotPreview>,
     /// The draft the preview was drawn from; the picture is out of date when it differs.
     pub previewed: Option<PageDraft>,
@@ -219,7 +177,9 @@ pub fn document_with_draft(document: &Document, draft: &PageDraft) -> Result<Doc
 /// The picture of the plot `draft` describes.
 pub fn render_preview(document: &Document, draft: &PageDraft) -> Result<PlotPreview, String> {
     let copy = document_with_draft(document, draft)?;
-    let sheet = plot_sheet(&copy, draft.space).map_err(|e| e.to_string())?;
+    // The page the way it is read, even when the paper goes through a printer
+    // the other way.
+    let sheet = plot_page(&copy, draft.space).map_err(|e| e.to_string())?;
     let (width, height) = opendraft_files::png_size(&sheet, PREVIEW_WIDTH);
     if height > PREVIEW_MAX_HEIGHT {
         return Err("The sheet is too tall to preview.".to_owned());
@@ -239,7 +199,8 @@ pub fn render_preview(document: &Document, draft: &PageDraft) -> Result<PlotPrev
     Ok(PlotPreview {
         size: [info.width as usize, info.height as usize],
         rgba,
-        notes: sheet.notes,
+        notes: sheet.notes.clone(),
+        sheet: std::sync::Arc::new(sheet),
     })
 }
 
@@ -285,6 +246,7 @@ impl AppState {
             printers,
             draft,
             save_changes: true,
+            view_when_done: self.settings.plot_view_when_done,
             preview: None,
             previewed: None,
             picking: None,
@@ -356,9 +318,13 @@ impl AppState {
         }
         self.settings.plot_device = dialog.target.device_name();
         self.settings.plot_dpi = dialog.dpi;
+        let view = dialog.view_when_done;
+        if matches!(dialog.target, Target::Pdf | Target::Svg) {
+            self.settings.plot_view_when_done = view;
+        }
         let started = match dialog.target.clone() {
-            Target::Pdf => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Pdf),
-            Target::Svg => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Svg),
+            Target::Pdf => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Pdf, view),
+            Target::Svg => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Svg, view),
             Target::Printer(printer) => {
                 self.print_draft(&dialog.draft, printer, dialog.copies, dialog.dpi)
             }
@@ -529,6 +495,32 @@ mod tests {
         assert_eq!(
             state.session().document().layouts()[0].plot.area,
             PlotArea::Layout
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_landscape_plot_on_paper_that_feeds_portrait_previews_landscape() {
+        let (mut state, _, dir) = state();
+        state.enter_model();
+        state.open_plot_dialog(false);
+        let dialog = state.command_dialogs.plot.as_mut().unwrap();
+        // AutoCAD's landscape A4: the paper as it feeds, the plot turned on it.
+        (dialog.draft.width, dialog.draft.height) = (210.0, 297.0);
+        dialog.draft.plot.rotation = opendraft_core::PlotRotation::CounterClockwise90;
+        dialog.draft.plot.margins_mm = [1.0, 2.0, 3.0, 4.0];
+        assert_eq!(
+            dialog.draft.page_as_read(),
+            (297.0, 210.0, [2.0, 3.0, 4.0, 1.0])
+        );
+        state.plot_dialog_preview();
+        let dialog = state.command_dialogs.plot.as_ref().unwrap();
+        let [w, h] = dialog.preview.as_ref().expect("a preview").size;
+        assert!(w > h, "{w} x {h}");
+        assert_eq!(
+            (dialog.draft.width, dialog.draft.height),
+            (210.0, 297.0),
+            "the setup is kept as it was"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -914,6 +906,40 @@ mod tests {
         state.open_plot_dialog(false);
         assert!(!state.plot_dialog_run(), "the picker answers cancelled");
         assert!(state.command_dialogs.plot.is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_plot_file_is_opened_when_written_if_asked_and_the_choice_is_kept() {
+        let (mut state, script, dir) = state();
+        assert!(state.settings.plot_view_when_done, "on to start with");
+        state.open_plot_dialog(false);
+        assert!(state.command_dialogs.plot.as_ref().unwrap().view_when_done);
+        script.will_save_to(Some(dir.join("seen.pdf")));
+        assert!(state.plot_dialog_run());
+        assert_eq!(
+            state.command_dialogs.plots_to_view,
+            [dir.join("seen.pdf")],
+            "written, so it is opened"
+        );
+        state.command_dialogs.plots_to_view.clear();
+
+        // A file that could not be written is not opened.
+        state.open_plot_dialog(false);
+        script.will_save_to(Some(dir.join("no such folder").join("x.pdf")));
+        assert!(state.plot_dialog_run());
+        assert!(state.command_dialogs.plots_to_view.is_empty());
+
+        // Unticked: not opened, and the next plot starts unticked.
+        state.open_plot_dialog(false);
+        state.command_dialogs.plot.as_mut().unwrap().view_when_done = false;
+        script.will_save_to(Some(dir.join("unseen.pdf")));
+        assert!(state.plot_dialog_run());
+        assert!(dir.join("unseen.pdf").exists());
+        assert!(state.command_dialogs.plots_to_view.is_empty());
+        assert!(!state.settings.plot_view_when_done);
+        state.open_plot_dialog(false);
+        assert!(!state.command_dialogs.plot.as_ref().unwrap().view_when_done);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

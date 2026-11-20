@@ -46,15 +46,41 @@ pub fn png_size(sheet: &PlotSheet, width: u32) -> (u32, u32) {
 /// `sheet` as a PNG of `width` by `height` pixels, the sheet scaled to the
 /// width.
 pub fn png(sheet: &PlotSheet, width: u32, height: u32) -> Result<Vec<u8>, PngError> {
+    let whole = [0.0, 0.0, sheet.width, sheet.height];
+    encode(&draw(sheet, whole, width, height)?)
+}
+
+/// Part of `sheet` as `width` by `height` pixels of RGBA, unpremultiplied
+/// (the paper is opaque): `part` is its left, bottom, width and height in
+/// millimetres, scaled to the width. For a closer look at a sheet drawn
+/// whole by [`png`].
+pub fn rgba_part(
+    sheet: &PlotSheet,
+    part: [f64; 4],
+    width: u32,
+    height: u32,
+) -> Result<Vec<u8>, PngError> {
+    Ok(draw(sheet, part, width, height)?.take())
+}
+
+fn draw(sheet: &PlotSheet, part: [f64; 4], width: u32, height: u32) -> Result<Pixmap, PngError> {
     let mut pixmap = Pixmap::new(width, height).ok_or(PngError::Size)?;
     pixmap.fill(Color::WHITE);
-    if !(sheet.width.is_finite() && sheet.width > 0.0) {
-        return encode(&pixmap);
+    let [left, bottom, across, _] = part;
+    if !(across.is_finite() && across > 0.0 && left.is_finite() && bottom.is_finite()) {
+        return Ok(pixmap);
     }
     // Millimetres to pixels, and up is up: the sheet's y runs from the
     // bottom.
-    let scale = (f64::from(width) / sheet.width) as f32;
-    let to_pixels = Transform::from_row(scale, 0.0, 0.0, -scale, 0.0, height as f32);
+    let scale = (f64::from(width) / across) as f32;
+    let to_pixels = Transform::from_row(
+        scale,
+        0.0,
+        0.0,
+        -scale,
+        -scale * left as f32,
+        height as f32 + scale * bottom as f32,
+    );
     let one_pixel = 1.0 / scale;
 
     for item in sheet.paint_order() {
@@ -104,7 +130,7 @@ pub fn png(sheet: &PlotSheet, width: u32, height: u32) -> Result<Vec<u8>, PngErr
             }
         }
     }
-    encode(&pixmap)
+    Ok(pixmap)
 }
 
 fn ink(rgb: [u8; 3]) -> Paint<'static> {
@@ -235,6 +261,27 @@ mod tests {
         let broken = path(&[(f64::NAN, 0.0), (1.0, f64::INFINITY)], [0, 0, 0], 1.0);
         let image = decode(&png(&sheet(vec![dot, nothing, broken], vec![]), 200, 100).unwrap());
         assert!(pixel(&image, 100, 50)[0] < 128, "the dot is there");
+    }
+
+    #[test]
+    fn a_part_of_the_sheet_is_drawn_larger_where_it_lies() {
+        // The line at y = 5 of the 100 x 50 sheet. Its part from x 50, y 0,
+        // 25 x 12.5 mm, at 200 x 100 px is 8 px to the mm: the line is on
+        // row 100 - 40 = 60, right across.
+        let line = path(&[(0.0, 5.0), (100.0, 5.0)], [200, 30, 30], 1.0);
+        let rgba = rgba_part(
+            &sheet(vec![line], vec![]),
+            [50.0, 0.0, 25.0, 12.5],
+            200,
+            100,
+        )
+        .unwrap();
+        let image = (200, 100, rgba);
+        assert_eq!(image.2.len(), 200 * 100 * 4);
+        assert_eq!(pixel(&image, 5, 60), [200, 30, 30]);
+        assert_eq!(pixel(&image, 195, 60), [200, 30, 30]);
+        assert_eq!(pixel(&image, 100, 20), [255, 255, 255], "above it");
+        assert_eq!(image.2[(60 * 200 + 100) * 4 + 3], 255, "opaque");
     }
 
     #[test]
