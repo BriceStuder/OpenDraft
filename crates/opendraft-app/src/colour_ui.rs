@@ -1,9 +1,16 @@
 //! Colour pickers shared by the Layers and Properties panels: a swatch or a
-//! swatch-and-name field that opens a palette.
+//! swatch-and-name field that opens a short list (the named colours, the
+//! ones used lately and "Select Colors..."), and the Select Color dialog with
+//! every AutoCAD index colour.
+
+mod index_dialog;
+mod names;
 
 use eframe::egui::{self, Align2, Color32, FontId, Id, Rect, Response, Sense, Stroke, Ui};
 use opendraft_core::Color;
 use opendraft_ui::{menu, Theme};
+
+pub use names::name;
 
 /// What the user picked in the palette.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -13,29 +20,10 @@ pub enum Pick {
     Color(Color),
 }
 
-/// The standard colours offered: the AutoCAD index colours, then lighter
-/// shades.
-const PALETTE: [(u8, u8, u8); 16] = [
-    (255, 0, 0),
-    (255, 255, 0),
-    (0, 255, 0),
-    (0, 255, 255),
-    (0, 0, 255),
-    (255, 0, 255),
-    (255, 127, 0),
-    (128, 128, 128),
-    (192, 192, 192),
-    (255, 128, 128),
-    (255, 255, 128),
-    (128, 255, 128),
-    (128, 255, 255),
-    (128, 128, 255),
-    (255, 128, 255),
-    (165, 82, 0),
-];
-
-const CELL: f32 = 20.0;
-const COLUMNS: usize = 8;
+/// How many colours "used lately" the list keeps.
+const RECENT: usize = 4;
+const ROW_HEIGHT: f32 = 22.0;
+const LIST_WIDTH: f32 = 170.0;
 
 /// The colour as drawn on screen.
 pub fn display(theme: &Theme, color: Color) -> Color32 {
@@ -43,38 +31,6 @@ pub fn display(theme: &Theme, color: Color) -> Color32 {
         Color::Foreground => theme.colors.text,
         Color::Rgb(r, g, b) => Color32::from_rgb(r, g, b),
     }
-}
-
-/// Human name: "Foreground", "Red" or "#FF8000".
-pub fn name(color: Color) -> String {
-    match color {
-        Color::Foreground => "Foreground".to_owned(),
-        Color::Rgb(r, g, b) => match PALETTE_NAMES.iter().find(|(c, _)| *c == (r, g, b)) {
-            Some((_, name)) => (*name).to_owned(),
-            None => format!("#{r:02X}{g:02X}{b:02X}"),
-        },
-    }
-}
-
-const PALETTE_NAMES: [((u8, u8, u8), &str); 8] = [
-    ((255, 0, 0), "Red"),
-    ((255, 255, 0), "Yellow"),
-    ((0, 255, 0), "Green"),
-    ((0, 255, 255), "Cyan"),
-    ((0, 0, 255), "Blue"),
-    ((255, 0, 255), "Magenta"),
-    ((255, 127, 0), "Orange"),
-    ((128, 128, 128), "Grey"),
-];
-
-/// Parse "#RRGGBB" or "RRGGBB".
-pub fn parse_hex(text: &str) -> Option<Color> {
-    let hex = text.trim().trim_start_matches('#');
-    if hex.len() != 6 || !hex.is_ascii() {
-        return None;
-    }
-    let byte = |i: usize| u8::from_str_radix(&hex[i..i + 2], 16).ok();
-    Some(Color::Rgb(byte(0)?, byte(2)?, byte(4)?))
 }
 
 fn swatch(ui: &Ui, theme: &Theme, rect: Rect, color: Color32) {
@@ -107,7 +63,7 @@ pub fn swatch_button(
             egui::StrokeKind::Outside,
         );
     }
-    palette_popup(ui, theme, id, &response, by_layer)
+    palette_popup(ui, theme, id, &response, Some(Pick::Color(color)), by_layer)
 }
 
 /// A drop-down field showing an optional swatch and a label ("Red", "ByLayer",
@@ -139,7 +95,19 @@ pub fn field(
         FontId::proportional(theme.font_size_body),
         theme.colors.text,
     );
-    palette_popup(ui, theme, id, &response, by_layer)
+    let current = match (swatch_color, label) {
+        (Some(color), _) => Some(Pick::Color(color)),
+        (None, "ByLayer") => Some(Pick::ByLayer),
+        (None, "ByBlock") => Some(Pick::ByBlock),
+        _ => None,
+    };
+    palette_popup(ui, theme, id, &response, current, by_layer)
+}
+
+/// What a row of the short list does.
+enum Choice {
+    Pick(Pick),
+    MoreColours,
 }
 
 fn palette_popup(
@@ -147,61 +115,116 @@ fn palette_popup(
     theme: &Theme,
     id: Id,
     anchor: &Response,
+    current: Option<Pick>,
     by_layer: bool,
 ) -> Option<Pick> {
-    let width = COLUMNS as f32 * (CELL + 2.0) + 4.0;
-    menu::popup(ui, theme, id, anchor, width, |ui| {
-        let mut picked = None;
-        if by_layer && menu::menu_row(ui, theme, "ByLayer", false) {
-            picked = Some(Pick::ByLayer);
+    let dialog_id = id.with("select_color");
+    let listed = menu::popup(ui, theme, id, anchor, LIST_WIDTH, |ui| {
+        short_list(ui, theme, by_layer)
+    });
+    let picked = match listed {
+        Some(Choice::Pick(pick)) => Some(pick),
+        Some(Choice::MoreColours) => {
+            let state = index_dialog::State::new(current);
+            ui.data_mut(|d| d.insert_temp(dialog_id, state));
+            None
         }
-        if by_layer && menu::menu_row(ui, theme, "ByBlock", false) {
-            picked = Some(Pick::ByBlock);
+        None => index_dialog::show(ui, theme, dialog_id, by_layer),
+    };
+    if let Some(Pick::Color(color)) = picked {
+        remember(ui, color);
+    }
+    picked
+}
+
+/// ByLayer and ByBlock (for objects), the seven named colours, the colours
+/// used lately, and "Select Colors...".
+fn short_list(ui: &mut Ui, theme: &Theme, by_layer: bool) -> Option<Choice> {
+    let mut picked = None;
+    if by_layer && menu::menu_row(ui, theme, "ByLayer", false) {
+        picked = Some(Choice::Pick(Pick::ByLayer));
+    }
+    if by_layer && menu::menu_row(ui, theme, "ByBlock", false) {
+        picked = Some(Choice::Pick(Pick::ByBlock));
+    }
+    let standard = (1..=7).map(names::from_index);
+    let recent: Vec<Color> = recent(ui)
+        .into_iter()
+        .filter(|&c| !names::index_of(c).is_some_and(|i| i <= 7))
+        .collect();
+    for (k, color) in standard.chain(recent.iter().copied()).enumerate() {
+        if k == 7 {
+            separator(ui, theme);
         }
-        if menu::menu_row(ui, theme, "Foreground", false) {
-            picked = Some(Pick::Color(Color::Foreground));
+        if colour_row(ui, theme, color) {
+            picked = Some(Choice::Pick(Pick::Color(color)));
         }
-        ui.add_space(4.0);
-        for row in PALETTE.chunks(COLUMNS) {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing = egui::vec2(2.0, 2.0);
-                for &(r, g, b) in row {
-                    let (rect, response) =
-                        ui.allocate_exact_size(egui::vec2(CELL, CELL), Sense::click());
-                    swatch(ui, theme, rect, Color32::from_rgb(r, g, b));
-                    if response.hovered() {
-                        ui.painter().rect_stroke(
-                            rect,
-                            2.0,
-                            Stroke::new(1.5_f32, theme.colors.text),
-                            egui::StrokeKind::Inside,
-                        );
-                    }
-                    if response.clicked() {
-                        picked = Some(Pick::Color(Color::Rgb(r, g, b)));
-                    }
-                }
-            });
-            ui.add_space(2.0);
-        }
-        let hex_id = id.with("hex");
-        let mut text = ui
-            .data(|d| d.get_temp::<String>(hex_id))
-            .unwrap_or_default();
-        let response = ui.add(
-            egui::TextEdit::singleline(&mut text)
-                .hint_text("#RRGGBB")
-                .desired_width(width - 8.0),
-        );
-        if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-            if let Some(color) = parse_hex(&text) {
-                picked = Some(Pick::Color(color));
-                text.clear();
-            }
-        }
-        ui.data_mut(|d| d.insert_temp(hex_id, text));
-        picked
-    })
+    }
+    separator(ui, theme);
+    if menu::menu_row(ui, theme, "Select Colors...", false) {
+        picked = Some(Choice::MoreColours);
+    }
+    picked
+}
+
+/// A list row with the colour's swatch and name; returns whether clicked.
+fn colour_row(ui: &mut Ui, theme: &Theme, color: Color) -> bool {
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), ROW_HEIGHT), Sense::click());
+    if response.hovered() {
+        ui.painter().rect_filled(rect, 2.0, theme.colors.hover);
+    }
+    let box_rect = Rect::from_center_size(
+        egui::pos2(rect.left() + 14.0, rect.center().y),
+        egui::vec2(12.0, 12.0),
+    );
+    if color == Color::Foreground {
+        index_dialog::half_and_half(ui, box_rect);
+    } else {
+        swatch(ui, theme, box_rect, display(theme, color));
+    }
+    ui.painter().text(
+        egui::pos2(rect.left() + 28.0, rect.center().y),
+        Align2::LEFT_CENTER,
+        name(color),
+        FontId::proportional(theme.font_size_body),
+        theme.colors.text,
+    );
+    response.clicked()
+}
+
+fn separator(ui: &mut Ui, theme: &Theme) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 7.0), Sense::hover());
+    ui.painter().hline(
+        rect.x_range().shrink(4.0),
+        rect.center().y,
+        Stroke::new(1.0_f32, theme.colors.border),
+    );
+}
+
+fn recent_id() -> Id {
+    Id::new("colour_ui_recent")
+}
+
+fn recent(ui: &Ui) -> Vec<Color> {
+    ui.data(|d| d.get_temp::<Vec<Color>>(recent_id()))
+        .unwrap_or_default()
+}
+
+/// Puts `color` first among the colours used lately.
+fn remember(ui: &Ui, color: Color) {
+    let list = with_recent(recent(ui), color);
+    ui.data_mut(|d| d.insert_temp(recent_id(), list));
+}
+
+fn with_recent(mut list: Vec<Color>, color: Color) -> Vec<Color> {
+    if names::index_of(color).is_some_and(|i| i <= 7) {
+        return list;
+    }
+    list.retain(|&c| c != color);
+    list.insert(0, color);
+    list.truncate(RECENT);
+    list
 }
 
 #[cfg(test)]
@@ -209,18 +232,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hex_parses_with_or_without_hash() {
-        assert_eq!(parse_hex("#FF8000"), Some(Color::Rgb(255, 128, 0)));
-        assert_eq!(parse_hex(" 00ff00 "), Some(Color::Rgb(0, 255, 0)));
-        assert_eq!(parse_hex("#FFF"), None);
-        assert_eq!(parse_hex("GG0000"), None);
-        assert_eq!(parse_hex("\u{e9}\u{e9}\u{e9}"), None);
-    }
-
-    #[test]
-    fn names_use_the_palette_then_hex() {
-        assert_eq!(name(Color::Foreground), "Foreground");
-        assert_eq!(name(Color::Rgb(255, 0, 0)), "Red");
-        assert_eq!(name(Color::Rgb(1, 2, 3)), "#010203");
+    fn recent_colours_skip_the_named_ones_and_keep_four() {
+        let mut list = Vec::new();
+        for i in [30u8, 1, 40, 33, 30, 60, 70] {
+            list = with_recent(list, names::from_index(i));
+        }
+        let expected: Vec<Color> = [70u8, 60, 30, 33].map(names::from_index).to_vec();
+        assert_eq!(list, expected);
     }
 }
