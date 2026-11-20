@@ -101,11 +101,14 @@ impl AppState {
                 self.finish_save(uid, &path, position, result);
                 self.file_ops.saved(uid, report);
             }
-            Done::Exported { path, result } => {
+            Done::Exported { path, result, view } => {
                 let report = result
                     .as_ref()
                     .map(Clone::clone)
                     .map_err(ToString::to_string);
+                if view && result.is_ok() {
+                    self.command_dialogs.plots_to_view.push(path.clone());
+                }
                 self.finish_export(&path, result);
                 self.file_ops.exported(&path, report);
             }
@@ -316,6 +319,7 @@ impl AppState {
         self.submit_cancellable(move |cancelled| Done::Exported {
             result: opendraft_files::save_cancellable(&path, &copy, cancelled),
             path,
+            view: false,
         })
     }
 
@@ -326,18 +330,20 @@ impl AppState {
         path: &Path,
         layout: opendraft_core::LayoutId,
     ) -> u64 {
-        self.begin_plot_with(index, path, PlotSpace::Layout(layout), None)
+        self.begin_plot_with(index, path, PlotSpace::Layout(layout), None, false)
     }
 
     /// As [`Self::begin_plot_of`], with `draft` standing in for the layout's
     /// page setup in the copy that is plotted. A draft that no longer fits
     /// the drawing is ignored here; the dialog checked it before this.
+    /// With `view`, the file is opened in the system's viewer once written.
     pub(crate) fn begin_plot_with(
         &mut self,
         index: usize,
         path: &Path,
         space: PlotSpace,
         draft: Option<&crate::layouts::PageDraft>,
+        view: bool,
     ) -> u64 {
         let document = self.docs[index].drawing().document();
         let copy = draft
@@ -348,6 +354,7 @@ impl AppState {
         self.submit_cancellable(move |cancelled| Done::Exported {
             result: opendraft_files::plot_cancellable(&path, &copy, space, cancelled),
             path,
+            view,
         })
     }
 

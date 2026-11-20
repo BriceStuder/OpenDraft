@@ -402,7 +402,7 @@ impl eframe::App for OpenDraftApp {
             self.state.io.set_waker(move || ctx.request_repaint());
             self.io_waker_set = true;
         }
-        self.state.poll_io();
+        self.poll_io();
         self.state.report_picker_problem();
         self.tick_updates(ctx);
         self.state.pump_command();

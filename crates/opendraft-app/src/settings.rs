@@ -63,6 +63,9 @@ pub struct Settings {
     /// and the resolution of a sheet printed as a picture.
     pub plot_device: String,
     pub plot_dpi: u32,
+    /// Open a PDF or SVG plot in the system's viewer once it is written
+    /// (the Plot dialog's "Open in viewer when done").
+    pub plot_view_when_done: bool,
     /// The experimental MCP automation endpoint is on. Off by default.
     pub automation_enabled: bool,
     /// Folders automation may open and write files in. Nothing outside
@@ -100,6 +103,7 @@ impl Default for Settings {
             field_eval: FIELD_EVAL_ALL,
             plot_device: String::new(),
             plot_dpi: 300,
+            plot_view_when_done: true,
             automation_enabled: false,
             automation_roots: Vec::new(),
             templates_dir: None,
@@ -357,6 +361,7 @@ mod tests {
             field_eval: 2,
             plot_device: "Office".into(),
             plot_dpi: 600,
+            plot_view_when_done: false,
             automation_enabled: true,
             automation_roots: vec!["/tmp/a".into(), "C:\\Plans".into()],
             templates_dir: Some("D:\\Templates".into()),
