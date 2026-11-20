@@ -1,6 +1,7 @@
 //! JOIN: turn lines, arcs and open polylines that meet end to end into one
 //! object, and elliptical arcs of one ellipse into one arc or the whole
-//! ellipse. The geometry is `opendraft_core::join`.
+//! ellipse. Lines that are all on one line join even across gaps or where
+//! they overlap. The geometry is `opendraft_core::join`.
 
 use opendraft_commands::{Cancelled, Editor};
 use opendraft_core::{join, Entity, EntityId};
@@ -146,8 +147,24 @@ mod tests {
     fn nothing_meeting_changes_nothing() {
         let state = joining(&[
             line(p(0.0, 0.0), p(1.0, 0.0)),
-            line(p(5.0, 0.0), p(6.0, 0.0)),
+            line(p(5.0, 0.0), p(5.0, 1.0)),
         ]);
+        assert_eq!(entities(&state).len(), 2);
+    }
+
+    #[test]
+    fn lines_on_one_line_join_across_a_gap_in_one_undo_step() {
+        let mut state = joining(&[
+            line(p(0.0, 0.0), p(4.0, 0.0)),
+            line(p(6.0, 0.0), p(9.0, 0.0)),
+        ]);
+        assert_eq!(entities(&state), vec![line(p(0.0, 0.0), p(9.0, 0.0))]);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("Joined 2 objects into 1 object.")));
+        state.undo();
         assert_eq!(entities(&state).len(), 2);
     }
 }
