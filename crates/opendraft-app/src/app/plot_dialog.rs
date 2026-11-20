@@ -238,12 +238,13 @@ fn preview_box(
 }
 
 /// The edge of the area the printer can reach, on the paper in the picture.
+/// The picture is the page as it is read, so are its margins.
 fn printable_outline(painter: &egui::Painter, paper: egui::Rect, dialog: &PlotDialog) {
-    let [left, bottom, right, top] = dialog.draft.plot.margins_mm;
+    let (w, h, [left, bottom, right, top]) = dialog.draft.page_as_read();
     if [left, bottom, right, top].iter().all(|m| *m == 0.0) {
         return;
     }
-    let (w, h) = (dialog.draft.width as f32, dialog.draft.height as f32);
+    let (w, h) = (w as f32, h as f32);
     if w <= 0.0 || h <= 0.0 {
         return;
     }

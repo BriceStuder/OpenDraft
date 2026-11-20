@@ -10,23 +10,14 @@ pub(crate) struct Fill {
     pub rgb: [u8; 3],
 }
 
-/// Paper is white, so white plots black.
-fn on_paper(rgb: [u8; 3]) -> [u8; 3] {
-    if rgb.iter().all(|c| *c >= 240) {
-        [0, 0, 0]
-    } else {
-        rgb
-    }
-}
-
 fn rgb_of(color: TextColor, object: [u8; 3]) -> [u8; 3] {
     match color {
         TextColor::Entity | TextColor::Aci(7) => object,
         TextColor::Aci(n) => {
             let (r, g, b) = aci_rgb(u8::try_from(n).unwrap_or(7));
-            on_paper([r, g, b])
+            [r, g, b]
         }
-        TextColor::Rgb(v) => on_paper([(v >> 16) as u8, (v >> 8) as u8, v as u8]),
+        TextColor::Rgb(v) => [(v >> 16) as u8, (v >> 8) as u8, v as u8],
     }
 }
 

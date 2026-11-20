@@ -154,7 +154,7 @@ fn layer_list(
     let picked = menu::popup(ui, theme, id.with("menu"), &response, rect.width(), |ui| {
         let rows = |ui: &mut Ui| {
             let mut picked = None;
-            for layer in document.layers() {
+            for layer in document.layers_by_name() {
                 let (pick, toggle) = menu_row(ui, theme, layer, shown == Some(layer.id));
                 if pick {
                     picked = Some(layer.id);

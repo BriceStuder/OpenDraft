@@ -431,7 +431,8 @@ impl eframe::App for OpenDraftApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(250));
         }
         // A command between prompts is busy for a moment: look again soon.
-        if self.state.command_running() {
+        // One waiting for the user needs no frames until the user acts.
+        if self.state.command_working() {
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
     }
