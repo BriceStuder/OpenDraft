@@ -205,6 +205,13 @@ pub fn resize_command_line(
     }
 }
 
+/// Whether the drawing view has its place to itself, with no other tab to
+/// switch to: it then needs no tab bar.
+pub fn drawing_alone(dock: &DockState<PanelTab>) -> bool {
+    dock.find_tab(&PanelTab::Canvas)
+        .is_some_and(|(surface, node, _)| dock[surface][node].tabs_count() == 1)
+}
+
 pub fn is_open(dock: &DockState<PanelTab>, panel: PanelTab) -> bool {
     dock.find_tab(&panel).is_some()
 }
@@ -759,6 +766,16 @@ mod tests {
         let text = ron::to_string(&dock).unwrap();
         let back: DockState<PanelTab> = ron::from_str(&text).unwrap();
         assert!(is_open(&back, PanelTab::Assistant));
+    }
+
+    #[test]
+    fn the_drawing_has_no_tab_bar_unless_a_panel_shares_its_place() {
+        let mut dock = default_layout();
+        assert!(drawing_alone(&dock));
+        let (surface, node, _) = dock.find_tab(&PanelTab::Canvas).unwrap();
+        dock.set_focused_node_and_surface((surface, node));
+        dock.push_to_focused_leaf(PanelTab::Assistant);
+        assert!(!drawing_alone(&dock));
     }
 
     #[test]
