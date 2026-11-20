@@ -26,7 +26,7 @@ pub fn show(
     let in_use = layers_in_use(ui, document, token);
     let base = ui.make_persistent_id("layers_panel");
     let mut selection = LayerSelection::load(ui.ctx(), base.with("selection"), document);
-    let order: Vec<LayerId> = document.layers().iter().map(|l| l.id).collect();
+    let order: Vec<LayerId> = document.layers_by_name().iter().map(|l| l.id).collect();
     let mut edit = None;
 
     ui.add_space(4.0);
@@ -73,7 +73,7 @@ pub fn show(
             };
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
             header(ui, theme, shape);
-            for layer in document.layers() {
+            for layer in document.layers_by_name() {
                 let picked = row(
                     ui,
                     theme,

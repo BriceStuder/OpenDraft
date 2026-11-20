@@ -6,6 +6,7 @@ use opendraft_canvas::{CanvasStyle, Click, GridSettings, RegionSelect};
 use opendraft_commands::Registry;
 use opendraft_ui::Theme;
 
+use super::command_line_strip::StripRows;
 use super::OpenDraftApp;
 use crate::dock::{self, PanelTab};
 use crate::state::AppState;
@@ -19,6 +20,14 @@ impl OpenDraftApp {
                 .show(ctx, |ui| self.home_page(ui));
             return;
         }
+        // As a strip the command line keeps two lines of history above its
+        // input row, and collapses to that row alone.
+        let strip = dock::command_line_strip(&self.dock);
+        let rows = StripRows::measure(ctx, &self.theme, strip);
+        let (least, collapsed) = match strip {
+            Some(_) => (rows.height(2), rows.height(0)),
+            None => (dock::COMMAND_LINE_MIN_HEIGHT, dock::COLLAPSED_HEIGHT),
+        };
         let colors = &self.theme.colors;
         let mut viewer = PanelViewer {
             theme: &self.theme,
@@ -60,8 +69,10 @@ impl OpenDraftApp {
             refused: false,
             placed_snap: None,
             dynamic_suppressed: self.dynamic_suppressed,
+            command_line_strip: strip.map(|side| (side, rows)),
         };
-        let style = dock::style(&self.theme, &ctx.style());
+        let style = dock::style(&self.theme, &ctx.style(), least);
+        let shares = dock::split_shares(&self.dock);
         // Before the dock is shown, where a panel may be closed by its tab.
         self.places.note(&self.dock, Some(ctx));
         egui::CentralPanel::default()
@@ -92,10 +103,12 @@ impl OpenDraftApp {
             run,
             ..
         } = viewer;
+        dock::keep_minimum_sizes(&mut self.dock, &shares, least);
+        dock::tuck_command_line(&mut self.dock);
 
         if let Some(collapse) = self.state.cmdline.resize.take() {
             let mut saved = self.state.cmdline.saved_split;
-            dock::resize_command_line(&mut self.dock, collapse, &mut saved);
+            dock::resize_command_line(&mut self.dock, collapse, &mut saved, collapsed);
             self.state.cmdline.saved_split = saved;
         }
         if let Some(at) = prompted.filter(|_| !self.state.defer_one_shot(placed_snap)) {
@@ -214,6 +227,8 @@ pub(super) struct PanelViewer<'a> {
     pub(super) refused: bool,
     pub(super) placed_snap: Option<opendraft_canvas::SnapPoint>,
     pub(super) dynamic_suppressed: bool,
+    /// The command line is drawn without its tab bar, behind a grip.
+    pub(super) command_line_strip: Option<(dock::Strip, StripRows)>,
     pub(super) registry: &'a Registry<AppState>,
     pub(super) run: Option<&'static str>,
     pub(super) automation: &'a mut super::automation_update::Automation,
@@ -260,7 +275,10 @@ impl PanelViewer<'_> {
         let label_color = self.theme.colors.text_weak;
         self.prepare_dynamic_canvas(ui.ctx());
         self.state.docs[self.state.active].keep_space_valid();
-        self.layout_tabs(ui);
+        // A command line docked under the drawing shows them below itself.
+        if !matches!(self.command_line_strip, Some((dock::Strip::Below, _))) {
+            self.layout_tabs(ui);
+        }
         let editing = self.state.mtext_editing() && self.state.run_doc == self.state.active;
         let sizes = self.state.settings.pointer_sizes();
         let crosshair = self.state.settings.crosshair();

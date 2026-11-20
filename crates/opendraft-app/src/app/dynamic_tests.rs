@@ -6,10 +6,12 @@ use super::{dynamic_input::field_id, OpenDraftApp};
 use crate::{dock, dynamic_input::Field, state::AppState};
 
 mod command_line_focus;
+mod command_line_strip;
 mod ctrl;
 mod dim_styles;
 mod home_keyboard;
 mod home_layout;
+mod idle_at_prompt;
 mod linetypes;
 mod mleader_styles;
 mod object_prompt_typing;

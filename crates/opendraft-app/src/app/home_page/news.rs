@@ -35,6 +35,11 @@ pub(super) fn whats_new_section(
                     ui.add(egui::Label::new(egui::RichText::new(*change).color(c.text)).wrap());
                 });
             }
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new("And more: the release notes list every change.")
+                    .color(c.text_weak),
+            );
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
                 if widgets::secondary_button(ui, theme, "View release notes").clicked() {

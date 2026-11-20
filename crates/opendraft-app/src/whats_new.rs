@@ -21,11 +21,11 @@ pub struct Note {
 const NOTES: &[Note] = &[
     Note {
         version: "0.4.0",
-        title: "Editing text in place, quicker trimming and smoother panning",
+        title: "Text in place, quicker trimming and a command line strip",
         changes: &[
             "TEXT is typed straight into the drawing, and TEXTEDIT edits single-line text where it is.",
-            "TRIM and EXTEND: drag for a fence or click for a crossing window, and trim both sides of an object in one go.",
-            "Large drawings pan and zoom more smoothly, double-clicking the wheel zooms to extents, and DWG files with very large objects now open.",
+            "TRIM and EXTEND: drag for a fence or click for a crossing window, and trim both sides of an object in one go. Double-clicking the wheel zooms to extents.",
+            "Dock the command line under the drawing for a slim strip, as in AutoCAD, and closed panels reopen where you left them. Large drawings also pan and zoom more smoothly.",
         ],
     },
     Note {
