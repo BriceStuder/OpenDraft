@@ -12,27 +12,31 @@ pub fn aci_rgb(i: u8) -> (u8, u8, u8) {
         5 => (0, 0, 255),
         6 => (255, 0, 255),
         7 => (255, 255, 255),
-        8 => (65, 65, 65),
-        9 => (128, 128, 128),
+        8 => (128, 128, 128),
+        9 => (192, 192, 192),
         10..=249 => {
-            // 24 hues, 15 degrees apart; within each, ten shades.
+            // 24 hues, 15 degrees apart; within each, five brightnesses,
+            // each full and then half saturated (as AutoCAD 2020's Select
+            // Color dialog shows them).
             const SHADES: [(f64, f64); 10] = [
                 (1.0, 1.0),
                 (0.5, 1.0),
-                (1.0, 0.8),
-                (0.5, 0.8),
-                (1.0, 0.6),
-                (0.5, 0.6),
+                (1.0, 0.65),
+                (0.5, 0.65),
                 (1.0, 0.5),
                 (0.5, 0.5),
                 (1.0, 0.3),
                 (0.5, 0.3),
+                (1.0, 0.15),
+                (0.5, 0.15),
             ];
             let n = usize::from(i) - 10;
             let hue = (n / 10) as f64 * 15.0;
             let (saturation, value) = SHADES[n % 10];
             hsv_to_rgb(hue, saturation, value)
         }
+        // AutoCAD's values on a black background (it lightens or darkens
+        // these greys on other backgrounds).
         250..=255 => {
             let grey = [51, 91, 132, 173, 214, 255][usize::from(i) - 250];
             (grey, grey, grey)
@@ -82,19 +86,26 @@ mod tests {
         assert_eq!(aci_rgb(1), (255, 0, 0));
         assert_eq!(aci_rgb(3), (0, 255, 0));
         assert_eq!(aci_rgb(5), (0, 0, 255));
+        assert_eq!(aci_rgb(8), (128, 128, 128));
+        assert_eq!(aci_rgb(9), (192, 192, 192));
         assert_eq!(aci_rgb(250), (51, 51, 51));
+        assert_eq!(aci_rgb(251), (91, 91, 91));
+        assert_eq!(aci_rgb(254), (214, 214, 214));
         assert_eq!(aci_rgb(255), (255, 255, 255));
     }
 
     #[test]
     fn the_generated_shades_match_the_published_table() {
-        // Spot checks against AutoCAD's documented values.
+        // Read from AutoCAD 2020's Select Color dialog.
         assert_eq!(aci_rgb(10), (255, 0, 0));
         assert_eq!(aci_rgb(11), (255, 127, 127));
-        assert_eq!(aci_rgb(12), (204, 0, 0));
-        assert_eq!(aci_rgb(14), (153, 0, 0));
-        assert_eq!(aci_rgb(18), (76, 0, 0));
-        assert_eq!(aci_rgb(19), (76, 38, 38));
+        assert_eq!(aci_rgb(12), (165, 0, 0));
+        assert_eq!(aci_rgb(13), (165, 82, 82));
+        assert_eq!(aci_rgb(14), (127, 0, 0));
+        assert_eq!(aci_rgb(16), (76, 0, 0));
+        assert_eq!(aci_rgb(17), (76, 38, 38));
+        assert_eq!(aci_rgb(18), (38, 0, 0));
+        assert_eq!(aci_rgb(19), (38, 19, 19));
         assert_eq!(aci_rgb(30), (255, 127, 0));
         assert_eq!(aci_rgb(50), (255, 255, 0));
         assert_eq!(aci_rgb(70), (127, 255, 0));
