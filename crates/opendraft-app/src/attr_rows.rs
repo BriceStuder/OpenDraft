@@ -64,12 +64,13 @@ fn layer_row(
 ) -> Option<AttrEdit> {
     let (_, cell) = row_frame(ui, theme, "Layer");
     let current = shared(objects.iter().map(|o| o.attrs.layer));
-    let names: Vec<String> = document.layers().iter().map(|l| l.name.clone()).collect();
-    let selected = current.and_then(|id| document.layer_position(id));
+    let layers = document.layers_by_name();
+    let names: Vec<String> = layers.iter().map(|l| l.name.clone()).collect();
+    let selected = current.and_then(|id| layers.iter().position(|l| l.id == id));
     let text = selected.map_or(VARIES, |i| names[i].as_str());
     let id = ui.id().with("attr_layer");
     let picked = cell_combo(ui, theme, id, cell, text, &names, selected)?;
-    Some(AttrEdit::Layer(document.layers()[picked].id))
+    Some(AttrEdit::Layer(layers.get(picked)?.id))
 }
 
 fn color_row(
