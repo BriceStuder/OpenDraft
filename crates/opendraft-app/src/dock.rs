@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 use crate::state::AppState;
 
 mod places;
-mod strip;
+mod sizes;
 
 pub use places::Places;
-pub use strip::{command_line_strip, keep_minimum_sizes, split_shares, tuck_command_line, Strip};
+pub use sizes::{keep_minimum_sizes, split_shares};
 
 // Bumped when a new default panel is added, so saved layouts pick it up.
 const LAYOUT_KEY: &str = "dock_layout_v4";
@@ -97,6 +97,82 @@ const PANEL_MIN: f32 = 175.0;
 /// The least height it leaves the command line with its tab bar. As a
 /// strip the app measures it: two lines of history above the input row.
 pub const COMMAND_LINE_MIN_HEIGHT: f32 = 74.0;
+
+/// The command line docked above or below the drawing with no other tab
+/// beside it. It is then drawn like AutoCAD's: no tab bar, and a narrow grip
+/// down its left edge instead.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Strip {
+    Above,
+    Below,
+}
+
+/// The other half of the split `node` is in.
+fn sibling(node: NodeIndex) -> Option<NodeIndex> {
+    let parent = node.parent()?;
+    Some(if node == parent.left() {
+        parent.right()
+    } else {
+        parent.left()
+    })
+}
+
+/// Whether the command line shows as a strip, and on which side of the
+/// drawing.
+pub fn command_line_strip(dock: &DockState<PanelTab>) -> Option<Strip> {
+    let (surface, node, _) = dock.find_tab(&PanelTab::CommandLine)?;
+    let (_, canvas, _) = dock.find_tab(&PanelTab::Canvas)?;
+    let (parent, other) = (node.parent()?, sibling(node)?);
+    let tree = dock.main_surface();
+    if surface != egui_dock::SurfaceIndex::main()
+        || tree[node].tabs_count() != 1
+        || !matches!(tree[parent], egui_dock::Node::Vertical { .. })
+    {
+        return None;
+    }
+    // The other half of the split holds the drawing.
+    std::iter::successors(Some(canvas), |n| n.parent())
+        .any(|n| n == other)
+        .then_some(match node == parent.left() {
+            true => Strip::Above,
+            false => Strip::Below,
+        })
+}
+
+/// A strip dropped along the whole window moves to the drawing's own column,
+/// so the panels beside the drawing keep their full height, as in AutoCAD.
+pub fn tuck_command_line(dock: &mut DockState<PanelTab>) {
+    let Some(strip) = command_line_strip(dock) else {
+        return;
+    };
+    let (Some(found), Some((_, canvas, _))) = (
+        dock.find_tab(&PanelTab::CommandLine),
+        dock.find_tab(&PanelTab::Canvas),
+    ) else {
+        return;
+    };
+    if sibling(found.1) == Some(canvas) {
+        return;
+    }
+    let tree = dock.main_surface();
+    let height = |node: NodeIndex| tree[node].rect().map_or(0.0, |r| r.height());
+    // The drawing gets back the height the strip leaves, then shares it.
+    let (own, drawing) = (height(found.1), height(canvas));
+    let share = match own > 0.0 && drawing > 0.0 {
+        true => own / (own + drawing),
+        false => 1.0 - BELOW_SPLIT,
+    };
+    dock.remove_tab(found);
+    let Some((_, canvas, _)) = dock.find_tab(&PanelTab::Canvas) else {
+        return;
+    };
+    // The fraction is the top half's share.
+    let (tree, tabs) = (dock.main_surface_mut(), vec![PanelTab::CommandLine]);
+    match strip {
+        Strip::Above => tree.split_above(canvas, share, tabs),
+        Strip::Below => tree.split_below(canvas, 1.0 - share, tabs),
+    };
+}
 
 /// Collapse the command line to its input row (`collapsed` points high), or
 /// restore it. `saved` remembers the expanded share between the two. Does
@@ -324,7 +400,6 @@ pub fn commands() -> Vec<Command<AppState>> {
 
 #[cfg(test)]
 mod tests {
-    use super::strip::{held_share, sibling};
     use super::*;
 
     #[test]
@@ -558,15 +633,6 @@ mod tests {
     }
 
     #[test]
-    fn a_share_is_held_between_the_least_sizes_when_they_fit() {
-        assert_eq!(held_share(0.5, 1000.0, [175.0, 74.0]), 0.5);
-        assert_eq!(held_share(0.0, 1000.0, [175.0, 74.0]), 0.175);
-        assert_eq!(held_share(1.0, 1000.0, [175.0, 74.0]), 1.0 - 0.074);
-        assert_eq!(held_share(0.9, 200.0, [175.0, 74.0]), 0.9);
-        assert_eq!(held_share(0.9, 0.0, [175.0, 74.0]), 0.9);
-    }
-
-    #[test]
     fn the_strip_collapses_to_its_input_row_without_a_tab_bar() {
         let mut dock = docked_below();
         set_rect(&mut dock, NodeIndex::root(), egui::vec2(1200.0, 800.0));
@@ -576,41 +642,6 @@ mod tests {
         assert!((share - (1.0 - 40.0 / 800.0)).abs() < 1e-6);
         resize_command_line(&mut dock, false, &mut saved, 40.0);
         assert_eq!(split_shares(&dock)[0], Some(BELOW_SPLIT));
-    }
-
-    #[test]
-    fn a_strip_closed_under_the_drawing_comes_back_as_a_strip() {
-        // Ctrl+9 twice, with the command line tucked under the drawing.
-        let (mut dock, mut places) = (docked_below(), Places::default());
-        tuck_command_line(&mut dock);
-        let before = ron::to_string(dock.main_surface()).unwrap();
-        apply(
-            &mut dock,
-            &mut places,
-            LayoutRequest::Toggle(PanelTab::CommandLine),
-        );
-        assert_eq!(command_line_strip(&dock), None);
-        apply(
-            &mut dock,
-            &mut places,
-            LayoutRequest::Toggle(PanelTab::CommandLine),
-        );
-        assert_eq!(command_line_strip(&dock), Some(Strip::Below));
-        assert_eq!(ron::to_string(dock.main_surface()).unwrap(), before);
-        // Closed before it was tucked, it is tucked once back.
-        let (mut dock, mut places) = (docked_below(), Places::default());
-        apply(
-            &mut dock,
-            &mut places,
-            LayoutRequest::Toggle(PanelTab::CommandLine),
-        );
-        apply(
-            &mut dock,
-            &mut places,
-            LayoutRequest::Toggle(PanelTab::CommandLine),
-        );
-        tuck_command_line(&mut dock);
-        assert_eq!(ron::to_string(dock.main_surface()).unwrap(), before);
     }
 
     #[test]

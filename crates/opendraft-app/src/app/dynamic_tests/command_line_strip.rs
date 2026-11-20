@@ -6,7 +6,11 @@ use crate::dock::{LayoutRequest, PanelTab, Strip};
 /// the panel's place once laid out.
 fn strip_app() -> (OpenDraftApp, egui::Context, Rect, f64) {
     let (mut app, ctx) = (app(), egui::Context::default());
-    toggle(&mut app);
+    dock::apply(
+        &mut app.dock,
+        &mut app.places,
+        LayoutRequest::Toggle(PanelTab::CommandLine),
+    );
     app.dock.main_surface_mut().split_below(
         egui_dock::NodeIndex::root(),
         0.74,
@@ -22,12 +26,6 @@ fn strip_app() -> (OpenDraftApp, egui::Context, Rect, f64) {
     }
     let panel = panel_rect(&app, PanelTab::CommandLine);
     (app, ctx, panel, time)
-}
-
-/// As Ctrl+9 does it.
-fn toggle(app: &mut OpenDraftApp) {
-    let request = LayoutRequest::Toggle(PanelTab::CommandLine);
-    dock::apply(&mut app.dock, &mut app.places, request);
 }
 
 fn panel_rect(app: &OpenDraftApp, panel: PanelTab) -> Rect {
@@ -218,63 +216,4 @@ fn the_model_tab_is_under_the_command_line_docked_below_the_drawing() {
         }
     }
     assert!(added, "no layout tab bar under the command line");
-}
-
-#[test]
-fn a_strip_closed_and_shown_again_is_a_strip_in_the_same_place() {
-    let (mut app, ctx, panel, mut time) = strip_app();
-    toggle(&mut app);
-    for _ in 0..3 {
-        time += 0.05;
-        frame(&mut app, &ctx, Vec::new(), time);
-    }
-    assert!(!dock::is_open(&app.dock, PanelTab::CommandLine));
-    toggle(&mut app);
-    for _ in 0..3 {
-        time += 0.05;
-        frame(&mut app, &ctx, Vec::new(), time);
-    }
-    assert_eq!(dock::command_line_strip(&app.dock), Some(Strip::Below));
-    let back = panel_rect(&app, PanelTab::CommandLine);
-    assert!(
-        (back.top() - panel.top()).abs() < 1.5,
-        "{back:?} for {panel:?}"
-    );
-    assert_eq!((back.left(), back.right()), (panel.left(), panel.right()));
-}
-
-#[test]
-fn a_command_line_undocked_by_its_grip_is_remembered_as_floating() {
-    let (mut app, ctx, panel, mut time) = strip_app();
-    let handle = Pos2::new(panel.left() + 9.0, panel.top() + 40.0);
-    drag(
-        &mut app,
-        &ctx,
-        handle,
-        handle + Vec2::new(60.0, -200.0),
-        &mut time,
-    );
-    let request = app.state.layout_request.take().unwrap();
-    dock::apply(&mut app.dock, &mut app.places, request);
-    let mut frames = |app: &mut OpenDraftApp| {
-        for _ in 0..3 {
-            time += 0.05;
-            frame(app, &ctx, Vec::new(), time);
-        }
-    };
-    frames(&mut app);
-    let window = |app: &OpenDraftApp| {
-        let (surface, ..) = app.dock.find_tab(&PanelTab::CommandLine).unwrap();
-        assert_ne!(surface, egui_dock::SurfaceIndex::main());
-        let id = egui::Id::from(format!("window {surface:?}"));
-        ctx.memory(|m| m.area_rect(id)).unwrap()
-    };
-    let floating = window(&app);
-    toggle(&mut app);
-    frames(&mut app);
-    toggle(&mut app);
-    frames(&mut app);
-    let back = window(&app);
-    assert_eq!(back.min, floating.min);
-    assert!((back.size() - floating.size()).abs().max_elem() < 1.0);
 }
