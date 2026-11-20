@@ -295,6 +295,7 @@ Still to do: the Arc and Line options inside the Polyline command's other forms 
 
 ## Join (done)
 JOIN (alias J) takes the selected objects, or asks for some, and chains the lines, arcs and open polylines whose ends meet (within 1e-6) into one object; `opendraft_core::join` holds the geometry. The result is a polyline with the arcs kept as bulges, except that lines on one line become a single line, arcs of one circle become one arc (or a circle when they close), and an open polyline whose ends meet is closed. The first object of each group keeps its layer and place in the drawing order; the rest are removed. One undo step.
+Lines on one line join across gaps (checked against AutoCAD 2020, 20-11-2026): when the objects JOIN can use are lines all on one line (within 1e-6), they become one line from the farthest end to the farthest end, whether they meet, leave gaps, overlap, double back or lie on top of each other; the line runs the way the first one did. Objects JOIN cannot use (a circle, a closed polyline) do not count. In a mixed selection only ends that meet join, as in AutoCAD: a corner of two lines becomes a polyline and a line beyond a gap on the same line is left out, a line touching another in its middle stops the two lines on one line from joining, and a closed outline with a notch stays one closed polyline (`opendraft_core::join`, `on_one_line`).
 Still to do: a Fuzz distance for ends that nearly meet, joining a rectangle or closed polyline (AutoCAD refuses these too), joining splines and ellipses (not yet drawable), and PEDIT Join (done, with its own chaining in `opendraft_core::pedit`).
 
 ## Explode (done)
@@ -493,7 +494,7 @@ Not done: automatic stacking of typed text (AutoCAD's Auto-stack setting and its
 - **Parking lot** (decided 14-10-2026; not started):
   - *Offset of an ellipse.* The offset of an ellipse is not an ellipse; AutoCAD makes a spline. The spline entity now exists (see "Spline"), but fitting the offset curve is spline Offset work (milestone 6 of the spline specification), so OFFSET still refuses ellipses ("OFFSET does not support ellipses yet.").
   - *`PELLIPSE`* (ellipses drawn as polylines; a drawing variable) and *Isocircle* (needs isometric drafting, which does not exist).
-  - *JOIN across gaps and its Close option.* AutoCAD joins arcs (circular and elliptical) of one circle or ellipse even with gaps between them, and Close turns a single arc into the whole circle or ellipse; our JOIN joins only pieces that meet, for circular arcs as for elliptical ones.
+  - *JOIN across gaps and its Close option.* AutoCAD joins arcs (circular and elliptical) of one circle or ellipse even with gaps between them, and Close turns a single arc into the whole circle or ellipse; our JOIN joins only pieces that meet, for circular arcs as for elliptical ones. (Lines on one line already join across gaps: see "Join (done)".)
   - *Intersection snap*, and checking the ELLIPSE prompts and the R2000 DXF export in AutoCAD itself.
 
 ## Spline (baseline done 14-10-2026: milestones 1 to 3 of `private_material/spline_element_specification.md`)
@@ -746,7 +747,7 @@ The colour lists (Layers panel, Properties, multileader styles) used to offer 16
 **Working rules:** commit as James with no co-author trailer; gate commits on real exit codes of fmt, clippy `-D warnings` and `cargo test --workspace`; stage with `git add -u` plus named new files; push only when asked; rebuild the exe before testing in the real app; the file-size test allows 450 production lines per file.
 **Suggested next steps, roughly in order:**
 1. PEDIT is built (see "PEDIT" at the end); its Fit, Spline, Jointype and vertex Tangent options wait for curve-fitting and conformance fixtures; the checks against `private_material/pedit_command_specification.md` are in the PEDIT section. (Ellipse items left over are in the Ellipse section's parking lot.)
-2. Spline milestone 4 (exact Break, Trim/Extend crossings, Join; see "Spline"), JOIN across gaps with Close.
+2. Spline milestone 4 (exact Break, Trim/Extend crossings, Join; see "Spline"), JOIN of arcs across gaps with Close (lines on one line are done).
 3. The missing draw commands from `2d_commands_reference.md`: Point, Donut, Construction line, Ray and Boundary are done (see their sections) (and the rest of Ellipse: see "Ellipse").
 4. Associative arrays (Distance, Area, Overkill and Purge are done) (see "Arrays").
 4a. Layouts, next: plot margins and linetypes, non-rectangular viewport clips, checking the R2000 export in AutoCAD (see "Layouts and viewports").
