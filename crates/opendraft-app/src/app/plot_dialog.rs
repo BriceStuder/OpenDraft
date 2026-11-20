@@ -31,6 +31,18 @@ enum Action {
 }
 
 impl OpenDraftApp {
+    /// Apply the file work that has finished, then open each plot file that
+    /// asked for it in the system's viewer.
+    pub(super) fn poll_io(&mut self) {
+        self.state.poll_io();
+        for path in std::mem::take(&mut self.state.command_dialogs.plots_to_view) {
+            if let Err(error) = crate::reveal::open_file(&path) {
+                self.state
+                    .tell(format!("Could not open {}: {error}", path.display()));
+            }
+        }
+    }
+
     pub(super) fn plot_dialog_window(&mut self, ctx: &egui::Context) {
         self.state.take_window_pick();
         let Some(mut dialog) = self.state.command_dialogs.plot.take() else {
@@ -285,12 +297,13 @@ fn zoom_caption(ui: &egui::Ui, painter: &egui::Painter, canvas: egui::Rect, zoom
 }
 
 /// The edge of the area the printer can reach, on the paper in the picture.
+/// The picture is the page as it is read, so are its margins.
 fn printable_outline(painter: &egui::Painter, paper: egui::Rect, dialog: &PlotDialog) {
-    let [left, bottom, right, top] = dialog.draft.plot.margins_mm;
+    let (w, h, [left, bottom, right, top]) = dialog.draft.page_as_read();
     if [left, bottom, right, top].iter().all(|m| *m == 0.0) {
         return;
     }
-    let (w, h) = (dialog.draft.width as f32, dialog.draft.height as f32);
+    let (w, h) = (w as f32, h as f32);
     if w <= 0.0 || h <= 0.0 {
         return;
     }
@@ -351,6 +364,9 @@ fn output_box(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, dialog: &mut PlotD
                 ui.small(format!("System printers are not available: {why}"));
             }
             Printers::Ready(_) => {}
+        }
+        if matches!(dialog.target, Target::Pdf | Target::Svg) {
+            ui.checkbox(&mut dialog.view_when_done, "Open in viewer when done");
         }
         if matches!(dialog.target, Target::Printer(_)) {
             ui.horizontal(|ui| {

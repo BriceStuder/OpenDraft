@@ -178,8 +178,11 @@ pub(in crate::app) fn paper_box(
                 ui.label("×");
                 widgets::number_field_width(ui, theme, &mut draft.height, "mm", 1.0, 74.0);
             } else {
+                // As the page is read: 297 × 210 for landscape A4, even when
+                // the paper feeds portrait and the plot is turned on it.
+                let (width, height, _) = draft.page_as_read();
                 ui.label(
-                    egui::RichText::new(format!("{:.0} × {:.0} mm", draft.width, draft.height))
+                    egui::RichText::new(format!("{width:.0} × {height:.0} mm"))
                         .color(theme.colors.text_weak),
                 );
             }
@@ -269,7 +272,7 @@ pub(in crate::app) fn plot_box(
                 offset_row(ui, theme, draft, &controls);
                 ui.end_row();
             });
-        let m = draft.plot.margins_mm;
+        let (.., m) = draft.page_as_read();
         if m.iter().any(|v| *v != 0.0) {
             ui.small(format!(
                 "Printable margins L {:.1}, B {:.1}, R {:.1}, T {:.1} mm",

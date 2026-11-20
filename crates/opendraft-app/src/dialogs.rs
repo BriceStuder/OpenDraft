@@ -34,6 +34,9 @@ pub struct CommandDialogs {
     pub plot_zoom: crate::plot_zoom::Zoom,
     /// What finished -PLOT commands asked for.
     pub plot_requests: crate::plot_line::PlotRequests,
+    /// Plot files written for the Plot dialog with "Open in viewer when done",
+    /// for the window to open in the system's viewer.
+    pub plots_to_view: Vec<std::path::PathBuf>,
 }
 
 impl AppState {

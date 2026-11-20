@@ -13,9 +13,11 @@ use crate::{Bounds, Color, Document, Entity, LayoutId, Point};
 
 mod model_space;
 mod outlines;
+mod page;
 mod settings;
 
 use outlines::dashed_outlines;
+pub use page::{page_as_read, plot_page};
 
 /// How far a flattened curve may stray from the true one, in paper millimetres.
 pub(crate) const TOLERANCE_MM: f64 = 0.02;
@@ -339,13 +341,14 @@ fn wide_ribbons(object: &crate::Object, tolerance: f64) -> Option<Ribbons> {
     })
 }
 
-/// Colour and width of an object as plotted: black on white for the
-/// foreground colour and for white, the layer's lineweight in millimetres
+/// Colour and width of an object as plotted: black for the foreground colour
+/// (AutoCAD's 7), any other colour as it is, so white (255) does not show on
+/// the paper, as in AutoCAD without a plot style table or with acad.ctb; and
+/// the layer's lineweight in millimetres
 /// (0 is a hairline: the thinnest line the device draws).
 fn look(document: &Document, object: &crate::Object) -> ([u8; 3], f64) {
     let rgb = match document.color_of(object) {
         Color::Foreground => [0, 0, 0],
-        Color::Rgb(r, g, b) if r >= 240 && g >= 240 && b >= 240 => [0, 0, 0],
         Color::Rgb(r, g, b) => [r, g, b],
     };
     let width = f64::from(document.lineweight_of(object).0) / 100.0;
@@ -722,8 +725,8 @@ mod tests {
         assert_eq!((paths[0].rgb, paths[0].width), ([0, 0, 0], 0.5));
         assert_eq!(
             (paths[1].rgb, paths[1].width),
-            ([0, 0, 0], 0.0),
-            "white plots black, 0 is a hairline"
+            ([255, 255, 255], 0.0),
+            "white (255) plots white, unseen on the paper; 0 is a hairline"
         );
         assert_eq!((paths[2].rgb, paths[2].width), ([200, 30, 30], 0.25));
     }

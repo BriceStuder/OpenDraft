@@ -199,3 +199,32 @@ fn an_unblocked_canvas_drag_still_selects() {
     let released = frame(&mut view, &ctx, vec![button(to, false)]);
     assert!(released.select.is_some());
 }
+
+fn right_click(at: egui::Pos2) -> Vec<Event> {
+    [true, false]
+        .map(|pressed| Event::PointerButton {
+            pos: at,
+            button: PointerButton::Secondary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        })
+        .to_vec()
+}
+
+#[test]
+fn a_right_click_on_a_window_above_the_canvas_opens_no_canvas_menu() {
+    let ctx = Context::default();
+    let mut view = View::default();
+    frame_under_window(&mut view, &ctx, vec![]);
+    frame_under_window(&mut view, &ctx, vec![]);
+
+    let under = pos2(300.0, 200.0);
+    frame_under_window(&mut view, &ctx, vec![Event::PointerMoved(under)]);
+    let out = frame_under_window(&mut view, &ctx, right_click(under));
+    assert!(out.context_menu.is_none(), "the window has its own menu");
+
+    let beside = pos2(50.0, 50.0);
+    frame_under_window(&mut view, &ctx, vec![Event::PointerMoved(beside)]);
+    let out = frame_under_window(&mut view, &ctx, right_click(beside));
+    assert!(out.context_menu.is_some(), "the open canvas still has one");
+}

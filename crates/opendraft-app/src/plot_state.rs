@@ -48,11 +48,13 @@ impl AppState {
     /// Ask where to write the current layout (or the Model tab) as `format` and start plotting
     /// it, with `draft` (the Plot dialog's page setup) in place of the layout's
     /// own if given. Returns whether a plot was started (not when there is no
-    /// layout or the file dialog was cancelled).
+    /// layout or the file dialog was cancelled). With `view`, the file is
+    /// opened in the system's viewer once it is written.
     pub fn plot_layout_with(
         &mut self,
         draft: Option<&crate::layouts::PageDraft>,
         format: PlotFormat,
+        view: bool,
     ) -> bool {
         let doc = &self.docs[self.active];
         let space = draft.map_or_else(
@@ -84,7 +86,7 @@ impl AppState {
         };
         let path = format.named(chosen);
         self.refresh_fields(self.active, crate::field_refresh::ON_PLOT);
-        self.begin_plot_with(self.active, &path, space, draft);
+        self.begin_plot_with(self.active, &path, space, draft, view);
         true
     }
 }
@@ -118,7 +120,7 @@ mod tests {
     fn plotting_writes_a_pdf_and_leaves_the_drawing_untouched() {
         let (mut state, script, dir) = state_in_a_layout("writes");
         script.will_save_to(Some(dir.join("sheet")));
-        assert!(state.plot_layout_with(None, PlotFormat::Pdf));
+        assert!(state.plot_layout_with(None, PlotFormat::Pdf, false));
         assert_eq!(script.suggested(), ["Drawing1-Layout1.pdf"]);
         assert_eq!(script.filters(), ["PDF file"]);
         let bytes = std::fs::read(dir.join("sheet.pdf")).expect("the extension was added");
@@ -131,7 +133,7 @@ mod tests {
         assert!(state.docs[0].is_modified() && state.docs[0].path.is_none());
 
         script.will_save_to(Some(dir.join("sheet.svg")));
-        assert!(state.plot_layout_with(None, PlotFormat::Svg));
+        assert!(state.plot_layout_with(None, PlotFormat::Svg, false));
         assert_eq!(script.filters(), ["PDF file", "SVG file"]);
         let svg = std::fs::read_to_string(dir.join("sheet.svg")).unwrap();
         assert!(svg.contains("<polyline"));
@@ -141,9 +143,15 @@ mod tests {
     #[test]
     fn a_cancelled_dialog_plots_nothing_from_either_tab() {
         let (mut state, _, dir) = state_in_a_layout("needs");
-        assert!(!state.plot_layout_with(None, PlotFormat::Pdf), "cancelled");
+        assert!(
+            !state.plot_layout_with(None, PlotFormat::Pdf, false),
+            "cancelled"
+        );
         state.enter_model();
-        assert!(!state.plot_layout_with(None, PlotFormat::Pdf), "cancelled");
+        assert!(
+            !state.plot_layout_with(None, PlotFormat::Pdf, false),
+            "cancelled"
+        );
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }

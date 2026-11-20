@@ -34,6 +34,8 @@ pub enum Done {
     Exported {
         path: PathBuf,
         result: Result<Vec<String>, FileError>,
+        /// Open the file in the system's viewer once it is written.
+        view: bool,
     },
     /// A sheet handed to a printer (or refused by it).
     Printed {
