@@ -7,7 +7,7 @@ use std::io::Cursor;
 use std::sync::mpsc::{channel, Receiver};
 use std::time::{Duration, Instant};
 
-use opendraft_core::plot::{plot_sheet, PlotSpace};
+use opendraft_core::plot::{plot_page, plot_sheet, PlotSpace};
 use opendraft_core::plot_plan::validate_plot;
 use opendraft_core::plot_settings::{DEVICE_PDF, DEVICE_SVG};
 use opendraft_core::Document;
@@ -219,7 +219,9 @@ pub fn document_with_draft(document: &Document, draft: &PageDraft) -> Result<Doc
 /// The picture of the plot `draft` describes.
 pub fn render_preview(document: &Document, draft: &PageDraft) -> Result<PlotPreview, String> {
     let copy = document_with_draft(document, draft)?;
-    let sheet = plot_sheet(&copy, draft.space).map_err(|e| e.to_string())?;
+    // The page the way it is read, even when the paper goes through a printer
+    // the other way.
+    let sheet = plot_page(&copy, draft.space).map_err(|e| e.to_string())?;
     let (width, height) = opendraft_files::png_size(&sheet, PREVIEW_WIDTH);
     if height > PREVIEW_MAX_HEIGHT {
         return Err("The sheet is too tall to preview.".to_owned());
@@ -529,6 +531,32 @@ mod tests {
         assert_eq!(
             state.session().document().layouts()[0].plot.area,
             PlotArea::Layout
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_landscape_plot_on_paper_that_feeds_portrait_previews_landscape() {
+        let (mut state, _, dir) = state();
+        state.enter_model();
+        state.open_plot_dialog(false);
+        let dialog = state.command_dialogs.plot.as_mut().unwrap();
+        // AutoCAD's landscape A4: the paper as it feeds, the plot turned on it.
+        (dialog.draft.width, dialog.draft.height) = (210.0, 297.0);
+        dialog.draft.plot.rotation = opendraft_core::PlotRotation::CounterClockwise90;
+        dialog.draft.plot.margins_mm = [1.0, 2.0, 3.0, 4.0];
+        assert_eq!(
+            dialog.draft.page_as_read(),
+            (297.0, 210.0, [2.0, 3.0, 4.0, 1.0])
+        );
+        state.plot_dialog_preview();
+        let dialog = state.command_dialogs.plot.as_ref().unwrap();
+        let [w, h] = dialog.preview.as_ref().expect("a preview").size;
+        assert!(w > h, "{w} x {h}");
+        assert_eq!(
+            (dialog.draft.width, dialog.draft.height),
+            (210.0, 297.0),
+            "the setup is kept as it was"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
