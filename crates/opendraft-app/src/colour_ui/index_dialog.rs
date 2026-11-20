@@ -7,7 +7,7 @@ use opendraft_core::aci::aci_rgb;
 use opendraft_ui::{widgets, Theme};
 
 use super::names::{self, from_index, index_of};
-use super::{display, swatch, Pick};
+use super::{paint_swatch, Pick};
 
 const CELL: f32 = 17.0;
 const GAP: f32 = 2.0;
@@ -99,8 +99,15 @@ pub fn show(ui: &Ui, theme: &Theme, id: Id, by_layer: bool) -> Option<Pick> {
             }
             let (rect, _) = ui.allocate_exact_size(egui::vec2(32.0, 20.0), Sense::hover());
             match state.chosen {
-                Some(Pick::Color(color)) => swatch(ui, theme, rect, display(theme, color)),
-                _ => swatch(ui, theme, rect, Color32::TRANSPARENT),
+                Some(Pick::Color(color)) => paint_swatch(ui.painter(), theme, rect, color),
+                _ => {
+                    ui.painter().rect_stroke(
+                        rect,
+                        2.0,
+                        Stroke::new(1.0_f32, theme.colors.border),
+                        egui::StrokeKind::Inside,
+                    );
+                }
             }
             if by_layer {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -164,7 +171,7 @@ fn describe(index: Option<u8>) -> String {
 fn index_cell(ui: &mut Ui, theme: &Theme, i: u8, chosen: Option<Pick>) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(CELL, CELL), Sense::click());
     if i == 7 {
-        half_and_half(ui, rect);
+        ui.painter().extend(half_and_half(rect));
     } else {
         let (r, g, b) = aci_rgb(i);
         ui.painter()
@@ -183,13 +190,15 @@ fn index_cell(ui: &mut Ui, theme: &Theme, i: u8, chosen: Option<Pick>) -> egui::
 }
 
 /// The swatch of colour 7: white above the diagonal, black below.
-pub fn half_and_half(ui: &Ui, rect: Rect) {
-    ui.painter().rect_filled(rect, 1.0, Color32::WHITE);
-    ui.painter().add(egui::Shape::convex_polygon(
-        vec![rect.right_top(), rect.right_bottom(), rect.left_bottom()],
-        Color32::BLACK,
-        Stroke::NONE,
-    ));
+pub fn half_and_half(rect: Rect) -> [egui::Shape; 2] {
+    [
+        egui::Shape::rect_filled(rect, 1.0, Color32::WHITE),
+        egui::Shape::convex_polygon(
+            vec![rect.right_top(), rect.right_bottom(), rect.left_bottom()],
+            Color32::BLACK,
+            Stroke::NONE,
+        ),
+    ]
 }
 
 #[cfg(test)]
