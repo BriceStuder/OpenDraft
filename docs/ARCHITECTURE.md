@@ -1019,7 +1019,7 @@ What the app must keep true so the API is cheap to add later:
 
 ## Where things are
 
-- Panels: `opendraft-app/src/app/panels.rs`; command line UI: `app/command_line.rs` (and `app/command_line_strip.rs` for its grip when docked above or below the drawing);
+- Panels: `opendraft-app/src/app/panels.rs`; command line UI: `app/command_line.rs` (and `app/command_line_strip.rs` for its grip when docked above or below the drawing); dock layout: `dock.rs` (panels, default layout, saving), `dock/places.rs` (where hidden panels return), `dock/targets.rs` and `dock/drag.rs` (dragging a panel: tab-bar drops are egui_dock's, body drops float, explicit targets dock);
   Properties: `properties.rs` (model) and `properties_ui.rs` (view).
 - Visual constants and palettes: `opendraft-ui/src/theme.rs`. Roadmap: `docs/ui_plan.md`
   (its last section, "Where we are and what next", is the place to start a
