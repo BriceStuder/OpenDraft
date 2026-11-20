@@ -9,9 +9,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
 
+mod drag;
 mod places;
 mod sizes;
+mod targets;
 
+pub use drag::show_area;
 pub use places::Places;
 pub use sizes::{keep_minimum_sizes, split_shares};
 
@@ -332,15 +335,16 @@ pub fn style(theme: &Theme, egui_style: &egui::Style, least: f32) -> egui_dock::
     // The dock has one limit for every separator; `keep_minimum_sizes`
     // raises it again for all panels but the command line.
     style.separator.extra = least.min(PANEL_MIN);
-    style.tab_bar.bg_fill = c.window_bg;
+    style.tab_bar.bg_fill = c.tab_strip();
     style.tab_bar.hline_color = c.divider;
     style.tab_bar.height = TAB_BAR_HEIGHT;
-    // Compact drop targets (the default is 100 px per button).
-    style.overlay.max_button_size = 34.0;
-    style.overlay.button_spacing = 4.0;
+    // egui_dock only marks drops on tab bars; a drop on a panel's body
+    // floats it, and `drag` draws the targets that dock it and the window
+    // outline itself.
+    style.overlay.overlay_type = egui_dock::OverlayType::HighlightedAreas;
+    style.overlay.feel.center_drop_coverage = 0.0;
+    style.overlay.selection_stroke_width = 0.0;
     style.overlay.selection_color = c.accent.gamma_multiply(0.45);
-    style.overlay.button_color = c.text_weak;
-    style.overlay.button_border_stroke = egui::Stroke::new(1.0_f32, c.text_weak);
     let tab = &mut style.tab;
     tab.tab_body.bg_fill = c.sidebar_bg;
     tab.tab_body.stroke = egui::Stroke::NONE;
@@ -361,7 +365,9 @@ pub fn style(theme: &Theme, egui_style: &egui::Style, least: f32) -> egui_dock::
     tab.active.text_color = c.text;
     tab.focused.bg_fill = c.sidebar_bg;
     tab.focused.text_color = c.text;
-    tab.inactive.bg_fill = c.window_bg;
+    // Tabs not showing merge into the strip, as the ribbon's do.
+    tab.inactive.bg_fill = c.tab_strip();
+    tab.inactive_with_kb_focus.bg_fill = c.tab_strip();
     tab.inactive.text_color = c.text_weak;
     tab.hovered.bg_fill = c.hover;
     tab.hovered.text_color = c.text;
@@ -408,6 +414,15 @@ pub fn commands() -> Vec<Command<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tab_bars_and_hidden_tabs_take_the_tab_strip_tone() {
+        let theme = Theme::dark();
+        let style = style(&theme, &egui::Style::default(), 80.0);
+        assert_eq!(style.tab_bar.bg_fill, theme.colors.tab_strip());
+        assert_eq!(style.tab.inactive.bg_fill, theme.colors.tab_strip());
+        assert_eq!(style.tab.active.bg_fill, theme.colors.sidebar_bg);
+    }
 
     #[test]
     fn default_layout_has_all_panels() {

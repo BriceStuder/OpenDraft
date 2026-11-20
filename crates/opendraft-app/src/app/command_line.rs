@@ -97,14 +97,14 @@ impl PanelViewer<'_> {
             row_height,
             ui.spacing().item_spacing.y,
         );
-        // The input line sits on a darker bar than the log above it, which
-        // keeps the blue prompt and option letters readable.
+        // The input line sits on a lighter band than the log above it, as
+        // in AutoCAD, so it reads as the line being typed into.
         let bar_rect = egui::Rect::from_min_max(
             egui::pos2(panel.left(), row_rect.top() - INPUT_BAR_PAD),
             panel.right_bottom(),
         );
         ui.painter()
-            .rect_filled(bar_rect, 0.0, theme.colors.input_bg);
+            .rect_filled(bar_rect, 0.0, theme.colors.panel_raised);
         if expanded {
             let mut log = ui.new_child(egui::UiBuilder::new().max_rect(log_rect).id_salt("log"));
             egui::ScrollArea::vertical()

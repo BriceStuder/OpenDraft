@@ -108,6 +108,13 @@ pub struct Colors {
 }
 
 impl Colors {
+    /// Behind a row of tabs (the ribbon's, the drawings', a panel's): a
+    /// little lighter than the window, so the row stands apart from the
+    /// drawing beside or below it, and darker than the tabs on it.
+    pub fn tab_strip(&self) -> Color32 {
+        self.window_bg.lerp_to_gamma(self.surface, 0.55)
+    }
+
     #[allow(clippy::too_many_arguments)]
     const fn from_tones(
         base: Color32,
@@ -370,6 +377,17 @@ impl Theme {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tab_strips_sit_between_the_window_and_the_tabs() {
+        for palette in Palette::ALL {
+            let c = Theme::with_palette(palette).colors;
+            let strip = c.tab_strip();
+            for i in 0..3 {
+                assert!(c.window_bg[i] < strip[i] && strip[i] < c.surface[i]);
+            }
+        }
+    }
 
     #[test]
     fn palette_keys_round_trip() {

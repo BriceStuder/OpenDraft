@@ -1,7 +1,6 @@
 //! The dock area and the panels inside it: drawing view and properties.
 
 use eframe::egui;
-use egui_dock::DockArea;
 use opendraft_canvas::{CanvasStyle, Click, GridSettings, RegionSelect};
 use opendraft_commands::Registry;
 use opendraft_ui::Theme;
@@ -79,12 +78,7 @@ impl OpenDraftApp {
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(self.theme.colors.window_bg))
             .show(ctx, |ui| {
-                DockArea::new(&mut self.dock)
-                    .style(style)
-                    .show_close_buttons(true)
-                    .show_leaf_close_all_buttons(false)
-                    .show_leaf_collapse_buttons(false)
-                    .show_inside(ui, &mut viewer);
+                dock::show_area(ui, &mut self.dock, style, &self.theme, &mut viewer);
             });
         let PanelViewer {
             cursor,
@@ -410,7 +404,11 @@ impl PanelViewer<'_> {
         let (document, space) = (&doc.session.document(), doc.view.space());
         let mut action = None;
         egui::TopBottomPanel::bottom("layout_tabs")
-            .frame(egui::Frame::NONE.inner_margin(egui::Margin::symmetric(6, 2)))
+            .frame(
+                egui::Frame::NONE
+                    .fill(self.theme.colors.tab_strip())
+                    .inner_margin(egui::Margin::symmetric(6, 2)),
+            )
             .show_inside(ui, |ui| {
                 action = crate::layout_tabs::show(ui, self.theme, document, space);
             });
