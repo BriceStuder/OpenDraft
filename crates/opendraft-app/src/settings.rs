@@ -75,6 +75,8 @@ pub struct Settings {
     /// May the program ask GitHub, once a day, whether a newer version
     /// exists? `None` until the user has answered (see `updates`).
     pub update_checks: Option<bool>,
+    /// The drawing cache and the frame-time readout (the Performance page).
+    pub performance: crate::performance_settings::PerformanceSettings,
 }
 
 impl Default for Settings {
@@ -88,7 +90,7 @@ impl Default for Settings {
             snap: SnapModes::default(),
             ortho: Ortho::default(),
             tracking: Tracking::default(),
-            pick_size: 6,
+            pick_size: 4,
             snap_aperture: 12,
             grip_size: 7,
             crosshair_size: 5,
@@ -103,6 +105,7 @@ impl Default for Settings {
             templates_dir: None,
             recovery_dir: None,
             update_checks: None,
+            performance: Default::default(),
         }
     }
 }
@@ -202,6 +205,7 @@ impl Settings {
     /// Force every value into its valid range (also guards against NaN).
     pub fn sanitized(mut self) -> Self {
         self.dynamic_input = self.dynamic_input.sanitized();
+        self.performance = self.performance.sanitized();
         let (min, max) = GRID_SPACING_RANGE;
         self.grid_spacing = if self.grid_spacing.is_finite() {
             self.grid_spacing.clamp(min, max)
@@ -358,6 +362,14 @@ mod tests {
             templates_dir: Some("D:\\Templates".into()),
             recovery_dir: Some("D:\\Recovery".into()),
             update_checks: Some(true),
+            performance: crate::performance_settings::PerformanceSettings {
+                drawing_cache: opendraft_canvas::CacheMode::Off,
+                memory_limit_mb: 1024,
+                while_moving: opendraft_canvas::Motion::Exact,
+                settle_delay_ms: 250,
+                draw_as: opendraft_canvas::Render::Triangles,
+                show_frame_time: true,
+            },
         };
         settings.save(&mut storage);
         assert_eq!(Settings::load(Some(&storage)), settings);

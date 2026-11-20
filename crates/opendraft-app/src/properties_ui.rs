@@ -58,11 +58,7 @@ pub fn show(ui: &mut Ui, theme: &Theme, state: &AppState) -> Option<Edit> {
                     ui.spacing_mut().item_spacing.y = 0.0;
                     let doc = &state.docs[state.active];
                     let document = &doc.session.document();
-                    let selected: Vec<&Object> = doc
-                        .selection
-                        .iter()
-                        .filter_map(|&id| document.object(id))
-                        .collect();
+                    let selected: Vec<&Object> = crate::selected_objects::of(ui.ctx(), doc);
                     edit = body(ui, theme, document, &selected);
                 });
         });

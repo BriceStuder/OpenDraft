@@ -9,6 +9,7 @@ use crate::grips::GripHit;
 use crate::select::Region;
 
 /// Colors the canvas paints with; supplied by the app from its theme.
+#[derive(Clone)]
 pub struct CanvasStyle {
     pub background: Color32,
     pub grid_minor: Color32,
@@ -43,7 +44,7 @@ pub struct PointerSizes {
 impl Default for PointerSizes {
     fn default() -> Self {
         Self {
-            pick: 6.0,
+            pick: 4.0,
             snap: 12.0,
             grip: 7.0,
         }

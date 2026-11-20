@@ -7,7 +7,7 @@ use opendraft_core::{Document, Layer, LayerId, Lineweight, Viewport};
 use opendraft_ui::{icons, menu, widgets, Theme};
 
 use crate::colour_ui::{self, Pick};
-use crate::layer_cells::{cell_text, fit_text};
+use crate::layer_cells::{cell_text, fit_text, layers_in_use};
 use crate::layers::{LayerEdit, LayerFlag};
 use crate::linetype_ui;
 
@@ -31,8 +31,10 @@ pub fn show(
     ui: &mut Ui,
     theme: &Theme,
     document: &Document,
+    token: (u64, u64),
     viewport: Option<&Viewport>,
 ) -> Option<LayerEdit> {
+    let in_use = layers_in_use(ui, document, token);
     let selected_id = ui.make_persistent_id("layers_selected");
     let selected: Option<LayerId> = ui
         .data(|d| d.get_temp(selected_id))
@@ -81,7 +83,7 @@ pub fn show(
             header(ui, theme, shape);
             for layer in document.layers() {
                 let current = layer.id == document.current_layer();
-                let in_use = document.layer_in_use(layer.id);
+                let in_use = in_use.contains(&layer.id);
                 let picked = row(
                     ui,
                     theme,

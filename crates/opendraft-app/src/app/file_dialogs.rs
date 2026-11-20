@@ -1,4 +1,5 @@
-//! The "save changes?" question shown before closing a drawing or the app.
+//! Questions about files: "save changes?" before closing a drawing or the app,
+//! and "open anyway?" before a large drawing is read.
 
 use eframe::egui;
 use opendraft_ui::widgets;
@@ -59,6 +60,45 @@ impl OpenDraftApp {
         }
         if let Some(choice) = choice {
             self.state.answer_block_close(choice);
+        }
+    }
+
+    /// Warns that a drawing is large before it is read: Open or Cancel.
+    /// Escape and the close button mean Cancel.
+    pub(super) fn large_open_dialog(&mut self, ctx: &egui::Context) {
+        let Some(held) = self.state.large_open() else {
+            return;
+        };
+        let (name, size) = (held.name(), crate::large_file::megabytes(held.bytes));
+        let mut open = true;
+        let mut choice = None;
+        widgets::dialog(ctx, &self.theme, "Large drawing", &mut open, 420.0, |ui| {
+            ui.label(format!("\"{name}\" is {size}. Open it anyway?"));
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new(
+                    "OpenDraft is early in development: a drawing this large may be slow \
+                     to open and use a lot of memory.",
+                )
+                .color(self.theme.colors.text_weak),
+            );
+            ui.add_space(14.0);
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if widgets::primary_button(ui, &self.theme, "Open").clicked() {
+                        choice = Some(true);
+                    }
+                    if widgets::secondary_button(ui, &self.theme, "Cancel").clicked() {
+                        choice = Some(false);
+                    }
+                });
+            });
+        });
+        if !open {
+            choice = Some(false);
+        }
+        if let Some(choice) = choice {
+            self.state.answer_large_open(choice);
         }
     }
 

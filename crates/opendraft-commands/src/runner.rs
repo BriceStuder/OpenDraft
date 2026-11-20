@@ -290,7 +290,7 @@ mod tests {
     fn two_circles() -> (Session, Vec<EntityId>) {
         let mut session = Session::default();
         let ids = (0..2)
-            .map(|i| session.document.add(circle_at(f64::from(i) * 10.0)))
+            .map(|i| session.document_mut().add(circle_at(f64::from(i) * 10.0)))
             .collect();
         (session, ids)
     }

@@ -7,6 +7,7 @@ use egui::{Pos2, Rect};
 use opendraft_core::{EntityId, Point};
 
 use super::{PointPrompt, Request, View, STEP_ZOOM};
+use crate::layer_cache::CacheConfig;
 
 impl View {
     /// UI overlays can constrain previews and keep their clicks out of drawing input.
@@ -110,6 +111,36 @@ impl View {
     /// memory early.
     pub fn invalidate_hatches(&self, ids: impl IntoIterator<Item = EntityId>) {
         self.hatch_cache.borrow_mut().invalidate(ids);
+    }
+
+    /// Say what the drawing is now (`Session::draw_token`): the kept picture
+    /// is reused while it is the same. Without one nothing is kept.
+    pub fn set_document_token(&mut self, token: Option<(u64, u64)>) {
+        self.document_token = token;
+    }
+
+    /// The drawing `show` is given, shared, so that its picture can be made
+    /// on another thread (see `builder.rs`). Without it, it is made here.
+    pub fn set_shared_document(&mut self, document: std::sync::Weak<opendraft_core::Document>) {
+        self.shared_document = document;
+    }
+
+    /// How the kept picture behaves (the Performance settings).
+    pub fn set_cache_config(&mut self, config: CacheConfig) {
+        if config != self.cache_config {
+            self.layer_cache.get_mut().clear();
+        }
+        self.cache_config = config;
+    }
+
+    /// What the kept picture has done so far.
+    pub fn cache_stats(&self) -> crate::layer_cache::CacheStats {
+        self.layer_cache.borrow().stats()
+    }
+
+    /// Forget the kept picture, so the next frame builds it again (REGEN).
+    pub fn clear_layer_cache(&self) {
+        self.layer_cache.borrow_mut().clear();
     }
 
     pub fn request_zoom_extents(&mut self) {

@@ -1,5 +1,6 @@
 //! Painting the viewport: entities and the overlays above them.
 
+use super::path_stroke::stroke_path;
 use super::*;
 use crate::grips::gripped;
 
@@ -138,7 +139,12 @@ impl View {
                 }
             }
             Entity::Insert(i) => {
+                // Pieces off screen or under a pixel add only triangles.
+                let visible = self.camera.visible_world(rect);
                 for piece in i.picture() {
+                    if self.negligible(&piece, &visible) {
+                        continue;
+                    }
                     self.stroke_entity(painter, rect, &piece, stroke);
                 }
             }
@@ -199,7 +205,7 @@ impl View {
                     .into_iter()
                     .map(to_screen)
                     .collect();
-                painter.add(egui::Shape::line(path, stroke));
+                stroke_path(painter, path, false, stroke);
             }
             Entity::Ellipse(e) => {
                 // Half a pixel of sag is invisible, so that is the tolerance.
@@ -208,12 +214,10 @@ impl View {
                     .into_iter()
                     .map(to_screen)
                     .collect();
-                painter.add(if e.is_full() {
+                if e.is_full() {
                     path.pop(); // the last point repeats the first
-                    egui::Shape::closed_line(path, stroke)
-                } else {
-                    egui::Shape::line(path, stroke)
-                });
+                }
+                stroke_path(painter, path, e.is_full(), stroke);
             }
             Entity::Spline(s) => {
                 let mut path: Vec<Pos2> = s
@@ -221,12 +225,11 @@ impl View {
                     .into_iter()
                     .map(to_screen)
                     .collect();
-                painter.add(if s.closed && path.len() > 2 {
+                let closed = s.closed && path.len() > 2;
+                if closed {
                     path.pop(); // the last point repeats the first
-                    egui::Shape::closed_line(path, stroke)
-                } else {
-                    egui::Shape::line(path, stroke)
-                });
+                }
+                stroke_path(painter, path, closed, stroke);
             }
             Entity::Rectangle { min, max } => {
                 painter.rect_stroke(
@@ -246,11 +249,7 @@ impl View {
                 let tolerance = 0.5 / self.camera.zoom;
                 let flat = bulge::flatten_path(points, bulges, *closed, tolerance);
                 let path: Vec<Pos2> = flat.iter().map(|p| to_screen(*p)).collect();
-                painter.add(if *closed {
-                    egui::Shape::closed_line(path, stroke)
-                } else {
-                    egui::Shape::line(path, stroke)
-                });
+                stroke_path(painter, path, *closed, stroke);
                 // Wide segments are filled in the stroke's colour.
                 let wide = width::triangles(points, bulges, widths, *closed, tolerance);
                 if !wide.is_empty() {
@@ -309,107 +308,9 @@ impl View {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn paint_entities(
-        &self,
-        painter: &egui::Painter,
-        rect: Rect,
-        style: &CanvasStyle,
-        document: &Document,
-        space: Option<LayoutId>,
-        frozen: &[LayerId],
-        selection: &BTreeSet<EntityId>,
-        hover: Option<EntityId>,
-    ) {
-        let visible = self.camera.visible_world(rect);
-        for object in document.visible_in_rect(space, frozen, visible) {
-            let (id, entity) = (&object.id, &object.entity);
-            let line = match document.color_of(object) {
-                Color::Foreground => style.entity,
-                Color::Rgb(r, g, b) => egui::Color32::from_rgb(r, g, b),
-            };
-            let bounds = object.bounds();
-            // Entities smaller than a pixel add nothing but triangles when
-            // zoomed far out. Selected ones are always drawn.
-            let on_screen =
-                (bounds.max.x - bounds.min.x).max(bounds.max.y - bounds.min.y) * self.camera.zoom;
-            // A point has no size of its own: its mode gives it one.
-            let sized = !matches!(entity, Entity::Point { .. });
-            if sized && on_screen < MIN_DRAW_PX && !selection.contains(id) {
-                continue;
-            }
-            if self.hidden == Some(*id) {
-                continue;
-            }
-            if let Entity::MText(text) = entity {
-                let (selected, hovered) = (selection.contains(id), hover == Some(*id));
-                self.paint_mtext(
-                    painter, rect, style, document, text, line, selected, hovered,
-                );
-                continue;
-            }
-            if let Entity::Text(text) = entity {
-                let (selected, hovered) = (selection.contains(id), hover == Some(*id));
-                let projected = text.projection();
-                self.paint_mtext(
-                    painter, rect, style, document, &projected, line, selected, hovered,
-                );
-                continue;
-            }
-            if let Entity::AttributeDefinition(d) = entity {
-                let (selected, hovered) = (selection.contains(id), hover == Some(*id));
-                let tag = d.tag_view();
-                self.paint_mtext(
-                    painter, rect, style, document, &tag, line, selected, hovered,
-                );
-                continue;
-            }
-            if let Entity::Hatch(h) = entity {
-                let highlight = if selection.contains(id) {
-                    Some(hatch_paint::Highlight {
-                        glow: style.selected_glow,
-                        edge: style.selected,
-                        width: 2.0,
-                    })
-                } else if hover == Some(*id) {
-                    Some(hatch_paint::Highlight {
-                        glow: style.hover,
-                        edge: line,
-                        width: 1.5,
-                    })
-                } else {
-                    None
-                };
-                self.paint_hatch(painter, rect, Some(*id), h, line, highlight);
-                continue;
-            }
-            let plain = !selection.contains(id) && hover != Some(*id);
-            if let Some(pieces) = plain.then(|| document.insert_pieces(object)).flatten() {
-                self.paint_insert_pieces(painter, rect, style, document, &pieces, frozen);
-                continue;
-            }
-            // A linetype cuts the line into dashes; the glow follows them.
-            let draw = |stroke: Stroke| self.stroke_object(painter, rect, document, object, stroke);
-            // Selected and hovered entities get a wide translucent overlay
-            // under a thicker, brighter line.
-            if selection.contains(id) {
-                draw(Stroke::new(HIGHLIGHT_WIDTH, style.selected_glow));
-                draw(Stroke::new(2.0_f32, style.selected));
-            } else if hover == Some(*id) {
-                draw(Stroke::new(HIGHLIGHT_WIDTH, style.hover));
-                draw(Stroke::new(1.5_f32, line));
-                if let Entity::Circle { center, .. } | Entity::Arc { center, .. } = entity {
-                    self.centre_hint(painter, rect, *center, line);
-                }
-            } else {
-                draw(Stroke::new(1.5_f32, line));
-            }
-        }
-    }
-
     /// A small cross at the centre of a hovered circle or arc, so it can be
     /// found (and snapped to) without hunting for it.
-    fn centre_hint(
+    pub(super) fn centre_hint(
         &self,
         painter: &egui::Painter,
         rect: Rect,

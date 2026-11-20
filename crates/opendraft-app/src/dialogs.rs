@@ -38,6 +38,7 @@ impl AppState {
     /// A dialog is open and owns the keyboard.
     pub fn modal_open(&self) -> bool {
         self.show_settings
+            || !self.large_opens.is_empty()
             || self.show_units
             || self.command_dialogs.properties.is_some()
             || self.show_point_style

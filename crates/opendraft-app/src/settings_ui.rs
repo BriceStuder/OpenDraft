@@ -19,7 +19,14 @@ pub enum FolderRequest {
     Choose(Location),
 }
 
-pub const TABS: &[&str] = &["Display", "Drafting", "Files", "Automation", "Updates"];
+pub const TABS: &[&str] = &[
+    "Display",
+    "Drafting",
+    "Files",
+    "Performance",
+    "Automation",
+    "Updates",
+];
 
 pub fn page(
     ui: &mut egui::Ui,
@@ -33,7 +40,8 @@ pub fn page(
         0 => display(ui, theme, draft),
         1 => drafting(ui, theme, draft),
         2 => files(ui, theme, draft, request),
-        3 => crate::automation::settings_page(ui, theme, draft, connections, request),
+        3 => crate::performance_settings::page(ui, theme, draft),
+        4 => crate::automation::settings_page(ui, theme, draft, connections, request),
         _ => updates(ui, theme, draft),
     }
 }
@@ -208,7 +216,7 @@ fn crosshair(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
 fn sizes(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
     widgets::group_box(ui, theme, "Sizes", |ui| {
         for (label, value, (min, max)) in [
-            ("Pick size", &mut draft.pick_size, PICK_SIZE_RANGE),
+            ("Pick box radius", &mut draft.pick_size, PICK_SIZE_RANGE),
             (
                 "Snap aperture",
                 &mut draft.snap_aperture,

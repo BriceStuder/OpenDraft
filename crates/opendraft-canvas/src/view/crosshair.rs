@@ -52,6 +52,13 @@ pub(super) fn arms(size: u32, canvas: Vec2) -> Vec2 {
     }
 }
 
+fn arm_segments(center: f32, extent: f32, gap: f32) -> Option<[(f32, f32); 2]> {
+    (extent > gap).then_some([
+        (center - extent, center - gap),
+        (center + gap, center + extent),
+    ])
+}
+
 fn paint(
     painter: &Painter,
     canvas: Rect,
@@ -63,8 +70,15 @@ fn paint(
     let stroke = Stroke::new(1.0_f32, crosshair.color.unwrap_or(DEFAULT_COLOR));
     if shape != CursorShape::PickBox {
         let arm = arms(crosshair.size, canvas.size());
-        painter.hline((at.x - arm.x)..=(at.x + arm.x), at.y, stroke);
-        painter.vline(at.x, (at.y - arm.y)..=(at.y + arm.y), stroke);
+        let gap = pick as f32 + stroke.width * 0.5;
+        if let Some([(left, left_end), (right_start, right)]) = arm_segments(at.x, arm.x, gap) {
+            painter.hline(left..=left_end, at.y, stroke);
+            painter.hline(right_start..=right, at.y, stroke);
+        }
+        if let Some([(top, top_end), (bottom_start, bottom)]) = arm_segments(at.y, arm.y, gap) {
+            painter.vline(at.x, top..=top_end, stroke);
+            painter.vline(at.x, bottom_start..=bottom, stroke);
+        }
     }
     if shape != CursorShape::Crosshair {
         let half = pick as f32;
@@ -149,6 +163,43 @@ impl View {
         WHEEL_ZOOM_RATE * self.zoom_speed.unwrap_or(1.0)
     }
 
+    /// Zoom the model view about the pointer by the wheel or a pinch, when
+    /// the canvas is `hovered` with the pointer at `pointer` (none when it is
+    /// over something else).
+    pub(super) fn wheel_zoom(
+        &mut self,
+        ui: &egui::Ui,
+        rect: Rect,
+        hovered: bool,
+        pointer: Option<Pos2>,
+    ) {
+        // With an editor over the drawing the wheel still zooms, over the
+        // editor too, but not over a toolbar, menu or dialog above it.
+        let wheel_at = if self.wheel_through {
+            let ctx = ui.ctx();
+            ui.input(|i| i.pointer.latest_pos()).filter(|p| {
+                rect.contains(*p)
+                    && ctx
+                        .layer_id_at(*p)
+                        .is_none_or(|l| l.order == egui::Order::Background)
+            })
+        } else {
+            pointer
+        };
+        let over = hovered || (self.wheel_through && wheel_at.is_some());
+        let (true, Some(pos)) = (over, wheel_at) else {
+            return;
+        };
+        // The whole notch at once, as AutoCAD does: egui's smoothed delta
+        // creeps on for a sixth of a second, and the sharp picture waits for
+        // the view to stand still.
+        let (scroll, pinch) = ui.input(|i| (i.raw_scroll_delta.y, i.zoom_delta()));
+        let factor = f64::from((scroll * self.wheel_rate()).exp() * pinch);
+        if (factor - 1.0).abs() > 1e-9 {
+            self.camera.zoom_at(pos, rect, factor);
+        }
+    }
+
     /// Hide the system cursor and draw ours at `at` (screen position).
     pub(super) fn paint_cursor(&self, ui: &egui::Ui, canvas: Rect, at: Pos2, shape: CursorShape) {
         ui.ctx().set_cursor_icon(egui::CursorIcon::None);
@@ -178,6 +229,15 @@ mod tests {
             canvas,
             "reaches either edge from anywhere"
         );
+    }
+
+    #[test]
+    fn crosshair_arms_leave_the_pickbox_clear() {
+        assert_eq!(
+            arm_segments(100.0, 40.0, 6.5),
+            Some([(60.0, 93.5), (106.5, 140.0)])
+        );
+        assert_eq!(arm_segments(100.0, 6.5, 6.5), None);
     }
 
     #[test]

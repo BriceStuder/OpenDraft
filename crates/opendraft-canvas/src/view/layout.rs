@@ -8,6 +8,7 @@
 //! active viewport. `sheet` is the sheet camera, kept apart for the frames
 //! that use the viewport camera.
 
+use crate::layer_cache::Slot;
 use opendraft_core::{Bounds, LayoutId, Viewport, ViewportId};
 
 use super::*;
@@ -213,7 +214,8 @@ impl View {
             }
         }
         if let (true, Some(at)) = (response.hovered(), pointer) {
-            let (scroll, pinch) = ui.input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));
+            // The whole notch at once (see `View::show`).
+            let (scroll, pinch) = ui.input(|i| (i.raw_scroll_delta.y, i.zoom_delta()));
             let factor = f64::from((scroll * wheel_rate).exp() * pinch);
             if (factor - 1.0).abs() > 1e-9 {
                 self.zoom_view(&mut vp, &mut edited, rect, at, factor);
@@ -338,13 +340,13 @@ impl View {
                         self.paint_grid(&clipped, rect, style, grid);
                     }
                     self.paint_axes(&clipped, rect, style);
-                    self.paint_entities(
-                        &clipped, rect, style, document, None, &vp.frozen, selection, hover,
-                    );
+                    let args = (&clipped, rect, style, document);
+                    let slot = Slot::Viewport(vp.id);
+                    self.paint_space(slot, args, None, &vp.frozen, selection, hover);
                 } else {
-                    self.paint_entities(
-                        &clipped, rect, style, document, None, &vp.frozen, &none, None,
-                    );
+                    let args = (&clipped, rect, style, document);
+                    let slot = Slot::Viewport(vp.id);
+                    self.paint_space(slot, args, None, &vp.frozen, &none, None);
                 }
                 self.camera = live;
             }
@@ -383,16 +385,9 @@ impl View {
         } else {
             (&none, None)
         };
-        self.paint_entities(
-            painter,
-            rect,
-            style,
-            document,
-            Some(layout.id),
-            &[],
-            selected,
-            hovered,
-        );
+        let args = (painter, rect, style, document);
+        let slot = Slot::Sheet(layout.id);
+        self.paint_space(slot, args, Some(layout.id), &[], selected, hovered);
         self.camera = live;
     }
 }

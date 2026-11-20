@@ -371,7 +371,8 @@ impl Document {
 
     /// Whether the space being edited holds any object.
     pub fn has_objects_here(&self) -> bool {
-        self.len_here() > 0
+        // Stops at the first, where counting would walk them all.
+        self.objects.iter().any(|o| o.layout == self.active_layout)
     }
 
     /// How many objects the space being edited holds.
@@ -404,6 +405,11 @@ impl Document {
         self.active_frozen = layers;
     }
 
+    /// The layers hidden from the object queries (see `set_active_frozen`).
+    pub fn active_frozen(&self) -> &[LayerId] {
+        &self.active_frozen
+    }
+
     /// Ids of the objects on a layout's sheet.
     pub fn objects_of_layout(&self, layout: LayoutId) -> Vec<EntityId> {
         self.objects
@@ -424,6 +430,19 @@ mod tests {
             center: Point::new(0.0, 0.0),
             radius: r,
         }
+    }
+
+    #[test]
+    fn objects_here_are_those_of_the_space_being_edited() {
+        let mut doc = Document::default();
+        assert!(!doc.has_objects_here());
+        let layout = doc.new_layout("Sheet", 297.0, 210.0);
+        let id = layout.id;
+        doc.set_layouts(vec![layout]);
+        doc.add(circle(1.0));
+        assert!(doc.has_objects_here() && doc.len_here() == 1);
+        doc.set_active_layout(Some(id));
+        assert!(!doc.has_objects_here() && doc.len_here() == 0);
     }
 
     #[test]

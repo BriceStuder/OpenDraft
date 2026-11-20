@@ -175,6 +175,8 @@ pub struct AppState {
     pub(crate) saving: Vec<u64>,
     /// Files being read right now.
     pub(crate) opening: Vec<PathBuf>,
+    /// Large files waiting for the user to say whether to open them.
+    pub(crate) large_opens: Vec<crate::large_file::LargeOpen>,
     /// A pass of recovery copies is being written; the next one waits.
     pub(crate) autosaving: bool,
     /// Block Editor requests from commands (see `block_editor.rs`).
@@ -200,6 +202,8 @@ pub struct AppState {
     pub(crate) events: crate::automation::EventLog,
     /// What keyed automation operations did, so a repeat does nothing.
     pub(crate) replays: crate::automation::Replays,
+    /// The optional frame-time readout over the canvas.
+    pub frame_readout: crate::frame_readout::Readout,
 }
 
 impl AppState {
@@ -247,6 +251,7 @@ impl AppState {
             io: crate::files::default_io(),
             saving: Vec::new(),
             opening: Vec::new(),
+            large_opens: Vec::new(),
             autosaving: false,
             block_requests: Default::default(),
             file_ops: Default::default(),
@@ -259,6 +264,7 @@ impl AppState {
             command_ends: Vec::new(),
             events: Default::default(),
             replays: Default::default(),
+            frame_readout: Default::default(),
         };
         state.new_document();
         state
@@ -382,33 +388,6 @@ impl AppState {
             // Grips picked with Shift: the first Esc only drops those.
         } else {
             self.docs[self.active].selection.clear();
-        }
-    }
-
-    pub fn selection(&self) -> &BTreeSet<EntityId> {
-        &self.docs[self.active].selection
-    }
-
-    /// Select every selectable object (not hidden, frozen or locked).
-    pub fn select_all(&mut self) {
-        let doc = &mut self.docs[self.active];
-        doc.selection = doc
-            .session
-            .document()
-            .selectable_objects()
-            .map(|o| o.id)
-            .collect();
-    }
-
-    /// Add `ids` to the selection, or remove them when `remove` is set.
-    pub fn select_ids(&mut self, ids: impl IntoIterator<Item = EntityId>, remove: bool) {
-        let selection = &mut self.docs[self.active].selection;
-        for i in ids {
-            if remove {
-                selection.remove(&i);
-            } else {
-                selection.insert(i);
-            }
         }
     }
 

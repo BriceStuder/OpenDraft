@@ -171,7 +171,9 @@ Rules that follow:
   before it is read into memory). The app opens through `load_cancellable`,
   which checks the size, reads, then dispatches, and passes the open job's
   Cancel flag; `FORMATS` is native, DXF, DWG, and the Open dialog's filters
-  come from it.
+  come from it. Before that, `AppState::open_path` asks about any file over
+  20 MiB (`opendraft-app/src/large_file.rs`, "Open it anyway?"); it warns and
+  never refuses. Automation opens skip the question.
   `.odraft` is also bounded by what it holds, not only by bytes: its long lists
   (objects, table rows, objects in a block, points of a shape) are cut off
   while they are read (`opendraft-files/src/native/limits.rs`), well above any real
@@ -180,7 +182,9 @@ Rules that follow:
   the same lifecycle as DXF: opening a `.dwg` installs an unsaved drawing with
   no file of its own and says "Imported", Save asks for an `.odraft` name, and
   `write` refuses (no Export DWG command exists). Files over the reader's
-  1 GiB limit are refused before they are read.
+  1 GiB limit are refused before they are read. Its limits (`DwgLimits`) bound
+  what a read allocates; one object may be as large as a section (512 MiB),
+  since it is read in place and its size allocates nothing.
 - **DXF** (`opendraft-files/src/dxf/`) is an exchange format, so it is treated as one:
   opening a `.dxf` is an *import* (a new unsaved drawing with no file of its
   own, so Save asks for an `.odraft` name) and `file.export_dxf` writes a copy
@@ -306,7 +310,7 @@ select by clicking or dragging a box when no command is waiting for a point.
 | Name | Meaning |
 |---|---|
 | `Document` (`opendraft-core`) | The drawing data: objects, layers. Pure, no UI. |
-| `Session` | A `Document` plus its undo history. Headless and testable. |
+| `Session` | A `Document` (shared, see "Background pictures") plus its undo history. Headless and testable. |
 | `Doc` (`opendraft-app`) | An open window: a `Session` plus view and selection. |
 | `Editor` | What a running command is handed to talk to the user and to edit. |
 | `Runner` | The UI side of a running command: its thread, its pending prompt. |
@@ -508,7 +512,8 @@ variables with their values. Names are upper case and matched ignoring case.
 - **The list is the app's.** `opendraft-app/src/sysvars.rs` binds the variables to
   `Settings` and the open drawing, so a variable that mirrors a setting is
   saved with the user's settings for free. Built: `GRIDMODE`, `GRIDUNIT`,
-  `OSMODE`, `SNAPMODE`, `SAVETIME`, `CURSORSIZE`, `PICKBOX`, `APERTURE`, `GRIPSIZE` (pixel radii of the pick, snap and grip targets; see `PointerSizes` in `opendraft-canvas`), `FILLETRAD`, `CHAMFERA`, `CHAMFERB`,
+  `OSMODE`, `SNAPMODE`, `SAVETIME`, `CURSORSIZE`, `PICKBOX` (defaults to a 4 px pick-box radius; Settings > Drafting > Sizes), `APERTURE`,
+  `GRIPSIZE` (pixel radii of the pick, snap and grip targets; see `PointerSizes` in `opendraft-canvas`), `FILLETRAD`, `CHAMFERA`, `CHAMFERB`,
   `CHAMFERC`, `CHAMFERD`, `CHAMMODE`, `TRIMMODE` (the last seven live in the
   `CommandDefaults` (`corner_memory.rs`) and are saved with the user's
   settings, not the drawing), and read-only `CMDACTIVE`, `DWGNAME`.
@@ -756,6 +761,117 @@ plotting and DXF export, forgotten when `Document::replace` changes the entity,
 ignored by equality. Code that has an `Object` asks it; code with only a
 detached `Dimension` (previews, tests) uses `Dimension::picture`. Block
 references are not cached (see `docs/ui_plan.md`, "Picture cache").
+
+## Entity layer cache (built; the detail controls are not)
+
+Painting is immediate-mode, so a drawing of hundreds of thousands of entities cost
+tens of milliseconds a frame even when only the pointer moved. `opendraft-canvas`
+(`layer_cache/`, `view/entity_paint.rs`) keeps the plain entities (neither selected nor
+hovered) of the space being edited as tessellated egui meshes and draws those instead;
+selected and hovered entities are painted live over them, as AutoCAD draws highlights.
+- **Used only when told**: the app gives each view `Session::draw_token()` (session id,
+  unique in the process, plus the revision, which moves on every edit, undo, redo and
+  viewport pan) with `View::set_document_token`. Without a token nothing is kept, so any
+  other caller of `View::show` paints as before.
+- **Key** (`layer_cache/key.rs`): token, space, frozen layers, camera, canvas and clip
+  rectangles, line colour, point style, the hidden entity, display scale and egui's
+  tessellation options, compared as exact bits. The audit of what plain painting reads is
+  in `layer_cache/mod.rs`; a new input to painting must be added to the key.
+- **Chunks** (`layer_cache/chunks.rs`): the plain entities are kept in chunks, each a fixed
+  range of 2,048 objects of the drawing's object list (so an object's chunk is its position
+  divided by 2,048, and a chunk can be made again alone from `objects()[n * 2048..]`, keeping
+  those that show through the view). A chunk holding a selected or hovered entity is drawn from a variant made without
+  it (kept while the highlight stays, dropped when it goes), and the highlight is drawn live
+  over the layer, so nothing sits under it. Hovering therefore remakes one small chunk, not
+  the layer. Variants count against the memory limit; one that does not fit is not kept and
+  the chunk is drawn whole, as without a variant.
+- **Capture**: a chunk's entities are painted through the normal code into a scratch egui
+  layer, taken out, tessellated once with `epaint::Tessellator` and kept as `Arc<Mesh>`.
+  Small text is drawn as textures held in the picture cache of `text_raster.rs`; the layer
+  holds those handles so the cache evicting one cannot free a texture it still points at.
+- **Settings** (`CacheConfig`, `View::set_cache_config`): mode Automatic (drawings of
+  5,000 objects or more), On or Off, motion Exact, Smooth or Automatic with a settle delay
+  (0 to 500 ms), and a memory limit (default 512 MB, 64 MB to 2 GB); a
+  layer over the limit is not kept and is painted directly. They are the user's, on the
+  Performance page of Settings (`performance_settings.rs`, saved with `Settings`, never in a
+  drawing); the panel passes them to each view every frame. An optional readout over the
+  canvas (`frame_readout.rs`, off by default, nothing timed while off) shows the paint time,
+  the frame time, the cache's size, builds, chunk rebuilds and frames, and the object count.
+- **Checks**: in debug builds a kept layer is compared with a fresh one every 256th frame
+  it is drawn (every frame in tests) and a difference is an assertion; the tests also show
+  the kept picture equals the directly painted one, that each key input rebuilds it, and
+  that a pointer-only frame builds nothing.
+- **Pan and zoom** (`layer_cache/moved.rs`, `pending.rs`, `view/layer_paint.rs`): the key has
+  a content part (drawing, space, canvas, colours, ...) and a view part (the camera). When
+  only the view differs and the motion setting allows (Smooth, or Automatic when the last
+  layer took over 24 ms to make), the old layer is drawn moved (egui's `transform_range`, with
+  the clip rectangles put back) and the new one is made a slice of chunks a frame (8 ms) once
+  the view has stood still for the settle delay (50 ms); moving again starts it over, and
+  when done it replaces the old one. Anything in the content part changing (an edit, a
+  resize, a colour) still makes the new layer at once, because an old picture would show
+  what is no longer there. If the old and the new together would pass the memory limit, the
+  new is made at once. Exact motion makes a new layer every frame, as before.
+- **Slots** (`layer_cache/slots.rs`): each place the drawing is painted has its own kept
+  layer: the model tab, each viewport of a sheet (with that viewport's frozen layers left
+  out) and the sheet's own objects. They share the memory limit (a slot may use what the
+  others leave) and the 8 ms slice of a frame, and a slot not painted for 600 passes is let
+  go. A viewport's clip rectangle is part of the key's view, not its content, because it moves
+  with the sheet, so zooming or panning the sheet moves every viewport's picture.
+- **Image mode** (`layer_cache/raster.rs`, `bitmap.rs`, `view/image_paint.rs`; `Render::Image`, the
+  default): once a layer's triangles are made they are drawn into an image by a software
+  rasteriser (the triangles egui would draw, with their soft edges as the anti-aliasing, blended
+  as egui blends: premultiplied, "over", in gamma space; tiles shared by up to eight threads, the
+  same result for any number), shown as one rectangle in a frame, and let go, so a layer costs
+  the screen's pixels in memory and a frame costs one rectangle whatever the drawing holds. A
+  pan or zoom moves the rectangle while a new one is made. What cannot be drawn flat (small text
+  pictures) stays as triangles over the image. Selected and hovered entities are drawn over the
+  image, not in place of what they cover (no chunk variants are made); a large selection has an
+  image of its own. `Render::Triangles` keeps the triangles and draws them as before; a change of
+  setting makes the layer again. Debug builds compare the image with a fresh one like the chunks.
+  Each row of a triangle is drawn only between where its edges cross it (widened by two pixels,
+  the exact test deciding them), not across its whole box, which for a slanted line is mostly empty.
+  The meshes are cut into one run per thread, each readied and sorted into tiles on its thread,
+  and a tile draws the runs in order, so the picture is the same for any number of threads.
+  An image reaches past each side of the canvas by a tenth of it (`IMAGE_MARGIN`; the `Frame`
+  carries the wider rectangle and clip, centred so the camera's mapping is unchanged), so a pan
+  shows drawing, not a blank strip, until the new picture comes; whether an old picture covers
+  enough of the screen to be shown moved counts the margin.
+- **Background pictures** (`view/builder.rs`, `view/background.rs`): when the app shares the
+  drawing (`View::set_shared_document`, a `Weak` of `Session::shared_document`) and the layer is
+  kept as an image, a new picture for a moved view is made on a thread of its own, at once (no
+  settle delay), while the old one is shown moved; Automatic motion then always shows it moved.
+  The thread keeps its own `View` (so its hatch and block reference caches stay warm) and paints
+  on an egui context of its own, because a context's shapes are taken by the frame that ends
+  next; the triangles are made with the screen context's tessellator (`Tess`), small text
+  pictures are loaded into the screen's context (`text_raster::load_into`), and so is the image,
+  which is all that comes back. Only the newest picture asked for each slot is made; one being
+  made is finished, so a pan that never stands still still gets new pictures, and one that comes
+  back for a view other than the current one is kept if it shows the same content. A picture
+  that needed egui's fonts (a hatch's "not drawn" note: its glyphs are in the other context's
+  atlas) comes back empty and that content is made on the screen's thread from then on, as is a
+  picture whose job panicked. Edits, the first picture and a zoom out too far to show moved are
+  still made at once on the screen's thread. `Session` keeps the drawing as `Arc<Document>`
+  and edits through `Arc::make_mut`: the view holds it weakly, so an edit copies the drawing
+  (about 34 ms for 417,000 objects) only when it lands while a picture is being made from it.
+- **Outlines through egui** (`view/path_stroke.rs`): the outlines of polylines, arcs, ellipses,
+  splines, dashes and hatch boundaries are stroked through `stroke_path`, which drops points within
+  0.05 px of the one before and cuts a path where it turns back on itself (within about a degree),
+  stroking each part alone. egui joins segments by averaging their sides; at a reversal that average
+  is rounding noise and the join's corner can land anywhere, even at infinity: a streak across the
+  view that is not in the drawing, cannot be picked and comes and goes with the view.
+- **Wheel zoom**: a notch zooms at once (`raw_scroll_delta`), as AutoCAD does, not over egui's
+  smoothed delta, which creeps on for about 170 ms and so held back the settle delay and the
+  sharp picture.
+- **Large selections** (`layer_cache/selected.rs`): a selection of 256 or more objects has its
+  highlight kept as triangles too, under a key of the layer key, a hash of the selected ids and
+  the two highlight colours, made again only when one of those changes; the exclusion lists are
+  kept by the same hash and the hovered entity. A hovered entity, a small selection and any
+  highlight while an old picture is shown moved are still drawn live. Over the memory limit the
+  highlight is drawn live. The debug check compares it with a fresh one like the chunks.
+- **Not yet**: a pan faster than the margin per picture still shows a blank strip for a
+  moment; kept triangles (`Render::Triangles`) are still made here, a slice a frame.
+  Highlights are drawn live and over everything, so a very large selection (hundreds of
+  thousands) is as slow as it was.
 
 ## Geometry in `opendraft-core` (built)
 
