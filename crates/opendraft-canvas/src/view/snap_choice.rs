@@ -73,7 +73,8 @@ impl View {
     }
 
     /// Where the right button was released over the canvas this frame, and
-    /// whether Shift or Ctrl was held.
+    /// whether Shift or Ctrl was held. A release over a palette, menu or
+    /// dialog above the drawing is theirs, not the canvas's.
     pub(super) fn right_released(&self, ui: &Ui, rect: egui::Rect) -> (Option<egui::Pos2>, bool) {
         let (at, menu) = ui.input(|i| {
             let at = i
@@ -83,7 +84,10 @@ impl View {
                 .flatten();
             (at, i.modifiers.shift || i.modifiers.ctrl)
         });
-        (at.filter(|p| rect.contains(*p) && !self.blocked(*p)), menu)
+        let ctx = ui.ctx();
+        let ours =
+            |p: &egui::Pos2| rect.contains(*p) && !self.blocked(*p) && !Self::covered(ctx, *p);
+        (at.filter(ours), menu)
     }
 
     /// Whether Tab would cycle between snap points under the pointer, so the
