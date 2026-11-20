@@ -13,6 +13,7 @@ use super::page_setup_dialog::boxes::{options_box, paper_box, plot_box};
 use super::OpenDraftApp;
 use crate::plot_controls::control_state;
 use crate::plot_job::{PlotDialog, Printers, Target};
+use crate::plot_zoom::{self, Zoom};
 
 const WIDTH: f32 = 1040.0;
 const LEFT: f32 = 340.0;
@@ -33,6 +34,8 @@ impl OpenDraftApp {
     pub(super) fn plot_dialog_window(&mut self, ctx: &egui::Context) {
         self.state.take_window_pick();
         let Some(mut dialog) = self.state.command_dialogs.plot.take() else {
+            // Closed: the next one opens on the whole page.
+            self.state.command_dialogs.plot_zoom = Default::default();
             return;
         };
         if dialog.picking.is_some() {
@@ -56,6 +59,8 @@ impl OpenDraftApp {
             return;
         };
         let texture = preview_texture(ctx, &dialog);
+        let mut zoom = std::mem::take(&mut self.state.command_dialogs.plot_zoom);
+        let speed = self.state.settings.zoom_speed as f32 / 100.0;
         let (mut open, mut action) = (true, None);
         let body_height = (ctx.screen_rect().height() - 190.0).max(240.0);
         widgets::dialog(ctx, theme, "Plot", &mut open, WIDTH, |ui| {
@@ -88,7 +93,8 @@ impl OpenDraftApp {
                                 theme,
                                 &dialog,
                                 texture.as_ref(),
-                                PREVIEW_HEIGHT,
+                                &mut zoom,
+                                speed,
                                 blocked,
                             );
                         });
@@ -135,6 +141,11 @@ impl OpenDraftApp {
         if !open || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             action = Some(Action::Cancel);
         }
+        let sheet = dialog.preview.as_ref().map(|p| &p.sheet);
+        if zoom.tick(sheet, std::time::Instant::now()) {
+            ctx.request_repaint_after(std::time::Duration::from_millis(60));
+        }
+        self.state.command_dialogs.plot_zoom = zoom;
         self.state.command_dialogs.plot = Some(dialog);
         match action {
             Some(Action::PickWindow) => self.state.plot_dialog_pick_window(),
@@ -164,34 +175,63 @@ fn preview_texture(ctx: &egui::Context, dialog: &PlotDialog) -> Option<egui::Tex
     Some(texture)
 }
 
+/// The sharp picture of the part in view as a texture, uploaded again only
+/// when it changed; none unless it is of the preview's sheet.
+fn detail_texture(
+    ctx: &egui::Context,
+    zoom: &Zoom,
+    preview: &crate::plot_job::PlotPreview,
+) -> Option<(egui::Rect, egui::TextureHandle)> {
+    let detail = zoom.detail_of(&preview.sheet)?;
+    let id = egui::Id::new("plot_preview_detail_texture");
+    let kept: Option<(u64, egui::TextureHandle)> = ctx.data(|d| d.get_temp(id));
+    if let Some((_, texture)) = kept.filter(|(serial, _)| *serial == zoom.serial) {
+        return Some((detail.part, texture));
+    }
+    let image = egui::ColorImage::from_rgba_unmultiplied(detail.size, &detail.rgba);
+    let texture = ctx.load_texture("plot_preview_detail", image, egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, (zoom.serial, texture.clone())));
+    Some((detail.part, texture))
+}
+
 /// The wide picture of the plot, the printable area marked on the paper, and
-/// a reminder when the settings have moved on from what it shows. `blocked`
-/// is set when there is a reason (shown under the dialog) no picture comes.
+/// a reminder when the settings have moved on from what it shows. The wheel,
+/// a drag and a double-click zoom and move it (`zoom`, at the drawing's wheel
+/// `speed`). `blocked` is set when there is a reason (shown under the
+/// dialog) no picture comes.
 fn preview_box(
     ui: &mut egui::Ui,
     theme: &opendraft_ui::Theme,
     dialog: &PlotDialog,
     texture: Option<&egui::TextureHandle>,
-    height: f32,
+    zoom: &mut Zoom,
+    speed: f32,
     blocked: bool,
 ) {
     widgets::group_box(ui, theme, "Preview", |ui| {
-        let size = egui::vec2(ui.available_width(), height);
-        let (canvas, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+        let size = egui::vec2(ui.available_width(), PREVIEW_HEIGHT);
+        let (canvas, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
         let painter = ui.painter_at(canvas);
         painter.rect_filled(canvas, 2.0, ui.visuals().extreme_bg_color);
         match (texture, dialog.preview.as_ref()) {
             (Some(texture), Some(preview)) => {
                 let shape = egui::vec2(preview.size[0] as f32, preview.size[1] as f32);
                 let room = canvas.shrink(10.0);
-                let fit = (room.width() / shape.x).min(room.height() / shape.y);
-                let paper = egui::Rect::from_center_size(canvas.center(), shape * fit);
-                painter.image(
-                    texture.id(),
-                    paper,
-                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                    egui::Color32::WHITE,
-                );
+                let fit = shape * (room.width() / shape.x).min(room.height() / shape.y);
+                zoom.follow_input(ui, &response, fit, speed);
+                let paper = zoom.view.page(canvas.center(), fit);
+                let whole = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+                painter.image(texture.id(), paper, whole, egui::Color32::WHITE);
+                if let Some((part, sharp)) = detail_texture(ui.ctx(), zoom, preview) {
+                    let on_screen = |p: egui::Pos2| paper.min + p.to_vec2() * paper.size();
+                    let rect = egui::Rect::from_min_max(on_screen(part.min), on_screen(part.max));
+                    painter.image(sharp.id(), rect, whole, egui::Color32::WHITE);
+                }
+                if let Some(part) = zoom.view.part(canvas, fit) {
+                    let seen = canvas.intersect(paper).size();
+                    let pixels = plot_zoom::pixels_for(seen, ui.ctx().pixels_per_point());
+                    zoom.want(part, pixels, std::time::Instant::now());
+                }
                 painter.rect_stroke(
                     paper,
                     0.0,
@@ -199,6 +239,7 @@ fn preview_box(
                     egui::StrokeKind::Outside,
                 );
                 printable_outline(&painter, paper, dialog);
+                zoom_caption(ui, &painter, canvas, zoom);
             }
             _ => {
                 painter.text(
@@ -223,6 +264,24 @@ fn preview_box(
             }
         }
     });
+}
+
+/// How to zoom the preview, or how far it is zoomed, in its bottom corner.
+fn zoom_caption(ui: &egui::Ui, painter: &egui::Painter, canvas: egui::Rect, zoom: &Zoom) {
+    let text = if zoom.view.is_whole() {
+        "Scroll to zoom".to_owned()
+    } else {
+        format!(
+            "{:.0}% · drag to move · double-click for the whole page",
+            zoom.view.zoom * 100.0
+        )
+    };
+    let colour = ui.visuals().weak_text_color();
+    let galley = painter.layout_no_wrap(text, egui::FontId::proportional(11.0), colour);
+    let at = canvas.left_bottom() + egui::vec2(6.0, -6.0 - galley.size().y);
+    let back = egui::Rect::from_min_size(at, galley.size()).expand(3.0);
+    painter.rect_filled(back, 3.0, ui.visuals().extreme_bg_color);
+    painter.galley(at, galley, colour);
 }
 
 /// The edge of the area the printer can reach, on the paper in the picture.

@@ -128,6 +128,8 @@ mod plot_line;
 mod plot_pick;
 mod plot_run;
 mod plot_state;
+mod plot_target;
+mod plot_zoom;
 mod point_cmd;
 mod point_vars;
 mod polygon_cmd;
