@@ -77,33 +77,50 @@ impl Action for ModifyLayers {
     }
 }
 
-/// Delete a layer. Does nothing when the drawing says it cannot be deleted
+/// Delete layers in one step. Skips any the drawing says cannot be deleted
 /// (layer 0, the current layer, a layer with objects on it); callers check
 /// `Document::layer_delete_blocker` first to tell the user why.
 pub struct RemoveLayer {
-    id: LayerId,
-    removed: Option<(usize, Layer)>,
+    ids: Vec<LayerId>,
+    /// Where each deleted layer stood, in the order they were taken out.
+    removed: Vec<(usize, Layer)>,
 }
 
 impl RemoveLayer {
     pub fn new(id: LayerId) -> Self {
-        Self { id, removed: None }
+        Self::many(vec![id])
+    }
+
+    pub fn many(ids: Vec<LayerId>) -> Self {
+        Self {
+            ids,
+            removed: Vec::new(),
+        }
     }
 }
 
 impl Action for RemoveLayer {
     fn name(&self) -> String {
-        "Delete layer".to_owned()
+        if self.ids.len() > 1 {
+            "Delete layers".to_owned()
+        } else {
+            "Delete layer".to_owned()
+        }
     }
 
     fn apply(&mut self, doc: &mut Document) {
-        if doc.layer_delete_blocker(self.id).is_none() {
-            self.removed = doc.remove_layer(self.id);
+        self.removed.clear();
+        for &id in &self.ids {
+            if doc.layer_delete_blocker(id).is_none() {
+                if let Some(removed) = doc.remove_layer(id) {
+                    self.removed.push(removed);
+                }
+            }
         }
     }
 
     fn revert(&mut self, doc: &mut Document) {
-        if let Some((position, layer)) = self.removed.take() {
+        while let Some((position, layer)) = self.removed.pop() {
             doc.insert_layer(position, layer);
         }
     }
@@ -318,5 +335,28 @@ mod tests {
         assert_eq!(doc.object(id).unwrap().attrs.layer, walls);
         action.revert(&mut doc);
         assert_eq!(doc.object(id).unwrap().attrs.layer, LayerId::DEFAULT);
+    }
+
+    #[test]
+    fn removing_several_layers_is_one_step_and_restores_their_order() {
+        let mut doc = Document::default();
+        let ids: Vec<LayerId> = ["A", "B", "C"]
+            .into_iter()
+            .map(|name| {
+                let id = doc.allocate_layer_id();
+                AddLayer::new(Layer::new(id, name)).apply(&mut doc);
+                id
+            })
+            .collect();
+        let before: Vec<String> = doc.layers().iter().map(|l| l.name.clone()).collect();
+        let mut action = RemoveLayer::many(vec![ids[0], ids[2], LayerId::DEFAULT]);
+        action.apply(&mut doc);
+        let names: Vec<&str> = doc.layers().iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names, ["0", "B"], "layer 0 is skipped");
+        action.revert(&mut doc);
+        let after: Vec<String> = doc.layers().iter().map(|l| l.name.clone()).collect();
+        assert_eq!(after, before);
+        action.apply(&mut doc);
+        assert_eq!(doc.layers().len(), 2);
     }
 }

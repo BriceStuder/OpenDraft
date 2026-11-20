@@ -373,26 +373,20 @@ impl AppState {
         self.session().document().layout(layout)?.viewport(viewport)
     }
 
-    /// Freeze a layer in the target viewport, or thaw it if it is frozen there.
-    pub fn toggle_layer_in_viewport(&mut self, layer: LayerId) {
+    /// Freeze (`freeze`) or thaw layers in the target viewport, one undo step.
+    pub fn set_layers_in_viewport(&mut self, layers: &[LayerId], freeze: bool) {
         let Some((layout, viewport)) = self.target_viewport() else {
             self.message = "Pick a viewport, or enter one with MSPACE".to_owned();
             return;
         };
         let layouts = self.session().document().layouts();
-        let frozen = layouts
-            .iter()
-            .find(|l| l.id == layout)
-            .and_then(|l| l.viewport(viewport))
-            .is_some_and(|v| v.is_frozen(layer));
-        let changed = with_viewport(layouts, layout, viewport, |v| {
-            v.set_frozen(&[layer], !frozen)
-        });
+        let changed = with_viewport(layouts, layout, viewport, |v| v.set_frozen(layers, freeze))
+            .filter(|new| new.as_slice() != layouts);
         if let Some(layouts) = changed {
-            let name = if frozen {
-                "Thaw layer in viewport"
-            } else {
+            let name = if freeze {
                 "Freeze layer in viewport"
+            } else {
+                "Thaw layer in viewport"
             };
             self.perform(SetLayouts::new(name, layouts));
         }
@@ -658,11 +652,11 @@ mod tests {
             state.target_viewport_ref().is_none(),
             "nothing picked on the sheet"
         );
-        state.apply_layer_edit(LayerEdit::ToggleInViewport(LayerId::DEFAULT));
+        state.apply_layer_edit(LayerEdit::SetInViewport(vec![LayerId::DEFAULT], true));
         assert!(layouts_frozen(&state, id).is_empty());
         state.mspace();
         assert!(state.target_viewport_ref().is_some());
-        state.apply_layer_edit(LayerEdit::ToggleInViewport(LayerId::DEFAULT));
+        state.apply_layer_edit(LayerEdit::SetInViewport(vec![LayerId::DEFAULT], true));
         assert_eq!(layouts_frozen(&state, id), [LayerId::DEFAULT]);
         assert!(
             !state
@@ -672,12 +666,9 @@ mod tests {
                 .unwrap()
                 .frozen
         );
-        state.apply_layer_edit(LayerEdit::ToggleInViewport(LayerId::DEFAULT));
-        assert!(
-            layouts_frozen(&state, id).is_empty(),
-            "a second click thaws it"
-        );
-        state.apply_layer_edit(LayerEdit::ToggleInViewport(LayerId::DEFAULT));
+        state.apply_layer_edit(LayerEdit::SetInViewport(vec![LayerId::DEFAULT], false));
+        assert!(layouts_frozen(&state, id).is_empty(), "thawing it again");
+        state.apply_layer_edit(LayerEdit::SetInViewport(vec![LayerId::DEFAULT], true));
         state.undo();
         assert!(layouts_frozen(&state, id).is_empty());
     }

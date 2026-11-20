@@ -2,28 +2,17 @@
 //! colour, linetype and lineweight. Reports what the user asked for; the
 //! application state does it.
 
-use eframe::egui::{self, Align2, FontId, Rect, Sense, Stroke, Ui};
+use eframe::egui::{self, Align2, Rect, Sense, Stroke, Ui};
 use opendraft_core::{Document, Layer, LayerId, Lineweight, Viewport};
 use opendraft_ui::{icons, menu, widgets, Theme};
 
 use crate::colour_ui::{self, Pick};
 use crate::layer_cells::{cell_text, fit_text, layers_in_use};
+use crate::layer_columns::{core_width, header, Columns, Layout, EXTRA_W, NAME_MIN, ROW_HEIGHT};
+use crate::layer_menu::{self, MenuPick};
+use crate::layer_selection::LayerSelection;
 use crate::layers::{LayerEdit, LayerFlag};
 use crate::linetype_ui;
-
-const ROW_HEIGHT: f32 = 22.0;
-const NAME_MIN: f32 = 90.0;
-const STATUS_W: f32 = 22.0;
-const SWITCH_W: f32 = 26.0;
-const COLOR_W: f32 = 44.0;
-const LINETYPE_W: f32 = 92.0;
-const WEIGHT_W: f32 = 78.0;
-/// Columns every row has (and the VP Freeze one while a viewport is the target);
-/// linetype and weight only appear when there is room.
-fn core_width(vp: bool) -> f32 {
-    STATUS_W + SWITCH_W * if vp { 4.0 } else { 3.0 } + COLOR_W
-}
-const EXTRA_W: f32 = LINETYPE_W + WEIGHT_W;
 
 /// `viewport` is the viewport being worked on in a layout, if any: it adds a
 /// VP Freeze column that freezes layers in that viewport only.
@@ -35,10 +24,9 @@ pub fn show(
     viewport: Option<&Viewport>,
 ) -> Option<LayerEdit> {
     let in_use = layers_in_use(ui, document, token);
-    let selected_id = ui.make_persistent_id("layers_selected");
-    let selected: Option<LayerId> = ui
-        .data(|d| d.get_temp(selected_id))
-        .filter(|&id| document.layer(id).is_some());
+    let base = ui.make_persistent_id("layers_panel");
+    let mut selection = LayerSelection::load(ui.ctx(), base.with("selection"), document);
+    let order: Vec<LayerId> = document.layers_by_name().iter().map(|l| l.id).collect();
     let mut edit = None;
 
     ui.add_space(4.0);
@@ -51,23 +39,27 @@ pub fn show(
         {
             edit = Some(LayerEdit::New);
         }
-        ui.add_enabled_ui(selected.is_some(), |ui| {
+        ui.add_enabled_ui(!selection.ids().is_empty(), |ui| {
             if widgets::secondary_button(ui, theme, "Delete")
-                .on_hover_text("Delete the selected layer")
+                .on_hover_text("Delete the selected layers")
                 .clicked()
             {
-                edit = selected.map(LayerEdit::Delete);
+                edit = Some(LayerEdit::Delete(selection.ids().to_vec()));
             }
+        });
+        ui.add_enabled_ui(selection.single().is_some(), |ui| {
             if widgets::secondary_button(ui, theme, "Set Current")
                 .on_hover_text("Draw new objects on the selected layer")
                 .clicked()
             {
-                edit = selected.map(LayerEdit::SetCurrent);
+                edit = selection.single().map(LayerEdit::SetCurrent);
             }
         });
     });
     ui.add_space(4.0);
 
+    let menu_key = base.with("menu");
+    let modifiers = ui.input(|i| i.modifiers);
     egui::ScrollArea::both()
         .auto_shrink([false, false])
         .show(ui, |ui| {
@@ -82,8 +74,6 @@ pub fn show(
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
             header(ui, theme, shape);
             for layer in document.layers_by_name() {
-                let current = layer.id == document.current_layer();
-                let in_use = in_use.contains(&layer.id);
                 let picked = row(
                     ui,
                     theme,
@@ -91,9 +81,11 @@ pub fn show(
                     shape,
                     layer,
                     RowState {
-                        current,
-                        in_use,
-                        selected: selected == Some(layer.id),
+                        base,
+                        current: layer.id == document.current_layer(),
+                        in_use: in_use.contains(&layer.id),
+                        selected: selection.contains(layer.id),
+                        targets: selection.targets(layer.id),
                         vp_frozen: viewport.map(|v| v.is_frozen(layer.id)),
                     },
                 );
@@ -101,109 +93,51 @@ pub fn show(
                     edit = Some(action);
                 }
                 if picked.select {
-                    ui.data_mut(|d| d.insert_temp(selected_id, layer.id));
+                    selection.click(layer.id, &order, modifiers.command, modifiers.shift);
+                }
+                if let Some(at) = picked.menu {
+                    selection.point_at(layer.id);
+                    layer_menu::open(ui, menu_key, at);
                 }
             }
+            // The empty space under the rows: a click clears the selection,
+            // a right-click opens the menu with nothing selected.
+            let rest = ui.available_size().max(egui::vec2(width, ROW_HEIGHT));
+            let (_, below) = ui.allocate_exact_size(rest, Sense::click());
+            if below.clicked() {
+                selection.clear();
+            }
+            if below.secondary_clicked() {
+                selection.clear();
+                let at = below.interact_pointer_pos().unwrap_or(below.rect.min);
+                layer_menu::open(ui, menu_key, at);
+            }
         });
+    match layer_menu::show(ui, theme, menu_key, &selection) {
+        Some(MenuPick::Edit(action)) => edit = Some(action),
+        Some(MenuPick::Rename(id)) => start_rename(ui, base, id, document),
+        Some(MenuPick::SelectAll) => selection.select_all(&order),
+        Some(MenuPick::SelectAllButCurrent) => {
+            selection.select_all_but(&order, document.current_layer())
+        }
+        Some(MenuPick::Invert) => selection.invert(&order),
+        Some(MenuPick::ClearAll) => selection.clear(),
+        None => {}
+    }
+    selection.store(ui.ctx(), base.with("selection"));
     edit
 }
 
-/// How wide a row is and whether the extra columns fit.
-#[derive(Clone, Copy)]
-struct Layout {
-    width: f32,
-    wide: bool,
-    /// The VP Freeze column is shown.
-    vp: bool,
-}
-
-/// Column rectangles for a row starting at `origin`. Hidden columns are empty.
-struct Columns {
-    status: Rect,
-    name: Rect,
-    on: Rect,
-    freeze: Rect,
-    /// Zero width unless a viewport is the target.
-    vp_freeze: Rect,
-    lock: Rect,
-    color: Rect,
-    linetype: Rect,
-    weight: Rect,
-}
-
-impl Columns {
-    fn new(origin: egui::Pos2, layout: Layout) -> Self {
-        let extra = if layout.wide { EXTRA_W } else { 0.0 };
-        let name_w = layout.width - core_width(layout.vp) - extra;
-        let mut x = origin.x;
-        let mut next = |w: f32| {
-            let rect = Rect::from_min_size(egui::pos2(x, origin.y), egui::vec2(w, ROW_HEIGHT));
-            x += w;
-            rect
-        };
-        Self {
-            status: next(STATUS_W),
-            name: next(name_w),
-            on: next(SWITCH_W),
-            freeze: next(SWITCH_W),
-            vp_freeze: next(if layout.vp { SWITCH_W } else { 0.0 }),
-            lock: next(SWITCH_W),
-            color: next(COLOR_W),
-            linetype: next(if layout.wide { LINETYPE_W } else { 0.0 }),
-            weight: next(if layout.wide { WEIGHT_W } else { 0.0 }),
-        }
-    }
-}
-
-fn header(ui: &mut Ui, theme: &Theme, shape: Layout) {
-    let (width, wide) = (shape.width, shape.wide);
-    let c = &theme.colors;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), Sense::hover());
-    ui.painter().rect_filled(rect, 0.0, c.panel_raised);
-    let cols = Columns::new(rect.min, shape);
-    let text = |rect: Rect, label: &str| {
-        ui.painter().text(
-            rect.left_center() + egui::vec2(6.0, 0.0),
-            Align2::LEFT_CENTER,
-            label,
-            FontId::proportional(theme.font_size_small),
-            c.text_weak,
-        );
+/// Put the name cell of layer `id` into editing, as a double-click does.
+fn start_rename(ui: &Ui, base: egui::Id, id: LayerId, document: &Document) {
+    let Some(layer) = document.layer(id) else {
+        return;
     };
-    let glyph = |rect: Rect, icon: char| {
-        opendraft_ui::icon_set::paint(
-            ui.painter(),
-            rect.center(),
-            Align2::CENTER_CENTER,
-            icon,
-            13.0,
-            c.text_weak,
-        );
-    };
-    text(cols.name, "Name");
-    // The same bulb, sun and padlock as the ribbon's layer list.
-    glyph(cols.on, icons::LAYER_LIST_ON);
-    glyph(cols.freeze, icons::LAYER_LIST_THAWED);
-    if shape.vp {
-        ui.painter().text(
-            cols.vp_freeze.center(),
-            Align2::CENTER_CENTER,
-            "VP",
-            FontId::proportional(theme.font_size_small),
-            c.text_weak,
-        );
-    }
-    glyph(cols.lock, icons::LAYER_LIST_UNLOCKED);
-    text(cols.color, "Color");
-    if wide {
-        text(cols.linetype, "Linetype");
-        text(cols.weight, "Weight");
-    }
-    ui.painter().hline(
-        rect.x_range(),
-        rect.bottom(),
-        Stroke::new(1.0_f32, c.divider),
-    );
+    let editing_id = base.with(("layer", id)).with("renaming");
+    ui.data_mut(|d| {
+        d.insert_temp(editing_id, true);
+        d.insert_temp(editing_id.with("text"), layer.name.clone());
+    });
 }
 
 /// What a row reported.
@@ -212,13 +146,19 @@ struct RowResult {
     edit: Option<LayerEdit>,
     /// The row itself was clicked (select it).
     select: bool,
+    /// The row was right-clicked here (open the menu).
+    menu: Option<egui::Pos2>,
 }
 
 /// What a row shows besides the layer's own settings.
 struct RowState {
+    /// The panel's id, under which each row keeps its state.
+    base: egui::Id,
     current: bool,
     in_use: bool,
     selected: bool,
+    /// The layers a change on this row applies to (see `LayerSelection::targets`).
+    targets: Vec<LayerId>,
     /// Whether the layer is frozen in the target viewport (`None`: no column).
     vp_frozen: Option<bool>,
 }
@@ -232,9 +172,11 @@ fn row(
     state: RowState,
 ) -> RowResult {
     let RowState {
+        base,
         current,
         in_use,
         selected,
+        targets,
         vp_frozen,
     } = state;
     let c = &theme.colors;
@@ -242,7 +184,7 @@ fn row(
     let (rect, background) =
         ui.allocate_exact_size(egui::vec2(layout.width, ROW_HEIGHT), Sense::click());
     let cols = Columns::new(rect.min, layout);
-    let id = ui.make_persistent_id(("layer", layer.id));
+    let id = base.with(("layer", layer.id));
 
     if selected {
         ui.painter()
@@ -255,9 +197,15 @@ fn row(
         rect.bottom(),
         Stroke::new(1.0_f32, c.divider),
     );
-    if background.clicked() || background.double_clicked() {
+    if background.clicked() {
         result.select = true;
     }
+    // A right-click anywhere on the visible part of the row, whichever cell
+    // is under it (not on a row scrolled out under the buttons).
+    let right = ui.input(|i| i.pointer.secondary_clicked()) && ui.rect_contains_pointer(rect);
+    result.menu = right
+        .then(|| ui.input(|i| i.pointer.interact_pos()))
+        .flatten();
 
     // Layers with objects on them read stronger than empty ones.
     let dim = !layer.is_visible();
@@ -349,7 +297,11 @@ fn row(
         "Off: click to turn on"
     };
     if switch(ui, cols.on, "on", on_glyph, on_tip) {
-        result.edit = Some(LayerEdit::Toggle(layer.id, LayerFlag::On));
+        result.edit = Some(LayerEdit::SetFlag(
+            targets.clone(),
+            LayerFlag::On,
+            !layer.on,
+        ));
     }
     let freeze_tip = if layer.frozen {
         "Frozen: click to thaw"
@@ -357,7 +309,11 @@ fn row(
         "Thawed: click to freeze"
     };
     if switch(ui, cols.freeze, "freeze", thaw_glyph, freeze_tip) {
-        result.edit = Some(LayerEdit::Toggle(layer.id, LayerFlag::Frozen));
+        result.edit = Some(LayerEdit::SetFlag(
+            targets.clone(),
+            LayerFlag::Frozen,
+            !layer.frozen,
+        ));
     }
     if let Some(frozen) = vp_frozen {
         let (glyph, tip) = if frozen {
@@ -372,7 +328,7 @@ fn row(
             )
         };
         if switch(ui, cols.vp_freeze, "vp_freeze", glyph, tip) {
-            result.edit = Some(LayerEdit::ToggleInViewport(layer.id));
+            result.edit = Some(LayerEdit::SetInViewport(targets.clone(), !frozen));
         }
     }
     let lock_tip = if layer.locked {
@@ -381,7 +337,11 @@ fn row(
         "Unlocked: click to lock"
     };
     if switch(ui, cols.lock, "lock", lock_glyph, lock_tip) {
-        result.edit = Some(LayerEdit::Toggle(layer.id, LayerFlag::Locked));
+        result.edit = Some(LayerEdit::SetFlag(
+            targets.clone(),
+            LayerFlag::Locked,
+            !layer.locked,
+        ));
     }
 
     // Colour.
@@ -389,7 +349,7 @@ fn row(
     if let Some(Pick::Color(color)) =
         colour_ui::swatch_button(&mut color_ui, theme, id.with("color"), layer.color, false)
     {
-        result.edit = Some(LayerEdit::SetColor(layer.id, color));
+        result.edit = Some(LayerEdit::SetColor(targets.clone(), color));
     }
 
     // Linetype and lineweight: flat text cells that open a list.
@@ -404,7 +364,7 @@ fn row(
     cell_text(ui, theme, cols.linetype, linetype_name);
     let menu_id = id.with("linetype_menu");
     if let Some(linetype) = linetype_ui::pick(ui, theme, menu_id, &cell, document, layer.linetype) {
-        result.edit = Some(LayerEdit::SetLinetype(layer.id, linetype));
+        result.edit = Some(LayerEdit::SetLinetype(targets.clone(), linetype));
     }
 
     let weights: Vec<String> = Lineweight::STANDARD
@@ -424,7 +384,7 @@ fn row(
         &weights,
         current_weight,
     ) {
-        result.edit = Some(LayerEdit::SetLineweight(layer.id, Lineweight::STANDARD[i]));
+        result.edit = Some(LayerEdit::SetLineweight(targets, Lineweight::STANDARD[i]));
     }
     result
 }
@@ -437,41 +397,6 @@ pub fn weight_label(weight: Lineweight) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn columns_tile_the_row_without_gaps() {
-        let width = 480.0;
-        let cols = Columns::new(
-            egui::pos2(10.0, 0.0),
-            Layout {
-                width,
-                wide: true,
-                vp: true,
-            },
-        );
-        assert_eq!(cols.status.left(), 10.0);
-        assert_eq!(cols.status.right(), cols.name.left());
-        assert_eq!(cols.on.right(), cols.freeze.left());
-        assert_eq!(cols.freeze.right(), cols.vp_freeze.left());
-        assert_eq!(cols.vp_freeze.right(), cols.lock.left());
-        assert_eq!(cols.weight.right(), 10.0 + width);
-    }
-
-    #[test]
-    fn narrow_rows_drop_the_extra_columns() {
-        let cols = Columns::new(
-            egui::pos2(0.0, 0.0),
-            Layout {
-                width: 260.0,
-                wide: false,
-                vp: false,
-            },
-        );
-        assert_eq!(cols.vp_freeze.width(), 0.0, "hidden without a viewport");
-        assert_eq!(cols.linetype.width(), 0.0);
-        assert_eq!(cols.weight.width(), 0.0);
-        assert_eq!(cols.color.right(), 260.0);
-    }
 
     #[test]
     fn weights_show_in_millimetres() {
