@@ -268,8 +268,9 @@ fn properties_tab(
         .spacing([10.0, 10.0])
         .show(ui, |ui| {
             ui.label("Layer:");
-            let names: Vec<String> = document.layers().iter().map(|l| l.name.clone()).collect();
-            let current = document.layer_position(row.look.layer);
+            let layers = document.layers_by_name();
+            let names: Vec<String> = layers.iter().map(|l| l.name.clone()).collect();
+            let current = layers.iter().position(|l| l.id == row.look.layer);
             let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
             let text = current.map_or("?", |i| names[i].as_str());
             if let Some(i) = attr_rows::cell_combo(
@@ -281,7 +282,7 @@ fn properties_tab(
                 &names,
                 current,
             ) {
-                edit = Some(AttrEdit::Layer(document.layers()[i].id));
+                edit = layers.get(i).map(|l| AttrEdit::Layer(l.id));
             }
             ui.label("");
             ui.label("");

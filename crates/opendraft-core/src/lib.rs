@@ -38,6 +38,7 @@ pub mod loop_polyline;
 pub mod measure;
 pub mod mleader;
 pub mod mtext;
+pub mod name_order;
 mod offset;
 pub mod ortho;
 pub mod outline;

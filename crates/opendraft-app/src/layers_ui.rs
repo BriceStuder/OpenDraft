@@ -81,7 +81,7 @@ pub fn show(
             };
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
             header(ui, theme, shape);
-            for layer in document.layers() {
+            for layer in document.layers_by_name() {
                 let current = layer.id == document.current_layer();
                 let in_use = in_use.contains(&layer.id);
                 let picked = row(
