@@ -35,8 +35,9 @@ pub fn display(theme: &Theme, color: Color) -> Color32 {
     }
 }
 
-/// A colour's swatch with its border. Colour 7 is half white, half black,
-/// as in AutoCAD, whatever the theme.
+/// A colour's swatch with its border. Colour 7 is half white, half black
+/// whatever the theme, so it reads as "white on a dark background, black on
+/// a light one".
 pub fn paint_swatch(painter: &Painter, theme: &Theme, rect: Rect, color: Color) {
     painter.extend(swatch_shapes(theme, rect, color));
 }
