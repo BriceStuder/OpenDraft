@@ -26,7 +26,7 @@ pub use dxf::DxfFormat;
 pub use error::FileError;
 pub use native::{NativeFormat, CURRENT_VERSION, NATIVE_EXTENSION};
 pub use plot::{pdf, pdf_filter, plot_cancellable, svg, svg_filter};
-pub use plot_png::{png, png_size, PngError};
+pub use plot_png::{png, png_size, rgba_part, PngError};
 pub use template::{
     is_template, template_filter, template_path, TemplateFormat, TEMPLATE_EXTENSION,
 };

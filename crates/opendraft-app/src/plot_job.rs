@@ -9,7 +9,6 @@ use std::time::{Duration, Instant};
 
 use opendraft_core::plot::{plot_page, plot_sheet, PlotSpace};
 use opendraft_core::plot_plan::validate_plot;
-use opendraft_core::plot_settings::{DEVICE_PDF, DEVICE_SVG};
 use opendraft_core::Document;
 
 use crate::layouts::PageDraft;
@@ -32,6 +31,8 @@ pub struct PlotPreview {
     pub rgba: Vec<u8>,
     /// What the plot could not show faithfully.
     pub notes: Vec<String>,
+    /// The sheet drawn, to draw part of it larger when the preview is zoomed.
+    pub sheet: std::sync::Arc<opendraft_core::plot::PlotSheet>,
 }
 
 /// What the printers of the machine are, found off the UI thread.
@@ -41,52 +42,7 @@ pub enum Printers {
     Failed(String),
 }
 
-/// Where the plot goes: one of OpenDraft's own file devices, or a printer.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Target {
-    /// A PDF file, asked for when Plot is pressed.
-    Pdf,
-    /// An SVG file, asked for when Plot is pressed.
-    Svg,
-    Printer(PrinterId),
-}
-
-impl Target {
-    /// The device as a page setup names it.
-    pub fn device_name(&self) -> String {
-        match self {
-            Self::Pdf => DEVICE_PDF.to_owned(),
-            Self::Svg => DEVICE_SVG.to_owned(),
-            Self::Printer(printer) => printer.0.clone(),
-        }
-    }
-
-    /// OpenDraft's own devices by name; a printer is found among the
-    /// machine's once they are known.
-    pub fn builtin(name: &str) -> Option<Self> {
-        match name {
-            DEVICE_PDF => Some(Self::Pdf),
-            DEVICE_SVG => Some(Self::Svg),
-            _ => None,
-        }
-    }
-}
-
-/// The device to start on: the layout's own, else the one used last. A
-/// printer is only named (to be found once the printers are known).
-pub fn initial_device(layout_device: &str, last: &str) -> (Target, Option<String>) {
-    for name in [layout_device, last] {
-        if let Some(target) = Target::builtin(name) {
-            return (target, None);
-        }
-        // Not a device: what a layout holds when none was chosen, or the
-        // name an earlier version gave to both file devices.
-        if !name.is_empty() && name != "none_device" && name != "OpenDraft PDF/SVG" {
-            return (Target::Pdf, Some(name.to_owned()));
-        }
-    }
-    (Target::Pdf, None)
-}
+pub use crate::plot_target::{initial_device, Target};
 
 impl PlotDialog {
     /// Once the printers are known, go back to the one used last time if it
@@ -243,7 +199,8 @@ pub fn render_preview(document: &Document, draft: &PageDraft) -> Result<PlotPrev
     Ok(PlotPreview {
         size: [info.width as usize, info.height as usize],
         rgba,
-        notes: sheet.notes,
+        notes: sheet.notes.clone(),
+        sheet: std::sync::Arc::new(sheet),
     })
 }
 

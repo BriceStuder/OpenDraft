@@ -30,6 +30,8 @@ pub struct CommandDialogs {
     pub properties: Option<DrawingProperties>,
     /// The Plot dialog (`PLOT`, `PREVIEW`), while it is open.
     pub plot: Option<crate::plot_job::PlotDialog>,
+    /// How far its preview is zoomed in, and the sharp picture of the part in view.
+    pub plot_zoom: crate::plot_zoom::Zoom,
     /// What finished -PLOT commands asked for.
     pub plot_requests: crate::plot_line::PlotRequests,
     /// Plot files written for the Plot dialog with "Open in viewer when done",
