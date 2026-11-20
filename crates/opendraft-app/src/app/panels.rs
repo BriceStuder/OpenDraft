@@ -70,6 +70,7 @@ impl OpenDraftApp {
             placed_snap: None,
             dynamic_suppressed: self.dynamic_suppressed,
             command_line_strip: strip.map(|side| (side, rows)),
+            drawing_alone: dock::drawing_alone(&self.dock),
         };
         let style = dock::style(&self.theme, &ctx.style(), least);
         let shares = dock::split_shares(&self.dock);
@@ -229,6 +230,8 @@ pub(super) struct PanelViewer<'a> {
     pub(super) dynamic_suppressed: bool,
     /// The command line is drawn without its tab bar, behind a grip.
     pub(super) command_line_strip: Option<(dock::Strip, StripRows)>,
+    /// The drawing view is drawn over its tab bar (see `drawing_tab`).
+    pub(super) drawing_alone: bool,
     pub(super) registry: &'a Registry<AppState>,
     pub(super) run: Option<&'static str>,
     pub(super) automation: &'a mut super::automation_update::Automation,
@@ -255,7 +258,7 @@ impl egui_dock::TabViewer for PanelViewer<'_> {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut PanelTab) {
         match tab {
-            PanelTab::Canvas => self.canvas(ui),
+            PanelTab::Canvas => self.drawing(ui),
             PanelTab::Properties => self.properties(ui),
             PanelTab::Layers => self.layers(ui),
             PanelTab::CommandLine => self.command_line(ui),
@@ -271,7 +274,7 @@ impl egui_dock::TabViewer for PanelViewer<'_> {
 }
 
 impl PanelViewer<'_> {
-    fn canvas(&mut self, ui: &mut egui::Ui) {
+    pub(super) fn canvas(&mut self, ui: &mut egui::Ui) {
         let label_color = self.theme.colors.text_weak;
         self.prepare_dynamic_canvas(ui.ctx());
         self.state.docs[self.state.active].keep_space_valid();
