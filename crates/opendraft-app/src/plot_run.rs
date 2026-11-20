@@ -57,7 +57,7 @@ impl AppState {
         match destination {
             Destination::File(path) => {
                 self.refresh_fields(self.active, crate::field_refresh::ON_PLOT);
-                self.begin_plot_with(self.active, &path, draft.space, Some(&draft));
+                self.begin_plot_with(self.active, &path, draft.space, Some(&draft), false);
             }
             Destination::Printer {
                 printer,

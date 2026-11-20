@@ -128,6 +128,8 @@ pub struct PlotDialog {
     pub printers: Printers,
     /// Write the draft to the layout when Plot is pressed.
     pub save_changes: bool,
+    /// Open a PDF or SVG file in the system's viewer once it is written.
+    pub view_when_done: bool,
     pub preview: Option<PlotPreview>,
     /// The draft the preview was drawn from; the picture is out of date when it differs.
     pub previewed: Option<PageDraft>,
@@ -287,6 +289,7 @@ impl AppState {
             printers,
             draft,
             save_changes: true,
+            view_when_done: self.settings.plot_view_when_done,
             preview: None,
             previewed: None,
             picking: None,
@@ -358,9 +361,13 @@ impl AppState {
         }
         self.settings.plot_device = dialog.target.device_name();
         self.settings.plot_dpi = dialog.dpi;
+        let view = dialog.view_when_done;
+        if matches!(dialog.target, Target::Pdf | Target::Svg) {
+            self.settings.plot_view_when_done = view;
+        }
         let started = match dialog.target.clone() {
-            Target::Pdf => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Pdf),
-            Target::Svg => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Svg),
+            Target::Pdf => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Pdf, view),
+            Target::Svg => self.plot_layout_with(Some(&dialog.draft), PlotFormat::Svg, view),
             Target::Printer(printer) => {
                 self.print_draft(&dialog.draft, printer, dialog.copies, dialog.dpi)
             }
@@ -942,6 +949,40 @@ mod tests {
         state.open_plot_dialog(false);
         assert!(!state.plot_dialog_run(), "the picker answers cancelled");
         assert!(state.command_dialogs.plot.is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_plot_file_is_opened_when_written_if_asked_and_the_choice_is_kept() {
+        let (mut state, script, dir) = state();
+        assert!(state.settings.plot_view_when_done, "on to start with");
+        state.open_plot_dialog(false);
+        assert!(state.command_dialogs.plot.as_ref().unwrap().view_when_done);
+        script.will_save_to(Some(dir.join("seen.pdf")));
+        assert!(state.plot_dialog_run());
+        assert_eq!(
+            state.command_dialogs.plots_to_view,
+            [dir.join("seen.pdf")],
+            "written, so it is opened"
+        );
+        state.command_dialogs.plots_to_view.clear();
+
+        // A file that could not be written is not opened.
+        state.open_plot_dialog(false);
+        script.will_save_to(Some(dir.join("no such folder").join("x.pdf")));
+        assert!(state.plot_dialog_run());
+        assert!(state.command_dialogs.plots_to_view.is_empty());
+
+        // Unticked: not opened, and the next plot starts unticked.
+        state.open_plot_dialog(false);
+        state.command_dialogs.plot.as_mut().unwrap().view_when_done = false;
+        script.will_save_to(Some(dir.join("unseen.pdf")));
+        assert!(state.plot_dialog_run());
+        assert!(dir.join("unseen.pdf").exists());
+        assert!(state.command_dialogs.plots_to_view.is_empty());
+        assert!(!state.settings.plot_view_when_done);
+        state.open_plot_dialog(false);
+        assert!(!state.command_dialogs.plot.as_ref().unwrap().view_when_done);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

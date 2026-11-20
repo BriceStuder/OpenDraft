@@ -30,6 +30,18 @@ enum Action {
 }
 
 impl OpenDraftApp {
+    /// Apply the file work that has finished, then open each plot file that
+    /// asked for it in the system's viewer.
+    pub(super) fn poll_io(&mut self) {
+        self.state.poll_io();
+        for path in std::mem::take(&mut self.state.command_dialogs.plots_to_view) {
+            if let Err(error) = crate::reveal::open_file(&path) {
+                self.state
+                    .tell(format!("Could not open {}: {error}", path.display()));
+            }
+        }
+    }
+
     pub(super) fn plot_dialog_window(&mut self, ctx: &egui::Context) {
         self.state.take_window_pick();
         let Some(mut dialog) = self.state.command_dialogs.plot.take() else {
@@ -293,6 +305,9 @@ fn output_box(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, dialog: &mut PlotD
                 ui.small(format!("System printers are not available: {why}"));
             }
             Printers::Ready(_) => {}
+        }
+        if matches!(dialog.target, Target::Pdf | Target::Svg) {
+            ui.checkbox(&mut dialog.view_when_done, "Open in viewer when done");
         }
         if matches!(dialog.target, Target::Printer(_)) {
             ui.horizontal(|ui| {
