@@ -31,12 +31,12 @@
   <screenshots>
     <screenshot type="default">
       <caption>A drawing with the ribbon, Properties panel, command line and Layers panel</caption>
-      <image type="source" width="850" height="552">https://raw.githubusercontent.com/JamesHodgkins/OpenDraft/main/docs/screenshot.png</image>
+      <image type="source" width="850" height="552">https://raw.githubusercontent.com/OpenEngineeringSoftware/OpenDraft/main/docs/screenshot.png</image>
     </screenshot>
   </screenshots>
-  <url type="homepage">https://github.com/JamesHodgkins/OpenDraft</url>
-  <url type="bugtracker">https://github.com/JamesHodgkins/OpenDraft/issues</url>
-  <url type="vcs-browser">https://github.com/JamesHodgkins/OpenDraft</url>
+  <url type="homepage">https://github.com/OpenEngineeringSoftware/OpenDraft</url>
+  <url type="bugtracker">https://github.com/OpenEngineeringSoftware/OpenDraft/issues</url>
+  <url type="vcs-browser">https://github.com/OpenEngineeringSoftware/OpenDraft</url>
   <categories>
     <category>Graphics</category>
     <category>2DGraphics</category>

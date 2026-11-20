@@ -89,7 +89,7 @@ const NOTES: &[Note] = &[
 ];
 
 /// Where a release's notes are, opened only on a click.
-const RELEASES: &str = "https://github.com/JamesHodgkins/OpenDraft/releases/tag/v";
+const RELEASES: &str = "https://github.com/OpenEngineeringSoftware/OpenDraft/releases/tag/v";
 
 /// The note for exactly `version`, if there is one.
 pub fn note_for(version: &str) -> Option<&'static Note> {
@@ -141,7 +141,7 @@ mod tests {
         let note = note_for("0.1.0").unwrap();
         assert_eq!(
             release_url(note),
-            "https://github.com/JamesHodgkins/OpenDraft/releases/tag/v0.1.0"
+            "https://github.com/OpenEngineeringSoftware/OpenDraft/releases/tag/v0.1.0"
         );
     }
 }

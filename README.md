@@ -5,13 +5,13 @@
 
 **A fast, free, open-source 2D CAD application written in Rust.**
 
-[![CI](https://github.com/JamesHodgkins/OpenDraft/actions/workflows/ci.yml/badge.svg)](https://github.com/JamesHodgkins/OpenDraft/actions/workflows/ci.yml)
+[![CI](https://github.com/OpenEngineeringSoftware/OpenDraft/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenEngineeringSoftware/OpenDraft/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/Rust-2021-orange?logo=rust&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)
 ![Status](https://img.shields.io/badge/status-early%20development-yellow)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue)](#license)
-[![Last commit](https://img.shields.io/github/last-commit/JamesHodgkins/OpenDraft)](https://github.com/JamesHodgkins/OpenDraft/commits/main)
-[![Issues](https://img.shields.io/github/issues/JamesHodgkins/OpenDraft)](https://github.com/JamesHodgkins/OpenDraft/issues)
+[![Last commit](https://img.shields.io/github/last-commit/OpenEngineeringSoftware/OpenDraft)](https://github.com/OpenEngineeringSoftware/OpenDraft/commits/main)
+[![Issues](https://img.shields.io/github/issues/OpenEngineeringSoftware/OpenDraft)](https://github.com/OpenEngineeringSoftware/OpenDraft/issues)
 
 <p>
 <a href="#-try-it-in-30-seconds">Try it</a> ·
@@ -98,7 +98,7 @@ If that looks familiar, you are home.
 
 ## 🚀 Getting started
 
-Download the latest build from the [Releases page](https://github.com/JamesHodgkins/OpenDraft/releases). A release marked **Pre-release** is a beta.
+Download the latest build from the [Releases page](https://github.com/OpenEngineeringSoftware/OpenDraft/releases). A release marked **Pre-release** is a beta.
 
 | System | File |
 |---|---|
@@ -173,7 +173,7 @@ OpenDraft makes no network requests unless you allow it. The one thing it can do
 You need a recent stable [Rust toolchain](https://rustup.rs/).
 
 ```bash
-git clone https://github.com/JamesHodgkins/OpenDraft.git
+git clone https://github.com/OpenEngineeringSoftware/OpenDraft.git
 cd OpenDraft
 cargo run --release -p opendraft-app
 ```
@@ -234,7 +234,7 @@ Contributions are welcome, from bug reports to whole commands. Every command is 
 
 ## 💬 Feedback and support
 
-Use the [issue tracker](https://github.com/JamesHodgkins/OpenDraft/issues) for bug reports and feature requests (there are forms for both). For a question or an idea, use [Discussions](https://github.com/JamesHodgkins/OpenDraft/discussions), or email the address below. For a security problem, do not open an issue: see the [security policy](./SECURITY.md).
+Use the [issue tracker](https://github.com/OpenEngineeringSoftware/OpenDraft/issues) for bug reports and feature requests (there are forms for both). For a question or an idea, use [Discussions](https://github.com/OpenEngineeringSoftware/OpenDraft/discussions), or email the address below. For a security problem, do not open an issue: see the [security policy](./SECURITY.md).
 
 Email: contact@openengineering.uk
 

@@ -9,7 +9,7 @@ body:
       value: |
         Thanks for helping improve OpenDraft. Please search the existing issues before filing a new one.
 
-        **Security problem?** Do not report it here, because issues are public. See the [security policy](https://github.com/JamesHodgkins/OpenDraft/security/policy) instead.
+        **Security problem?** Do not report it here, because issues are public. See the [security policy](https://github.com/OpenEngineeringSoftware/OpenDraft/security/policy) instead.
 
         **Keep private things out of the report.** Do not attach confidential drawings. DXF and DWG files often hold names, company names or file paths in their headers, and screenshots can show your user name in a file path. If a drawing is needed to reproduce the problem, attach a small, sanitised example. GitHub accepts only some file types as attachments, so put a drawing in a `.zip` first.
 

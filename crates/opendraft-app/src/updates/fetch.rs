@@ -7,7 +7,7 @@ use std::time::Duration;
 
 /// The releases list of this project, newest first (at most 20).
 const RELEASES_URL: &str =
-    "https://api.github.com/repos/JamesHodgkins/OpenDraft/releases?per_page=20";
+    "https://api.github.com/repos/OpenEngineeringSoftware/OpenDraft/releases?per_page=20";
 /// A developer's override, for trying the check against a local server.
 pub const URL_ENV: &str = "OPENDRAFT_UPDATES_URL";
 const TIMEOUT: Duration = Duration::from_secs(10);
