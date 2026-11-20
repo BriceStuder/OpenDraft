@@ -278,13 +278,7 @@ fn layer_row_contents(ui: &Ui, theme: &Theme, rect: Rect, layer: &Layer, text: C
         egui::pos2(rect.left() + 3.0 * SWITCH_W + 12.0, rect.center().y),
         egui::vec2(11.0, 11.0),
     );
-    painter.rect_filled(swatch, 1.0, colour_ui::display(theme, layer.color));
-    painter.rect_stroke(
-        swatch,
-        1.0,
-        Stroke::new(1.0_f32, c.border),
-        egui::StrokeKind::Inside,
-    );
+    colour_ui::paint_swatch(painter, theme, swatch, layer.color);
     // The name stops short of the field's chevron.
     let room = Rect::from_min_max(
         egui::pos2(swatch.right() + 6.0, rect.top()),

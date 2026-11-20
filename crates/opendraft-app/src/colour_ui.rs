@@ -6,7 +6,9 @@
 mod index_dialog;
 mod names;
 
-use eframe::egui::{self, Align2, Color32, FontId, Id, Rect, Response, Sense, Stroke, Ui};
+use eframe::egui::{
+    self, Align2, Color32, FontId, Id, Painter, Rect, Response, Sense, Shape, Stroke, Ui,
+};
 use opendraft_core::Color;
 use opendraft_ui::{menu, Theme};
 
@@ -33,14 +35,26 @@ pub fn display(theme: &Theme, color: Color) -> Color32 {
     }
 }
 
-fn swatch(ui: &Ui, theme: &Theme, rect: Rect, color: Color32) {
-    ui.painter().rect_filled(rect, 2.0, color);
-    ui.painter().rect_stroke(
+/// A colour's swatch with its border. Colour 7 is half white, half black
+/// whatever the theme, so it reads as "white on a dark background, black on
+/// a light one".
+pub fn paint_swatch(painter: &Painter, theme: &Theme, rect: Rect, color: Color) {
+    painter.extend(swatch_shapes(theme, rect, color));
+}
+
+fn swatch_shapes(theme: &Theme, rect: Rect, color: Color) -> Vec<Shape> {
+    let mut shapes = if color == Color::Foreground {
+        index_dialog::half_and_half(rect).to_vec()
+    } else {
+        vec![Shape::rect_filled(rect, 2.0, display(theme, color))]
+    };
+    shapes.push(Shape::rect_stroke(
         rect,
         2.0,
         Stroke::new(1.0_f32, theme.colors.border),
         egui::StrokeKind::Inside,
-    );
+    ));
+    shapes
 }
 
 /// A square swatch that opens the palette (layer table cells). `by_layer`
@@ -54,7 +68,7 @@ pub fn swatch_button(
 ) -> Option<Pick> {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(22.0, 20.0), Sense::click());
     let inner = rect.shrink2(egui::vec2(3.0, 2.0));
-    swatch(ui, theme, inner, display(theme, color));
+    paint_swatch(ui.painter(), theme, inner, color);
     if response.hovered() {
         ui.painter().rect_stroke(
             inner.expand(1.0),
@@ -85,7 +99,7 @@ pub fn field(
             egui::pos2(rect.left() + 16.0, rect.center().y),
             egui::vec2(12.0, 12.0),
         );
-        swatch(ui, theme, box_rect, display(theme, color));
+        paint_swatch(ui.painter(), theme, box_rect, color);
         text_x = rect.left() + 28.0;
     }
     ui.painter().text(
@@ -178,11 +192,7 @@ fn colour_row(ui: &mut Ui, theme: &Theme, color: Color) -> bool {
         egui::pos2(rect.left() + 14.0, rect.center().y),
         egui::vec2(12.0, 12.0),
     );
-    if color == Color::Foreground {
-        index_dialog::half_and_half(ui, box_rect);
-    } else {
-        swatch(ui, theme, box_rect, display(theme, color));
-    }
+    paint_swatch(ui.painter(), theme, box_rect, color);
     ui.painter().text(
         egui::pos2(rect.left() + 28.0, rect.center().y),
         Align2::LEFT_CENTER,
@@ -239,5 +249,25 @@ mod tests {
         }
         let expected: Vec<Color> = [70u8, 60, 30, 33].map(names::from_index).to_vec();
         assert_eq!(list, expected);
+    }
+
+    /// The fill colours of a swatch's shapes, border left out.
+    fn fills(color: Color) -> Vec<Color32> {
+        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(12.0, 12.0));
+        swatch_shapes(&Theme::dark(), rect, color)
+            .into_iter()
+            .filter_map(|shape| match shape {
+                Shape::Rect(r) => Some(r.fill),
+                Shape::Path(p) => Some(p.fill),
+                _ => None,
+            })
+            .filter(|c| *c != Color32::TRANSPARENT)
+            .collect()
+    }
+
+    #[test]
+    fn colour_7_is_half_white_half_black_and_others_are_plain() {
+        assert_eq!(fills(Color::Foreground), [Color32::WHITE, Color32::BLACK]);
+        assert_eq!(fills(Color::Rgb(255, 0, 0)), [Color32::from_rgb(255, 0, 0)]);
     }
 }
