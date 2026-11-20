@@ -103,6 +103,14 @@ fn display_left(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
 }
 
 fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
+    widgets::group_box(ui, theme, "Drawing window", |ui| {
+        ui.checkbox(
+            &mut draft.show_viewport_controls,
+            "Display the viewport controls",
+        )
+        .on_hover_text("The [-][Top][2D Wireframe] label in the top-left corner (VPCONTROL)");
+    });
+    ui.add_space(6.0);
     widgets::group_box(ui, theme, "Mouse wheel", |ui| {
         let (min, max) = ZOOM_SPEED_RANGE;
         ui.horizontal(|ui| {

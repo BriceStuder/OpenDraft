@@ -384,12 +384,11 @@ impl PanelViewer<'_> {
             opendraft_canvas::Space::Paper(_) => "Layout",
             opendraft_canvas::Space::Viewport(..) => "Top (viewport)",
         };
-        ui.put(
-            egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(220.0, 18.0)),
-            egui::Label::new(
-                egui::RichText::new(format!("[-][{view_name}][2D Wireframe]")).color(label_color),
-            ),
-        );
+        if self.state.settings.show_viewport_controls {
+            let at = egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(220.0, 18.0));
+            let text = egui::RichText::new(format!("[-][{view_name}][2D Wireframe]"));
+            ui.put(at, egui::Label::new(text.color(label_color)));
+        }
         if let Some(viewport) = viewport_edit {
             self.state.apply_viewport_edit(viewport);
         }
