@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 /// The page a release is read at. Built here from the version, never taken
 /// from the downloaded text.
-const RELEASE_PAGE: &str = "https://github.com/JamesHodgkins/OpenDraft/releases/tag/v";
+const RELEASE_PAGE: &str = "https://github.com/OpenEngineeringSoftware/OpenDraft/releases/tag/v";
 
 pub fn release_page(version: &Version) -> String {
     format!("{RELEASE_PAGE}{version}")
@@ -189,7 +189,7 @@ mod tests {
     fn the_page_and_package_names_are_built_from_the_version() {
         assert_eq!(
             release_page(&v("0.2.0-beta.1")),
-            "https://github.com/JamesHodgkins/OpenDraft/releases/tag/v0.2.0-beta.1"
+            "https://github.com/OpenEngineeringSoftware/OpenDraft/releases/tag/v0.2.0-beta.1"
         );
         assert_eq!(
             package_name(&v("0.2.0"), true),
