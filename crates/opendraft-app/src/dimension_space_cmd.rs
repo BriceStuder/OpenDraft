@@ -23,7 +23,7 @@ pub fn dim_space(ed: &mut Editor) -> Result<(), Cancelled> {
         .filter(|id| *id != base_id)
         .collect();
     let auto = 2.0 * base.style.text_height * base.style.scale;
-    let options = Options::<f64>::new("Enter value or [Auto]")
+    let options = Options::<f64>::new("Enter value")
         .keyword("Auto", "A")
         .allow_empty();
     let spacing = match ed.ask_distance(options)? {
