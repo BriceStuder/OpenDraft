@@ -1,10 +1,10 @@
 //! Colour pickers shared by the Layers and Properties panels: a swatch or a
 //! swatch-and-name field that opens a short list (the named colours, the
 //! ones used lately and "Select Colors..."), and the Select Color dialog with
-//! every AutoCAD index colour.
+//! its Index Color and True Color tabs.
 
-mod index_dialog;
 mod names;
+mod select_color;
 
 use eframe::egui::{
     self, Align2, Color32, FontId, Id, Painter, Rect, Response, Sense, Shape, Stroke, Ui,
@@ -44,7 +44,7 @@ pub fn paint_swatch(painter: &Painter, theme: &Theme, rect: Rect, color: Color) 
 
 fn swatch_shapes(theme: &Theme, rect: Rect, color: Color) -> Vec<Shape> {
     let mut shapes = if color == Color::Foreground {
-        index_dialog::half_and_half(rect, 1.0).to_vec()
+        select_color::half_and_half(rect, 1.0).to_vec()
     } else {
         vec![Shape::rect_filled(rect, 2.0, display(theme, color))]
     };
@@ -140,11 +140,11 @@ fn palette_popup(
     let picked = match listed {
         Some(Choice::Pick(pick)) => Some(pick),
         Some(Choice::MoreColours) => {
-            let state = index_dialog::State::new(current);
+            let state = select_color::State::new(current);
             ui.data_mut(|d| d.insert_temp(dialog_id, state));
             None
         }
-        None => index_dialog::show(ui, theme, dialog_id, by_layer),
+        None => select_color::show(ui, theme, dialog_id, by_layer),
     };
     if let Some(Pick::Color(color)) = picked {
         remember(ui, color);
