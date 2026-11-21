@@ -1,6 +1,7 @@
-//! TRIM and EXTEND: change objects against the edges other objects make. Both
-//! ask for edges, then for objects to change, and Shift-click does the other
-//! one's job. Written against the `Editor` like the other commands; the
+//! TRIM and EXTEND: change objects against the edges other objects make. As in
+//! AutoCAD's Quick mode, every object is an edge unless some were selected
+//! before the command; then the command asks for objects to change, and
+//! Shift-click does the other one's job. Written against the `Editor` like the other commands; the
 //! geometry is `opendraft_core`'s `intersections`, `split_at` and `extended_to`.
 
 use opendraft_canvas::Region;
@@ -34,7 +35,7 @@ pub fn trim_plan(
         {
             return Err("Splines cannot be cutting edges yet.");
         }
-        return Err("Object does not intersect an edge.");
+        return Err(NO_EDGE);
     }
     let pieces = target.split_at(&crossings);
     // One piece means the cuts did not divide it (a circle cut once, a
@@ -64,6 +65,28 @@ pub fn trim_plan(
         .filter(|(i, _)| *i != nearest)
         .map(|(_, piece)| piece)
         .collect())
+}
+
+/// Why `trim_plan` cannot trim an object that no edge crosses.
+const NO_EDGE: &str = "Object does not intersect an edge.";
+
+/// What TRIM (or EXTEND) leaves of `target`. When every object is an edge
+/// (`quick`: none was selected before the command), trimming an object that
+/// no edge crosses erases it, as in AutoCAD's Quick mode.
+pub(crate) fn plan(
+    mode: Mode,
+    target: &Entity,
+    others: &[Entity],
+    at: Point,
+    quick: bool,
+) -> Result<Vec<Entity>, &'static str> {
+    match mode {
+        Mode::Trim => match trim_plan(target, others, at) {
+            Err(NO_EDGE) if quick => Ok(Vec::new()),
+            made => made,
+        },
+        Mode::Extend => extend_plan(target, others, at),
+    }
 }
 
 /// The index of the piece nearest `at`.
@@ -140,8 +163,9 @@ impl Mode {
     }
 }
 
-/// TRIM: choose cutting edges (Enter takes every object), then click the part
-/// of each object to remove. Shift-click extends instead. A path dragged from
+/// TRIM: click the part of each object to remove, against every object, or
+/// against the objects selected before the command. With every object as
+/// edges, an object that nothing crosses is erased. Shift-click extends instead. A path dragged from
 /// empty space (or the Fence option) trims every object it crosses; a click
 /// in empty space starts a crossing window that
 /// trims every object it touches (see `edges_sweep.rs`). Each click or
@@ -151,43 +175,31 @@ pub fn trim_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     edit_against_edges(
         ed,
         Mode::Trim,
-        "Select cutting edges or <select all>",
         "Select object to trim or shift-select to extend",
     )
 }
 
-/// EXTEND: choose boundary edges (Enter takes every object), then click each
-/// object near the end to lengthen. Shift-click trims instead.
+/// EXTEND: click each object near the end to lengthen, against every object,
+/// or against the objects selected before the command. Shift-click trims instead.
 pub fn extend_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     edit_against_edges(
         ed,
         Mode::Extend,
-        "Select boundary edges or <select all>",
         "Select object to extend or shift-select to trim",
     )
 }
 
-fn edit_against_edges(
-    ed: &mut Editor,
-    mode: Mode,
-    edges_message: &str,
-    object_message: &str,
-) -> Result<(), Cancelled> {
-    // Objects selected before the command are the edges: skip asking.
-    let chosen = if ed.pickset().is_empty() {
-        ed.ask_selection(Options::<()>::new(edges_message).allow_empty())?
-    } else {
-        let count = ed.pickset().len();
-        ed.say(format!(
-            "Using the {} selected as edges.",
-            plural(count, "object")
-        ));
-        ed.pickset().to_vec()
-    };
-    // `None` stands for every object in the drawing.
+fn edit_against_edges(ed: &mut Editor, mode: Mode, object_message: &str) -> Result<(), Cancelled> {
+    // AutoCAD's Quick mode: objects selected before the command are the
+    // edges; with none, every object is one (`None`), without asking.
+    let chosen = ed.pickset().to_vec();
     let edges = (!chosen.is_empty()).then_some(chosen);
-    if edges.is_none() {
-        ed.say("Using every object as an edge.");
+    match &edges {
+        Some(ids) => ed.say(format!(
+            "Using the {} selected as edges.",
+            plural(ids.len(), "object")
+        )),
+        None => ed.say("Using every object as an edge."),
     }
     let mut changed = 0_usize;
     loop {
@@ -239,10 +251,7 @@ fn change_one(
     let plan = ed.read(move |doc| {
         let target = doc.object(id)?;
         let others = edges_for(doc, &edges, id);
-        let made = match mode {
-            Mode::Trim => trim_plan(&target.entity, &others, at),
-            Mode::Extend => extend_plan(&target.entity, &others, at),
-        };
+        let made = plan(mode, &target.entity, &others, at, edges.is_none());
         Some(made.map(|left| (target.attrs.clone(), left)))
     })?;
     let (attrs, left) = match plan {
@@ -469,10 +478,8 @@ mod tests {
     }
 
     #[test]
-    fn enter_takes_every_object_as_an_edge_and_each_click_is_one_undo_step() {
+    fn every_object_is_an_edge_without_asking_and_each_click_is_one_undo_step() {
         let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(4.0), wall(6.0)]);
-        state.answer_enter();
-        state.settle_command();
         assert!(state.cmdline.log.iter().any(|l| l.contains("every object")));
         assert!(state.cmd_prompt().text.starts_with("Select object to trim"));
         let target = id(&state, 0);
@@ -531,25 +538,42 @@ mod tests {
     }
 
     #[test]
-    fn only_the_chosen_edges_cut() {
-        let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(4.0), wall(6.0)]);
-        let near = id(&state, 1);
-        state.select_ids([near], false);
-        state.answer_enter();
-        state.settle_command();
+    fn with_every_object_as_edges_trim_erases_what_nothing_crosses() {
+        // AutoCAD's Quick mode: TRIM erases it, EXTEND leaves it alone.
+        let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(40.0)]);
         let target = id(&state, 0);
-        // Click the right-hand part: only the wall at 4 cuts, so the part
-        // from 4 to the end goes.
-        state.answer_object(p(8.0, 0.0), Some(target), false);
+        state.answer_object(p(5.0, 0.0), Some(target), false);
         state.settle_command();
-        assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(4.0, 0.0)));
-        assert_eq!(entities(&state).len(), 3);
+        assert_eq!(entities(&state), vec![wall(40.0)]);
+        state.cmd_submit("u");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2, "Undo brings it back");
+        // A path across it erases it too.
+        state.answer_path(vec![p(5.0, 1.0), p(5.0, -1.0)], false);
+        state.settle_command();
+        assert_eq!(entities(&state), vec![wall(40.0)]);
+
+        let mut state = extending(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(-40.0)]);
+        let target = id(&state, 0);
+        state.answer_object(p(9.0, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2);
+        assert!(state
+            .cmdline
+            .log
+            .last()
+            .unwrap()
+            .contains("No boundary in the way"));
     }
 
     #[test]
-    fn an_object_that_no_edge_crosses_is_left_alone_and_the_user_told() {
-        let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(40.0)]);
-        state.answer_enter();
+    fn an_object_that_no_selected_edge_crosses_is_left_alone_and_the_user_told() {
+        let mut state = AppState::new();
+        for e in [line(p(0.0, 0.0), p(10.0, 0.0)), wall(40.0)] {
+            state.add_entity(e);
+        }
+        state.select_ids([id(&state, 1)], false);
+        state.start_command("Trim", trim_objects);
         state.settle_command();
         let target = id(&state, 0);
         state.answer_object(p(5.0, 0.0), Some(target), false);
@@ -617,8 +641,6 @@ mod tests {
         }
         state.start_command("Extend", extend_objects);
         state.settle_command();
-        state.answer_enter();
-        state.settle_command();
         state
     }
 
@@ -641,8 +663,6 @@ mod tests {
     #[test]
     fn shift_extends_while_trimming() {
         let mut state = trimming(&[line(p(0.0, 0.0), p(2.0, 0.0)), wall(6.0)]);
-        state.answer_enter();
-        state.settle_command();
         let target = id(&state, 0);
         state.answer_object(p(1.9, 0.0), Some(target), true);
         state.settle_command();
