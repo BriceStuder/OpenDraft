@@ -14,6 +14,18 @@ const INPUT_BAR_PAD: f32 = 4.0;
 /// Space kept clear along the top and bottom of the panel.
 pub(super) const MARGIN: f32 = 4.0;
 
+/// Space between the log's last line and the input row: the input bar's
+/// pad plus some clear space, so the log does not run into the bar.
+pub(super) const LOG_CLEARANCE: f32 = INPUT_BAR_PAD + 6.0;
+
+/// Space kept clear left and right of the log and the input row.
+const SIDE_MARGIN: f32 = 8.0;
+
+/// Space between the log's scroll bar and the panel's right edge, and room
+/// kept for the bar so lines wrap before it.
+const SCROLL_BAR_EDGE: f32 = 3.0;
+const SCROLL_BAR_ROOM: f32 = 12.0;
+
 /// Where the log and the input row go in a panel's inside: the row keeps
 /// its height along the bottom, whatever the panel's, and the log has what
 /// is left `gap` above it.
@@ -93,10 +105,11 @@ impl PanelViewer<'_> {
         let panel = ui.max_rect();
         let row_height = ui.spacing().interact_size.y.max(22.0);
         let (log_rect, row_rect) = rows(
-            panel.shrink2(egui::vec2(8.0, MARGIN)),
+            panel.shrink2(egui::vec2(SIDE_MARGIN, MARGIN)),
             row_height,
-            ui.spacing().item_spacing.y,
+            LOG_CLEARANCE,
         );
+        let log_rect = log_rect.with_max_x(panel.right() - SCROLL_BAR_EDGE);
         // The input line sits on a lighter band than the log above it, as
         // in AutoCAD, so it reads as the line being typed into.
         let bar_rect = egui::Rect::from_min_max(
@@ -113,6 +126,7 @@ impl PanelViewer<'_> {
                 .auto_shrink([false, false])
                 .stick_to_bottom(true)
                 .show(&mut log, |ui| {
+                    ui.set_max_width((ui.available_width() - SCROLL_BAR_ROOM).max(0.0));
                     for line in &self.state.cmdline.log {
                         ui.label(
                             egui::RichText::new(line)
