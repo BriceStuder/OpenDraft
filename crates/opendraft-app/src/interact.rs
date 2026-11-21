@@ -192,6 +192,7 @@ impl AppState {
         self.take_block_requests();
         self.take_plot_requests();
         self.take_window_pick();
+        self.take_zoom_requests();
     }
 
     /// Wait for the running command to ask or end (tests).
