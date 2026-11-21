@@ -104,7 +104,7 @@ Download the latest build from the [Releases page](https://github.com/OpenEngine
 |---|---|
 | Windows 10 or 11 (64-bit) | `OpenDraft-<version>-windows-x64.msi` (installer, from 0.1.1) or `OpenDraft-<version>-windows.zip` (portable) |
 | Linux (64-bit Intel/AMD) | `OpenDraft-<version>-linux-amd64.deb` (Debian, Ubuntu, Mint; from 0.1.2), `OpenDraft-<version>-linux-x86_64.AppImage` (any distribution; from 0.1.2) or `OpenDraft-<version>-linux.tar.gz` |
-| Linux (64-bit ARM, e.g. Raspberry Pi 4/5) | `OpenDraft-<version>-linux-arm64.deb`, `OpenDraft-<version>-linux-aarch64.AppImage` or `OpenDraft-<version>-linux-aarch64.tar.gz` (community-tested) |
+| Linux (64-bit ARM, e.g. Raspberry Pi 4/5) | `OpenDraft-<version>-linux-arm64.deb` (Raspberry Pi OS, Debian, Ubuntu) or `OpenDraft-<version>-linux-aarch64.tar.gz` (community-tested; no AppImage) |
 
 Each release also has a `SHA256SUMS` file to check your download against.
 
