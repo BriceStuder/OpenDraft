@@ -30,11 +30,10 @@ fn first_corner(prompt: &str) -> Options<Point> {
 }
 
 /// The opposite corner: a plain rectangle follows the pointer, with no
-/// dimensions and no snaps (a view is not a drawn object).
+/// dimensions and no snaps (a view is not a drawn object). There is no base
+/// point, as dynamic input would draw a length and an angle from it.
 fn opposite_corner(first: Point) -> Options<Point> {
     Options::new("Specify opposite corner")
-        .base(first)
-        .corner()
         .no_snap()
         .ghost(move |at| {
             vec![Entity::Rectangle {
@@ -145,6 +144,7 @@ mod tests {
             ask.dynamic_dimensions,
             opendraft_commands::DynamicDimensions::None
         );
+        assert!(ask.base.is_none());
         state.answer_point(Point::new(50.0, 30.0));
         state.settle_command();
         assert!(state.runner.is_none());
