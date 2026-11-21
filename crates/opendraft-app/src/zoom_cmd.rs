@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options};
-use opendraft_core::Point;
+use opendraft_core::{Entity, Point};
 
 use crate::state::AppState;
 
@@ -26,6 +26,22 @@ fn first_corner(prompt: &str) -> Options<Point> {
         .keyword("Extents", "E")
         .keyword("Previous", "P")
         .keyword("Window", "W")
+        .no_snap()
+}
+
+/// The opposite corner: a plain rectangle follows the pointer, with no
+/// dimensions and no snaps (a view is not a drawn object).
+fn opposite_corner(first: Point) -> Options<Point> {
+    Options::new("Specify opposite corner")
+        .base(first)
+        .corner()
+        .no_snap()
+        .ghost(move |at| {
+            vec![Entity::Rectangle {
+                min: first,
+                max: at,
+            }]
+        })
 }
 
 /// Ask what to zoom to. Enter ends with nothing changed.
@@ -43,7 +59,7 @@ fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
             }
             Answer::Enter => return Ok(None),
         };
-        let second = match ed.ask_corner(first, "Specify opposite corner")? {
+        let second = match ed.ask_point(opposite_corner(first))? {
             Answer::Value(at) => at,
             _ => return Err(Cancelled),
         };
@@ -118,9 +134,17 @@ mod tests {
         state.start_zoom();
         state.settle_command();
         assert!(asked(&state).starts_with("Specify first corner of window"));
+        assert!(state.waiting().is_some_and(|ask| ask.no_snap));
         state.answer_point(Point::new(10.0, 10.0));
         state.settle_command();
         assert_eq!(asked(&state), "Specify opposite corner");
+        // No dimensions and no snaps on the window (it is not drawn).
+        let ask = state.waiting().unwrap();
+        assert!(ask.no_snap);
+        assert_eq!(
+            ask.dynamic_dimensions,
+            opendraft_commands::DynamicDimensions::None
+        );
         state.answer_point(Point::new(50.0, 30.0));
         state.settle_command();
         assert!(state.runner.is_none());
