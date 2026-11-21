@@ -218,8 +218,15 @@ fn edit_against_edges(
     let mut edges = choose_edges(ed, &mut quick, ed.pickset().to_vec(), edges_message)?;
     let mut changed = 0_usize;
     loop {
+        // Quick mode is named here, its only prompt; Standard mode was named
+        // at the edge question.
+        let message = if quick {
+            with_mode(true, object_message)
+        } else {
+            sentence(object_message)
+        };
         // No Crossing option: a click in empty space starts the window.
-        let mut options = Options::<Swept>::new(with_mode(quick, object_message))
+        let mut options = Options::<Swept>::new(message)
             .keyword("Fence", "F")
             .keyword("mOde", "O");
         if changed > 0 {
@@ -270,6 +277,15 @@ fn edit_against_edges(
 fn with_mode(quick: bool, message: &str) -> String {
     let named = if quick { "Quick mode" } else { "Standard mode" };
     format!("{named}, {message}")
+}
+
+/// `message` with a capital first letter, as a prompt starts.
+fn sentence(message: &str) -> String {
+    let mut chars = message.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 /// The edges: the objects selected before the command (`chosen`); with none,
@@ -714,10 +730,7 @@ mod tests {
         assert!(!state.defaults().trim.get().quick, "remembered");
         state.answer_enter();
         state.settle_command();
-        assert!(state
-            .cmd_prompt()
-            .text
-            .starts_with("Standard mode, select object to trim"));
+        assert!(state.cmd_prompt().text.starts_with("Select object to trim"));
         let target = id(&state, 0);
         state.answer_object(p(5.0, 0.0), Some(target), false);
         state.settle_command();
