@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use egui::{Color32, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, Ui};
 use opendraft_core::{
-    arc, bulge, width, Color, Document, Entity, EntityId, LayerId, LayoutId, Point, ViewportId,
+    arc, bulge, width, Bounds, Color, Document, Entity, EntityId, LayerId, LayoutId, Point,
+    ViewportId,
 };
 
 use crate::camera::Camera;
@@ -71,6 +72,8 @@ const STEP_ZOOM: f64 = 1.5;
 enum Request {
     Extents,
     Zoom(f64),
+    /// ZOOM Window: two corners in the space being worked in.
+    Window(Point, Point),
 }
 
 /// Per-drawing view state.
@@ -195,6 +198,9 @@ impl View {
                     self.camera.fit(document.bounds(), rect);
                 }
                 Some(Request::Zoom(factor)) => self.camera.zoom_at(rect.center(), rect, factor),
+                Some(Request::Window(a, b)) => {
+                    self.camera.show_window(Bounds::from_points(a, b), rect);
+                }
                 None => {}
             }
             if response.dragged_by(PointerButton::Middle) {

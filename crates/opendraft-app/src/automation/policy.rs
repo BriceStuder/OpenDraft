@@ -182,6 +182,7 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("view.zoom_in", ImmediateSafe, Ui),
     ("view.zoom_out", ImmediateSafe, Ui),
     ("view.zoom_previous", ImmediateSafe, Ui),
+    ("view.zoom", InteractiveInApp, Ui),
     ("view.grid", ImmediateSafe, Ui),
     ("view.dynamic_input", ImmediateSafe, Ui),
     ("view.snap", ImmediateSafe, Ui),

@@ -331,10 +331,11 @@ fn all() -> Vec<Command<AppState>> {
         .transparent(),
         cmd("view.zoom_previous", "Zoom Previous", |s| {
             if !s.docs[s.active].view.zoom_previous() {
-                s.message = "No previous view saved.".to_owned();
+                s.say_no_previous_view();
             }
         })
         .transparent(),
+        cmd("view.zoom", "Zoom", |s| s.start_zoom()).checked(|s| s.is_running("ZOOM")),
         toggle_command!("view.grid", "Grid", show_grid)
             .key("F7")
             .transparent(),
