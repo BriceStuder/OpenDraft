@@ -4,7 +4,7 @@
 
 use eframe::egui;
 
-use super::command_line::MARGIN;
+use super::command_line::{LOG_CLEARANCE, MARGIN};
 use super::panels::PanelViewer;
 use crate::dock::{self, LayoutRequest, PanelTab, Strip};
 
@@ -45,7 +45,12 @@ impl StripRows {
 
     /// Height of a strip showing `lines` of history above its input row.
     pub fn height(&self, lines: usize) -> f32 {
-        2.0 * MARGIN + lines as f32 * (self.log + self.gap) + self.input + self.tabs
+        // Lines have a gap between them and the clearance under the last.
+        let log = match lines {
+            0 => 0.0,
+            n => n as f32 * (self.log + self.gap) - self.gap + LOG_CLEARANCE,
+        };
+        2.0 * MARGIN + log + self.input + self.tabs
     }
 }
 
@@ -239,8 +244,11 @@ mod tests {
 
     #[test]
     fn the_least_strip_is_two_lines_of_history_and_the_input_row() {
-        // Margins, two lines each with the space under it, and the row.
-        assert_eq!(ROWS.height(2), 4.0 + 18.0 + 18.0 + 26.0 + 4.0);
+        // Margins, two lines with a gap between, the clearance and the row.
+        assert_eq!(
+            ROWS.height(2),
+            4.0 + 14.0 + 4.0 + 14.0 + LOG_CLEARANCE + 26.0 + 4.0
+        );
         assert_eq!(ROWS.height(0), 4.0 + 26.0 + 4.0);
         let with_tabs = StripRows { tabs: 30.0, ..ROWS };
         assert_eq!(with_tabs.height(2), ROWS.height(2) + 30.0);

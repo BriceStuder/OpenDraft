@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::command_line::LOG_CLEARANCE;
 use crate::app::command_line_strip::StripRows;
 use crate::dock::{LayoutRequest, PanelTab, Strip};
 
@@ -182,7 +183,7 @@ fn the_input_row_shows_whole_at_every_height_of_the_strip() {
     assert_eq!(check(&app, "at the least height"), under);
     let row = ctx.read_response(input).unwrap().rect;
     let above = row.center().y - rows.input / 2.0 - panel.top();
-    let two_lines = 4.0 + 2.0 * (rows.log + rows.gap);
+    let two_lines = 4.0 + 2.0 * rows.log + rows.gap + LOG_CLEARANCE;
     assert!((above - two_lines).abs() < 1.5, "{above} for {two_lines}");
     // Collapsed by the chevron: the row alone.
     app.state.cmdline.resize = Some(true);
