@@ -1,16 +1,13 @@
-<!-- @license lucide-static v0.469.0 - ISC -->
-<svg
-  class="lucide lucide-arrow-up-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M7 7h10v10" />
-  <path d="M7 17 17 7" />
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g id="annotate-leader" transform="matrix(1,0,0,1,-0.002906,74)">
+        <rect x="0.003" y="-74" width="64" height="64" style="fill:none;"/>
+        <g transform="matrix(1.053134,0,0,1.367537,0.226687,-94.137287)">
+            <path d="M18.638,44.484L22.157,46.554L10.003,51.005L12.384,40.804L15.966,42.912L34.418,24.46C34.737,24.142 35.229,23.956 35.75,23.956L47.503,23.956C48.431,23.956 49.184,24.536 49.184,25.25C49.184,25.964 48.431,26.544 47.503,26.544L36.577,26.544L18.638,44.484Z" style="fill:rgb(243,243,243);"/>
+        </g>
+        <g transform="matrix(-0.794679,-0.60703,0.60703,-0.794679,65.978864,59.157123)">
+            <path d="M94.523,33.393L100.999,46L88.047,46L94.523,33.393ZM94.523,41.141L93.846,42.46L95.201,42.46L94.523,41.141Z" style="fill:rgb(243,243,243);"/>
+        </g>
+    </g>
 </svg>
