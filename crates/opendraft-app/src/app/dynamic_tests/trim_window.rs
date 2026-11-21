@@ -56,7 +56,7 @@ fn the_click_that_ends_a_trim_window_does_not_start_another() {
 
     let prompt = app.state.cmd_prompt().text;
     assert!(
-        prompt.starts_with("Select object to trim"),
+        prompt.starts_with("Quick mode, select object to trim"),
         "{prompt} after {:?}",
         app.state.cmdline.log
     );

@@ -1,13 +1,16 @@
 //! TRIM and EXTEND: change objects against the edges other objects make. As in
-//! AutoCAD's Quick mode, every object is an edge unless some were selected
-//! before the command; then the command asks for objects to change, and
-//! Shift-click does the other one's job. Written against the `Editor` like the other commands; the
-//! geometry is `opendraft_core`'s `intersections`, `split_at` and `extended_to`.
+//! AutoCAD, two modes (`TRIMEXTENDMODE`, the mOde option): in Quick mode every
+//! object is an edge without asking, in Standard mode the command asks for the
+//! edges first; objects selected before the command are the edges in both.
+//! Then it asks for objects to change, and Shift-click does the other one's
+//! job. Written against the `Editor` like the other commands; the geometry is
+//! `opendraft_core`'s `intersections`, `split_at` and `extended_to`.
 
 use opendraft_canvas::Region;
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked, Swept};
 use opendraft_core::{End, Entity, EntityId, Point};
 
+use crate::defaults::EditorDefaults;
 use crate::edges_sweep::{ask_fence, ask_window, change_swept, edges_for, put_back};
 use crate::text::plural;
 
@@ -70,23 +73,38 @@ pub fn trim_plan(
 /// Why `trim_plan` cannot trim an object that no edge crosses.
 const NO_EDGE: &str = "Object does not intersect an edge.";
 
-/// What TRIM (or EXTEND) leaves of `target`. When every object is an edge
-/// (`quick`: none was selected before the command), trimming an object that
-/// no edge crosses erases it, as in AutoCAD's Quick mode.
+/// What TRIM (or EXTEND) leaves of `target`. With `erase` (Quick mode with
+/// every object as an edge), trimming an object that no edge divides erases
+/// it, as in AutoCAD: one that nothing crosses, or one an edge only touches
+/// at an end.
 pub(crate) fn plan(
     mode: Mode,
     target: &Entity,
     others: &[Entity],
     at: Point,
-    quick: bool,
+    erase: bool,
 ) -> Result<Vec<Entity>, &'static str> {
     match mode {
         Mode::Trim => match trim_plan(target, others, at) {
-            Err(NO_EDGE) if quick => Ok(Vec::new()),
+            Err(NO_EDGE) if erase => Ok(Vec::new()),
+            Err(_) if erase && undivided(target, others) => Ok(Vec::new()),
             made => made,
         },
         Mode::Extend => extend_plan(target, others, at),
     }
+}
+
+/// Whether edges meet `target` without dividing it (a line touched at an
+/// end, a circle cut once), so the whole of it is the part clicked.
+fn undivided(target: &Entity, others: &[Entity]) -> bool {
+    if matches!(target, Entity::Spline(_)) {
+        return false;
+    }
+    let crossings: Vec<Point> = others
+        .iter()
+        .flat_map(|other| target.intersections(other))
+        .collect();
+    !crossings.is_empty() && target.split_at(&crossings).len() < 2
 }
 
 /// The index of the piece nearest `at`.
@@ -163,59 +181,71 @@ impl Mode {
     }
 }
 
-/// TRIM: click the part of each object to remove, against every object, or
-/// against the objects selected before the command. With every object as
-/// edges, an object that nothing crosses is erased. Shift-click extends instead. A path dragged from
-/// empty space (or the Fence option) trims every object it crosses; a click
-/// in empty space starts a crossing window that
-/// trims every object it touches (see `edges_sweep.rs`). Each click or
-/// gesture is its own undo step; Undo takes back the last one; Enter or Esc
-/// ends.
+/// TRIM: click the part of each object to remove. Shift-click extends
+/// instead. A path dragged from empty space (or the Fence option) trims every
+/// object it crosses; a click in empty space starts a crossing window that
+/// trims every object it touches (see `edges_sweep.rs`). In Quick mode with
+/// every object as an edge, an object that nothing divides is erased. Each
+/// click or gesture is its own undo step; Undo takes back the last one; Enter
+/// or Esc ends.
 pub fn trim_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     edit_against_edges(
         ed,
         Mode::Trim,
-        "Select object to trim or shift-select to extend",
+        "Select cutting edges or <select all>",
+        "select object to trim or shift-select to extend",
     )
 }
 
-/// EXTEND: click each object near the end to lengthen, against every object,
-/// or against the objects selected before the command. Shift-click trims instead.
+/// EXTEND: click each object near the end to lengthen. Shift-click trims
+/// instead.
 pub fn extend_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     edit_against_edges(
         ed,
         Mode::Extend,
-        "Select object to extend or shift-select to trim",
+        "Select boundary edges or <select all>",
+        "select object to extend or shift-select to trim",
     )
 }
 
-fn edit_against_edges(ed: &mut Editor, mode: Mode, object_message: &str) -> Result<(), Cancelled> {
-    // AutoCAD's Quick mode: objects selected before the command are the
-    // edges; with none, every object is one (`None`), without asking.
-    let chosen = ed.pickset().to_vec();
-    let edges = (!chosen.is_empty()).then_some(chosen);
-    match &edges {
-        Some(ids) => ed.say(format!(
-            "Using the {} selected as edges.",
-            plural(ids.len(), "object")
-        )),
-        None => ed.say("Using every object as an edge."),
-    }
+fn edit_against_edges(
+    ed: &mut Editor,
+    mode: Mode,
+    edges_message: &str,
+    object_message: &str,
+) -> Result<(), Cancelled> {
+    let mut quick = ed.defaults().trim.get().quick;
+    let mut edges = choose_edges(ed, quick, ed.pickset().to_vec(), edges_message)?;
     let mut changed = 0_usize;
     loop {
+        // The mode first, as a reminder: "Quick mode, select object to trim".
+        let named = if quick { "Quick mode" } else { "Standard mode" };
         // No Crossing option: a click in empty space starts the window.
-        let mut options = Options::<Swept>::new(object_message).keyword("Fence", "F");
+        let mut options = Options::<Swept>::new(format!("{named}, {object_message}"))
+            .keyword("Fence", "F")
+            .keyword("mOde", "O");
         if changed > 0 {
             options = options.keyword("Undo", "U");
         }
         let doing = |shift: bool| if shift { mode.other() } else { mode };
+        // Quick mode with every object as an edge erases what nothing divides.
+        let erase = quick && edges.is_none();
         let done = match ed.ask_object_or_sweep(options) {
             Err(Cancelled) | Ok(Answer::Enter) => return Ok(()),
             Ok(Answer::Keyword(word)) => match word.as_str() {
                 "Fence" => match ask_fence(ed)? {
-                    Some(path) => change_swept(ed, &edges, mode, Region::Fence(path))? > 0,
+                    Some(path) => change_swept(ed, &edges, mode, Region::Fence(path), erase)? > 0,
                     None => false,
                 },
+                "mOde" => {
+                    let now = ask_mode(ed, quick)?;
+                    if now != quick {
+                        quick = now;
+                        ed.defaults().trim.change(|m| m.quick = now);
+                        edges = choose_edges(ed, quick, Vec::new(), edges_message)?;
+                    }
+                    false
+                }
                 _ => {
                     ed.undo()?;
                     changed -= 1;
@@ -223,14 +253,15 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode, object_message: &str) -> Resu
                 }
             },
             Ok(Answer::Value(Swept::Object(picked))) => {
-                change_one(ed, &edges, doing(picked.shift), picked)?
+                change_one(ed, &edges, doing(picked.shift), picked, erase)?
             }
             Ok(Answer::Value(Swept::Missed { at, shift })) => {
                 let corners = ask_window(ed, at)?;
-                change_swept(ed, &edges, doing(shift), Region::Crossing(corners))? > 0
+                let region = Region::Crossing(corners);
+                change_swept(ed, &edges, doing(shift), region, erase)? > 0
             }
             Ok(Answer::Value(Swept::Path { points, shift })) => {
-                change_swept(ed, &edges, doing(shift), Region::Fence(points))? > 0
+                change_swept(ed, &edges, doing(shift), Region::Fence(points), erase)? > 0
             }
         };
         if done {
@@ -239,19 +270,59 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode, object_message: &str) -> Resu
     }
 }
 
+/// The edges: the objects selected before the command (`chosen`); with none,
+/// every object (`None`) in Quick mode, or those the user selects in Standard
+/// mode, where Enter takes every object.
+fn choose_edges(
+    ed: &Editor,
+    quick: bool,
+    chosen: Vec<EntityId>,
+    edges_message: &str,
+) -> Result<Option<Vec<EntityId>>, Cancelled> {
+    let chosen = if chosen.is_empty() && !quick {
+        ed.ask_selection(Options::<()>::new(edges_message).allow_empty())?
+    } else {
+        chosen
+    };
+    if chosen.is_empty() {
+        ed.say("Using every object as an edge.");
+        return Ok(None);
+    }
+    ed.say(format!(
+        "Using the {} selected as edges.",
+        plural(chosen.len(), "object")
+    ));
+    Ok(Some(chosen))
+}
+
+/// The mOde option: Quick or Standard, the current one by default.
+fn ask_mode(ed: &Editor, quick: bool) -> Result<bool, Cancelled> {
+    let current = if quick { "Quick" } else { "Standard" };
+    let options = Options::<String>::new("Enter a trim mode option")
+        .keyword("Quick", "Q")
+        .keyword("Standard", "S")
+        .default(current.to_owned());
+    Ok(match ed.ask_keyword(options)?.as_deref() {
+        Some("Quick") => true,
+        Some("Standard") => false,
+        _ => quick,
+    })
+}
+
 /// Trim or extend the picked object. Returns whether the drawing changed.
 fn change_one(
     ed: &Editor,
     edges: &Option<Vec<EntityId>>,
     mode: Mode,
     picked: Picked,
+    erase: bool,
 ) -> Result<bool, Cancelled> {
     let Picked { id, at, .. } = picked;
     let edges = edges.clone();
     let plan = ed.read(move |doc| {
         let target = doc.object(id)?;
         let others = edges_for(doc, &edges, id);
-        let made = plan(mode, &target.entity, &others, at, edges.is_none());
+        let made = plan(mode, &target.entity, &others, at, erase);
         Some(made.map(|left| (target.attrs.clone(), left)))
     })?;
     let (attrs, left) = match plan {
@@ -481,7 +552,10 @@ mod tests {
     fn every_object_is_an_edge_without_asking_and_each_click_is_one_undo_step() {
         let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(4.0), wall(6.0)]);
         assert!(state.cmdline.log.iter().any(|l| l.contains("every object")));
-        assert!(state.cmd_prompt().text.starts_with("Select object to trim"));
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Quick mode, select object to trim"));
         let target = id(&state, 0);
         state.answer_object(p(5.0, 0.0), Some(target), false);
         state.settle_command();
@@ -515,7 +589,10 @@ mod tests {
         state.start_command("Trim", trim_objects);
         state.settle_command();
         // Straight to choosing what to trim, using only the selected wall.
-        assert!(state.cmd_prompt().text.starts_with("Select object to trim"));
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Quick mode, select object to trim"));
         assert!(state
             .cmdline
             .log
@@ -534,7 +611,7 @@ mod tests {
         assert!(state
             .cmd_prompt()
             .text
-            .starts_with("Select object to extend"));
+            .starts_with("Quick mode, select object to extend"));
     }
 
     #[test]
@@ -564,6 +641,81 @@ mod tests {
             .last()
             .unwrap()
             .contains("No boundary in the way"));
+    }
+
+    #[test]
+    fn with_every_object_as_edges_trim_erases_a_line_an_edge_only_touches_at_its_end() {
+        // AutoCAD 2027: a slanted line that ends on a long one is erased.
+        let edge = line(p(-5.0, 5.0), p(15.0, 5.0));
+        let slanted = line(p(0.0, 0.0), p(3.0, 5.0));
+        let mut state = trimming(&[edge.clone(), slanted.clone()]);
+        let target = id(&state, 1);
+        state.answer_object(p(1.5, 2.5), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state), vec![edge.clone()]);
+
+        // With the long line selected as the edge, it is not erased.
+        let mut state = AppState::new();
+        for e in [edge, slanted] {
+            state.add_entity(e);
+        }
+        state.select_ids([id(&state, 0)], false);
+        state.start_command("Trim", trim_objects);
+        state.settle_command();
+        let target = id(&state, 1);
+        state.answer_object(p(1.5, 2.5), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2);
+        assert!(state
+            .cmdline
+            .log
+            .last()
+            .unwrap()
+            .contains("cannot be trimmed there"));
+    }
+
+    #[test]
+    fn the_mode_option_switches_to_standard_which_asks_for_edges_and_erases_nothing() {
+        let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(40.0)]);
+        assert!(state.cmd_prompt().options.iter().any(|o| o.label == "mOde"));
+        state.cmd_submit("o");
+        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Enter a trim mode option"));
+        state.cmd_submit("s");
+        state.settle_command();
+        assert!(state.cmd_prompt().text.starts_with("Select cutting edges"));
+        assert!(!state.defaults().trim.get().quick, "remembered");
+        state.answer_enter();
+        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Standard mode, select object to trim"));
+        let target = id(&state, 0);
+        state.answer_object(p(5.0, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2, "Standard mode erases nothing");
+        // The next TRIM starts in Standard mode, asking for the edges.
+        state.cancel();
+        state.cancel();
+        state.start_command("Trim", trim_objects);
+        state.settle_command();
+        assert!(state.cmd_prompt().text.starts_with("Select cutting edges"));
+        // And back to Quick.
+        state.answer_enter();
+        state.settle_command();
+        state.cmd_submit("o");
+        state.settle_command();
+        state.cmd_submit("q");
+        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Quick mode, select object to trim"));
+        assert!(state.defaults().trim.get().quick);
     }
 
     #[test]
