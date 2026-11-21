@@ -213,6 +213,8 @@ icons! {
     LAYER_THAW_ALL = '\u{e17b}';
     LAYER_UNISOLATE = '\u{e256}';
     LAYER_UNLOCK = '\u{e10f}';
+    /// New layout, after the Model and layout tabs.
+    LAYOUT_TABS_NEW = '\u{e140}';
     MANAGE_SETTINGS = '\u{e157}';
     MODIFY_ARRAY_PATH = '\u{e282}';
     MODIFY_ARRAY_POLAR = '\u{e4b6}';

@@ -35,9 +35,9 @@ impl StripRows {
         Self {
             log: ctx.fonts(|f| f.row_height(&font)).ceil(),
             gap: spacing.item_spacing.y,
-            input: spacing.interact_size.y.max(22.0),
+            input: super::command_line::INPUT_ROW_HEIGHT,
             tabs: match strip {
-                Some(Strip::Below) => spacing.interact_size.y + 2.0 * TABS_MARGIN,
+                Some(Strip::Below) => crate::layout_tabs::TAB_HEIGHT + 2.0 * TABS_MARGIN,
                 _ => 0.0,
             },
         }
@@ -127,9 +127,15 @@ impl PanelViewer<'_> {
         over.interact(tab_bar, id.with("cover"), egui::Sense::click_and_drag())
             .on_hover_cursor(egui::CursorIcon::Default);
         let painter = over.painter().clone();
-        painter.rect_filled(whole, 0.0, colors.sidebar_bg);
-        painter.rect_filled(grip, 0.0, colors.tab_strip());
-        painter.rect_filled(tabs, 0.0, colors.tab_strip());
+        // Grip and log share one recessed tone, with a line along the top
+        // to part the strip from the drawing, as along the layout tabs.
+        painter.rect_filled(whole, 0.0, super::command_line::log_fill(theme));
+        let edge = egui::Stroke::new(1.0_f32, colors.border);
+        painter.hline(whole.x_range(), whole.top() + 0.5, edge);
+        painter.rect_filled(tabs, 0.0, crate::layout_tabs::bar_fill(theme));
+        if tabs.height() > 0.0 {
+            crate::layout_tabs::paint_bar_line(&painter, theme, tabs);
+        }
 
         let (close_rect, handle_rect) = grip.split_top_bottom_at_y(grip.top() + GRIP_WIDTH);
         let handle = over
