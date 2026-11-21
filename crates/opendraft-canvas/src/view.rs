@@ -183,10 +183,7 @@ impl View {
         // A double click of the wheel zooms to the extents, as in AutoCAD.
         // It only moves the view, so a running command carries on.
         if response.double_clicked_by(PointerButton::Middle) {
-            self.request = Some(Request::Extents);
-        }
-        if self.request.is_some() {
-            self.previous.new_step();
+            self.request_zoom_extents();
         }
 
         let mut layout_input = LayoutInput::default();
