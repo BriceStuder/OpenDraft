@@ -192,7 +192,7 @@ pub fn trim_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     edit_against_edges(
         ed,
         Mode::Trim,
-        "Select cutting edges or <select all>",
+        "select cutting edges first",
         "select object to trim or shift-select to extend",
     )
 }
@@ -203,7 +203,7 @@ pub fn extend_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     edit_against_edges(
         ed,
         Mode::Extend,
-        "Select boundary edges or <select all>",
+        "select boundary edges first",
         "select object to extend or shift-select to trim",
     )
 }
@@ -215,13 +215,11 @@ fn edit_against_edges(
     object_message: &str,
 ) -> Result<(), Cancelled> {
     let mut quick = ed.defaults().trim.get().quick;
-    let mut edges = choose_edges(ed, quick, ed.pickset().to_vec(), edges_message)?;
+    let mut edges = choose_edges(ed, &mut quick, ed.pickset().to_vec(), edges_message)?;
     let mut changed = 0_usize;
     loop {
-        // The mode first, as a reminder: "Quick mode, select object to trim".
-        let named = if quick { "Quick mode" } else { "Standard mode" };
         // No Crossing option: a click in empty space starts the window.
-        let mut options = Options::<Swept>::new(format!("{named}, {object_message}"))
+        let mut options = Options::<Swept>::new(with_mode(quick, object_message))
             .keyword("Fence", "F")
             .keyword("mOde", "O");
         if changed > 0 {
@@ -238,11 +236,8 @@ fn edit_against_edges(
                     None => false,
                 },
                 "mOde" => {
-                    let now = ask_mode(ed, quick)?;
-                    if now != quick {
-                        quick = now;
-                        ed.defaults().trim.change(|m| m.quick = now);
-                        edges = choose_edges(ed, quick, Vec::new(), edges_message)?;
+                    if switch_mode(ed, &mut quick)? {
+                        edges = choose_edges(ed, &mut quick, Vec::new(), edges_message)?;
                     }
                     false
                 }
@@ -270,20 +265,39 @@ fn edit_against_edges(
     }
 }
 
+/// `message` after the mode, as a reminder: "Quick mode, select object to
+/// trim".
+fn with_mode(quick: bool, message: &str) -> String {
+    let named = if quick { "Quick mode" } else { "Standard mode" };
+    format!("{named}, {message}")
+}
+
 /// The edges: the objects selected before the command (`chosen`); with none,
 /// every object (`None`) in Quick mode, or those the user selects in Standard
-/// mode, where Enter takes every object.
+/// mode, where Enter takes every object and mOde can switch to Quick.
 fn choose_edges(
     ed: &Editor,
-    quick: bool,
-    chosen: Vec<EntityId>,
+    quick: &mut bool,
+    mut chosen: Vec<EntityId>,
     edges_message: &str,
 ) -> Result<Option<Vec<EntityId>>, Cancelled> {
-    let chosen = if chosen.is_empty() && !quick {
-        ed.ask_selection(Options::<()>::new(edges_message).allow_empty())?
-    } else {
-        chosen
-    };
+    while chosen.is_empty() && !*quick {
+        let options = Options::<()>::new(with_mode(false, edges_message))
+            .allow_empty()
+            .keyword("mOde", "O");
+        match ed.ask_selection_or_keyword(options, "select all")? {
+            Answer::Value(ids) => {
+                if ids.is_empty() {
+                    break;
+                }
+                chosen = ids;
+            }
+            Answer::Keyword(_) => {
+                switch_mode(ed, quick)?;
+            }
+            Answer::Enter => break,
+        }
+    }
     if chosen.is_empty() {
         ed.say("Using every object as an edge.");
         return Ok(None);
@@ -295,18 +309,25 @@ fn choose_edges(
     Ok(Some(chosen))
 }
 
-/// The mOde option: Quick or Standard, the current one by default.
-fn ask_mode(ed: &Editor, quick: bool) -> Result<bool, Cancelled> {
-    let current = if quick { "Quick" } else { "Standard" };
+/// The mOde option: Quick or Standard, the current one by default. The
+/// choice is remembered (`TRIMEXTENDMODE`). Returns whether it changed.
+fn switch_mode(ed: &Editor, quick: &mut bool) -> Result<bool, Cancelled> {
+    let current = if *quick { "Quick" } else { "Standard" };
     let options = Options::<String>::new("Enter a trim mode option")
         .keyword("Quick", "Q")
         .keyword("Standard", "S")
         .default(current.to_owned());
-    Ok(match ed.ask_keyword(options)?.as_deref() {
+    let now = match ed.ask_keyword(options)?.as_deref() {
         Some("Quick") => true,
         Some("Standard") => false,
-        _ => quick,
-    })
+        _ => *quick,
+    };
+    if now == *quick {
+        return Ok(false);
+    }
+    *quick = now;
+    ed.defaults().trim.change(|m| m.quick = now);
+    Ok(true)
 }
 
 /// Trim or extend the picked object. Returns whether the drawing changed.
@@ -686,7 +707,10 @@ mod tests {
             .starts_with("Enter a trim mode option"));
         state.cmd_submit("s");
         state.settle_command();
-        assert!(state.cmd_prompt().text.starts_with("Select cutting edges"));
+        assert_eq!(
+            state.cmd_prompt().plain(),
+            "TRIM Standard mode, select cutting edges first or <select all> [mOde]:"
+        );
         assert!(!state.defaults().trim.get().quick, "remembered");
         state.answer_enter();
         state.settle_command();
@@ -703,10 +727,11 @@ mod tests {
         state.cancel();
         state.start_command("Trim", trim_objects);
         state.settle_command();
-        assert!(state.cmd_prompt().text.starts_with("Select cutting edges"));
-        // And back to Quick.
-        state.answer_enter();
-        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Standard mode, select cutting edges first"));
+        // And back to Quick from the edge question: no edges asked any more.
         state.cmd_submit("o");
         state.settle_command();
         state.cmd_submit("q");
