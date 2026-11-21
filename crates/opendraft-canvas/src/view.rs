@@ -37,6 +37,7 @@ mod layout;
 mod paint;
 mod path_stroke;
 mod point_paint;
+mod previous;
 mod snap_choice;
 mod snap_marker;
 mod sweep;
@@ -98,6 +99,8 @@ pub struct View {
     /// button is down (see `sweep.rs`).
     sweep: Option<Vec<Pos2>>,
     request: Option<Request>,
+    /// The views ZOOM Previous goes back to.
+    previous: previous::Previous,
     /// Set while a running command waits for a point.
     point_prompt: Option<PointPrompt>,
     /// Set while a running command waits for objects to be selected.
@@ -182,6 +185,9 @@ impl View {
         if response.double_clicked_by(PointerButton::Middle) {
             self.request = Some(Request::Extents);
         }
+        if self.request.is_some() {
+            self.previous.new_step();
+        }
 
         let mut layout_input = LayoutInput::default();
         if in_layout {
@@ -206,6 +212,7 @@ impl View {
         if !in_layout {
             self.wheel_zoom(ui, rect, response.hovered(), pointer);
         }
+        self.note_view(ui.input(|i| i.time));
 
         let tolerance = self.sizes.pick / self.camera.zoom;
         let cursor = pointer.map(|p| self.camera.screen_to_world(p, rect));
