@@ -95,26 +95,35 @@ impl CommandLine {
         self.say(format!("Command: {}", label.to_uppercase()));
     }
 
+    /// A command was run: echo it and remember it. One run inside another
+    /// command (a zoom inside LINE) is not the one Enter repeats next.
+    pub fn note_run(&mut self, id: &'static str, label: &str, transparent: bool) {
+        let name = echo_name(id, label);
+        self.echo_command(name);
+        if !transparent {
+            self.note_last(id);
+        }
+        self.note_recent(id);
+        self.note_typed(&name.to_uppercase());
+    }
+
+    /// Remember a command started with no other command running, for Enter
+    /// to repeat. As in AutoCAD that is any command (U, ZOOM, LAYOFF,
+    /// PLOT...), except the switches and panels, which are settings rather
+    /// than commands: repeating F7 would only turn the grid back off.
+    pub fn note_last(&mut self, id: &'static str) {
+        let view = id.starts_with("view.");
+        let moves_the_view = id.starts_with("view.zoom") || id == "view.pan";
+        if (view && !moves_the_view) || id == "tool.select" || id == "edit.cancel" {
+            return;
+        }
+        self.last_command = Some(id);
+    }
+
     /// Remember a command run from the ribbon or the command line. Only
     /// commands that make something are kept, newest first, once each.
     pub fn note_recent(&mut self, id: &'static str) {
         const KEPT: usize = 6;
-        // Enter repeats the last drawing, editing, annotation, dimension,
-        // block or inquiry command (TEXT, DIMLINEAR, INSERT, DIST...).
-        if [
-            "draw.",
-            "select.",
-            "modify.",
-            "annotate.",
-            "dim.",
-            "block.",
-            "inquiry.",
-        ]
-        .iter()
-        .any(|prefix| id.starts_with(prefix))
-        {
-            self.last_command = Some(id);
-        }
         if ["edit.", "view.", "file.", "tool.", "layer."]
             .iter()
             .any(|prefix| id.starts_with(prefix))
@@ -415,12 +424,12 @@ mod tests {
             "block.insert",
             "inquiry.distance",
         ] {
-            line.note_recent("draw.line");
-            line.note_recent(id);
+            line.note_last("draw.line");
+            line.note_last(id);
             assert_eq!(line.last_command, Some(id));
         }
         // Settings and view changes leave the command to repeat alone.
-        line.note_recent("view.grid");
+        line.note_last("view.grid");
         assert_eq!(line.last_command, Some("inquiry.distance"));
     }
 
