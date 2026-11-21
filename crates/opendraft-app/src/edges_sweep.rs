@@ -130,6 +130,7 @@ pub(crate) fn change_swept(
     edges: &Option<Vec<EntityId>>,
     mode: Mode,
     region: Region,
+    erase: bool,
 ) -> Result<usize, Cancelled> {
     let edges = edges.clone();
     let name = match mode {
@@ -162,7 +163,7 @@ pub(crate) fn change_swept(
                 continue;
             };
             let others = edges_for(doc, &edges, target.id);
-            if let Ok(left) = plan(mode, &target.entity, &others, at, edges.is_none()) {
+            if let Ok(left) = plan(mode, &target.entity, &others, at, erase) {
                 let (id, attrs) = (target.id, target.attrs.clone());
                 put_back(tx, id, attrs, left);
                 done += 1;
