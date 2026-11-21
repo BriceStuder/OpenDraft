@@ -405,15 +405,16 @@ impl PanelViewer<'_> {
         let doc = &self.state.docs[self.state.active];
         let (document, space) = (&doc.session.document(), doc.view.space());
         let mut action = None;
-        egui::TopBottomPanel::bottom("layout_tabs")
+        let bar = egui::TopBottomPanel::bottom("layout_tabs")
             .frame(
                 egui::Frame::NONE
-                    .fill(self.theme.colors.tab_strip())
+                    .fill(crate::layout_tabs::bar_fill(self.theme))
                     .inner_margin(egui::Margin::symmetric(6, 2)),
             )
             .show_inside(ui, |ui| {
                 action = crate::layout_tabs::show(ui, self.theme, document, space);
             });
+        crate::layout_tabs::paint_bar_line(ui.painter(), self.theme, bar.response.rect);
         if let Some(action) = action {
             crate::layout_tabs::apply(self.state, action);
         }
