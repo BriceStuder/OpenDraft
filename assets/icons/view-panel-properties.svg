@@ -1,15 +1,21 @@
-<!-- @license lucide-static v0.469.0 - ISC -->
-<svg
-  class="lucide lucide-rectangle-vertical"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect width="12" height="20" x="6" y="2" rx="2" />
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 65 65" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1,0,0,1,-73,-1035)">
+        <g id="view-panel-properties" transform="matrix(1,0,0,1,-40.120055,73.82441)">
+            <rect x="114" y="962.034" width="64" height="64" style="fill:none;"/>
+            <g transform="matrix(1.745787,0,0,1.86559,63.772474,360.40463)">
+                <path d="M58.486,354.361L35.863,354.361L35.863,325.108L58.397,325.108L58.486,354.361ZM55.489,327.829L38.768,327.829L38.768,339.394L55.489,339.394L55.489,327.829Z" style="fill:rgb(243,243,243);"/>
+            </g>
+            <g transform="matrix(1.665741,0,0,1.89282,67.759073,352.532865)">
+                <rect x="39" y="328" width="16" height="10" style="fill:rgb(115,197,255);"/>
+            </g>
+            <g transform="matrix(-1.745229,0,0,1.745229,228.305226,401.267066)">
+                <path d="M41.678,343.75L38.769,343.75L38.769,343.023L41.678,343.023L41.678,340.841L43.132,340.841L43.132,343.023L55.495,343.023L55.495,343.75L43.132,343.75L43.132,345.932L41.678,345.932L41.678,343.75Z" style="fill:rgb(101,101,101);"/>
+            </g>
+            <g transform="matrix(1.745229,0,0,1.745229,63.792542,412.689288)">
+                <path d="M41.678,343.75L38.769,343.75L38.769,343.023L41.678,343.023L41.678,340.841L43.132,340.841L43.132,343.023L55.495,343.023L55.495,343.75L43.132,343.75L43.132,345.932L41.678,345.932L41.678,343.75Z" style="fill:rgb(101,101,101);"/>
+            </g>
+        </g>
+    </g>
 </svg>

@@ -1,19 +1,21 @@
-<!-- @license lucide-static v0.469.0 - ISC -->
-<svg
-  class="lucide lucide-file-text"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-  <path d="M10 9H8" />
-  <path d="M16 13H8" />
-  <path d="M16 17H8" />
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1,0,0,1,-148,-814)">
+        <rect id="format-properties" x="148" y="814" width="64" height="64" style="fill:none;"/>
+        <g id="format-properties1" affinity:id="format-properties">
+            <g transform="matrix(1,0,0,1,152.987119,216.007785)">
+                <path d="M48.003,617L48.003,650L29.056,650L29.019,624.063L12.003,623.984L12.003,604L35.003,604L35.003,617L48.003,617ZM36,604L36.003,604L48.003,616L36,616L36,604Z" style="fill:rgb(243,243,243);"/>
+            </g>
+            <g transform="matrix(1.000319,0,0,1.068966,122.955909,493.578422)">
+                <path d="M58,325L58,354L36,354L36,325L58,325ZM54.994,328L38.999,328L38.999,339L54.994,339L54.994,328Z" style="fill:rgb(243,243,243);"/>
+            </g>
+            <g transform="matrix(0.875,0,0,1,128.842408,516.992215)">
+                <rect x="39" y="328" width="16" height="10" style="fill:rgb(115,197,255);"/>
+            </g>
+            <g transform="matrix(1,0,0,1,122.967408,516.992215)">
+                <path d="M41.994,344L39,344L39,343L41.994,343L41.994,340.994L42.994,340.994L42.994,343L55,343L55,344L42.994,344L42.994,346L41.994,346L41.994,344ZM51.994,350.006L39,350.006L39,349.006L51.994,349.006L51.994,347L52.994,347L52.994,349.006L55,349.006L55,350.006L52.994,350.006L52.994,352.006L51.994,352.006L51.994,350.006Z" style="fill:rgb(101,101,101);"/>
+            </g>
+        </g>
+    </g>
 </svg>

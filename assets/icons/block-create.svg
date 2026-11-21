@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(1,0,0,1,-74,-370)">
-        <g id="block-create" transform="matrix(1,0,0,1,-39.997094,0)">
+    <g transform="matrix(1,0,0,1,-74,-444)">
+        <g id="block-create" transform="matrix(1,0,0,1,-39.997094,74)">
             <rect x="114" y="370" width="64" height="64" style="fill:none;"/>
             <g transform="matrix(1,0,0,1,114,0)">
                 <path d="M43,395.177L43,402.664C49.797,403.744 55,409.638 55,416.737C55,424.602 48.615,430.987 40.75,430.987C33.655,430.987 27.764,425.791 26.679,419L7,419C6.448,419 6,418.552 6,418L6,393C6,392.448 6.448,392 7,392L37.808,392L37.185,392.998C36.99,393.311 36.869,393.652 36.818,394L8,394L8,417L26.502,417L26.5,416.737C26.5,408.872 32.885,402.487 40.75,402.487L41,402.489L41,396.425L43,395.177ZM28.709,419C29.772,424.682 34.762,428.987 40.75,428.987C47.511,428.987 53,423.498 53,416.737C53,410.745 48.688,405.751 43,404.694L43,418C43,418.552 42.552,419 42,419L28.709,419ZM28.503,417L41,417L41,404.49L40.75,404.487C33.989,404.487 28.5,409.976 28.5,416.737L28.503,417Z" style="fill:white;"/>

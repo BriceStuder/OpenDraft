@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">
-    <g transform="matrix(1,0,0,1,-592,-888)">
-        <rect id="osnap-insertion" x="592" y="888" width="64" height="64" style="fill:none;"/>
-        <g id="osnap-insertion1" affinity:id="osnap-insertion">
+    <g transform="matrix(1,0,0,1,-592,-962)">
+        <g id="osnap-insertion" transform="matrix(1,0,0,1,0,74)">
+            <rect x="592" y="888" width="64" height="64" style="fill:none;"/>
             <g transform="matrix(1,0,0,1,593.126864,509.01282)">
                 <path d="M27.56,418L7,418L7,393L42,393L42,403.545C48.728,404.176 54,409.846 54,416.737C54,424.05 48.063,429.987 40.75,429.987C33.863,429.987 28.196,424.721 27.56,418Z" style="fill:white;fill-opacity:0.4;"/>
             </g>

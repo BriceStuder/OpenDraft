@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(1,0,0,1,0,-370)">
-        <g id="block-insert" transform="matrix(1,0,0,1,0.002906,-40)">
+    <g transform="matrix(1,0,0,1,0,-444)">
+        <g id="block-insert" transform="matrix(1,0,0,1,0.002906,34)">
             <rect x="0" y="410" width="64" height="64" style="fill:none;"/>
             <g transform="matrix(1.037045,0,0,1,-1.074305,39)">
                 <path d="M55.994,413.985C55.989,406.993 48.283,402 45.393,401.458L45.393,391.736C45.393,390.777 44.643,390 43.719,390L29,390L29,378.006L45.393,378.006L45.396,389L55.994,389L55.994,413.985ZM47.321,378.006L55.994,387L47.321,387L47.321,378.006ZM55.994,413.985C55.994,413.99 55.994,413.995 55.994,414L55.994,413.985Z" style="fill:rgb(0,199,154);"/>
