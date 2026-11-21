@@ -15,6 +15,8 @@ OpenDraft is a native Linux program: it needs no interpreter and no runtime, and
 
 The programs in the .deb, AppImage and archive are built on Ubuntu 22.04, so they need glibc 2.35 or newer.
 
+**ARM (aarch64):** each release also has `linux-arm64.deb`, `linux-aarch64.AppImage` and `linux-aarch64.tar.gz`, built natively on an ARM runner from the same source. They suit 64-bit boards such as the Raspberry Pi 4 and 5 and are community-tested: please report problems.
+
 ## What it needs
 
 OpenDraft opens these libraries when it starts, so a bare system must have them. Desktop installations almost always do.

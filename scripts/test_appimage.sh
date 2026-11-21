@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run INSIDE a clean ubuntu:22.04 container (see .github/workflows/release.yml):
-#   scripts/test_appimage.sh /path/to/OpenDraft-<version>-linux-x86_64.AppImage
+#   scripts/test_appimage.sh /path/to/OpenDraft-<version>-linux-<machine>.AppImage (x86_64 or aarch64)
 # An AppImage brings the libraries the program opens at run time (the keyboard and
 # X11 input ones, listed in Cargo.toml under appimage `libs`); it relies on the
 # system for the window system's core (libX11, libxcb) and the graphics (libGL,

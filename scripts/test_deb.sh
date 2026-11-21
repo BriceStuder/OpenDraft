@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run INSIDE a clean ubuntu:22.04 container (see .github/workflows/release.yml), with
 # the repository mounted so the smoke test can run:
-#   scripts/test_deb.sh /path/to/OpenDraft-<version>-linux-amd64.deb
+#   scripts/test_deb.sh /path/to/OpenDraft-<version>-linux-<arch>.deb (amd64 or arm64)
 # Installs the package with only what it declares (plus a virtual display and a
 # software GL driver, which a desktop has), checks the files it should install,
 # then starts OpenDraft and checks it stays open. This is what tells us the

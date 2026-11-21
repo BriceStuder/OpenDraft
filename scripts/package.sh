@@ -10,7 +10,8 @@ cd "$(dirname "$0")/.."
 version=$(cargo pkgid -p opendraft-app | sed 's/.*[#@]//')
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) os=windows; ext=.exe ;;
-  Linux) os=linux; ext= ;;
+  # The x86_64 name stays plain "linux"; other CPUs (ARM) carry theirs.
+  Linux) os=linux; ext=; [ "$(uname -m)" = x86_64 ] || os="linux-$(uname -m)" ;;
   *) echo "unsupported system: $(uname -s)" >&2; exit 1 ;;
 esac
 name="OpenDraft-${version}-${os}"

@@ -79,7 +79,9 @@ jobs:
       matrix:
         # Linux is built on the oldest runner we offer so the program runs on
         # systems with an older glibc than the newest runner has.
-        os: [windows-latest, ubuntu-22.04]
+        # ubuntu-22.04-arm builds the 64-bit ARM Linux packages (Raspberry Pi 4/5 and
+        # other aarch64 boards) natively from the same source: no cross-compiling.
+        os: [windows-latest, ubuntu-22.04, ubuntu-22.04-arm]
     runs-on: ${{ matrix.os }}
     env:
       # The Windows programs carry their C runtime, so they run without the
@@ -104,7 +106,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-packager*
-          key: cargo-packager-0.11.8-${{ runner.os }}
+          key: cargo-packager-0.11.8-${{ runner.os }}-${{ runner.arch }}
       - name: Build cargo-packager
         if: ${{ !contains(needs.verify.outputs.version, '-') && steps.packager.outputs.cache-hit != 'true' }}
         run: cargo install cargo-packager --locked --version 0.11.8
@@ -140,28 +142,33 @@ jobs:
         run: |
           # The AppImage bundles these from the build machine (appimage `libs` in Cargo.toml).
           sudo apt-get install -y --no-install-recommends libxkbcommon0 libxkbcommon-x11-0 libxcursor1 libxi6 libx11-xcb1
+          # x86_64 / amd64 on Intel and AMD, aarch64 / arm64 on ARM.
+          machine=$(uname -m)
+          deb_arch=$(dpkg --print-architecture)
+          echo "MACHINE=$machine" >> "$GITHUB_ENV"
+          echo "DEB_ARCH=$deb_arch" >> "$GITHUB_ENV"
           cargo packager --release -f deb,appimage
           ls -la dist/packager
-          cp dist/packager/*.deb "dist/OpenDraft-${VERSION}-linux-amd64.deb"
-          cp dist/packager/*.AppImage "dist/OpenDraft-${VERSION}-linux-x86_64.AppImage"
-          chmod +x "dist/OpenDraft-${VERSION}-linux-x86_64.AppImage"
+          cp dist/packager/*.deb "dist/OpenDraft-${VERSION}-linux-${deb_arch}.deb"
+          cp dist/packager/*.AppImage "dist/OpenDraft-${VERSION}-linux-${machine}.AppImage"
+          chmod +x "dist/OpenDraft-${VERSION}-linux-${machine}.AppImage"
       - name: The .deb installs, works (the full smoke test) and removes cleanly on a bare Ubuntu 22.04
         if: runner.os == 'Linux' && !contains(needs.verify.outputs.version, '-')
         shell: bash
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
-          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD:/repo:ro" ubuntu:22.04             bash /repo/scripts/test_deb.sh "/dist/OpenDraft-${VERSION}-linux-amd64.deb"
+          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD:/repo:ro" ubuntu:22.04             bash /repo/scripts/test_deb.sh "/dist/OpenDraft-${VERSION}-linux-${DEB_ARCH}.deb"
       - name: The AppImage starts on a bare Ubuntu 22.04, bringing its own libraries
         if: runner.os == 'Linux' && !contains(needs.verify.outputs.version, '-')
         shell: bash
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
-          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/scripts:/scripts:ro" ubuntu:22.04             bash /scripts/test_appimage.sh "/dist/OpenDraft-${VERSION}-linux-x86_64.AppImage"
+          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/scripts:/scripts:ro" ubuntu:22.04             bash /scripts/test_appimage.sh "/dist/OpenDraft-${VERSION}-linux-${MACHINE}.AppImage"
       - uses: actions/upload-artifact@v4
         with:
-          name: OpenDraft-${{ runner.os }}
+          name: OpenDraft-${{ matrix.os }}
           path: |
             dist/*.zip
             dist/*.tar.gz
