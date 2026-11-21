@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use egui::{Color32, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, Ui};
 use opendraft_core::{
-    arc, bulge, width, Color, Document, Entity, EntityId, LayerId, LayoutId, Point, ViewportId,
+    arc, bulge, width, Bounds, Color, Document, Entity, EntityId, LayerId, LayoutId, Point,
+    ViewportId,
 };
 
 use crate::camera::Camera;
@@ -36,6 +37,7 @@ mod layout;
 mod paint;
 mod path_stroke;
 mod point_paint;
+mod previous;
 mod select_gesture;
 #[cfg(test)]
 mod select_gesture_tests;
@@ -74,6 +76,8 @@ const STEP_ZOOM: f64 = 1.5;
 enum Request {
     Extents,
     Zoom(f64),
+    /// ZOOM Window: two corners in the space being worked in.
+    Window(Point, Point),
 }
 
 /// Per-drawing view state.
@@ -106,6 +110,8 @@ pub struct View {
     /// button is down (see `sweep.rs`).
     sweep: Option<Vec<Pos2>>,
     request: Option<Request>,
+    /// The views ZOOM Previous goes back to.
+    previous: previous::Previous,
     /// Set while a running command waits for a point.
     point_prompt: Option<PointPrompt>,
     /// Set while a running command waits for objects to be selected.
@@ -188,7 +194,7 @@ impl View {
         // A double click of the wheel zooms to the extents, as in AutoCAD.
         // It only moves the view, so a running command carries on.
         if response.double_clicked_by(PointerButton::Middle) {
-            self.request = Some(Request::Extents);
+            self.request_zoom_extents();
         }
 
         let mut layout_input = LayoutInput::default();
@@ -200,6 +206,9 @@ impl View {
                     self.camera.fit(document.bounds(), rect);
                 }
                 Some(Request::Zoom(factor)) => self.camera.zoom_at(rect.center(), rect, factor),
+                Some(Request::Window(a, b)) => {
+                    self.camera.show_window(Bounds::from_points(a, b), rect);
+                }
                 None => {}
             }
             if response.dragged_by(PointerButton::Middle) {
@@ -214,6 +223,7 @@ impl View {
         if !in_layout {
             self.wheel_zoom(ui, rect, response.hovered(), pointer);
         }
+        self.note_view(ui.input(|i| i.time));
 
         let tolerance = self.sizes.pick / self.camera.zoom;
         let cursor = pointer.map(|p| self.camera.screen_to_world(p, rect));
@@ -221,6 +231,9 @@ impl View {
         let selecting = !prompting;
         let shift = ui.input(|i| i.modifiers.shift);
         let picking = self.point_prompt.as_ref().is_some_and(|p| p.pick);
+        // Grips belong to no command: a command asking for objects shows the
+        // selected ones highlighted, without grips to press, as in AutoCAD.
+        let grips_on = selecting && !self.selecting_objects;
         // What a click on an object prompt can pick (LAYULK reaches locked layers).
         let pick_object = match &self.point_prompt {
             Some(p) if p.pick && p.pick_locked => pick_visible_here,
@@ -279,10 +292,10 @@ impl View {
         self.snap_acquire.clear_if(placed.is_some());
         // A press on a grip of a selected object takes it instead of selecting.
         let grip_pick = pressed_at
-            .filter(|_| selecting && self.pending.is_none())
+            .filter(|_| grips_on && self.pending.is_none())
             .and_then(|at| grip_at(document, selection, at, self.sizes.grip / self.camera.zoom));
         let grip_hover = cursor
-            .filter(|_| selecting && self.drag.is_none())
+            .filter(|_| grips_on && self.drag.is_none())
             .and_then(|c| grip_at(document, selection, c, self.sizes.grip / self.camera.zoom));
         keep_selected(&mut self.warm, selection);
         let swallow = self.press_taken;
@@ -354,7 +367,7 @@ impl View {
             Some(clip) => painter.with_clip_rect(clip.intersect(rect)),
             None => painter,
         };
-        if selecting && self.drag.is_none() && self.pending.is_none() {
+        if grips_on && self.drag.is_none() && self.pending.is_none() {
             let marks = paint::GripMarks {
                 hovered: grip_hover,
                 warm: &self.warm,

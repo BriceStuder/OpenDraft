@@ -9,6 +9,8 @@ mod command_line_focus;
 mod command_line_strip;
 mod ctrl;
 mod dim_styles;
+mod enter_repeats;
+mod grips_at_select_objects;
 mod home_keyboard;
 mod home_layout;
 mod idle_at_prompt;

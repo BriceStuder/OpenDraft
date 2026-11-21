@@ -27,15 +27,25 @@ if ldd "$bin/opendraft" | grep -q "not found"; then
 fi
 
 fb=$(mktemp -d)
-display=:99
-Xvfb "$display" -screen 0 1600x1000x24 -fbdir "$fb" -nolisten tcp >"$out/$label-xvfb.log" 2>&1 &
+ready=$(mktemp)
+# -displayfd: Xvfb picks a free display and writes its number only once it
+# accepts connections. A fixed display raced the last run's server, still
+# shutting down: the new one refused its lock and the old socket looked ready.
+Xvfb -displayfd 3 -screen 0 1600x1000x24 -fbdir "$fb" -nolisten tcp \
+  3>"$ready" >"$out/$label-xvfb.log" 2>&1 &
 xvfb=$!
-trap 'kill "$xvfb" 2>/dev/null || true; rm -rf "$fb"' EXIT
+trap 'kill "$xvfb" 2>/dev/null || true; wait "$xvfb" 2>/dev/null || true; rm -rf "$fb" "$ready"' EXIT
 for _ in $(seq 100); do
-  [ -S "/tmp/.X11-unix/X${display#:}" ] && break
+  [ -s "$ready" ] && break
+  kill -0 "$xvfb" 2>/dev/null || break
   sleep 0.1
 done
-export DISPLAY=$display
+if [ ! -s "$ready" ]; then
+  echo "Xvfb did not start; its log:"
+  cat "$out/$label-xvfb.log"
+  exit 1
+fi
+export DISPLAY=":$(head -n 1 "$ready")"
 
 args=(--binary "$bin/opendraft" --mcp "$bin/opendraft-mcp"
       --sample "$repo/crates/opendraft-files/tests/fixtures/ezdxf_sample.dxf"
