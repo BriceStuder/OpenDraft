@@ -228,8 +228,8 @@ fn view() -> Tab {
                     )),
                     Column::Large(Item::new(
                         "view.panel_layers",
-                        "Layers",
-                        icons::VIEW_PANEL_LAYERS,
+                        "Layer Properties",
+                        icons::LAYER_PROPERTIES,
                     )),
                     Column::Large(Item::new(
                         "view.command_line",

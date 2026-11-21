@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(1,0,0,1,-74,-592)">
-        <rect id="edit-cut" x="74" y="592" width="64" height="64" style="fill:none;"/>
-        <g id="edit-cut1" affinity:id="edit-cut">
+    <g transform="matrix(1,0,0,1,-74,-666)">
+        <g id="edit-cut" transform="matrix(1,0,0,1,0,74)">
+            <rect x="74" y="592" width="64" height="64" style="fill:none;"/>
             <g transform="matrix(1,0,0,1,66,-7)">
                 <path d="M48.003,617L48.003,624.997C44.171,625.188 41.25,625.221 39.003,625.369C34.897,625.64 33.25,625.544 32,629L29,629L29,650L12.003,650L12.003,604L35.003,604L35.003,617L48.003,617ZM36,604L36.003,604L48.003,616L36,616L36,604Z" style="fill:rgb(243,243,243);"/>
             </g>

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(1,0,0,1,-518,-74)">
-        <g id="modify-matchprop" transform="matrix(1,0,0,1,-0.002906,0)">
+    <g transform="matrix(1,0,0,1,-518,-148)">
+        <g id="modify-matchprop" transform="matrix(1,0,0,1,-0.002906,74)">
             <rect x="518.003" y="74" width="64" height="64" style="fill:none;"/>
             <g transform="matrix(1.375571,0,0,1.469969,472.674213,-399.898907)">
                 <path d="M49.739,354.361L35.863,354.361L35.863,325.108L58.397,325.108L58.398,346.042L56.809,348.618C54.897,351.716 53.453,353.075 50.587,352.911C50.135,352.885 49.724,353.153 49.593,353.559C49.503,353.84 49.564,354.135 49.739,354.361ZM55.489,327.829L38.768,327.829L38.768,339.394L55.489,339.394L55.489,327.829Z" style="fill:rgb(243,243,243);"/>

@@ -12,8 +12,9 @@
 //! A drawing is either plain or coloured. A plain one (all its colours are
 //! grey or white, as Lucide's are) counts only for where it is opaque, and is
 //! painted in the colour asked for, so it follows the theme and dims when
-//! disabled. A coloured one (any clearly coloured part, such as a green point)
-//! is drawn in its own colours, only fading when disabled; `currentColor` in it
+//! disabled. A coloured one (any clearly coloured part, such as a green point,
+//! or greys clearly lighter and darker than each other, such as white marks on
+//! a dark grey body) is drawn in its own colours, only fading when disabled; `currentColor` in it
 //! is white. Each icon is rasterised the first time it is drawn at a size.
 
 use std::collections::HashMap;
@@ -151,15 +152,26 @@ pub fn rgba(data: &[u8], px: u32) -> Result<Vec<u8>, String> {
         .collect())
 }
 
-/// Whether the picture has a clearly coloured part (mostly opaque, so the
-/// soft edge of a grey shape never counts).
+/// Whether the picture has a clearly coloured part, or greys clearly lighter
+/// and darker than each other (a dark body with white marks on it, which a
+/// one-colour mask would fill in). Only mostly opaque pixels count, so the
+/// soft edge of a grey shape never does.
 fn is_coloured(pixmap: &tiny_skia::Pixmap) -> bool {
-    pixmap.pixels().iter().any(|p| {
+    let (mut lightest, mut darkest) = (0, 255);
+    for p in pixmap.pixels() {
         let c = p.demultiply();
+        if c.alpha() <= 128 {
+            continue;
+        }
         let (hi, lo) = ([c.red(), c.green(), c.blue()].into_iter())
             .fold((0, 255), |(h, l), v| (h.max(v), l.min(v)));
-        c.alpha() > 128 && hi - lo > COLOURED
-    })
+        if hi - lo > COLOURED {
+            return true;
+        }
+        lightest = lightest.max(hi);
+        darkest = darkest.min(hi);
+    }
+    lightest.saturating_sub(darkest) > COLOURED
 }
 
 /// The drawing as a `px` square image: its own colours, or for a plain one a
@@ -406,6 +418,11 @@ mod tests {
         );
         let grey = GREEN_DOT.replace("rgb(0,199,154)", "rgb(200,200,200)");
         assert!(!is_coloured(&render(grey.as_bytes(), 24).unwrap()));
+        let two_greys = GREEN_DOT.replace("rgb(0,199,154)", "rgb(64,64,64)");
+        assert!(
+            is_coloured(&render(two_greys.as_bytes(), 24).unwrap()),
+            "white on dark grey keeps both"
+        );
 
         let image = rasterise(GREEN_DOT.as_bytes(), 24, true).unwrap();
         assert_eq!(image.pixels[12 * 24 + 12], Color32::from_rgb(0, 199, 154));
