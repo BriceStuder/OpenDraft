@@ -69,7 +69,7 @@ fn matching(ed: &Editor, category: Category, patterns: &str) -> Result<Vec<Item>
 
 /// Whether to ask about each name first.
 fn verify(ed: &Editor) -> Result<bool, Cancelled> {
-    let options = Options::<String>::new("Verify each name to be purged? [Yes/No]")
+    let options = Options::<String>::new("Verify each name to be purged?")
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .default("Yes".to_owned());

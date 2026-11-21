@@ -44,7 +44,7 @@ fn describe(ed: &Editor, s: &Settings) -> Result<String, Cancelled> {
 
 /// Yes or No, with `current` as the default.
 fn ask_yes_no(ed: &Editor, message: &str, current: bool) -> Result<bool, Cancelled> {
-    let options = Options::<String>::new(format!("{message} [Yes/No]"))
+    let options = Options::<String>::new(message)
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .default(yes_no(current).to_owned());
@@ -59,16 +59,14 @@ fn ask_yes_no(ed: &Editor, message: &str, current: bool) -> Result<bool, Cancell
 /// `All` ignores every one.
 fn ask_ignore(ed: &Editor, ignore: &mut Ignore) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<String>::new(
-            "Enter property to ignore, Enter when done [None/All/Color/LAyer/Ltype/Ltscale/LWeight]",
-        )
-        .keyword("None", "N")
-        .keyword("All", "A")
-        .keyword("Color", "C")
-        .keyword("LAyer", "LA")
-        .keyword("Ltype", "LT")
-        .keyword("Ltscale", "LTS")
-        .keyword("LWeight", "LW");
+        let options = Options::<String>::new("Enter property to ignore, Enter when done")
+            .keyword("None", "N")
+            .keyword("All", "A")
+            .keyword("Color", "C")
+            .keyword("LAyer", "LA")
+            .keyword("Ltype", "LT")
+            .keyword("Ltscale", "LTS")
+            .keyword("LWeight", "LW");
         match ed.ask_keyword(options)?.as_deref() {
             Some("None") => *ignore = Ignore::default(),
             Some("All") => {

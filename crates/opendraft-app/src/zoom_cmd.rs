@@ -45,7 +45,7 @@ fn opposite_corner(first: Point) -> Options<Point> {
 
 /// Ask what to zoom to. Enter ends with nothing changed.
 fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
-    let mut prompt = first_corner("Specify first corner of window or [Extents/Previous/Window]");
+    let mut prompt = first_corner("Specify first corner of window");
     loop {
         let first = match ed.ask_point(prompt)? {
             Answer::Value(at) => at,
@@ -66,7 +66,7 @@ fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
             return Ok(Some(ZoomTo::Window(first, second)));
         }
         ed.say("The window has no size.");
-        prompt = first_corner("Specify first corner of window or [Extents/Previous/Window]");
+        prompt = first_corner("Specify first corner of window");
     }
 }
 
@@ -125,6 +125,17 @@ mod tests {
 
     fn zoomed(state: &AppState) -> Option<ZoomTo> {
         *state.docs[state.active].zoom_to.lock().unwrap()
+    }
+
+    #[test]
+    fn the_options_are_listed_once() {
+        let mut state = AppState::new();
+        state.start_zoom();
+        state.settle_command();
+        assert_eq!(
+            state.cmd_prompt().plain(),
+            "ZOOM Specify first corner of window or [Extents/Previous/Window]:"
+        );
     }
 
     #[test]
