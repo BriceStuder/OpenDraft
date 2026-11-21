@@ -160,6 +160,7 @@ impl AppState {
                         pick: true,
                         pick_locked: false,
                         sweep: false,
+                        no_snap: false,
                     });
                 }
                 // After the base of `FRO` or the first of `M2P` the rubber
@@ -421,6 +422,7 @@ fn canvas_prompt(ask: &Ask) -> Option<PointPrompt> {
         pick: ask.wants == Wants::Object,
         pick_locked: ask.pick_locked,
         sweep: ask.sweep,
+        no_snap: ask.no_snap,
         ghost: ask.ghost.clone(),
         snap_geometry: ask.snap_geometry.clone(),
         marker: ask.marker.clone(),
@@ -459,6 +461,7 @@ mod tests {
             marker: None,
             default_hint: None,
             sweep: false,
+            no_snap: false,
             mtext: None,
             mtext_of: None,
             single_line: false,
