@@ -287,7 +287,6 @@ icons! {
     VIEW_COMMAND_LINE = '\u{e379}';
     VIEW_GRID = '\u{e0ec}';
     VIEW_PAN = '\u{e1d6}';
-    VIEW_PANEL_LAYERS = '\u{e52d}';
     VIEW_PANEL_PROPERTIES = '\u{e37a}';
     VIEW_RESET_LAYOUT = '\u{e2a0}';
     VIEW_SNAP = '\u{e2b4}';

@@ -16,13 +16,14 @@ Drawing rules:
 - The drawing is fitted to a square at the icon's size (14 px in a ribbon
   row, 32 px for a large button), so keep the artboard square.
 - Any size of square `viewBox` works, and so does any editor's SVG. An icon
-  whose colours are all grey or white (as Lucide's are) is *plain*: the app
-  takes only its shape and paints it in the theme's colour, so it follows
-  the theme and dims when the command is unavailable. An icon with any
-  clearly coloured part (the green points of `draw-line.svg`) is *coloured*:
-  it is drawn in its own colours and only fades when unavailable. Use
-  `currentColor` for a part that should be white. Keep the light parts light:
-  the ribbon is dark.
+  in one grey or white (as Lucide's are) is *plain*: the app takes only its
+  shape and paints it in the theme's colour, so it follows the theme and
+  dims when the command is unavailable. An icon with any clearly coloured
+  part (the green points of `draw-line.svg`), or with greys clearly lighter
+  and darker than each other (the white prompt on the dark grey window of
+  `view-command-line.svg`), is *coloured*: it is drawn in its own colours
+  and only fades when unavailable. Use `currentColor` for a part that should
+  be white. Keep the light parts light: the ribbon is dark.
 - Each file is named after the command (`draw-line.svg` is Line, `modify-move.svg`
   is Move) or the part of the window (`layer-panel-frozen.svg`) it is for, and
   is used only there. To add an icon, add a line to `crates/opendraft-ui/src/icons.rs`
@@ -262,7 +263,6 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](view-command-line.svg) | `view-command-line.svg` | rectangle-horizontal | Command Line |
 | ![](view-grid.svg) | `view-grid.svg` | grid-3x3 | Grid |
 | ![](view-pan.svg) | `view-pan.svg` | hand | Pan |
-| ![](view-panel-layers.svg) | `view-panel-layers.svg` | layers | Layers |
 | ![](view-panel-properties.svg) | `view-panel-properties.svg` | rectangle-vertical | Properties |
 | ![](view-reset-layout.svg) | `view-reset-layout.svg` | undo-2 | Reset Layout |
 | ![](view-snap.svg) | `view-snap.svg` | magnet | Snap |
