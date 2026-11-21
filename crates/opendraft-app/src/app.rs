@@ -199,13 +199,13 @@ impl OpenDraftApp {
     /// Run a command by id, reporting commands that have no implementation yet.
     fn run(&mut self, id: &str) {
         use opendraft_commands::ExecuteError;
+        let transparent = self.state.command_running();
         match self.registry.execute(id, &mut self.state) {
             Ok(()) => {
                 if let Some(command) = self.registry.get(id).filter(|c| c.id != "edit.cancel") {
-                    let name = crate::cmdline::echo_name(command.id, command.label);
-                    self.state.cmdline.echo_command(name);
-                    self.state.cmdline.note_recent(command.id);
-                    self.state.cmdline.note_typed(&name.to_uppercase());
+                    self.state
+                        .cmdline
+                        .note_run(command.id, command.label, transparent);
                 }
             }
             Err(ExecuteError::Disabled(_)) => {}

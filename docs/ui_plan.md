@@ -207,7 +207,7 @@ Next: port Line, Circle, Rectangle, then the selection tools; then delete `Tool`
 
 ## Line, Circle and Rectangle on the Editor (done)
 `draw.line`, `draw.circle` and `draw.rectangle` are written like the modify commands (`draw.rs`); `Tool::{Line,Circle,Rectangle}`, `Draft`, `PointResult`, the canvas draft/preview code and the `Pending` sub-prompts are gone. Each segment or shape is added as soon as it is complete, so it can be snapped to straight away.
-Behaviour that changed on purpose, following AutoCAD: Line now chains (each segment starts where the last ended; Enter or Esc ends and keeps what was drawn; Undo takes back the last segment; Close joins the end to the start). Circle and Rectangle draw one shape per command; Enter at an idle command line repeats the last command. Circle keeps its Diameter option and Rectangle its Dimensions option. A zero-size shape is refused with a message and asked again.
+Behaviour that changed on purpose, following AutoCAD: Line now chains (each segment starts where the last ended; Enter or Esc ends and keeps what was drawn; Undo takes back the last segment; Close joins the end to the start). Circle and Rectangle draw one shape per command; Enter at an idle command line repeats the last command: any command, U, ZOOM, LAYOFF or PLOT as much as CIRCLE, but not a switch such as F7 or a palette, nor a zoom run inside another command (`CommandLine::note_last`). Circle keeps its Diameter option and Rectangle its Dimensions option. A zero-size shape is refused with a message and asked again.
 Next: port the three selection tools (window polygon, crossing polygon, fence), then delete `Tool`, `View::enter_point`/`points` and `prompt_for`.
 
 ## Selection tools on the Editor; the Tool enum is gone (done)
