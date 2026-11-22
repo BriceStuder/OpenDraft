@@ -29,7 +29,7 @@ impl View {
                 minor
             }
         };
-        if ccs.angle != 0.0 {
+        if ccs.angle != 0.0 || self.camera.twist != 0.0 {
             return self.paint_turned_grid(painter, rect, step, ccs, &pick);
         }
         let visible = self.camera.visible_world(rect);
@@ -89,7 +89,7 @@ impl View {
         ccs: Ccs,
     ) {
         let o = self.camera.world_to_screen(ccs.origin, rect);
-        if ccs.angle == 0.0 {
+        if ccs.angle == 0.0 && self.camera.twist == 0.0 {
             // Each axis runs from the origin along its positive direction only.
             let x_start = o.x.max(rect.left());
             if x_start < rect.right() {
@@ -110,20 +110,22 @@ impl View {
         } else {
             // Far enough to leave the canvas from anywhere on it.
             let reach = (rect.width() + rect.height()) + (o - rect.center()).length();
-            let (x, y) = screen_axes(ccs);
+            let (x, y) = screen_axes(ccs, self.camera.twist);
             painter.line_segment([o, o + x * reach], Stroke::new(1.0_f32, style.axis_x));
             painter.line_segment([o, o + y * reach], Stroke::new(1.0_f32, style.axis_y));
         }
-        if !ccs.is_world() {
-            paint_icon(painter, rect, style, ccs);
+        // Shown for a custom system, and in a turned view whatever the system.
+        if !ccs.is_world() || self.camera.twist != 0.0 {
+            paint_icon(painter, rect, style, ccs, self.camera.twist);
         }
     }
 }
 
-/// The unit directions of a system's X and Y axes on the screen (whose y
-/// runs down).
-pub(super) fn screen_axes(ccs: Ccs) -> (egui::Vec2, egui::Vec2) {
-    let (x, y) = (ccs.x_axis(), ccs.y_axis());
+/// The unit directions of a system's X and Y axes on a screen (whose y runs
+/// down) showing the drawing turned by `twist`.
+pub(super) fn screen_axes(ccs: Ccs, twist: f64) -> (egui::Vec2, egui::Vec2) {
+    let on_screen = Ccs::new(ccs.origin, ccs.angle + twist);
+    let (x, y) = (on_screen.x_axis(), on_screen.y_axis());
     (
         egui::vec2(x.x as f32, -x.y as f32),
         egui::vec2(y.x as f32, -y.y as f32),
@@ -132,15 +134,15 @@ pub(super) fn screen_axes(ccs: Ccs) -> (egui::Vec2, egui::Vec2) {
 
 /// The coordinate system icon in the lower-left corner of the canvas (of the
 /// viewport, in a layout): two arms along its axes, labelled, so a custom
-/// system is never in force unseen. The world system has none.
-fn paint_icon(painter: &egui::Painter, rect: Rect, style: &CanvasStyle, ccs: Ccs) {
+/// system or a turned view is never in force unseen.
+fn paint_icon(painter: &egui::Painter, rect: Rect, style: &CanvasStyle, ccs: Ccs, twist: f64) {
     let area = painter.clip_rect().intersect(rect);
     let room = ICON_ARM + ICON_INSET + 6.0;
     if area.width() < 2.0 * room || area.height() < 2.0 * room {
         return;
     }
     let corner = egui::pos2(area.left() + room, area.bottom() - room);
-    let (x, y) = screen_axes(ccs);
+    let (x, y) = screen_axes(ccs, twist);
     let font = egui::FontId::proportional(11.0);
     for (dir, color, label) in [(x, style.axis_x, "X"), (y, style.axis_y, "Y")] {
         let end = corner + dir * ICON_ARM;

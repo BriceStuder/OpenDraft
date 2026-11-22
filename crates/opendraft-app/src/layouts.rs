@@ -104,6 +104,7 @@ impl Doc {
             _ => None,
         };
         self.session.set_active_space(layout, viewport, frozen);
+        self.session.set_view_twist(self.view.twist());
         if more_frozen {
             self.prune_selection();
         }

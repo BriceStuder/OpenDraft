@@ -108,6 +108,14 @@ impl Session {
         }
     }
 
+    /// Tell the document how the view being worked in is turned. Not an
+    /// edit; run every frame, so nothing is copied when it is unchanged.
+    pub fn set_view_twist(&mut self, twist: f64) {
+        if self.document.view_twist().to_bits() != twist.to_bits() {
+            self.document_mut().set_view_twist(twist);
+        }
+    }
+
     /// Store layouts changed by panning or zooming a viewport. The drawing
     /// differs afterwards (the revision moves) but, like AutoCAD's zoom, it is
     /// not an undo step.

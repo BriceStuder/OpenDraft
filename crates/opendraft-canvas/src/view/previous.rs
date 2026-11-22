@@ -108,6 +108,7 @@ mod tests {
         Camera {
             center: Point::new(0.0, 0.0),
             zoom,
+            twist: 0.0,
         }
     }
 

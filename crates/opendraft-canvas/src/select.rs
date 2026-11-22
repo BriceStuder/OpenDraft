@@ -31,6 +31,20 @@ impl Region {
         ]
     }
 
+    /// A rectangle between two opposite corners, square to a screen showing
+    /// the drawing turned by `twist` (a turned box in the drawing).
+    pub fn view_corners(a: Point, b: Point, twist: f64) -> Vec<Point> {
+        if twist == 0.0 {
+            return Self::rect_corners(a, b);
+        }
+        let frame = opendraft_core::Ccs::new(Point::new(0.0, 0.0), -twist);
+        let (va, vb) = (frame.from_world(a), frame.from_world(b));
+        Self::rect_corners(va, vb)
+            .into_iter()
+            .map(|p| frame.to_world(p))
+            .collect()
+    }
+
     /// Whether a point is inside a polygon region (never, for a fence).
     pub fn contains(&self, p: Point) -> bool {
         match self {

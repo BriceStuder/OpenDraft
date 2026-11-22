@@ -1,6 +1,8 @@
 //! Drawing a layer moved: while a new picture is made, the old one is shown
 //! as if panned and zoomed to the new view. A pan is exact; a zoom scales the
 //! lines too, which is wrong for the moment until the new picture replaces it.
+//! A turn cannot be shown this way (egui moves shapes only by shifting and
+//! scaling), so a picture made at another twist is not shown moved.
 
 use std::sync::Arc;
 
@@ -11,12 +13,19 @@ use egui::{Painter, Rect, Shape};
 
 use crate::camera::Camera;
 
-/// The move that takes what `from` shows on `rect` to what `to` shows.
-pub(crate) fn move_between(from: &Camera, to: &Camera, rect: Rect) -> TSTransform {
+/// The move that takes what `from` shows on `rect` to what `to` shows; none
+/// when the two are turned differently.
+pub(crate) fn move_between(from: &Camera, to: &Camera, rect: Rect) -> Option<TSTransform> {
+    if from.twist.to_bits() != to.twist.to_bits() {
+        return None;
+    }
     let scale = (to.zoom / from.zoom) as f32;
     let was = from.world_to_screen(from.center, rect);
     let now = to.world_to_screen(from.center, rect);
-    TSTransform::new(now.to_vec2() - was.to_vec2() * scale, scale)
+    Some(TSTransform::new(
+        now.to_vec2() - was.to_vec2() * scale,
+        scale,
+    ))
 }
 
 /// The part of the screen `rect` (0 to 1) that the old picture, of `picture`,
@@ -84,23 +93,27 @@ mod tests {
         let from = Camera {
             center: Point::new(100.0, 50.0),
             zoom: 2.0,
+            twist: 0.0,
         };
         for to in [
             from,
             Camera {
                 center: Point::new(130.0, 40.0),
                 zoom: 2.0,
+                twist: 0.0,
             },
             Camera {
                 center: Point::new(100.0, 50.0),
                 zoom: 5.0,
+                twist: 0.0,
             },
             Camera {
                 center: Point::new(-20.0, 90.0),
                 zoom: 0.5,
+                twist: 0.0,
             },
         ] {
-            let t = move_between(&from, &to, rect);
+            let t = move_between(&from, &to, rect).unwrap();
             for world in [
                 Point::new(100.0, 50.0),
                 Point::new(130.0, 20.0),
@@ -111,5 +124,13 @@ mod tests {
                 assert!((moved - want).length() < 0.01, "{moved:?} vs {want:?}");
             }
         }
+    }
+
+    #[test]
+    fn a_picture_at_another_twist_is_not_moved() {
+        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(400.0, 300.0));
+        let from = Camera::default();
+        let to = Camera { twist: 0.3, ..from };
+        assert!(move_between(&from, &to, rect).is_none());
     }
 }

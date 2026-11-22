@@ -49,6 +49,7 @@ mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
 pub(crate) mod text_raster;
+mod twist;
 pub use text_paint::paint_text;
 mod types;
 
@@ -78,6 +79,9 @@ enum Request {
     Zoom(f64),
     /// ZOOM Window: two corners in the space being worked in.
     Window(Point, Point),
+    /// Turn the drawing on the screen to this twist, then (when `true`)
+    /// show the extents (PLAN).
+    Twist(f64, bool),
 }
 
 /// Per-drawing view state.
@@ -92,6 +96,8 @@ pub struct View {
     /// The coordinate system in force this frame (tooltip angles count from
     /// its X axis).
     ccs: opendraft_core::Ccs,
+    /// A Ctrl+middle-drag turning the view, while one is under way.
+    twist_drag: Option<twist::TwistDrag>,
     /// Wheel zoom speed as a multiple of the base rate; none means 1.
     zoom_speed: Option<f32>,
     constraint: Option<Arc<dyn Fn(Point) -> Point + Send + Sync>>,
@@ -209,9 +215,17 @@ impl View {
                 Some(Request::Window(a, b)) => {
                     self.camera.show_window(Bounds::from_points(a, b), rect);
                 }
+                Some(Request::Twist(twist, fit)) => {
+                    self.camera.set_twist(twist);
+                    if fit {
+                        self.camera.fit(document.bounds(), rect);
+                    }
+                }
                 None => {}
             }
-            if response.dragged_by(PointerButton::Middle) {
+            if let Some(twist) = self.twist_by_drag(ui, &response, rect.center()) {
+                self.camera.set_twist(twist);
+            } else if response.dragged_by(PointerButton::Middle) {
                 self.camera.pan_by_pixels(response.drag_delta());
             } else {
                 self.pan_through_editor(ui, rect);

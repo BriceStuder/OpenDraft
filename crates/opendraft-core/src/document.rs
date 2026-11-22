@@ -73,6 +73,10 @@ pub struct Document {
     /// `active_layout` (which is none there, as new objects go to model
     /// space). Not part of the drawing's history or file.
     active_viewport: Option<(LayoutId, crate::layout::ViewportId)>,
+    /// How far the view being worked in turns the drawing on the screen
+    /// (radians counter-clockwise), for commands that work along the screen.
+    /// Not part of the drawing's history or file.
+    view_twist: f64,
     /// The Model tab's custom coordinate system (each layout viewport keeps
     /// its own; see `opendraft_core::ccs`).
     model_ccs: crate::ccs::Ccs,

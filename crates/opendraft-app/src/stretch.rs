@@ -10,6 +10,8 @@ use crate::text::plural;
 /// Ask for the region: two corners of a crossing window, or the CPolygon
 /// option for a polygon of any number of points (Enter closes it).
 fn ask_region(ed: &Editor) -> Result<Vec<Point>, Cancelled> {
+    // Square to the screen, however the view is turned.
+    let twist = ed.read(|doc| doc.view_twist())?;
     let first_options =
         PointOptions::new("Specify first corner of crossing window").keyword("CPolygon", "CP");
     let first = match ed.ask_point(first_options)? {
@@ -21,14 +23,14 @@ fn ask_region(ed: &Editor) -> Result<Vec<Point>, Cancelled> {
         .ghost_style(GhostStyle::Crossing)
         .ghost(move |at| {
             vec![Entity::Polyline {
-                points: Region::rect_corners(first, at),
+                points: Region::view_corners(first, at, twist),
                 closed: true,
                 bulges: Vec::new(),
                 widths: Vec::new(),
             }]
         });
     let opposite = ed.get_point(options)?;
-    Ok(Region::rect_corners(first, opposite))
+    Ok(Region::view_corners(first, opposite, twist))
 }
 
 fn ask_polygon(ed: &Editor) -> Result<Vec<Point>, Cancelled> {

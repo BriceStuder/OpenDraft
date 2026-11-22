@@ -200,6 +200,16 @@ impl View {
                 }
                 stroke_path(painter, path, closed, stroke);
             }
+            // In a turned view the rectangle is turned on the screen.
+            Entity::Rectangle { min, max } if self.camera.twist != 0.0 => {
+                let corners = [
+                    *min,
+                    Point::new(max.x, min.y),
+                    *max,
+                    Point::new(min.x, max.y),
+                ];
+                stroke_path(painter, corners.map(to_screen).to_vec(), true, stroke);
+            }
             Entity::Rectangle { min, max } => {
                 painter.rect_stroke(
                     Rect::from_two_pos(to_screen(*min), to_screen(*max)),
