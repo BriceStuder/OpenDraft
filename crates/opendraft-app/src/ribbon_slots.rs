@@ -277,7 +277,7 @@ pub(crate) fn vp_tip(frozen: bool) -> &'static str {
 }
 
 /// The VP Freeze switch's glyph and colour: the sun and snowflake of the
-/// Freeze switch, drawn in a square by `paint_vp_switch`.
+/// Freeze switch, framed by corners by `paint_vp_switch`.
 pub(crate) fn vp_glyph(frozen: bool, weak: Color32) -> (char, Color32) {
     if frozen {
         (icons::LAYER_LIST_FROZEN, weak)
@@ -290,9 +290,13 @@ pub(crate) fn vp_glyph(frozen: bool, weak: Color32) -> (char, Color32) {
 /// to touch it.
 const VP_GLYPH_SCALE: f32 = 0.9;
 
-/// The VP Freeze switch: the sun or snowflake, a little smaller, in a square
-/// `size` wide, so it reads apart from the Freeze switch beside it. The
-/// square's line is one screen pixel, on whole pixels so it stays sharp.
+/// How far each corner mark runs along a side of the square.
+const VP_CORNER: f32 = 0.25;
+
+/// The VP Freeze switch: the sun or snowflake, a little smaller, framed by
+/// the four corners of a square `size` wide, so it reads apart from the
+/// Freeze switch beside it. The corners are one screen pixel wide, on whole
+/// pixels so they stay sharp.
 pub(crate) fn paint_vp_switch(
     painter: &Painter,
     center: Pos2,
@@ -304,12 +308,10 @@ pub(crate) fn paint_vp_switch(
     let side = snap(size);
     let min = egui::pos2(snap(center.x - side / 2.0), snap(center.y - side / 2.0));
     let square = Rect::from_min_size(min, egui::vec2(side, side));
-    painter.rect_stroke(
-        square,
-        0.0,
-        Stroke::new(1.0 / ppp, color),
-        egui::StrokeKind::Inside,
-    );
+    let stroke = Stroke::new(1.0 / ppp, color);
+    for corner in corner_marks(square, 1.0 / ppp, snap(side * VP_CORNER)) {
+        painter.add(egui::Shape::line(corner.to_vec(), stroke));
+    }
     opendraft_ui::icon_set::paint(
         painter,
         square.center(),
@@ -318,6 +320,21 @@ pub(crate) fn paint_vp_switch(
         size * VP_GLYPH_SCALE,
         color,
     );
+}
+
+/// The four corner marks of `square`, each an L of three points with arms
+/// `arm` long, running down the middle of the edge pixels (`pixel` wide) so
+/// a one-pixel line fills them exactly.
+fn corner_marks(square: Rect, pixel: f32, arm: f32) -> [[Pos2; 3]; 4] {
+    let inner = square.shrink(pixel / 2.0);
+    let (l, r, t, b) = (inner.left(), inner.right(), inner.top(), inner.bottom());
+    let p = egui::pos2;
+    [
+        [p(l, t + arm), p(l, t), p(l + arm, t)],
+        [p(r - arm, t), p(r, t), p(r, t + arm)],
+        [p(r, b - arm), p(r, b), p(r - arm, b)],
+        [p(l + arm, b), p(l, b), p(l, b - arm)],
+    ]
 }
 
 fn switch_tip(layer: &Layer, flag: LayerFlag) -> &'static str {
@@ -447,5 +464,16 @@ mod tests {
         let grey = Color32::GRAY;
         assert_eq!(vp_glyph(false, grey), (icons::LAYER_LIST_THAWED, SWITCH_ON));
         assert_eq!(vp_glyph(true, grey), (icons::LAYER_LIST_FROZEN, grey));
+    }
+
+    #[test]
+    fn the_vp_corners_run_down_the_middle_of_the_edge_pixels() {
+        let square = Rect::from_min_size(egui::pos2(10.0, 20.0), egui::vec2(14.0, 14.0));
+        let [top_left, top_right, bottom_right, bottom_left] = corner_marks(square, 1.0, 3.0);
+        let p = egui::pos2;
+        assert_eq!(top_left, [p(10.5, 23.5), p(10.5, 20.5), p(13.5, 20.5)]);
+        assert_eq!(top_right, [p(20.5, 20.5), p(23.5, 20.5), p(23.5, 23.5)]);
+        assert_eq!(bottom_right, [p(23.5, 30.5), p(23.5, 33.5), p(20.5, 33.5)]);
+        assert_eq!(bottom_left, [p(13.5, 33.5), p(10.5, 33.5), p(10.5, 30.5)]);
     }
 }
