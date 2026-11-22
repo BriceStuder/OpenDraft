@@ -33,6 +33,9 @@ pub struct PlotPreview {
     pub notes: Vec<String>,
     /// The sheet drawn, to draw part of it larger when the preview is zoomed.
     pub sheet: std::sync::Arc<opendraft_core::plot::PlotSheet>,
+    /// Where the plot puts the drawing: the offset from the printable corner
+    /// and paper mm per drawing unit, for the fields Center and Fit turn off.
+    pub placed: Option<(opendraft_core::Point, f64)>,
 }
 
 /// What the printers of the machine are, found off the UI thread.
@@ -208,6 +211,7 @@ pub fn render_preview(document: &Document, draft: &PageDraft) -> Result<PlotPrev
         rgba,
         notes: sheet.notes.clone(),
         sheet: std::sync::Arc::new(sheet),
+        placed: opendraft_core::plot::placed(&copy, draft.space).ok(),
     })
 }
 

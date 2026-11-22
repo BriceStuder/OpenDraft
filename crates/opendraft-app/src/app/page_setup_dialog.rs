@@ -27,6 +27,7 @@ impl OpenDraftApp {
         let (mut open, mut choice) = (true, None);
         let error_id = egui::Id::new("page_setup_error");
         let error: Option<String> = ctx.data(|d| d.get_temp(error_id));
+        let placed = placed_of(ctx, self.state.session().document(), &draft);
         widgets::dialog(ctx, theme, "Page Setup", &mut open, WIDTH, |ui| {
             ui.horizontal(|ui| {
                 widgets::field_label(ui, theme, "Layout name:");
@@ -39,7 +40,7 @@ impl OpenDraftApp {
             });
             ui.add_space(6.0);
             ui.columns(3, |columns| {
-                left_column(&mut columns[0], theme, &mut draft);
+                left_column(&mut columns[0], theme, &mut draft, placed);
                 right_column(&mut columns[1], theme, &mut draft);
                 preview_column(&mut columns[2], theme, &draft);
             });
@@ -74,6 +75,28 @@ impl OpenDraftApp {
             None => self.state.page_setup = Some(draft),
         }
     }
+}
+
+/// Where the plot of `draft` puts the drawing, worked out again only when
+/// the draft changes (Extents plots the drawing to find it).
+fn placed_of(
+    ctx: &egui::Context,
+    document: &opendraft_core::Document,
+    draft: &PageDraft,
+) -> Option<boxes::Placed> {
+    type Kept = (PageDraft, Option<boxes::Placed>);
+    let id = egui::Id::new("page_setup_placed");
+    if let Some((kept, placed)) = ctx.data(|d| d.get_temp::<Kept>(id)) {
+        if &kept == draft {
+            return placed;
+        }
+    }
+    let placed = crate::plot_job::document_with_draft(document, draft)
+        .ok()
+        .and_then(|copy| opendraft_core::plot::placed(&copy, draft.space).ok())
+        .map(|(origin, scale)| boxes::Placed { origin, scale });
+    ctx.data_mut(|d| d.insert_temp::<Kept>(id, (draft.clone(), placed)));
+    placed
 }
 
 fn preview_column(ui: &mut egui::Ui, theme: &opendraft_ui::Theme, draft: &PageDraft) {
