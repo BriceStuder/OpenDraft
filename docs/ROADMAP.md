@@ -100,7 +100,8 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 
 *Why: audience 3. Only after phases 1 to 5, and in this rough order.*
 
-- [ ] Text: TEXT/MTEXT in all import and export paths, block attributes (`ByBlock` is done, 31-10-2026).
+- [ ] Text: TEXT/MTEXT in all import and export paths (`ByBlock` is done, 31-10-2026).
+- [x] Block attributes, done 01-11-2026 (PRs #100 and #101). What is left (multiline attributes, `ATTDISP`, BATTMAN, more data fields) is in `docs/parking_lot.md`.
 - [ ] DWG export (L).
 - [ ] Associative arrays (ARRAY makes plain copies today).
 - [ ] Spline editing (trim, extend, break, join, offset), Lengthen for ellipses and splines, PEDIT's Fit and Spline.
