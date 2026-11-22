@@ -38,7 +38,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - Snapping to the shape being drawn: ELLIPSE's first axis and a CV spline's control frame are not passed.
 - Window and lasso selection style: the command line does not say "Specify opposite corner", the lasso does not show its kind by the pointer, no option to start a lasso only from empty space, no highlight of what the box or lasso would take.
 - Transparent commands (`'Z` inside another command) and Ctrl+Z routed to a command's own Undo option.
-- ZOOM: All, Center, Dynamic, Scale, Object and a typed scale; ribbon items for ZOOM Window and Previous; Previous for the views of a layout viewport.
+- ZOOM: All, Center, Dynamic, Scale and a typed scale; ribbon items for ZOOM Window, Objects and Previous; a typed alias for Zoom Out (its `ZO` went to Zoom Objects); Previous for the views of a layout viewport.
 - Measuring: Radius, Angle and the MEASUREGEOM wrapper, hatch and region areas, the DISTANCE, AREA and PERIMETER variables, area units such as square feet.
 - Find (and replace), greyed in the context menu.
 - Power Select: answers at the command line, colour by name or number, attribute properties.
@@ -104,7 +104,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 - Non-rectangular viewport clips (see the plan below); rotated, twisted and perspective viewports; new viewports taking a layer state.
 - The LAYOUT Set option.
-- Light or dark paper for layouts: a per-user setting, light by default, with a Light Paper toggle on the Layout tab and `LAYOUTPAPER`; model space keeps its own look (`docs/ROADMAP.md`, next steps).
+- Layout colours beyond the paper: AutoCAD's Drawing Window Colors sets each part (crosshair, grid, snap marker and the rest) per context; OpenDraft chooses them to suit the paper, and only the paper is the user's to pick. Colours are drawn as they are, so pale ones such as yellow (colour 2) are hard to read on white paper, as in AutoCAD. A viewport that runs off the sheet draws its contents over the dark surround there, where black lines on light paper all but vanish (AutoCAD's surround is grey); the part off the sheet does not plot.
 - The Layout tab's other AutoCAD items: viewport Clip, Lock as a Lock/Unlock list, and the Create View, Modify View, Update and Styles and Standards panels.
 - Display and named View plot areas (no saved view state).
 - Plotting: `-PAGESETUP`, cancel and progress in the dialog, the last printer remembered, margins and media from the printer, a Page Setup Manager with named setups, collation, plot-style tables; proof on real printers and cutters (`docs/ROADMAP.md`, Phase 3).

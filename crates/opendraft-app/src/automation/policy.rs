@@ -157,6 +157,8 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("layout.vplayer", Denied, Mutation),
     ("layout.vplock", Denied, Mutation),
     ("layout.page_setup", Denied, Lifecycle),
+    // A view setting of the user's, as the grid is.
+    ("view.layout_paper", ImmediateSafe, Ui),
     // Dialogs and variables.
     ("tools.setvar", Denied, Lifecycle),
     ("format.units", Denied, Lifecycle),
@@ -183,6 +185,7 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("view.zoom_out", ImmediateSafe, Ui),
     ("view.zoom_previous", ImmediateSafe, Ui),
     ("view.zoom", InteractiveInApp, Ui),
+    ("view.zoom_objects", InteractiveInApp, Ui),
     ("view.grid", ImmediateSafe, Ui),
     ("view.dynamic_input", ImmediateSafe, Ui),
     ("view.snap", ImmediateSafe, Ui),

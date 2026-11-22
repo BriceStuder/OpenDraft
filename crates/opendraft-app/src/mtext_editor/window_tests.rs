@@ -11,6 +11,8 @@ fn style(theme: &Theme) -> CanvasStyle {
     let c = &theme.colors;
     CanvasStyle {
         background: c.canvas_bg,
+        surround: c.canvas_bg,
+        crosshair: c.text,
         grid_minor: c.text,
         grid_major: c.text,
         axis_x: c.text,

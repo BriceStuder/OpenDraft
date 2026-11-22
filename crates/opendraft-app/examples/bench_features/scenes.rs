@@ -69,6 +69,8 @@ pub fn generate(n: usize) -> Vec<Entity> {
 pub fn style() -> CanvasStyle {
     CanvasStyle {
         background: Color32::from_rgb(0x25, 0x25, 0x25),
+        surround: Color32::from_rgb(0x16, 0x16, 0x16),
+        crosshair: Color32::from_gray(215),
         grid_minor: Color32::from_white_alpha(18),
         grid_major: Color32::from_white_alpha(36),
         axis_x: Color32::GRAY,

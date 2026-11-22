@@ -58,6 +58,7 @@ pub fn build_registry() -> Registry<AppState> {
         crate::primitive_commands::commands(),
         crate::dimension_commands::commands(),
         crate::dock::commands(),
+        crate::canvas_style::commands(),
     ];
     for command in all().into_iter().chain(tables.into_iter().flatten()) {
         registry
@@ -339,6 +340,9 @@ fn all() -> Vec<Command<AppState>> {
         })
         .transparent(),
         cmd("view.zoom", "Zoom", |s| s.start_zoom()).checked(|s| s.is_running("ZOOM")),
+        cmd("view.zoom_objects", "Zoom Objects", |s| {
+            s.start_zoom_objects()
+        }),
         toggle_command!("view.grid", "Grid", show_grid)
             .key("F7")
             .transparent(),
@@ -770,6 +774,7 @@ mod tests {
             "view.zoom_in",
             "view.zoom_out",
             "view.zoom_previous",
+            "view.zoom_objects",
         ] {
             assert!(registry.is_enabled(id, &state), "{id}");
             registry.execute(id, &mut state).unwrap();

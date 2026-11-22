@@ -11,10 +11,6 @@ use crate::grid::grid_step;
 use crate::snap::{SnapModes, SnapOverride};
 use crate::snap_axis::Aim;
 
-/// The crosshair's colour unless one is chosen: off-white, not so bright as
-/// to glare on a dark background.
-pub const DEFAULT_COLOR: Color32 = Color32::from_gray(215);
-
 /// Which parts of the cursor the canvas shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum CursorShape {
@@ -64,12 +60,13 @@ fn paint(
     canvas: Rect,
     at: Pos2,
     shape: CursorShape,
-    crosshair: &Crosshair,
+    size: u32,
+    color: Color32,
     pick: f64,
 ) {
-    let stroke = Stroke::new(1.0_f32, crosshair.color.unwrap_or(DEFAULT_COLOR));
+    let stroke = Stroke::new(1.0_f32, color);
     if shape != CursorShape::PickBox {
-        let arm = arms(crosshair.size, canvas.size());
+        let arm = arms(size, canvas.size());
         let gap = pick as f32 + stroke.width * 0.5;
         if let Some([(left, left_end), (right_start, right)]) = arm_segments(at.x, arm.x, gap) {
             painter.hline(left..=left_end, at.y, stroke);
@@ -200,18 +197,21 @@ impl View {
         }
     }
 
-    /// Hide the system cursor and draw ours at `at` (screen position).
-    pub(super) fn paint_cursor(&self, ui: &egui::Ui, canvas: Rect, at: Pos2, shape: CursorShape) {
+    /// Hide the system cursor and draw ours at `at` (screen position), in
+    /// the colour the user chose, else `over`, the colour for what is under it.
+    pub(super) fn paint_cursor(
+        &self,
+        ui: &egui::Ui,
+        canvas: Rect,
+        at: Pos2,
+        shape: CursorShape,
+        over: Color32,
+    ) {
         ui.ctx().set_cursor_icon(egui::CursorIcon::None);
         let painter = ui.painter_at(canvas);
-        paint(
-            &painter,
-            canvas,
-            at,
-            shape,
-            &self.crosshair,
-            self.sizes.pick,
-        );
+        let color = self.crosshair.color.unwrap_or(over);
+        let size = self.crosshair.size;
+        paint(&painter, canvas, at, shape, size, color, self.sizes.pick);
     }
 }
 
