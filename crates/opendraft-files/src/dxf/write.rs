@@ -128,9 +128,10 @@ fn r12_name(name: &str) -> bool {
 /// Whether the drawing needs R2000: R12 has one unnamed paper space, so
 /// layouts need it, and R12 has no ellipse, spline, hatch or multiline text (AutoCAD turns
 /// them into lines, arcs and polylines when saving that far back, which we
-/// do not guess at).
+/// do not guess at), nor the APPID table a Model-tab freeze needs.
 fn needs_r2000(document: &Document) -> bool {
     !document.layouts().is_empty()
+        || super::model_freeze::any(document.layers())
         || !document.blocks().is_empty()
         || document.layers().iter().any(|l| !r12_name(&l.name))
         || document.text_styles().iter().any(|s| !r12_name(&s.name))

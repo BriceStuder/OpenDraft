@@ -84,6 +84,7 @@ impl Document {
                 h,
                 self.model_bounds(),
             )],
+            paper_frozen: Vec::new(),
         }
     }
 
@@ -148,6 +149,7 @@ mod tests {
                 170.0,
                 None,
             )],
+            paper_frozen: Vec::new(),
         }
     }
 

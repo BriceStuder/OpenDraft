@@ -279,10 +279,9 @@ pub fn write(document: &Document) -> Result<Encoded, FileError> {
                 .iter()
                 .filter(|o| o.layout == Some(layout.id))
             {
+                let corner = layout.printable_corner();
                 let mut printable = object.clone();
-                printable.entity = printable
-                    .entity
-                    .translated(-layout.plot.margins_mm[0], -layout.plot.margins_mm[1]);
+                printable.entity = printable.entity.translated(-corner.x, -corner.y);
                 write_object(out, h, &ids, document, &printable, owner, true)?;
             }
             Ok(())
@@ -462,6 +461,7 @@ mod tests {
             height: 150.0,
             plot: opendraft_core::PlotSettings::for_layout(200.0, 150.0),
             viewports: Vec::new(),
+            paper_frozen: Vec::new(),
         };
         let detail_id = detail.id;
         doc.set_layouts(vec![plan, detail]);
@@ -557,6 +557,48 @@ mod tests {
         assert_eq!(value(layout, 7), Some("monochrome.ctb"));
         assert_eq!(value(layout, 74), Some("4"));
         assert_eq!(value(layout, 78), Some("600"));
+    }
+
+    #[test]
+    fn a_sheet_turned_a_quarter_is_kept_from_the_corner_of_its_page_as_read() {
+        // AutoCAD's landscape A4: the paper feeds portrait, the plot is turned.
+        let mut original = drawing();
+        let mut layouts = original.layouts().to_vec();
+        (layouts[0].width, layouts[0].height) = (210.0, 297.0);
+        let plot = &mut layouts[0].plot;
+        (plot.paper_width_mm, plot.paper_height_mm) = (210.0, 297.0);
+        plot.margins_mm = [4.0, 5.0, 6.0, 7.0];
+        plot.rotation = opendraft_core::PlotRotation::CounterClockwise90;
+        original.set_layouts(layouts);
+        let encoded = write(&original).unwrap();
+
+        // Read across, the page's left margin is the paper's bottom one (5)
+        // and its bottom margin the paper's right one (6).
+        let pairs = pairs(&encoded.bytes);
+        let mut from = 0;
+        let sheet_line = loop {
+            let (at, line) = object(&pairs, "LINE", from).unwrap();
+            if value(line, 67) == Some("1") {
+                break line;
+            }
+            from = at + 1;
+        };
+        let number = |code| value(sheet_line, code).unwrap().parse::<f64>().unwrap();
+        assert_eq!((number(10), number(20)), (0.0, -1.0));
+
+        let loaded = crate::dxf::read::read(&encoded.bytes).unwrap();
+        let plan = &loaded.document.layouts()[0];
+        assert_eq!(plan.sheet_bounds().max, Point::new(297.0, 210.0));
+        let line = loaded
+            .document
+            .objects_of_layout(plan.id)
+            .into_iter()
+            .find_map(|id| match loaded.document.get(id) {
+                Some(Entity::Line { start, end }) => Some((*start, *end)),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(line, (Point::new(5.0, 5.0), Point::new(50.0, 5.0)));
     }
 
     #[test]
@@ -882,6 +924,26 @@ mod tests {
                 at: Point::new(4.5, -1.0)
             }));
         assert_eq!(back.point_style(), original.point_style());
+    }
+
+    #[test]
+    fn layers_frozen_in_paper_space_come_back_per_layout() {
+        let mut original = drawing();
+        let walls = original.layers()[1].id;
+        let mut layouts = original.layouts().to_vec();
+        layouts[1].set_paper_frozen(&[walls], true);
+        original.set_layouts(layouts);
+        let back = crate::dxf::read::read(&write(&original).unwrap().bytes)
+            .unwrap()
+            .document;
+        let sheet = |name: &str| back.layouts().iter().find(|l| l.name == name).unwrap();
+        let names = |ids: &[opendraft_core::LayerId]| -> Vec<String> {
+            let name = |id: &opendraft_core::LayerId| back.layer(*id).unwrap().name.clone();
+            ids.iter().map(name).collect()
+        };
+        assert_eq!(names(&sheet("Detail").paper_frozen), ["Walls"]);
+        assert!(sheet("Plan").paper_frozen.is_empty());
+        assert_eq!(names(&sheet("Plan").viewports[0].frozen), ["Walls"]);
     }
 
     #[test]

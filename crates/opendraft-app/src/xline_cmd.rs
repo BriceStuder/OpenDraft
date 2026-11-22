@@ -89,11 +89,13 @@ fn through(
     }
 }
 
-/// Construction lines along `direction` through each point given.
+/// Construction lines along `direction` through each point given. Tangent
+/// and Perpendicular find their point from the direction.
 fn parallel(ed: &Editor, direction: Point) -> Result<(), Cancelled> {
     loop {
-        let options =
-            PointOptions::new("Specify through point").ghost(move |at| vec![xline(at, direction)]);
+        let options = PointOptions::new("Specify through point")
+            .along(direction)
+            .ghost(move |at| vec![xline(at, direction)]);
         match ed.ask_point(options) {
             Ok(Answer::Value(at)) => add(ed, xline(at, direction), NAME)?,
             Ok(_) | Err(Cancelled) => return Ok(()),
@@ -280,6 +282,19 @@ mod tests {
         assert!(near(d, Point::new(0.0, 1.0)));
         let state = run(draw_xline, &["bisect", "0,0", "10,0", "0,10"]);
         assert_eq!(lines(&state).len(), 1);
+    }
+
+    #[test]
+    fn ang_hor_and_ver_tell_the_snaps_their_direction() {
+        // Tangent and Perpendicular need it: there is no last point.
+        let along = |inputs: &[&str]| run(draw_xline, inputs).waiting().and_then(|a| a.along);
+        let d = along(&["a", "30"]).unwrap();
+        let (sin, cos) = 30f64.to_radians().sin_cos();
+        assert!(near(d, Point::new(cos, sin)), "{d:?}");
+        assert_eq!(along(&["h"]), Some(Point::new(1.0, 0.0)));
+        assert_eq!(along(&["v"]), Some(Point::new(0.0, 1.0)));
+        // A line through two points has its first point instead.
+        assert_eq!(along(&["0,0"]), None);
     }
 
     #[test]

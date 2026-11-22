@@ -34,6 +34,7 @@ fn all_from(
         grid_step: None,
         modes,
         from,
+        along: None,
         defer: true,
         tracks: &[],
         track: None,
@@ -136,6 +137,7 @@ fn points_in_the_aperture_come_first_then_nearest_then_the_grid() {
         grid_step: Some(2.0),
         modes: &modes,
         from: None,
+        along: None,
         defer: true,
         tracks: &[],
         track: None,
@@ -368,4 +370,33 @@ fn a_snap_with_a_last_point_is_never_deferred() {
     let found = all_from(&entities, p(5.4, 0.3), 1.0, &modes, Some(p(5.0, 30.0)));
     assert!(!found[0].deferred);
     assert_eq!(found[0].label(), "Perpendicular");
+}
+
+#[test]
+fn with_a_known_direction_tangent_and_perpendicular_are_exact_at_once() {
+    fn probe(cursor: Point, modes: &SnapModes) -> Probe<'_> {
+        Probe {
+            cursor,
+            tolerance: 1.0,
+            grid_step: None,
+            modes,
+            from: None,
+            along: Some(p(1.0, 0.0)),
+            defer: true,
+            tracks: &[],
+            track: None,
+        }
+    }
+    let modes = only(SnapKind::Tangent);
+    let circle = objs(&[circle(0.0, 0.0, 5.0)]);
+    // A horizontal line touches the circle at its top.
+    let found = snap_all(&circle, &probe(p(0.4, 5.3), &modes));
+    assert_eq!(found.len(), 1);
+    assert!(!found[0].deferred);
+    assert_eq!(found[0].point, p(0.0, 5.0));
+    // And is square to it at its right end.
+    let modes = only(SnapKind::Perpendicular);
+    let found = snap_all(&circle, &probe(p(5.2, 0.4), &modes));
+    assert!(!found[0].deferred);
+    assert_eq!(found[0].point, p(5.0, 0.0));
 }

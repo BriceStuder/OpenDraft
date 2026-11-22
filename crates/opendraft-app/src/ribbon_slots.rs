@@ -6,13 +6,14 @@
 //! lineweight new objects are drawn with (ByLayer unless set).
 
 use eframe::egui::{self, Align2, Color32, FontId, Painter, Pos2, Rect, Sense, Stroke, Ui};
-use opendraft_core::{Document, Layer, Object, Viewport};
+use opendraft_core::{Document, Layer, Object};
 use opendraft_ui::{icons, menu, Theme};
 
 use crate::attr_rows::{self, shared};
 use crate::colour_ui;
 use crate::layers::{AttrEdit, LayerEdit, LayerFlag};
 use crate::state::AppState;
+use crate::view_freeze::{FreezeTarget, VpSwitch};
 
 pub const LAYER_LIST: &str = "layer.list";
 pub const COLOR_LIST: &str = "properties.color";
@@ -70,7 +71,7 @@ pub fn show(
                 id,
                 document,
                 &selected,
-                state.target_viewport_ref(),
+                state.freeze_target(),
             ),
             COLOR_LIST | LINEWEIGHT_LIST | LINETYPE_LIST => {
                 property_list(&mut child, theme, id, slot, document, &selected).map(SlotEdit::Attr)
@@ -145,9 +146,9 @@ fn layer_list(
     id: egui::Id,
     document: &Document,
     selected: &[&Object],
-    viewport: Option<&Viewport>,
+    target: Option<FreezeTarget>,
 ) -> Option<SlotEdit> {
-    let vp_frozen = |layer: &Layer| viewport.map(|v| v.is_frozen(layer.id));
+    let vp_frozen = |layer: &Layer| target.map(|t| t.switch(layer));
     let rect = ui.max_rect();
     let response = ui.interact(rect, id.with("field"), Sense::click());
     let shown = if selected.is_empty() {
@@ -192,14 +193,14 @@ fn layer_list(
 }
 
 /// One layer in the menu. Returns whether the layer was picked and the
-/// switch toggled, if any. `vp_frozen` is the layer's state in the viewport
-/// being worked on (`None`: no VP Freeze switch).
+/// switch toggled, if any. `vp_frozen` is the layer's VP Freeze switch
+/// (`None`: none).
 fn menu_row(
     ui: &mut Ui,
     theme: &Theme,
     layer: &Layer,
     current: bool,
-    vp_frozen: Option<bool>,
+    vp_frozen: Option<VpSwitch>,
 ) -> (bool, Option<LayerEdit>) {
     let c = &theme.colors;
     let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), ROW_H), Sense::hover());
@@ -232,9 +233,9 @@ fn menu_row(
         }
         let (tip, edit) = match toggle {
             Toggle::Viewport => {
-                let frozen = vp_frozen.unwrap_or(false);
+                let frozen = vp_frozen.is_some_and(|s| s.frozen);
                 (
-                    vp_tip(frozen),
+                    vp_frozen.map_or("", VpSwitch::tip),
                     LayerEdit::SetInViewport(vec![layer.id], !frozen),
                 )
             }
@@ -265,15 +266,6 @@ fn toggles(vp: bool) -> Vec<Toggle> {
     }
     toggles.push(Toggle::Flag(LayerFlag::Locked));
     toggles
-}
-
-/// The tooltip of the VP Freeze switch (here and in the Layers panel).
-pub(crate) fn vp_tip(frozen: bool) -> &'static str {
-    if frozen {
-        "Frozen in this viewport: click to thaw"
-    } else {
-        "Click to freeze in this viewport only"
-    }
 }
 
 /// The VP Freeze switch's glyph and colour: the sun and snowflake of the
@@ -379,7 +371,7 @@ fn layer_row_contents(
     rect: Rect,
     layer: &Layer,
     text: Color32,
-    vp_frozen: Option<bool>,
+    vp_frozen: Option<VpSwitch>,
 ) {
     let c = &theme.colors;
     let painter = ui.painter();
@@ -395,7 +387,7 @@ fn layer_row_contents(
             Toggle::Flag(LayerFlag::Frozen) => thaw,
             Toggle::Flag(LayerFlag::Locked) => lock,
             Toggle::Viewport => {
-                let frozen = vp_frozen.unwrap_or(false);
+                let frozen = vp_frozen.is_some_and(|s| s.frozen);
                 paint_vp_switch(painter, at, 13.0, vp_glyph(frozen, c.text_weak));
                 continue;
             }

@@ -143,9 +143,12 @@ pub fn plot_sheet(document: &Document, space: PlotSpace) -> Result<PlotSheet, Pl
 pub fn plot_layout(document: &Document, layout: LayoutId) -> Result<PlotSheet, PlotError> {
     let layout = document.layout(layout).ok_or(PlotError::NoLayout)?;
     validate_plot(&layout.plot).map_err(PlotError::Invalid)?;
+    // The sheet's objects lie on the page as it is read; the page setup turns
+    // them onto the paper.
+    let (width, height) = layout.page_size();
     let mut sheet = PlotSheet {
-        width: layout.width,
-        height: layout.height,
+        width,
+        height,
         paths: Vec::new(),
         fills: Vec::new(),
         notes: Vec::new(),
@@ -218,9 +221,12 @@ fn add_paper(
     let window = Bounds::from_points(Point::new(0.0, 0.0), Point::new(sheet.width, sheet.height));
     let frame = Bounds::from_points(Point::new(-1e12, -1e12), Point::new(1e12, 1e12));
     let same = |p: Point| p;
+    let shown = |layer| !layout.is_paper_frozen(layer);
     for object in document
         .visible_in(Some(layout.id))
+        .filter(|o| shown(o.attrs.layer))
         .flat_map(|o| document.drawn(o))
+        .filter(|o| shown(o.attrs.layer))
     {
         add_viewed(
             sheet,
@@ -476,6 +482,7 @@ mod tests {
             height: 210.0,
             plot: crate::PlotSettings::for_layout(297.0, 210.0),
             viewports: vec![vp],
+            paper_frozen: Vec::new(),
         };
         doc.set_layouts(vec![layout]);
         (doc, id)
@@ -626,6 +633,39 @@ mod tests {
             plot_layout(&doc, crate::LayoutId(99)),
             Err(PlotError::NoLayout)
         );
+    }
+
+    #[test]
+    fn a_layer_frozen_in_the_model_tab_still_plots_in_viewports() {
+        let (mut doc, id) = plotted(&[line((4500.0, 4000.0), (5500.0, 4000.0))]);
+        let layer = doc.allocate_layer_id();
+        doc.push_layer(Layer {
+            frozen_in_model: true,
+            ..Layer::new(layer, "Hatching")
+        });
+        doc.add_with(
+            line((4600.0, 4100.0), (5400.0, 4100.0)),
+            Attributes::on_layer(layer),
+        );
+        assert_eq!(plot_layout(&doc, id).unwrap().paths.len(), 2);
+    }
+
+    #[test]
+    fn a_layer_frozen_in_paper_space_leaves_the_sheet_but_not_its_viewports() {
+        let (mut doc, id) = plotted(&[line((4500.0, 4000.0), (5500.0, 4000.0))]);
+        let layer = doc.allocate_layer_id();
+        doc.push_layer(Layer::new(layer, "Notes"));
+        doc.add_with(
+            line((4600.0, 4100.0), (5400.0, 4100.0)),
+            Attributes::on_layer(layer),
+        );
+        doc.set_active_layout(Some(id));
+        doc.add_with(line((10.0, 5.0), (40.0, 5.0)), Attributes::on_layer(layer));
+        assert_eq!(plot_layout(&doc, id).unwrap().paths.len(), 3);
+        let mut layouts = doc.layouts().to_vec();
+        layouts[0].set_paper_frozen(&[layer], true);
+        doc.set_layouts(layouts);
+        assert_eq!(plot_layout(&doc, id).unwrap().paths.len(), 2);
     }
 
     #[test]

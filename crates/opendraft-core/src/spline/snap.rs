@@ -208,6 +208,30 @@ impl Spline {
             (p.x - from.x) * d.y - (p.y - from.y) * d.x
         })
     }
+
+    /// The points of the spline where a line running along `direction`
+    /// meets it at a right angle.
+    pub fn perpendicular_along(&self, direction: Point) -> Vec<Point> {
+        let Some(dir) = crate::curve_snap::unit(direction) else {
+            return Vec::new();
+        };
+        self.roots(|u| {
+            let d = self.derivative_at(u);
+            d.x * dir.x + d.y * dir.y
+        })
+    }
+
+    /// The points of the spline where a line running along `direction`
+    /// just touches it.
+    pub fn tangent_along(&self, direction: Point) -> Vec<Point> {
+        let Some(dir) = crate::curve_snap::unit(direction) else {
+            return Vec::new();
+        };
+        self.roots(|u| {
+            let d = self.derivative_at(u);
+            d.x * dir.y - d.y * dir.x
+        })
+    }
 }
 
 #[cfg(test)]
@@ -229,6 +253,17 @@ mod tests {
 
     fn everywhere() -> Bounds {
         Bounds::from_points(p(-100.0, -100.0), p(100.0, 100.0))
+    }
+
+    #[test]
+    fn a_line_of_known_direction_touches_the_top_of_the_cap() {
+        let touch = cap().tangent_along(p(2.0, 0.0));
+        assert_eq!(touch.len(), 1, "{touch:?}");
+        assert!(near(touch[0], p(5.0, 5.0)), "{touch:?}");
+        let feet = cap().perpendicular_along(p(0.0, 1.0));
+        assert_eq!(feet.len(), 1, "{feet:?}");
+        assert!(near(feet[0], p(5.0, 5.0)), "{feet:?}");
+        assert!(cap().tangent_along(p(0.0, 0.0)).is_empty());
     }
 
     #[test]

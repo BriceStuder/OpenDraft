@@ -13,7 +13,7 @@ use std::sync::Arc;
 use opendraft_core::{Bounds, Curve, Ellipse, Entity, Object, Point, Spline};
 
 use super::track::{Geom, Track};
-use super::{Class, Ranked, SnapKind, SnapPoint};
+use super::{Class, Probe, Ranked, SnapKind, SnapPoint};
 
 /// Most pieces in the aperture that are intersected with each other; the
 /// pairs grow with the square, and a pointer over a dense patch should still
@@ -73,6 +73,20 @@ impl Piece<'_> {
         match self {
             Piece::Curve(c) => c.tangent_points(from),
             Piece::Spline(s) => s.tangent_points(from),
+        }
+    }
+
+    fn feet_along(&self, direction: Point) -> Vec<Point> {
+        match self {
+            Piece::Curve(c) => c.perpendicular_along(direction),
+            Piece::Spline(s) => s.perpendicular_along(direction),
+        }
+    }
+
+    fn tangents_along(&self, direction: Point) -> Vec<Point> {
+        match self {
+            Piece::Curve(c) => c.tangent_along(direction),
+            Piece::Spline(s) => s.tangent_along(direction),
         }
     }
 }
@@ -238,19 +252,21 @@ pub(super) fn intersections(
 /// under the pointer, that are themselves within `tolerance` of `cursor`: the
 /// pointer has to be near the point, not just over the curve.
 ///
-/// With no `from` (the command has no last point yet) the point cannot be
+/// With no `from` but the direction of the line the point places (XLINE's
+/// Ang), they are the points where a line along that direction is square to
+/// the piece or touches it.
+///
+/// With neither (the command has no last point yet) the point cannot be
 /// worked out: the snap is *deferred*, found at the nearest point of a piece
 /// that could have one (any for Perpendicular, a curved one for Tangent), and
 /// the command settles it when the next point is given.
 pub(super) fn from_point(
     scene: &Scene<'_>,
     capture: &Bounds,
-    cursor: Point,
-    tolerance: f64,
-    from: Option<Point>,
-    defer: bool,
+    probe: &Probe<'_>,
     want: (bool, bool),
 ) -> Vec<Ranked> {
+    let (cursor, tolerance) = (probe.cursor, probe.tolerance);
     let (perpendicular, tangent) = want;
     let mut found = Vec::new();
     for item in scene.items(capture) {
@@ -270,8 +286,8 @@ pub(super) fn from_point(
                 }
             }
         };
-        match from {
-            Some(from) => {
+        match (probe.from, probe.along) {
+            (Some(from), _) => {
                 if perpendicular {
                     add(piece.feet(from), SnapKind::Perpendicular, false);
                 }
@@ -279,7 +295,15 @@ pub(super) fn from_point(
                     add(piece.tangents(from), SnapKind::Tangent, false);
                 }
             }
-            None if defer => {
+            (None, Some(direction)) => {
+                if perpendicular {
+                    add(piece.feet_along(direction), SnapKind::Perpendicular, false);
+                }
+                if tangent {
+                    add(piece.tangents_along(direction), SnapKind::Tangent, false);
+                }
+            }
+            (None, None) if probe.defer => {
                 let at = vec![piece.nearest(cursor)];
                 if perpendicular {
                     add(at.clone(), SnapKind::Perpendicular, true);
@@ -288,7 +312,7 @@ pub(super) fn from_point(
                     add(at, SnapKind::Tangent, true);
                 }
             }
-            None => {}
+            (None, None) => {}
         }
     }
     found

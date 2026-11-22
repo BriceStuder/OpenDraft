@@ -413,7 +413,8 @@ impl View {
         };
         let args = (painter, rect, style, document);
         let slot = Slot::Sheet(layout.id);
-        self.paint_space(slot, args, Some(layout.id), &[], selected, hovered);
+        let frozen = &layout.paper_frozen;
+        self.paint_space(slot, args, Some(layout.id), frozen, selected, hovered);
         self.camera = live;
     }
 }
