@@ -365,6 +365,7 @@ pub(super) fn to_document(
             on: l.on,
             frozen: l.frozen,
             locked: l.locked,
+            frozen_in_model: false,
         };
         if is_default {
             document.replace_layer(layer);

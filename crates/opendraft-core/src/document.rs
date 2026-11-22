@@ -319,10 +319,11 @@ impl Document {
         self.layer_of(object).is_visible()
     }
 
-    /// May be picked and edited: visible and not on a locked layer.
+    /// May be picked and edited: visible, not on a locked layer, nor on one
+    /// frozen where the view is (`active_frozen`).
     pub fn is_selectable(&self, object: &Object) -> bool {
         let layer = self.layer_of(object);
-        layer.is_visible() && !layer.locked
+        layer.is_visible() && !layer.locked && !self.active_frozen.contains(&layer.id)
     }
 
     /// Visible objects of the space being edited (see `active_layout`).
@@ -408,6 +409,13 @@ impl Document {
     /// The layers hidden from the object queries (see `set_active_frozen`).
     pub fn active_frozen(&self) -> &[LayerId] {
         &self.active_frozen
+    }
+
+    /// The layers frozen in the Model tab only (`Layer::frozen_in_model`):
+    /// the Model tab hides them, layout viewports still show them.
+    pub fn frozen_in_model(&self) -> Vec<LayerId> {
+        let layers = self.layers().iter().filter(|l| l.frozen_in_model);
+        layers.map(|l| l.id).collect()
     }
 
     /// Ids of the objects on a layout's sheet.

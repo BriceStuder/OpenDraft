@@ -288,6 +288,9 @@ struct LayerDto {
     on: bool,
     frozen: bool,
     locked: bool,
+    /// Frozen in the Model tab only (layout viewports still show it).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    frozen_in_model: bool,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -369,6 +372,7 @@ impl DrawingDto {
                 on: l.on,
                 frozen: l.frozen,
                 locked: l.locked,
+                frozen_in_model: l.frozen_in_model,
             })
             .collect();
         let mut styles = StylePool::new();
@@ -552,6 +556,7 @@ mod tests {
             on: true,
             frozen: false,
             locked: true,
+            frozen_in_model: true,
         });
         let hidden = document.allocate_layer_id();
         document.push_layer(Layer {
@@ -1093,6 +1098,7 @@ mod tests {
                     None,
                 )
             }],
+            paper_frozen: Vec::new(),
         };
         layout.plot.device_name = "Office Printer.pc3".into();
         layout.plot.canonical_media_name = "ISO_A3_(420.00_x_297.00_MM)".into();
@@ -1133,6 +1139,7 @@ mod tests {
             height: 210.0,
             plot: opendraft_core::PlotSettings::for_layout(297.0, 210.0),
             viewports: vec![viewport],
+            paper_frozen: vec![LayerId(4)],
         };
         document.set_layouts(vec![layout]);
         let loaded = roundtrip(&document);
@@ -1140,11 +1147,12 @@ mod tests {
             loaded.layouts()[0].viewports[0].frozen,
             [LayerId(0), LayerId(4)]
         );
+        assert_eq!(loaded.layouts()[0].paper_frozen, [LayerId(4)]);
         let text = String::from_utf8(NativeFormat.write(&document).unwrap().bytes).unwrap();
         assert!(text.contains("\"frozen\""));
         let plain = String::from_utf8(NativeFormat.write(&rich()).unwrap().bytes).unwrap();
         assert!(
-            !plain.contains("\"frozen\": ["),
+            !plain.contains("frozen\": ["),
             "none written when none are frozen"
         );
     }
@@ -1163,6 +1171,7 @@ mod tests {
             height: 210.0,
             plot: opendraft_core::PlotSettings::for_layout(297.0, 210.0),
             viewports: Vec::new(),
+            paper_frozen: Vec::new(),
         };
         let id = layout.id;
         document.set_layouts(vec![layout]);

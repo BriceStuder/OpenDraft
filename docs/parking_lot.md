@@ -100,6 +100,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - The layer plot flag (AutoCAD's Plot / No Plot column, DXF group 290): not kept, so a non-plotting layer read from a file is plotted and is written back as plotted (only Defpoints is written not plotted). Objects on Defpoints are plotted too, though AutoCAD never plots them.
 - Properties panel parity with AutoCAD, kind by kind: `private_material/properties_gap.md`.
 - Colours: the Color Books tab, recent colours kept across sessions, greys 250 to 255 that follow the background.
+- Freeze in the Model tab only: no command for it (only the Layers panel and the ribbon's layer list), and Home-page thumbnails still draw those layers.
 
 ## Layouts and plotting
 
@@ -164,7 +165,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
-- **In AutoCAD** (open, `AUDIT`, edit, save): everything the DXF writer emits for dimensions, multileaders, legacy leaders and block attributes, ByBlock, and the R2000 layout export; the DWG reader's object counts against an AutoCAD listing; the ellipse angle convention and the spline prompts; MTEXT tracking at the end of a line; the rectangular array's default spacing; the multileader style's angle constraints and attachment codes.
+- **In AutoCAD** (open, `AUDIT`, edit, save): the Model-tab freeze's XDATA on LAYER records (it should survive a save), everything the DXF writer emits for dimensions, multileaders, legacy leaders and block attributes, ByBlock, and the R2000 layout export; the DWG reader's object counts against an AutoCAD listing; the ellipse angle convention and the spline prompts; MTEXT tracking at the end of a line; the rectangular array's default spacing; the multileader style's angle constraints and attachment codes.
 - **By hand in the real app** (tests drive the commands through `AppState` only): DIMEDIT and DIMTEDIT, TEXTEDIT and TEXT typed in place, DIST and AREA, Overkill and Purge, ByBlock, the attribute editor's double-click and the ATTDEF dialog, the warning before a large file opens, the window and lasso selection style, snapping to a polyline while drawing it, the Ortho pointer test, the Paragraph dialog (nobody has seen it), DIVIDE, MEASURE, grips, TRIM and BREAK on points and construction lines, and whether the Settings dialog's Files and Automation pages fit its height without scrolling.
 - **On real machines:** Linux desktops beyond Mint (and on Mint: the Home page's templates and file actions, the assistant's key in the Secret Service, the crash log); the Windows exe on a machine with no Visual C++ Redistributable; the MSI's shortcut and file association opening with no console window; physical printers, and CUPS versions other than the one tried; the update check against the real GitHub.
 - **With a real model:** the assistant with Mistral on a real drawing, including its warning before it generates shapes (it needs your API key, and sends drawing data to the service).

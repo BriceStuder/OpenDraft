@@ -22,6 +22,9 @@ pub struct LayoutDto {
     plot: Option<PlotSettingsDto>,
     /// Bottom viewport first.
     viewports: Vec<ViewportDto>,
+    /// Layers frozen on this layout's sheet only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    paper_frozen: Vec<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -152,8 +155,17 @@ impl LayoutDto {
                     frozen: v.frozen.iter().map(|l| l.0).collect(),
                 })
                 .collect(),
+            paper_frozen: layout.paper_frozen.iter().map(|l| l.0).collect(),
         }
     }
+}
+
+/// A file's frozen-layer list, sorted and without repeats.
+fn sorted_layers(ids: &[u64]) -> Vec<LayerId> {
+    let mut layers: Vec<_> = ids.iter().map(|l| LayerId(*l)).collect();
+    layers.sort_unstable();
+    layers.dedup();
+    layers
 }
 
 /// Turn the file's layouts into real ones, refusing what could not exist.
@@ -183,12 +195,7 @@ pub fn into_layouts(dtos: Vec<LayoutDto>) -> Result<Vec<Layout>, FileError> {
                 scale: v.scale,
                 locked: v.locked,
                 on: v.on,
-                frozen: {
-                    let mut layers: Vec<_> = v.frozen.iter().map(|l| LayerId(*l)).collect();
-                    layers.sort_unstable();
-                    layers.dedup();
-                    layers
-                },
+                frozen: sorted_layers(&v.frozen),
             };
             if !viewport.is_valid() {
                 return invalid(format!("viewport {} has no usable size or scale", v.id));
@@ -206,6 +213,7 @@ pub fn into_layouts(dtos: Vec<LayoutDto>) -> Result<Vec<Layout>, FileError> {
             height: dto.height,
             plot,
             viewports,
+            paper_frozen: sorted_layers(&dto.paper_frozen),
         };
         if !layout.is_valid() {
             return invalid(format!("layout {} has no usable sheet size", dto.id));

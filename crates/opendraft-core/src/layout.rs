@@ -110,13 +110,7 @@ impl Viewport {
 
     /// Freeze or thaw layers here, keeping the list sorted and without repeats.
     pub fn set_frozen(&mut self, layers: &[LayerId], freeze: bool) {
-        if freeze {
-            self.frozen.extend_from_slice(layers);
-            self.frozen.sort_unstable();
-            self.frozen.dedup();
-        } else {
-            self.frozen.retain(|l| !layers.contains(l));
-        }
+        set_in(&mut self.frozen, layers, freeze);
     }
 
     /// Whether the window can be drawn and inverted: finite and not flat.
@@ -252,9 +246,23 @@ pub struct Layout {
     pub plot: PlotSettings,
     /// Viewports in stacking order, the last on top.
     pub viewports: Vec<Viewport>,
+    /// Layers hidden on this layout's sheet only (VP Freeze in paper space),
+    /// kept sorted. Its viewports and other layouts still show them. DXF
+    /// keeps the list on the layout's sheet-wide viewport.
+    pub paper_frozen: Vec<LayerId>,
 }
 
 impl Layout {
+    /// Whether a layer is frozen on this layout's sheet.
+    pub fn is_paper_frozen(&self, layer: LayerId) -> bool {
+        self.paper_frozen.binary_search(&layer).is_ok()
+    }
+
+    /// Freeze or thaw layers on the sheet, keeping the list sorted.
+    pub fn set_paper_frozen(&mut self, layers: &[LayerId], freeze: bool) {
+        set_in(&mut self.paper_frozen, layers, freeze);
+    }
+
     pub fn viewport(&self, id: ViewportId) -> Option<&Viewport> {
         self.viewports.iter().find(|v| v.id == id)
     }
@@ -294,6 +302,17 @@ impl Layout {
             && (self.plot.paper_width_mm - self.width).abs() < 1e-9
             && (self.plot.paper_height_mm - self.height).abs() < 1e-9
             && ids.len() == self.viewports.len()
+    }
+}
+
+/// Add `layers` to a sorted list without repeats, or take them out.
+fn set_in(list: &mut Vec<LayerId>, layers: &[LayerId], freeze: bool) {
+    if freeze {
+        list.extend_from_slice(layers);
+        list.sort_unstable();
+        list.dedup();
+    } else {
+        list.retain(|l| !layers.contains(l));
     }
 }
 
@@ -501,6 +520,7 @@ mod tests {
             height: 210.0,
             plot: PlotSettings::for_layout(297.0, 210.0),
             viewports: vec![under, over, off],
+            paper_frozen: Vec::new(),
         };
         assert_eq!(
             layout.viewport_at(Point::new(150.0, 100.0)),

@@ -90,10 +90,11 @@ fn dim_style_entries(doc: &Document, out: &mut Vec<Entry>) {
     }
 }
 
+/// Frozen in a viewport or on a layout's sheet (AutoCAD's VP Freeze).
 fn frozen_in_viewport(doc: &Document, id: LayerId) -> bool {
     doc.layouts()
         .iter()
-        .any(|l| l.viewports.iter().any(|v| v.is_frozen(id)))
+        .any(|l| l.is_paper_frozen(id) || l.viewports.iter().any(|v| v.is_frozen(id)))
 }
 
 fn layer_entries(doc: &Document, out: &mut Vec<Entry>) {

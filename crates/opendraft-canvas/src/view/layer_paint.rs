@@ -82,7 +82,8 @@ pub(super) struct Frame<'a> {
 }
 
 impl View {
-    /// The entities of the space being edited in the model tab.
+    /// The entities of the space being edited in the model tab, but those on
+    /// layers frozen there (`Document::active_frozen`).
     pub(super) fn paint_model(
         &self,
         painter: &Painter,
@@ -95,7 +96,8 @@ impl View {
         let space = document.active_layout();
         let slot = Slot::Model;
         let args = (painter, rect, style, document);
-        self.paint_space(slot, args, space, &[], selection, hover);
+        let frozen = document.active_frozen();
+        self.paint_space(slot, args, space, frozen, selection, hover);
     }
 
     /// The entities of `space` but those on `frozen` layers, through the kept

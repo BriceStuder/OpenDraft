@@ -61,7 +61,8 @@ pub enum LayerEdit {
     SetColor(Vec<LayerId>, Color),
     SetLinetype(Vec<LayerId>, LinetypeId),
     SetLineweight(Vec<LayerId>, Lineweight),
-    /// Freeze (`true`) or thaw layers in the viewport being worked on.
+    /// Freeze (`true`) or thaw layers in the viewport being worked on, or in
+    /// the Model tab (see `view_freeze`).
     SetInViewport(Vec<LayerId>, bool),
 }
 
@@ -120,7 +121,7 @@ impl AppState {
             LayerEdit::SetLineweight(ids, weight) => {
                 self.edit_layers("Change layer lineweight", ids, |l| l.lineweight = weight)
             }
-            LayerEdit::SetInViewport(ids, freeze) => self.set_layers_in_viewport(&ids, freeze),
+            LayerEdit::SetInViewport(ids, freeze) => self.set_layers_in_view(&ids, freeze),
         }
     }
 
@@ -224,7 +225,7 @@ impl AppState {
 
     /// Apply `change` to the given layers as one undo step. Does nothing when
     /// no layer would change.
-    fn edit_layers(
+    pub(crate) fn edit_layers(
         &mut self,
         name: &str,
         ids: impl IntoIterator<Item = LayerId>,
