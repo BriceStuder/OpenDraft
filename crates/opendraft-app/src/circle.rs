@@ -96,7 +96,8 @@ pub fn draw_circle_ttr(ed: &mut Editor) -> Result<(), Cancelled> {
     tangent_tangent_radius(ed)
 }
 
-/// CIRCLE, Tan, Tan, Tan: three lines, circles or arcs to touch.
+/// CIRCLE, Tan, Tan, Tan: three lines, circles, arcs, ellipses or splines
+/// to touch.
 pub fn draw_circle_3t(ed: &mut Editor) -> Result<(), Cancelled> {
     let first = pick_touchable(ed, "first")?;
     let second = pick_touchable(ed, "second")?;
@@ -123,7 +124,7 @@ fn pick_touchable(ed: &Editor, which: &str) -> Result<(Entity, Point), Cancelled
         if touchable_by_tangent_circle(&entity, at) {
             return Ok((entity, at));
         }
-        ed.say("Select a line, a circle or an arc.");
+        ed.say("Select a line, a circle, an arc, an ellipse or a spline.");
     }
 }
 
