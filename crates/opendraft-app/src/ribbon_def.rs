@@ -1,25 +1,94 @@
 //! The application's ribbon layout. Items name command ids; what they do is
 //! decided elsewhere (the command registry arrives in Phase 3).
+//!
+//! The usual tabs are always there, and a contextual tab follows them while
+//! the drawing on screen is in the Block Editor or a layout
+//! ([`RibbonContext`]). The Block Editor's opens on its tab, as in AutoCAD:
+//! its Save and Close are how one leaves it. The Layout tab never takes the
+//! focus, unlike AutoCAD's (which does unless set to "Full without focus"):
+//! it holds set-up tools used now and then, while the work in a layout is done
+//! on the usual tabs, so being moved off them would only get in the way.
 
 use opendraft_ui::icons;
 use opendraft_ui::ribbon::{Column, Item, Panel, Ribbon, Tab};
 
-mod home;
+use crate::state::AppState;
 
-pub fn default_ribbon() -> Ribbon {
-    Ribbon {
-        tabs: vec![home::home(), insert(), annotate(), view(), manage()],
-    }
-}
+mod home;
+mod layout;
+
+pub use layout::LAYOUT_TAB;
 
 /// The title of the contextual tab shown while the Block Editor is open.
 pub const BLOCK_EDITOR_TAB: &str = "Block Editor";
 
-/// The ribbon while the Block Editor is open: the usual tabs and, last, a
-/// contextual Block Editor tab, as in AutoCAD.
-pub fn block_editor_ribbon() -> Ribbon {
-    let mut ribbon = default_ribbon();
-    ribbon.tabs.push(Tab {
+/// What the drawing on screen is doing, which decides the contextual tab.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RibbonContext {
+    /// Model space, or no drawing on screen (the Home page).
+    Normal,
+    Layout,
+    BlockEditor,
+}
+
+impl RibbonContext {
+    pub fn of(state: &AppState) -> Self {
+        if state.home {
+            Self::Normal
+        } else if state.in_block_editor() {
+            Self::BlockEditor
+        } else if state.space().layout().is_some() {
+            Self::Layout
+        } else {
+            Self::Normal
+        }
+    }
+
+    /// The context `ribbon` was made for, told by its contextual tab.
+    pub fn shown(ribbon: &Ribbon) -> Self {
+        match ribbon.tabs.last().filter(|t| t.contextual).map(|t| t.title) {
+            Some(BLOCK_EDITOR_TAB) => Self::BlockEditor,
+            Some(LAYOUT_TAB) => Self::Layout,
+            _ => Self::Normal,
+        }
+    }
+}
+
+pub fn default_ribbon() -> Ribbon {
+    ribbon_for(RibbonContext::Normal)
+}
+
+/// The usual tabs and, last, the contextual tab of `context`, if it has one.
+pub fn ribbon_for(context: RibbonContext) -> Ribbon {
+    let mut tabs = vec![home::home(), insert(), annotate(), view(), manage()];
+    match context {
+        RibbonContext::Normal => {}
+        RibbonContext::Layout => tabs.push(layout::layout()),
+        RibbonContext::BlockEditor => tabs.push(block_editor()),
+    }
+    Ribbon { tabs }
+}
+
+/// The tab to show once the ribbon changes from `from` to `to` (made for
+/// `context`): the Block Editor's own tab; otherwise the tab that was showing,
+/// if `to` still has it, else Home.
+pub fn tab_after_change(
+    active: usize,
+    from: &Ribbon,
+    to: &Ribbon,
+    context: RibbonContext,
+) -> usize {
+    if context == RibbonContext::BlockEditor {
+        return to.tabs.len().saturating_sub(1);
+    }
+    from.tabs
+        .get(active)
+        .and_then(|shown| to.tabs.iter().position(|t| t.title == shown.title))
+        .unwrap_or(0)
+}
+
+fn block_editor() -> Tab {
+    Tab {
         title: BLOCK_EDITOR_TAB,
         panels: vec![
             Panel {
@@ -41,8 +110,8 @@ pub fn block_editor_ribbon() -> Ribbon {
                 ..Default::default()
             },
         ],
-    });
-    ribbon
+        contextual: true,
+    }
 }
 
 fn insert() -> Tab {
@@ -109,6 +178,7 @@ fn insert() -> Tab {
                 ..Default::default()
             },
         ],
+        contextual: false,
     }
 }
 
@@ -187,6 +257,7 @@ fn annotate() -> Tab {
                 ..Default::default()
             },
         ],
+        contextual: false,
     }
 }
 
@@ -250,6 +321,7 @@ fn view() -> Tab {
                 ..Default::default()
             },
         ],
+        contextual: false,
     }
 }
 
@@ -284,5 +356,165 @@ fn manage() -> Tab {
                 ..Default::default()
             },
         ],
+        contextual: false,
+    }
+}
+
+/// Every command id on `tab`, in its panels and their flyouts.
+#[cfg(test)]
+fn commands(tab: &Tab) -> Vec<&'static str> {
+    use opendraft_ui::ribbon::Cell;
+    let mut ids = Vec::new();
+    for panel in &tab.panels {
+        for column in &panel.columns {
+            match column {
+                Column::Large(item) => ids.push(item.command),
+                Column::LargeSplit(split) => ids.extend(split.items.iter().map(|i| i.command)),
+                Column::Stack(items) => ids.extend(items.iter().map(|i| i.command)),
+                Column::Rows(rows) => {
+                    for cell in rows.iter().flatten() {
+                        match cell {
+                            Cell::Button(item) | Cell::Icon(item) => ids.push(item.command),
+                            Cell::Split(split) | Cell::IconSplit(split) => {
+                                ids.extend(split.items.iter().map(|i| i.command))
+                            }
+                            Cell::Slot { .. } => {}
+                        }
+                    }
+                }
+            }
+        }
+        ids.extend(panel.extra.iter().map(|i| i.command));
+    }
+    ids
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block_cmd::define_block;
+    use crate::commands::build_registry;
+    use opendraft_core::{Entity, Point};
+    use RibbonContext::{BlockEditor, Layout, Normal};
+
+    fn titles(ribbon: &Ribbon) -> Vec<&'static str> {
+        ribbon.tabs.iter().map(|t| t.title).collect()
+    }
+
+    #[test]
+    fn a_contextual_tab_follows_the_usual_ones_and_only_it_is_marked() {
+        let usual = titles(&default_ribbon());
+        assert_eq!(usual, ["Home", "Insert", "Annotate", "View", "Manage"]);
+        for (context, extra) in [
+            (Normal, None),
+            (Layout, Some(LAYOUT_TAB)),
+            (BlockEditor, Some(BLOCK_EDITOR_TAB)),
+        ] {
+            let ribbon = ribbon_for(context);
+            let mut expected = usual.clone();
+            expected.extend(extra);
+            assert_eq!(titles(&ribbon), expected);
+            let marked: Vec<&str> = ribbon
+                .tabs
+                .iter()
+                .filter(|t| t.contextual)
+                .map(|t| t.title)
+                .collect();
+            assert_eq!(marked, Vec::from_iter(extra));
+            assert_eq!(RibbonContext::shown(&ribbon), context);
+        }
+    }
+
+    #[test]
+    fn every_contextual_item_runs_a_command() {
+        let registry = build_registry();
+        for context in [Layout, BlockEditor] {
+            let ribbon = ribbon_for(context);
+            let tab = ribbon.tabs.last().expect("a contextual tab");
+            let ids = commands(tab);
+            assert!(!ids.is_empty());
+            for id in ids {
+                assert!(registry.get(id).is_some(), "{}: {id}", tab.title);
+            }
+        }
+    }
+
+    #[test]
+    fn the_layout_tab_has_autocads_panels() {
+        let ribbon = ribbon_for(Layout);
+        let tab = ribbon.tabs.last().expect("the Layout tab");
+        let panels: Vec<&str> = tab.panels.iter().map(|p| p.title).collect();
+        assert_eq!(panels, ["Layout", "Layout Viewports", "Display"]);
+    }
+
+    #[test]
+    fn the_layout_tab_comes_and_goes_without_moving_the_ribbon() {
+        let (normal, layout) = (ribbon_for(Normal), ribbon_for(Layout));
+        for active in 0..normal.tabs.len() {
+            assert_eq!(tab_after_change(active, &normal, &layout, Layout), active);
+            assert_eq!(tab_after_change(active, &layout, &normal, Normal), active);
+        }
+        // Leaving a layout while on its tab: that tab is gone, so Home.
+        let on_layout = layout.tabs.len() - 1;
+        assert_eq!(tab_after_change(on_layout, &layout, &normal, Normal), 0);
+    }
+
+    #[test]
+    fn the_block_editor_opens_on_its_tab_and_leaves_the_others_be() {
+        let (normal, editor) = (ribbon_for(Normal), ribbon_for(BlockEditor));
+        let on_editor = editor.tabs.len() - 1;
+        assert_eq!(
+            tab_after_change(2, &normal, &editor, BlockEditor),
+            on_editor
+        );
+        assert_eq!(tab_after_change(on_editor, &editor, &normal, Normal), 0);
+        // Moved to another tab while editing: closing keeps it.
+        assert_eq!(tab_after_change(3, &editor, &normal, Normal), 3);
+    }
+
+    #[test]
+    fn the_context_is_the_one_of_the_drawing_on_screen() {
+        let mut state = AppState::new();
+        assert_eq!(RibbonContext::of(&state), Normal);
+        state.new_layout();
+        assert_eq!(RibbonContext::of(&state), Layout);
+        state.mspace();
+        assert!(state.space().viewport().is_some(), "inside the viewport");
+        assert_eq!(RibbonContext::of(&state), Layout);
+        state.home = true;
+        assert_eq!(RibbonContext::of(&state), Normal, "the Home page");
+        state.home = false;
+        state.enter_model();
+        assert_eq!(RibbonContext::of(&state), Normal);
+
+        state.add_entity(Entity::Rectangle {
+            min: Point::new(0.0, 0.0),
+            max: Point::new(2.0, 1.0),
+        });
+        state.select_all();
+        state.start_command("BLOCK", define_block);
+        state.settle_command();
+        for answer in ["Box", "0,0"] {
+            state.cmd_submit(answer);
+            state.settle_command();
+        }
+        state.select_all();
+        state.bedit();
+        assert!(state.in_block_editor());
+        assert_eq!(RibbonContext::of(&state), BlockEditor);
+    }
+
+    #[test]
+    fn the_lock_button_shows_the_lock_of_the_viewport_it_acts_on() {
+        let registry = build_registry();
+        let mut state = AppState::new();
+        state.new_layout();
+        assert!(!registry.is_checked("layout.vplock", &state), "none picked");
+        state.mspace();
+        assert!(!registry.is_checked("layout.vplock", &state));
+        registry.execute("layout.vplock", &mut state).unwrap();
+        assert!(registry.is_checked("layout.vplock", &state));
+        registry.execute("layout.vplock", &mut state).unwrap();
+        assert!(!registry.is_checked("layout.vplock", &state));
     }
 }

@@ -1,4 +1,11 @@
-# OpenDraft UI Plan
+# OpenDraft development history (archive)
+
+**This file is no longer updated (21-11-2026).** It was `docs/ui_plan.md`: the plan the interface started from, then a diary of what was built and why, feature by feature, up to that date. It is kept for the reasoning behind past decisions; much of what it calls "not done" has been done since. For the current state read:
+
+- `docs/ARCHITECTURE.md`: how things work and the rules new code follows.
+- `docs/ROADMAP.md`: what comes first and why, and the next steps.
+- `docs/parking_lot.md`: everything known to be missing or left for later.
+- The pull requests and `git log`: what each change did, from 21-11-2026 on.
 
 Goal: a solid, good-looking UI foundation for a 2D-only CAD app, built on **egui/eframe** (the same approach as EffectCraft). This is a fresh start: the PySide6 app is a source of feature ideas only, not an architecture or look to copy.
 
@@ -749,22 +756,8 @@ The colour lists (Layers panel, Properties, multileader styles) used to offer 16
 
 Colour 7's swatch is half white and half black everywhere (20-11-2026), not only in the list and the dialog (AutoCAD draws it white in most places; the two halves say it follows the background): the Layers panel's colour cells, the ribbon's layer and colour lists, the Color rows of Properties and of the multileader styles, and the dialog's preview. They all draw through `colour_ui::paint_swatch` (with a test).
 
-## Where we are and what next (start here in a new session)
-**Built:** shell, theme, ribbon, docking, canvas with snapping and region selection, Properties and Layers panels, command line, system variables, files (`.odraft` v1, DXF import (with blocks, ellipses, splines and hatches) and R12/R2000 export, DWG import with blocks, ellipses and splines, atomic save, autosave and recovery), and these commands: Line, Circle, Arc, Ellipse, Spline, Hatch and Edit Hatch, Rectangle, Polyline (with Arc), Move, Copy, Rotate, Mirror, Scale, Erase, Trim, Extend, Offset, Fillet, Chamfer, Join, Explode, Break, Stretch, the five dimension commands, Block, Insert, Purge (blocks only), the Block Editor (BEDIT, BSAVE, BCLOSE), and grip editing. Everything up to the ellipse baseline (14-10-2026) is pushed; `git log origin/main..` shows anything newer.
-**Working rules:** commit as James with no co-author trailer; gate commits on real exit codes of fmt, clippy `-D warnings` and `cargo test --workspace`; stage with `git add -u` plus named new files; push only when asked; rebuild the exe before testing in the real app; the file-size test allows 450 production lines per file.
-**Suggested next steps, roughly in order:**
-1. PEDIT is built (see "PEDIT" at the end); its Fit, Spline, Jointype and vertex Tangent options wait for curve-fitting and conformance fixtures; the checks against `private_material/pedit_command_specification.md` are in the PEDIT section. (Ellipse items left over are in the Ellipse section's parking lot.)
-2. Spline milestone 4 (exact Break, Trim/Extend crossings, Join; see "Spline"), JOIN of arcs across gaps with Close (lines on one line are done).
-3. The missing draw commands from `2d_commands_reference.md`: Point, Donut, Construction line, Ray and Boundary are done (see their sections) (and the rest of Ellipse: see "Ellipse").
-4. Associative arrays (Distance, Area, Overkill and Purge are done) (see "Arrays").
-4a. Layouts, next: plot margins and linetypes, non-rectangular viewport clips, checking the R2000 export in AutoCAD (see "Layouts and viewports").
-4b. OD Roman stroke font (`private_material/od_roman_font_specification.md`): data format, parser, SVG converter, outlines and layout (stroke shaper, weight per glyph, painting, plotting, `.odraft`) are built (milestones 1 to 5, checked in the real app: the style dialog has the font list and Line Weight, the MTEXT toolbar has Weight %); the weight is stored in the font control as the `|w` field. Next: the PDF hidden text layer and the DXF round trip (`RomanS.shx` plus OpenDraft XDATA, and whether AutoCAD accepts `|w`). The font is drawn as one SVG per glyph in `fonts/od_roman/` (see the specification, section 2; `scripts/od_roman_new_glyph.py`, `od_roman_import.py`, `od_roman_preview.py`). Still to draw: `$ % / : < > @ [ \ ] ^ ` { | } ~`, `Ø`, `±`, `×`.
-5. Annotation: multiline text (slices 1 to 7 are built, see "Multiline text"; next is a font and style menu in the toolbar, symbols and fields, then the ruler once there are AutoCAD paragraph fixtures), then the dimensions that are left (see "Dimensions: what is done and what is outstanding" below, starting with DWG dimension import), then blocks (see "Blocks": DXF blocks, ByBlock, attributes, dynamic blocks).
-6. Housekeeping: split `dxf/read.rs` (`widgets.rs` was split into `widgets/cards.rs` and `widgets/containers.rs`, 1-11-2026); make Document mutators return `Result`; run on Linux for the first time; progress bar for large files.
-7. Linetypes (see "Linetypes": slices 1 to 5 are built (table, dashes, scales and generation, DXF and DWG patterns, the Manager and lists); left are `CELTYPE`, `.lin` loading and `ByBlock`).
-8. Properties panel parity with AutoCAD: `private_material/properties_gap.md` lists every row in the AutoCAD screenshots against what we have, per object kind, with a suggested order (cheap rows first, dimension style table last).
-9. Object snap is complete to the spec apart from the items in docs/ARCHITECTURE.md's "Not built" and the AutoCAD fixtures noted in the spec (see "Object snap").
-Known gaps are listed in the "Still to do" line of each section above.
+## Where we were (moved)
+The to-do list that stood here moved to `docs/ROADMAP.md` ("Next steps") and `docs/parking_lot.md` on 21-11-2026.
 
 ## Sample drawings withdrawn from the repository (23-10-2026)
 The AutoCAD sample drawings (21 DXF and DWG files) moved from the tracked `test_data/` to the git-ignored `private_material/`, because their headers carry the author's work login. Every test that read them was removed: `opendraft-files/tests/{block,dwg,hatch,linetype,spline}_fixtures.rs`, all of `opendraft-dwg/tests/` (containers, inventory, drawing, blocks and the SHA-256 helper), five tests that compared our DXF output with `LEADERS1.dxf`, four more that read its multileaders, texts and leaders, and three app and file tests that imported `Test Drawing 2018.dwg`. The paths named in the sections above for those tests no longer exist. Left to do: rebuild the coverage from small hand-made drawings (DWG container, sections and blocks; leader, multileader and text import; hatch, linetype and spline fixtures), ideally written by our own tools so no personal data is involved.
@@ -1268,9 +1261,5 @@ Settings > Display > Selection chooses how a click on empty space and a drag sel
 **Not done:** a ribbon item; the views of a viewport inside a layout.
 
 ## ZOOM Window (done 21-11-2026)
-`ZOOM` (`Z`, `view.zoom`, `zoom_cmd.rs`) asks "Specify first corner of window or [Extents/Objects/Previous/Window]", then "Specify opposite corner" with a rectangle following the pointer, and shows that window as large as the canvas allows, with no margin (`Camera::show_window`). Extents and Previous do what `ZE` and `ZP` do; Window only asks the corners, for those who type `Z W`; Enter ends with nothing changed; the same point twice says "The window has no size." and asks again. The command asks on its thread and leaves its answer in the drawing's `Doc::zoom_to` slot, which the UI thread empties into the view as soon as it is there. In a layout the window frames the sheet; inside an unlocked viewport it frames the viewport's view (as `ZE` does, so at a tidy scale), and inside a locked one the sheet. Each zoom is a step for `ZP`.
-
-### ZOOM Objects (done 22-11-2026)
-
-`ZO` (`view.zoom_objects`) and the Objects option of `ZOOM` show the box round the selected objects, as large as the canvas allows, like a zoom window round them; with nothing selected they ask "Select objects" first. Construction lines and rays have no box and are left out (as `ZE` leaves them out); with nothing else, "These objects have no extents to zoom to." `ZO` was Zoom Out's alias; Zoom Out keeps its command and ribbon button.
+`ZOOM` (`Z`, `view.zoom`, `zoom_cmd.rs`) asks "Specify first corner of window or [Extents/Previous/Window]", then "Specify opposite corner" with a rectangle following the pointer, and shows that window as large as the canvas allows, with no margin (`Camera::show_window`). Extents and Previous do what `ZE` and `ZP` do; Window only asks the corners, for those who type `Z W`; Enter ends with nothing changed; the same point twice says "The window has no size." and asks again. The command asks on its thread and leaves its answer in the drawing's `Doc::zoom_to` slot, which the UI thread empties into the view as soon as it is there. In a layout the window frames the sheet; inside an unlocked viewport it frames the viewport's view (as `ZE` does, so at a tidy scale), and inside a locked one the sheet. Each zoom is a step for `ZP`.
 **Not done:** `'Z` during another command (a command cannot run inside another yet), AutoCAD's other ZOOM options (All, Center, Dynamic, Scale, Object, a typed scale), a ribbon item.

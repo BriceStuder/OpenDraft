@@ -58,6 +58,7 @@ pub fn build_registry() -> Registry<AppState> {
         crate::primitive_commands::commands(),
         crate::dimension_commands::commands(),
         crate::dock::commands(),
+        crate::canvas_style::commands(),
     ];
     for command in all().into_iter().chain(tables.into_iter().flatten()) {
         registry
@@ -289,7 +290,8 @@ fn all() -> Vec<Command<AppState>> {
         })
         .checked(|s| s.is_running("VPLAYER"))
         .transparent(),
-        cmd("layout.vplock", "VPLOCK", |s| s.toggle_viewport_lock()),
+        cmd("layout.vplock", "VPLOCK", |s| s.toggle_viewport_lock())
+            .checked(AppState::target_viewport_locked),
         cmd("layout.page_setup", "Page Setup", |s| s.open_page_setup())
             .when(AppState::has_drawings),
         cmd("tools.setvar", "Set Variable", |s| s.begin_setvar()),

@@ -135,7 +135,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](edit-undo.svg) | `edit-undo.svg` | undo-2 | app.rs, app/context_menu.rs |
 | ![](file-new.svg) | `file-new.svg` | file | app.rs, app/home_page/start.rs |
 | ![](file-open.svg) | `file-open.svg` | folder-open | app.rs, app/home_page/start.rs |
-| ![](file-plot.svg) | `file-plot.svg` | printer | app.rs |
+| ![](file-plot.svg) | `file-plot.svg` | printer | Plot, app.rs |
 | ![](file-save.svg) | `file-save.svg` | save | app.rs, theme.rs |
 | ![](format-linetype.svg) | `format-linetype.svg` | ellipsis | Linetypes |
 | ![](format-properties.svg) | `format-properties.svg` | file-text | Properties |
@@ -189,6 +189,12 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](layer-thaw-all.svg) | `layer-thaw-all.svg` | sun | Thaw All Layers |
 | ![](layer-unisolate.svg) | `layer-unisolate.svg` | scan | Unisolate |
 | ![](layer-unlock.svg) | `layer-unlock.svg` | lock-open | Unlock |
+| ![](layout-mview.svg) | `layout-mview.svg` | picture-in-picture-2 | Rectangular (Rectangular viewport (MVIEW), on the Layout tab: a frame on a sheet.) |
+| ![](layout-new.svg) | `layout-new.svg` | file-plus | New |
+| ![](layout-page-setup.svg) | `layout-page-setup.svg` | file-cog | Page Setup |
+| ![](layout-vplayer.svg) | `layout-vplayer.svg` | layers | Viewport Layers |
+| ![](layout-vplock.svg) | `layout-vplock.svg` | lock | Lock |
+| ![](layout-vpscale.svg) | `layout-vpscale.svg` | scaling | Viewport Scale |
 | ![](layout-tabs-new.svg) | `layout-tabs-new.svg` | plus | layout_tabs.rs (New layout, after the Model and layout tabs.) |
 | ![](manage-settings.svg) | `manage-settings.svg` | settings | Settings |
 | ![](modify-array-path.svg) | `modify-array-path.svg` | waves | Path Array |
@@ -263,6 +269,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](view-base-model.svg) | `view-base-model.svg` | frame | From Model Space |
 | ![](view-command-line.svg) | `view-command-line.svg` | rectangle-horizontal | Command Line |
 | ![](view-grid.svg) | `view-grid.svg` | grid-3x3 | Grid |
+| ![](view-layout-paper.svg) | `view-layout-paper.svg` | sun | Light Paper (Light Paper, on the Layout tab.) |
 | ![](view-pan.svg) | `view-pan.svg` | hand | Pan |
 | ![](view-panel-properties.svg) | `view-panel-properties.svg` | rectangle-vertical | Properties |
 | ![](view-reset-layout.svg) | `view-reset-layout.svg` | undo-2 | Reset Layout |

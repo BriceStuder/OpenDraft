@@ -1,6 +1,6 @@
 # Roadmap
 
-How OpenDraft gets from "a capable early project" to "actually, that's quite an impressive project". This is the plan for trust, reach and depth. The command-by-command to-do list is in `docs/ui_plan.md`; this file decides what to do first and why.
+How OpenDraft gets from "a capable early project" to "actually, that's quite an impressive project". This is the plan for trust, reach and depth, and the next steps of feature work. Everything known to be missing is in `docs/parking_lot.md`; this file decides what to do first and why.
 
 Written 2026-10-31. Update it when something is done or the plan changes: tick the box, add the date and the PR.
 
@@ -60,13 +60,13 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 
 *Why: audience 2. Files going out matter as much as files coming in.*
 
-**Correction (2026-10-31):** this phase first said PDF and SVG plotting were still to build. They are built (`PLOT` writes a layout to PDF or SVG at 1:1 in millimetres; `opendraft_core::plot` and `opendraft_files::plot`, checked in two PDF readers and a browser). What is missing is *proof on real fabrication and printing workflows*, and a few gaps listed in `docs/ui_plan.md`.
+**Correction (2026-10-31):** this phase first said PDF and SVG plotting were still to build. They are built (`PLOT` writes a layout to PDF or SVG at 1:1 in millimetres; `opendraft_core::plot` and `opendraft_files::plot`, checked in two PDF readers and a browser). What is missing is *proof on real fabrication and printing workflows*, and a few gaps listed in `docs/parking_lot.md` ("Layouts and plotting").
 
 - [ ] **Prove the plots on real workflows (M, needs real software and a printer).** Open OpenDraft's SVG in Inkscape and in the laser and cutter software people use (LightBurn, Glowforge, Silhouette, Cricut and similar); print the PDF at 100% and measure it with a ruler. Write down what was tried in the repository, and fix what breaks.
 - [x] **Plot gaps (M), done 03-11-2026 (PRs #105 and #108).** Margins, plot area (Layout, Limits, Extents, Window), plot scale, offset and centring, rotation, wide polylines (filled ribbons) and viewport borders are built and tested in `opendraft_core::plot`/`plot_plan`, and set in the Plot dialog and Page Setup. Still refused, with a clear message: Display and named View areas (no persistent view state). Paper output through the Windows and CUPS backends is built; see the next item for what is still unproven.
 - [ ] **Layers to cut settings (S to M).** Laser software reads colour or layer as "cut", "engrave" and "score". Check that SVG and DXF carry layer names and colours in a way those tools use, and document the recipe.
 - [ ] **Clean DXF for fabrication (M).** Correct units, closed polylines, splines handled sensibly. OVERKILL and JOIN already help; add a checklist test of a typical laser-cutting file.
-- [ ] **DXF gaps (M).** TEXT import (skipped today: a DXF with one gives "Skipped 1 TEXT"), anonymous blocks, block export. Each is a known gap in `CLAUDE.md`.
+- [ ] **DXF gaps (M).** Anonymous blocks on import (references to them are skipped and counted). TEXT import and block export are built (checked 21-11-2026).
 - [ ] **Templates and a first-hour tutorial (S).** A metric sheet, A4 and A3, a laser-cutting template, and a ten-command walkthrough.
 - [ ] **Hatch patterns from `.pat` files, and linetypes from `.lin` files (M).** Check what loads today (there is a stock linetype library) before scoping.
 
@@ -100,7 +100,8 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 
 *Why: audience 3. Only after phases 1 to 5, and in this rough order.*
 
-- [ ] Text: TEXT/MTEXT in all import and export paths, block attributes (`ByBlock` is done, 31-10-2026).
+- [ ] Text: TEXT/MTEXT in all import and export paths (`ByBlock` is done, 31-10-2026).
+- [x] Block attributes, done 01-11-2026 (PRs #100 and #101). What is left (multiline attributes, `ATTDISP`, BATTMAN, more data fields) is in `docs/parking_lot.md`.
 - [ ] DWG export (L).
 - [ ] Associative arrays (ARRAY makes plain copies today).
 - [ ] Spline editing (trim, extend, break, join, offset), Lengthen for ellipses and splines, PEDIT's Fit and Spline.
@@ -110,6 +111,21 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 - [ ] External references (xrefs).
 
 Dynamic blocks are last, and may never be worth it.
+
+## Next steps (feature work)
+
+What to build next, roughly in order, beside the phases above. The details of each are in `docs/parking_lot.md`; take an item off this list when it is done.
+
+1. PEDIT's Fit, Spline, Jointype and vertex Tangent (curve fitting of a polyline).
+2. Spline editing: exact Trim, Extend, Break and Join, then Offset and Fillet; and JOIN of arcs across gaps, with Close.
+3. The commands still dimmed on the Home tab (`NOT_BUILT` in `opendraft-app/src/ribbon_def/home.rs`): Groups, Table, Radius, Angle and ID Point, Isolate, Layer States and the rest.
+4. Associative arrays.
+5. Annotation: the MTEXT toolbar's font menu and symbols, then its ruler (waits for AutoCAD paragraph samples); the dimensions that are left, starting with DWG dimension import; leaders and multileaders.
+6. OD Roman: the PDF hidden text layer, the DXF round trip, and the glyphs still to draw.
+7. Linetypes from `.lin` files (a self-contained plan in `docs/parking_lot.md`).
+8. Layouts: non-rectangular viewport clips (planned in `docs/parking_lot.md`); open the R2000 export in AutoCAD.
+9. Properties panel parity with AutoCAD (`private_material/properties_gap.md`, cheap rows first).
+10. Housekeeping: split `dxf/read.rs`, make the Document mutators return `Result`, a progress bar for large files.
 
 ## Not now
 
@@ -124,6 +140,7 @@ Dynamic blocks, 3D, a cloud or collaboration layer, macOS (unless a contributor 
 
 ## Related files
 
-- `docs/ui_plan.md`: what was built and why, and the detailed to-do list.
+- `docs/parking_lot.md`: everything known to be missing or left for later, by area.
+- `docs/ARCHITECTURE.md`: how what is built works, and the rules new code follows.
+- `docs/history.md`: the archived development diary (was `docs/ui_plan.md`), kept for the reasoning behind decisions made up to 21-11-2026.
 - `docs/code_review_findings.md`: the engineering review and its current status. Only OD-007 (modal flags) is open.
-- `docs/parking_lot.md`: things looked at and left for later.

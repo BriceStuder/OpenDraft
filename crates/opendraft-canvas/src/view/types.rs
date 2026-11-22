@@ -11,7 +11,10 @@ use crate::select::Region;
 /// Colors the canvas paints with; supplied by the app from its theme.
 #[derive(Clone)]
 pub struct CanvasStyle {
+    /// What the drawing is drawn on: in a layout, the sheet's paper.
     pub background: Color32,
+    /// Around a layout's sheet: dark, whatever the paper.
+    pub surround: Color32,
     pub grid_minor: Color32,
     pub grid_major: Color32,
     pub axis_x: Color32,
@@ -28,6 +31,9 @@ pub struct CanvasStyle {
     pub window: Color32,
     /// Crossing selection box and polygons (dashed border, translucent fill).
     pub crossing: Color32,
+    /// The crosshair over the drawing, unless the user chose its colour. Off
+    /// a layout's sheet it is [`Crosshair::OFF_WHITE`], the surround being dark.
+    pub crosshair: Color32,
 }
 
 /// How big the pointer's targets are, in screen points.
@@ -57,8 +63,13 @@ pub struct Crosshair {
     /// Length of the crosshair lines as a percent of the canvas (1 to 100;
     /// 100 reaches the edges).
     pub size: u32,
-    /// The lines' colour, or off-white if none.
+    /// The lines' colour, or the style's (`CanvasStyle::crosshair`) if none.
     pub color: Option<Color32>,
+}
+
+impl Crosshair {
+    /// Off-white, not so bright as to glare on a dark background.
+    pub const OFF_WHITE: Color32 = Color32::from_gray(215);
 }
 
 impl Default for Crosshair {
