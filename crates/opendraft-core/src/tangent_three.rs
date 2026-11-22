@@ -159,7 +159,7 @@ fn normalised(carrier: Carrier, origin: Point, scale: f64) -> Carrier {
 
 /// Where the circle of `centre` and `radius` touches `carrier`, or `None`
 /// when it does not touch it at one point (it is the carrier's own circle).
-fn contact(carrier: Carrier, centre: Point, radius: f64) -> Option<Point> {
+pub(crate) fn contact(carrier: Carrier, centre: Point, radius: f64) -> Option<Point> {
     let tolerance = 1e-6 * (1.0 + radius);
     match carrier {
         Carrier::Line(a, b) => {
@@ -184,34 +184,46 @@ fn contact(carrier: Carrier, centre: Point, radius: f64) -> Option<Point> {
 }
 
 /// Whether CIRCLE Tan Tan Tan can touch `entity` where it was picked: its
-/// picked part is a line, a circle or an arc (a polyline's segment counts).
+/// picked part is a line, a circle or an arc (a polyline's segment counts),
+/// or it is an ellipse, an elliptical arc or a spline.
 pub fn touchable_by_tangent_circle(entity: &Entity, pick: Point) -> bool {
-    picked_curve(entity, pick)
-        .and_then(|c| carrier(&c))
-        .is_some()
+    exact_carrier(entity, pick).is_some() || crate::tangent_three_curves::is_curve(entity)
+}
+
+/// The line or circle the picked part of `entity` lies on.
+fn exact_carrier(entity: &Entity, pick: Point) -> Option<Carrier> {
+    carrier(&picked_curve(entity, pick)?)
 }
 
 /// The circle (centre, radius) touching the three `objects`, each given with
 /// the point it was picked at. Of the possible circles it is the one whose
 /// touching points lie nearest the picks. `None` when no circle touches all
-/// three, or an object is not a line, circle or arc.
+/// three, or an object cannot be touched. Lines, circles and arcs are solved
+/// exactly; with an ellipse or a spline, see `tangent_three_curves`.
 pub fn circle_tangent_to_three(objects: [(&Entity, Point); 3]) -> Option<(Point, f64)> {
-    let mut carriers = Vec::new();
-    for (entity, pick) in objects {
-        carriers.push(carrier(&picked_curve(entity, pick)?)?);
+    let picks = objects.map(|(_, pick)| pick);
+    let exact = objects.map(|(entity, pick)| exact_carrier(entity, pick));
+    match exact {
+        [Some(a), Some(b), Some(c)] => exact_circles([a, b, c], picks)
+            .first()
+            .map(|&(_, centre, radius)| (centre, radius)),
+        _ => crate::tangent_three_curves::circle_touching(objects),
     }
+}
+
+/// Every circle touching the three carriers (with a single touching point
+/// on each), as (score, centre, radius), the score being how far its
+/// touching points lie from the picks, best first.
+pub(crate) fn exact_circles(carriers: [Carrier; 3], picks: [Point; 3]) -> Vec<(f64, Point, f64)> {
     // Solve near the origin at about unit size, so tolerances hold far out.
-    let origin = objects[0].1;
-    let scale = objects
+    let origin = picks[0];
+    let scale = picks
         .iter()
-        .map(|(_, pick)| distance(*pick, origin))
+        .map(|pick| distance(*pick, origin))
         .fold(0.0, f64::max)
         .max(EPS);
-    let local: Vec<Carrier> = carriers
-        .iter()
-        .map(|c| normalised(*c, origin, scale))
-        .collect();
-    let mut best: Option<(f64, Point, f64)> = None;
+    let local = carriers.map(|c| normalised(c, origin, scale));
+    let mut found = Vec::new();
     for sides in 0..8 {
         let side = |i: usize| if sides >> i & 1 == 0 { 1.0 } else { -1.0 };
         let equations = (0..3).map(|i| equation(local[i], side(i))).collect();
@@ -221,20 +233,16 @@ pub fn circle_tangent_to_three(objects: [(&Entity, Point); 3]) -> Option<(Point,
             }
             let centre = Point::new(origin.x + x * scale, origin.y + y * scale);
             let radius = r * scale;
-            let mut score = 0.0;
-            for (carrier, (_, pick)) in carriers.iter().zip(objects) {
-                let Some(at) = contact(*carrier, centre, radius) else {
-                    score = f64::INFINITY;
-                    break;
-                };
-                score += distance(at, pick);
-            }
-            if score.is_finite() && best.is_none_or(|(s, ..)| score < s) {
-                best = Some((score, centre, radius));
+            let score = carriers.iter().zip(picks).try_fold(0.0, |sum, (c, pick)| {
+                Some(sum + distance(contact(*c, centre, radius)?, pick))
+            });
+            if let Some(score) = score {
+                found.push((score, centre, radius));
             }
         }
     }
-    best.map(|(_, centre, radius)| (centre, radius))
+    found.sort_by(|a, b| a.0.total_cmp(&b.0));
+    found
 }
 
 #[cfg(test)]
@@ -444,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn only_lines_circles_and_arcs_can_be_touched() {
+    fn lines_circles_arcs_and_ellipses_can_be_touched_but_not_points() {
         assert!(touchable_by_tangent_circle(
             &line((0.0, 0.0), (1.0, 0.0)),
             p(0.5, 0.0)
@@ -454,7 +462,7 @@ mod tests {
             p(1.0, 0.0)
         ));
         let ellipse = Entity::Ellipse(crate::Ellipse::full(p(0.0, 0.0), p(2.0, 0.0), 0.5).unwrap());
-        assert!(!touchable_by_tangent_circle(&ellipse, p(2.0, 0.0)));
+        assert!(touchable_by_tangent_circle(&ellipse, p(2.0, 0.0)));
         let point = Entity::Point { at: p(0.0, 0.0) };
         assert!(!touchable_by_tangent_circle(&point, p(0.0, 0.0)));
     }
