@@ -98,7 +98,8 @@ impl View {
             return;
         };
         if self.sheet_fit {
-            self.sheet.fit(Some(layout.sheet_bounds()), rect);
+            self.sheet
+                .fit(Some(self.paper_bounds(document, layout)), rect);
             self.sheet_fit = false;
         }
         self.camera = self.sheet;
@@ -121,7 +122,7 @@ impl View {
     /// Where the sheet of the layout being worked in is on the screen.
     pub(super) fn sheet_on_screen(&self, document: &Document, rect: Rect) -> Option<Rect> {
         let layout = self.space.layout().and_then(|l| document.layout(l))?;
-        Some(self.sheet_rect(layout.sheet_bounds(), rect))
+        Some(self.sheet_rect(self.paper_bounds(document, layout), rect))
     }
 
     fn sheet_rect(&self, b: Bounds, rect: Rect) -> Rect {
@@ -186,7 +187,8 @@ impl View {
                     });
                     edited = true;
                 } else {
-                    self.sheet.fit(Some(layout.sheet_bounds()), rect);
+                    self.sheet
+                        .fit(Some(self.paper_bounds(document, layout)), rect);
                 }
             }
             // Inside an unlocked viewport the window frames its view, as
@@ -338,7 +340,7 @@ impl View {
         let Some(layout) = self.space.layout().and_then(|l| document.layout(l)) else {
             return;
         };
-        let page = self.sheet_rect(layout.sheet_bounds(), rect);
+        let page = self.sheet_rect(self.paper_bounds(document, layout), rect);
         painter.rect_filled(
             page.translate(egui::vec2(4.0, 4.0)),
             0.0,
