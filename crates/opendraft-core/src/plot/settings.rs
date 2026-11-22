@@ -104,11 +104,15 @@ pub(super) fn placement(settings: &PlotSettings, source: &Bounds) -> (Point, f64
 
 /// The offset this placement comes to (what DXF codes 46 and 47 keep): from
 /// the printable corner of the page as it is read to the plotted drawing's
-/// lower-left corner. For a centred plot it is the centring.
-pub(super) fn placed_origin(settings: &PlotSettings, source: &Bounds) -> Point {
-    let (at, _) = placement(settings, source);
+/// lower-left corner, with paper millimetres per source unit. For a centred
+/// plot it is the centring.
+pub(super) fn placed_origin(settings: &PlotSettings, source: &Bounds) -> (Point, f64) {
+    let (at, factor) = placement(settings, source);
     let printable = upright_printable(settings);
-    Point::new(at.x - printable.min.x, at.y - printable.min.y)
+    (
+        Point::new(at.x - printable.min.x, at.y - printable.min.y),
+        factor,
+    )
 }
 
 /// The paper upright, in the drawing's own orientation: the page as it is

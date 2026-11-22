@@ -122,29 +122,53 @@ pub fn paper_on_sheet(document: &Document, layout: LayoutId) -> Result<Bounds, P
 /// (when its printer is changed), so a file must carry it. `None` when the
 /// plot is not centred, or is a layout area (never centred).
 pub fn centred_origin(document: &Document, space: PlotSpace) -> Result<Option<Point>, PlotError> {
-    let (plot, sheet) = match space {
+    let plot = match space {
+        PlotSpace::Model => document.model_plot(),
+        PlotSpace::Layout(id) => &document.layout(id).ok_or(PlotError::NoLayout)?.plot,
+    };
+    let centred = plot.flags & crate::plot_settings::flags::PLOT_CENTERED != 0;
+    if !centred || plot.area == crate::PlotArea::Layout {
+        return Ok(None);
+    }
+    let (origin, _) = placed(document, space)?;
+    Ok(Some(if quarter(plot.rotation) {
+        Point::new(origin.y, origin.x)
+    } else {
+        origin
+    }))
+}
+
+/// Where a plot of `space` puts the drawing: the offset from the printable
+/// corner of the page as it is read to the drawing's lower-left corner, and
+/// paper millimetres per drawing unit. What Center and Fit come to, for Plot
+/// and Page Setup to show. Extents plots the drawing to find it.
+pub fn placed(document: &Document, space: PlotSpace) -> Result<(Point, f64), PlotError> {
+    let (plot, layout) = match space {
         PlotSpace::Model => (document.model_plot(), None),
         PlotSpace::Layout(id) => {
             let layout = document.layout(id).ok_or(PlotError::NoLayout)?;
             (&layout.plot, Some(layout))
         }
     };
-    let centred = plot.flags & crate::plot_settings::flags::PLOT_CENTERED != 0;
-    if !centred || plot.area == crate::PlotArea::Layout {
-        return Ok(None);
-    }
     validate_plot(plot).map_err(PlotError::Invalid)?;
-    let drawn = match sheet {
-        None => super::model_space::model_sheet(document)?,
-        Some(layout) => super::layout_sheet(document, layout)?,
+    let (width, height) = layout.map_or((0.0, 0.0), crate::Layout::page_size);
+    let mut drawn = PlotSheet {
+        width,
+        height,
+        paths: Vec::new(),
+        fills: Vec::new(),
+        notes: Vec::new(),
     };
+    if plot.area == crate::PlotArea::Extents {
+        drawn = match layout {
+            None => super::model_space::model_sheet(document)?,
+            Some(layout) => super::layout_sheet(document, layout)?,
+        };
+    } else if layout.is_none() && !matches!(plot.area, crate::PlotArea::Window { .. }) {
+        return Err(PlotError::UnsupportedArea);
+    }
     let source = super::settings::source_bounds(&drawn, plot)?;
-    let origin = super::settings::placed_origin(plot, &source);
-    Ok(Some(if quarter(plot.rotation) {
-        Point::new(origin.y, origin.x)
-    } else {
-        origin
-    }))
+    Ok(super::settings::placed_origin(plot, &source))
 }
 
 #[cfg(test)]
@@ -334,6 +358,24 @@ mod tests {
         layouts[0].plot.flags &= !crate::plot_settings::flags::PLOT_CENTERED;
         doc.set_layouts(layouts);
         assert_eq!(centred_origin(&doc, PlotSpace::Layout(id)), Ok(None));
+    }
+
+    #[test]
+    fn what_center_and_fit_come_to_is_known_for_the_dialogs() {
+        let (mut doc, id) = sheet_with_a_line(crate::PlotArea::Extents);
+        let (origin, scale) = placed(&doc, PlotSpace::Layout(id)).unwrap();
+        assert!(near_point(origin, Point::new(93.5, 75.0)), "{origin:?}");
+        assert!((scale - 1.0).abs() < 1e-9);
+        // Fitted: the 100 × 50 box grows 2.87 times to fill 287 mm across.
+        let mut layouts = doc.layouts().to_vec();
+        layouts[0].plot.scale = crate::PlotScale::Standard {
+            kind: crate::StandardScale::Fit,
+            value: 1.0,
+        };
+        doc.set_layouts(layouts);
+        let (origin, scale) = placed(&doc, PlotSpace::Layout(id)).unwrap();
+        assert!((scale - 2.87).abs() < 1e-9, "{scale}");
+        assert!(near_point(origin, Point::new(0.0, 28.25)), "{origin:?}");
     }
 
     #[test]
