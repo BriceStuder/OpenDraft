@@ -156,6 +156,10 @@ pub struct Layer {
     pub frozen: bool,
     /// Locked layers are shown but their objects cannot be selected.
     pub locked: bool,
+    /// Frozen in the Model tab only: hidden there, while layout viewports
+    /// still show it and plot it. An OpenDraft extension (AutoCAD has no
+    /// such switch), kept in DXF as XDATA on the layer.
+    pub frozen_in_model: bool,
 }
 
 impl Layer {
@@ -177,6 +181,7 @@ impl Layer {
             on: true,
             frozen: false,
             locked: false,
+            frozen_in_model: false,
         }
     }
 

@@ -40,10 +40,12 @@ pub(super) fn plot_model(document: &Document) -> Result<PlotSheet, PlotError> {
         notes: Vec::new(),
     };
     let same = |p: Point| p;
+    let frozen = document.frozen_in_model();
     let objects = document
         .visible_in(None)
-        .filter(|o| o.bounds().intersects(&frame));
-    for object in objects.flat_map(|o| document.drawn(o)) {
+        .filter(|o| !frozen.contains(&o.attrs.layer) && o.bounds().intersects(&frame));
+    let pieces = objects.flat_map(|o| document.drawn(o));
+    for object in pieces.filter(|o| !frozen.contains(&o.attrs.layer)) {
         add_viewed(
             &mut sheet,
             document,
@@ -60,10 +62,14 @@ pub(super) fn plot_model(document: &Document) -> Result<PlotSheet, PlotError> {
     }
 }
 
-/// The box around everything visible in the model.
+/// The box around everything visible in the Model tab.
 fn extents(document: &Document) -> Result<Bounds, PlotError> {
     let mut all: Option<Bounds> = None;
-    for object in document.visible_in(None) {
+    let frozen = document.frozen_in_model();
+    for object in document
+        .visible_in(None)
+        .filter(|o| !frozen.contains(&o.attrs.layer))
+    {
         let b = object.bounds();
         all = Some(match all {
             None => b,
@@ -240,6 +246,25 @@ mod tests {
         let sheet = plot_sheet(&doc, PlotSpace::Model).unwrap();
         assert_eq!(sheet.paths.len(), 1);
         assert_eq!(sheet.paths[0].rgb, [0, 0, 0]);
+    }
+
+    #[test]
+    fn a_layer_frozen_in_the_model_tab_is_left_out_of_its_plot_and_extents() {
+        let mut doc = Document::default();
+        let hidden = doc.allocate_layer_id();
+        doc.push_layer(Layer {
+            frozen_in_model: true,
+            ..Layer::new(hidden, "Hatching")
+        });
+        doc.add(line((0.0, 0.0), (100.0, 0.0)));
+        // Far off: it would widen the extents if it counted.
+        doc.add_with(
+            line((0.0, 900.0), (100.0, 900.0)),
+            crate::Attributes::on_layer(hidden),
+        );
+        assert_eq!(extents(&doc).unwrap().max.y, 0.0);
+        let sheet = plot_sheet(&doc, PlotSpace::Model).unwrap();
+        assert_eq!(sheet.paths.len(), 1);
     }
 
     #[test]

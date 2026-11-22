@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use opendraft_core::{
-    Attr, Attributes, Color, Document, Entity, Layer, LayerId, LinetypeId, Lineweight, Point,
+    Attr, Attributes, Color, Document, Entity, Layer, LayerId, Lineweight, Point,
 };
 
 use crate::{FileError, Loaded};
@@ -22,6 +22,7 @@ mod hatch_sources;
 #[cfg(test)]
 mod hatch_tests;
 mod infinite;
+mod layer;
 mod layouts;
 mod leader;
 mod ltype;
@@ -181,46 +182,6 @@ impl Importer {
         self.document.push_layer(Layer::new(id, name));
         self.layers.insert(key, id);
         id
-    }
-
-    fn layer_record(&mut self, record: &Record) {
-        let name = decode(record.text(2).unwrap_or("0"));
-        let flags = record.int(70).unwrap_or(0);
-        let index = record.int(62).unwrap_or(7);
-        let mut color = match record.int(420) {
-            Some(value) => true_color(value),
-            None => aci_color(index.abs()),
-        };
-        if index == 0 {
-            color = Color::Foreground;
-        }
-        let lineweight = match record.int(370) {
-            Some(w) if w >= 0 => Lineweight(u16::try_from(w).unwrap_or(u16::MAX)),
-            _ => Lineweight::DEFAULT,
-        };
-        let id = if name == "0" {
-            LayerId::DEFAULT
-        } else {
-            self.layer_named(&name)
-        };
-        let layer = Layer {
-            id,
-            name: if id == LayerId::DEFAULT {
-                "0".to_owned()
-            } else {
-                name
-            },
-            color,
-            linetype: self
-                .linetype_ref(record.text(6))
-                .unwrap_or(LinetypeId::CONTINUOUS),
-            lineweight,
-            on: index >= 0,
-            frozen: flags & 1 != 0,
-            locked: flags & 4 != 0,
-        };
-        self.layers.insert(layer.name.to_lowercase(), id);
-        self.document.replace_layer(layer);
     }
 
     fn attributes(&mut self, record: &Record) -> Attributes {
