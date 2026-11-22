@@ -928,7 +928,12 @@ centre or on an edge, for POLYGON), `array` (where array items go:
   circles or arcs, for the ribbon's Circle Tan, Tan, Tan: Apollonius' problem
   solved exactly for each choice of sides, in coordinates scaled to the picks
   so it holds far from the origin; of up to eight circles, the one touching
-  nearest the picks, never a picked circle itself) and `rect` (a rectangle at an angle with rounded or
+  nearest the picks, never a picked circle itself; with an ellipse or a
+  spline, `tangent_three_curves` stands in for each by its circle of
+  curvature, or its tangent line, at the pick, solves that exactly, then
+  corrects each answer by Newton steps until it touches the real curves,
+  an elliptical arc counting as its whole ellipse and a spline only as
+  itself) and `rect` (a rectangle at an angle with rounded or
   bevelled corners and a width, as a plain `Rectangle` when it can be).
 - **Results are lists of entities.** A trim, split or join returns the
   entities that replace the old one; the first keeps the object's id and draw
