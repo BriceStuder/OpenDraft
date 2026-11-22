@@ -655,7 +655,15 @@ only changes how points and angles are typed and shown, and which way is
 - **Commands that orient what they make** use the system: TEXT, -TEXT, MTEXT,
   INSERT and ATTDEF default to its X axis; RECTANG is square to it (a polyline
   when turned); XLINE Horizontal, Vertical and Angle; DIMLINEAR's automatic,
-  Horizontal and Vertical directions; ARRAYRECT's rows and columns.
+  Horizontal and Vertical directions; ARRAYRECT's rows and columns;
+  DIMORDINATE, which measures from the system's origin along its axes. An
+  ordinate dimension keeps the system it was made in (`DimKind::Ordinate`'s
+  `frame`, World by default): its value and picture are worked out in it,
+  moving or turning the dimension leaves it where it is, `.odraft` keeps it
+  as an optional `frame`, and DXF as the definition point (group 10, the
+  origin) and the horizontal direction (group 51, the negative of the
+  system's turn; ezdxf writes the same sign). The automation API sends the
+  points in world coordinates and not the frame.
 - **The command** (`ccs_cmd.rs`): two points (origin, then a point on X;
   Enter keeps the direction), Object (`ccs_align::aligned_to`: a line or
   segment from its nearer end along it, arcs and circles from the centre,
@@ -667,8 +675,7 @@ only changes how points and angles are typed and shown, and which way is
   Previous ribbon buttons act at once. Outside callers cannot run any of them
   (`automation/policy.rs`); the automation API stays in world coordinates.
 - **Not built** (see `docs/parking_lot.md`, "Plan: custom coordinate system"):
-  DIMORDINATE from the system's origin (the ordinate dimension stores no
-  origin or direction), hatch angle and origin, MLEADER, DWG's UCS table and
+  hatch angle and origin, MLEADER, DWG's UCS table and
   viewports, turning the view (PLAN), `UCSICON` settings, a manager dialog.
 
 ## Layouts (built, phases 1-3)

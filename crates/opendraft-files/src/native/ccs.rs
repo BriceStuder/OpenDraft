@@ -169,4 +169,28 @@ mod tests {
         assert!(bad(serde_json::json!({"named_ccs": [one("a/b")]})));
         assert!(!bad(serde_json::json!({"named_ccs": [one("A")]})));
     }
+
+    #[test]
+    fn an_ordinate_dimension_keeps_the_system_it_measures_in() {
+        let mut document = Document::default();
+        let style = document.dim_style().clone();
+        let frame = turned();
+        let (feature, end) = (
+            frame.to_world(Point::new(4.0, 7.0)),
+            frame.to_world(Point::new(4.0, 20.0)),
+        );
+        let d = opendraft_core::Dimension::ordinate_in(frame, feature, end, true, &style);
+        document.add(opendraft_core::Entity::Dimension(Box::new(d)));
+        let back = roundtrip(&document);
+        let found = back.objects().iter().find_map(|o| match &o.entity {
+            opendraft_core::Entity::Dimension(d) => Some(d.clone()),
+            _ => None,
+        });
+        let d = found.expect("the dimension");
+        assert!((d.measurement().unwrap_or_default() - 4.0).abs() < 1e-6);
+        let opendraft_core::DimKind::Ordinate { frame: kept, .. } = d.kind else {
+            panic!("an ordinate dimension");
+        };
+        assert!((kept.angle - frame.angle).abs() < 1e-9);
+    }
 }

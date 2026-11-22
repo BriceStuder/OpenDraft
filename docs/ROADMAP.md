@@ -116,7 +116,7 @@ Dynamic blocks are last, and may never be worth it.
 
 What to build next, roughly in order, beside the phases above. The details of each are in `docs/parking_lot.md`; take an item off this list when it is done.
 
-1. The custom coordinate system (in progress, 22-11-2026): DIMORDINATE, hatches and MLEADER, then turning the view (PLAN and a gesture). Plan in `docs/parking_lot.md`.
+1. The custom coordinate system (in progress, 22-11-2026): hatches and MLEADER, then turning the view (PLAN and a gesture). Plan in `docs/parking_lot.md`.
 2. PEDIT's Fit, Spline, Jointype and vertex Tangent (curve fitting of a polyline).
 3. Spline editing: exact Trim, Extend, Break and Join, then Offset and Fillet; and JOIN of arcs across gaps, with Close.
 4. The commands still dimmed on the Home tab (`NOT_BUILT` in `opendraft-app/src/ribbon_def/home.rs`): Groups, Table, Radius, Angle and ID Point, Isolate, Layer States and the rest.

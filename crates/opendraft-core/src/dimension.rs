@@ -105,11 +105,14 @@ pub enum DimKind {
         lines: bool,
     },
     /// The X (`x_datum`) or Y coordinate of `feature`, on a leader to
-    /// `leader_end`.
+    /// `leader_end`, measured in `frame` (the coordinate system in force
+    /// when it was made; AutoCAD's UCS). Moving or turning the dimension
+    /// leaves the frame where it is.
     Ordinate {
         feature: Point,
         leader_end: Point,
         x_datum: bool,
+        frame: crate::ccs::Ccs,
     },
 }
 
@@ -243,8 +246,20 @@ impl Dimension {
         )
     }
 
-    /// The X or Y coordinate of `feature`, led to `leader_end`.
+    /// The X or Y coordinate of `feature` in world coordinates, led to
+    /// `leader_end`.
     pub fn ordinate(
+        feature: Point,
+        leader_end: Point,
+        x_datum: bool,
+        style: &DimStyle,
+    ) -> Dimension {
+        Self::ordinate_in(crate::ccs::Ccs::WORLD, feature, leader_end, x_datum, style)
+    }
+
+    /// [`ordinate`](Self::ordinate), measured in the coordinate system `frame`.
+    pub fn ordinate_in(
+        frame: crate::ccs::Ccs,
         feature: Point,
         leader_end: Point,
         x_datum: bool,
@@ -255,6 +270,7 @@ impl Dimension {
                 feature,
                 leader_end,
                 x_datum,
+                frame: frame.sanitized(),
             },
             style,
         )
