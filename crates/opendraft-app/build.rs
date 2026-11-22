@@ -39,6 +39,8 @@ fn windows_resources() {
 fn windows_resources() {}
 
 fn main() {
+    // The translations are read when the program is compiled.
+    println!("cargo:rerun-if-changed=../../locales");
     windows_resources();
     // A commit, a branch switch or a new tag changes one of these.
     for path in ["HEAD", "refs", "packed-refs"] {

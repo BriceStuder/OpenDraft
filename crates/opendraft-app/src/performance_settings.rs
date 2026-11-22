@@ -262,8 +262,8 @@ mod tests {
 
     #[test]
     fn the_settings_dialog_lists_the_page_before_automation() {
-        let tabs = crate::settings_ui::TABS;
-        let at = |name: &str| tabs.iter().position(|t| *t == name);
+        let tabs = crate::settings_ui::tabs();
+        let at = |name: &str| tabs.iter().position(|t| t.as_ref() == name);
         assert_eq!(at("Performance"), Some(3));
         assert_eq!(at("Automation"), Some(4));
         assert_eq!(at("Updates"), Some(5));
