@@ -118,6 +118,12 @@ impl View {
         }
     }
 
+    /// Where the sheet of the layout being worked in is on the screen.
+    pub(super) fn sheet_on_screen(&self, document: &Document, rect: Rect) -> Option<Rect> {
+        let layout = self.space.layout().and_then(|l| document.layout(l))?;
+        Some(self.sheet_rect(layout.sheet_bounds(), rect))
+    }
+
     fn sheet_rect(&self, b: Bounds, rect: Rect) -> Rect {
         Rect::from_two_pos(
             self.sheet.world_to_screen(b.min, rect),
@@ -465,6 +471,30 @@ mod tests {
         assert!(near_border(&b, Point::new(101.0, 25.0), 2.0));
         assert!(!near_border(&b, Point::new(50.0, 25.0), 2.0));
         assert!(!near_border(&b, Point::new(110.0, 25.0), 2.0));
+    }
+
+    #[test]
+    fn the_sheet_is_found_on_screen_only_in_a_layout() {
+        let mut doc = Document::default();
+        let layout = doc.new_layout("Sheet", 297.0, 210.0);
+        let (id, vp) = (layout.id, layout.viewports[0].id);
+        doc.set_layouts(vec![layout]);
+        let rect = Rect::from_min_size(Pos2::new(0.0, 0.0), egui::vec2(800.0, 600.0));
+        let mut view = View {
+            sheet: Camera {
+                center: Point::new(148.5, 105.0),
+                zoom: 2.0,
+            },
+            ..View::default()
+        };
+        assert_eq!(view.sheet_on_screen(&doc, rect), None, "model space");
+        view.space = Space::Paper(id);
+        let sheet = view.sheet_on_screen(&doc, rect).unwrap();
+        assert!((sheet.width() - 594.0).abs() < 1e-3 && (sheet.height() - 420.0).abs() < 1e-3);
+        assert!((sheet.center() - rect.center()).length() < 1e-3);
+        // Inside a viewport it is still the sheet's, not the viewport's.
+        view.space = Space::Viewport(id, vp);
+        assert_eq!(view.sheet_on_screen(&doc, rect), Some(sheet));
     }
 
     #[test]

@@ -157,6 +157,8 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("layout.vplayer", Denied, Mutation),
     ("layout.vplock", Denied, Mutation),
     ("layout.page_setup", Denied, Lifecycle),
+    // A view setting of the user's, as the grid is.
+    ("view.layout_paper", ImmediateSafe, Ui),
     // Dialogs and variables.
     ("tools.setvar", Denied, Lifecycle),
     ("format.units", Denied, Lifecycle),

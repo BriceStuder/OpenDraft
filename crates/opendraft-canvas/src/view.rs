@@ -184,11 +184,7 @@ impl View {
         painter.rect_filled(rect, 0.0, style.background);
         let in_layout = self.space != Space::Model;
         if in_layout {
-            painter.rect_filled(
-                rect,
-                0.0,
-                style.background.lerp_to_gamma(Color32::BLACK, 0.4),
-            );
+            painter.rect_filled(rect, 0.0, style.surround);
         }
         self.begin_layout_frame(document, rect);
         // A double click of the wheel zooms to the extents, as in AutoCAD.
@@ -390,7 +386,16 @@ impl View {
             let boxed = prompting && !picking && snap_modes.aperture_box;
             self.paint_aperture_box(&painter, at, style, boxed);
             let at = self.pulled_to(rect, at, snapped, snap_modes);
-            self.paint_cursor(ui, rect, at, shape);
+            // Off a layout's sheet the surround is dark, whatever the paper.
+            let off_sheet = self
+                .sheet_on_screen(document, rect)
+                .is_some_and(|s| !s.contains(at));
+            let over = if off_sheet {
+                Crosshair::OFF_WHITE
+            } else {
+                style.crosshair
+            };
+            self.paint_cursor(ui, rect, at, shape, over);
         }
 
         let double_click = (selecting
