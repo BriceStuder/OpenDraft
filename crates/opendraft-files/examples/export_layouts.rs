@@ -86,6 +86,7 @@ fn main() {
             130.0,
             None,
         )],
+        paper_frozen: Vec::new(),
     };
     let custom_id = custom.id;
     doc.set_layouts(vec![a3, custom]);

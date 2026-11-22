@@ -91,24 +91,13 @@ impl Doc {
         self.sync_active_space();
     }
 
-    /// Tell the document which space the view is in, and which layers the
-    /// viewport being worked through has frozen, or in the Model tab those
-    /// frozen there. Run every frame, so an undo or a VPLAYER is seen at once;
-    /// objects on layers newly frozen there leave the selection.
+    /// Tell the document which space the view is in, and which layers are
+    /// frozen there (`view_freeze::active_space`). Run every frame, so an undo
+    /// or a VPLAYER is seen at once; objects on layers newly frozen there
+    /// leave the selection.
     fn sync_active_space(&mut self) {
         let document = self.session.document();
-        let (layout, frozen) = match self.view.space() {
-            Space::Model => (None, document.frozen_in_model()),
-            Space::Paper(l) => (Some(l), Vec::new()),
-            Space::Viewport(l, v) => {
-                let frozen = document
-                    .layout(l)
-                    .and_then(|layout| layout.viewport(v))
-                    .map(|vp| vp.frozen.clone())
-                    .unwrap_or_default();
-                (None, frozen)
-            }
-        };
+        let (layout, frozen) = crate::view_freeze::active_space(document, self.view.space());
         let more_frozen = frozen.iter().any(|l| !document.active_frozen().contains(l));
         self.session.set_active_space(layout, frozen);
         if more_frozen {
