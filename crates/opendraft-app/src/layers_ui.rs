@@ -270,17 +270,21 @@ fn row(
     // Switches: the ribbon list's bulb, sun and padlock, yellow while the
     // layer can be seen and edited, grey when not.
     let [on_glyph, thaw_glyph, lock_glyph] = crate::ribbon_slots::switch_glyphs(layer, c.text_weak);
-    let switch =
-        |ui: &mut Ui, cell: Rect, name: &str, (icon, color): (char, egui::Color32), tip: &str| {
-            let response = ui.interact(cell, id.with(name), Sense::click());
-            if response.hovered() {
-                ui.painter().rect_stroke(
-                    cell.shrink(1.0),
-                    2.0,
-                    egui::Stroke::new(1.0_f32, c.border),
-                    egui::StrokeKind::Inside,
-                );
-            }
+    let switch = |ui: &mut Ui, cell: Rect, name: &str, glyph: (char, egui::Color32), tip: &str| {
+        let response = ui.interact(cell, id.with(name), Sense::click());
+        if response.hovered() {
+            ui.painter().rect_stroke(
+                cell.shrink(1.0),
+                2.0,
+                egui::Stroke::new(1.0_f32, c.border),
+                egui::StrokeKind::Inside,
+            );
+        }
+        // The VP Freeze switch is the sun or snowflake in a square.
+        if name == "vp_freeze" {
+            crate::ribbon_slots::paint_vp_switch(ui.painter(), cell.center(), 14.0, glyph);
+        } else {
+            let (icon, color) = glyph;
             opendraft_ui::icon_set::paint(
                 ui.painter(),
                 cell.center(),
@@ -289,8 +293,9 @@ fn row(
                 14.0,
                 color,
             );
-            response.on_hover_text(tip).clicked()
-        };
+        }
+        response.on_hover_text(tip).clicked()
+    };
     let on_tip = if layer.on {
         "On: click to turn off"
     } else {
@@ -316,17 +321,8 @@ fn row(
         ));
     }
     if let Some(frozen) = vp_frozen {
-        let (glyph, tip) = if frozen {
-            (
-                (icons::LAYER_LIST_FROZEN, c.text_weak),
-                "Frozen in this viewport: click to thaw",
-            )
-        } else {
-            (
-                (icons::LAYER_LIST_THAWED, crate::ribbon_slots::SWITCH_ON),
-                "Click to freeze in this viewport only",
-            )
-        };
+        let glyph = crate::ribbon_slots::vp_glyph(frozen, c.text_weak);
+        let tip = crate::ribbon_slots::vp_tip(frozen);
         if switch(ui, cols.vp_freeze, "vp_freeze", glyph, tip) {
             result.edit = Some(LayerEdit::SetInViewport(targets.clone(), !frozen));
         }

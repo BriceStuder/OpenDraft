@@ -5,8 +5,8 @@
 //! current layer, and the other lists show and set the colour, linetype and
 //! lineweight new objects are drawn with (ByLayer unless set).
 
-use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, Ui};
-use opendraft_core::{Document, Layer, Object};
+use eframe::egui::{self, Align2, Color32, FontId, Painter, Pos2, Rect, Sense, Stroke, Ui};
+use opendraft_core::{Document, Layer, Object, Viewport};
 use opendraft_ui::{icons, menu, Theme};
 
 use crate::attr_rows::{self, shared};
@@ -64,7 +64,14 @@ pub fn show(
             child.disable();
         }
         let made = match slot {
-            LAYER_LIST => layer_list(&mut child, theme, id, document, &selected),
+            LAYER_LIST => layer_list(
+                &mut child,
+                theme,
+                id,
+                document,
+                &selected,
+                state.target_viewport_ref(),
+            ),
             COLOR_LIST | LINEWEIGHT_LIST | LINETYPE_LIST => {
                 property_list(&mut child, theme, id, slot, document, &selected).map(SlotEdit::Attr)
             }
@@ -130,14 +137,17 @@ fn property_list(
 /// The layer list: the selected objects' layer (blank when they differ) or
 /// the current layer. Its menu lists every layer with switches that toggle
 /// without closing it; picking a layer moves the selection to it, or makes
-/// it current when nothing is selected.
+/// it current when nothing is selected. With a viewport to work on (in a
+/// layout), each layer also has the Layers panel's VP Freeze switch.
 fn layer_list(
     ui: &mut Ui,
     theme: &Theme,
     id: egui::Id,
     document: &Document,
     selected: &[&Object],
+    viewport: Option<&Viewport>,
 ) -> Option<SlotEdit> {
+    let vp_frozen = |layer: &Layer| viewport.map(|v| v.is_frozen(layer.id));
     let rect = ui.max_rect();
     let response = ui.interact(rect, id.with("field"), Sense::click());
     let shown = if selected.is_empty() {
@@ -147,7 +157,7 @@ fn layer_list(
     };
     menu::paint_combo(ui, theme, rect, "", response.hovered());
     if let Some(layer) = shown.and_then(|id| document.layer(id)) {
-        layer_row_contents(ui, theme, rect, layer, theme.colors.text);
+        layer_row_contents(ui, theme, rect, layer, theme.colors.text, vp_frozen(layer));
     }
 
     let mut toggled = None;
@@ -155,7 +165,8 @@ fn layer_list(
         let rows = |ui: &mut Ui| {
             let mut picked = None;
             for layer in document.layers_by_name() {
-                let (pick, toggle) = menu_row(ui, theme, layer, shown == Some(layer.id));
+                let current = shown == Some(layer.id);
+                let (pick, toggle) = menu_row(ui, theme, layer, current, vp_frozen(layer));
                 if pick {
                     picked = Some(layer.id);
                 }
@@ -181,11 +192,19 @@ fn layer_list(
 }
 
 /// One layer in the menu. Returns whether the layer was picked and the
-/// switch toggled, if any.
-fn menu_row(ui: &mut Ui, theme: &Theme, layer: &Layer, current: bool) -> (bool, Option<LayerEdit>) {
+/// switch toggled, if any. `vp_frozen` is the layer's state in the viewport
+/// being worked on (`None`: no VP Freeze switch).
+fn menu_row(
+    ui: &mut Ui,
+    theme: &Theme,
+    layer: &Layer,
+    current: bool,
+    vp_frozen: Option<bool>,
+) -> (bool, Option<LayerEdit>) {
     let c = &theme.colors;
     let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), ROW_H), Sense::hover());
-    let switches = 3.0 * SWITCH_W + 4.0;
+    let toggles = toggles(vp_frozen.is_some());
+    let switches = toggles.len() as f32 * SWITCH_W + 4.0;
     let name = Rect::from_min_max(egui::pos2(rect.left() + switches, rect.top()), rect.max);
     let picked = ui.interact(name, ui.id().with(("layer_pick", layer.id)), Sense::click());
     if current {
@@ -195,10 +214,7 @@ fn menu_row(ui: &mut Ui, theme: &Theme, layer: &Layer, current: bool) -> (bool, 
     }
     let text = if current { c.text_on_accent } else { c.text };
     let mut toggled = None;
-    for (i, flag) in [LayerFlag::On, LayerFlag::Frozen, LayerFlag::Locked]
-        .into_iter()
-        .enumerate()
-    {
+    for (i, toggle) in toggles.into_iter().enumerate() {
         let at = rect.left() + 2.0 + i as f32 * SWITCH_W;
         let switch = Rect::from_min_size(egui::pos2(at, rect.top()), egui::vec2(SWITCH_W, ROW_H));
         let response = ui.interact(
@@ -214,12 +230,94 @@ fn menu_row(ui: &mut Ui, theme: &Theme, layer: &Layer, current: bool) -> (bool, 
                 egui::StrokeKind::Inside,
             );
         }
-        if response.on_hover_text(switch_tip(layer, flag)).clicked() {
-            toggled = Some(LayerEdit::Toggle(layer.id, flag));
+        let (tip, edit) = match toggle {
+            Toggle::Viewport => {
+                let frozen = vp_frozen.unwrap_or(false);
+                (
+                    vp_tip(frozen),
+                    LayerEdit::SetInViewport(vec![layer.id], !frozen),
+                )
+            }
+            Toggle::Flag(flag) => (switch_tip(layer, flag), LayerEdit::Toggle(layer.id, flag)),
+        };
+        if response.on_hover_text(tip).clicked() {
+            toggled = Some(edit);
         }
     }
-    layer_row_contents(ui, theme, rect, layer, text);
+    layer_row_contents(ui, theme, rect, layer, text, vp_frozen);
     (picked.clicked(), toggled)
+}
+
+/// A switch of the layer list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Toggle {
+    Flag(LayerFlag),
+    /// Freeze in the viewport being worked on.
+    Viewport,
+}
+
+/// The switches in order: bulb, sun, the VP Freeze one when `vp` (where the
+/// Layers panel has its column), padlock.
+fn toggles(vp: bool) -> Vec<Toggle> {
+    let mut toggles = vec![Toggle::Flag(LayerFlag::On), Toggle::Flag(LayerFlag::Frozen)];
+    if vp {
+        toggles.push(Toggle::Viewport);
+    }
+    toggles.push(Toggle::Flag(LayerFlag::Locked));
+    toggles
+}
+
+/// The tooltip of the VP Freeze switch (here and in the Layers panel).
+pub(crate) fn vp_tip(frozen: bool) -> &'static str {
+    if frozen {
+        "Frozen in this viewport: click to thaw"
+    } else {
+        "Click to freeze in this viewport only"
+    }
+}
+
+/// The VP Freeze switch's glyph and colour: the sun and snowflake of the
+/// Freeze switch, drawn in a square by `paint_vp_switch`.
+pub(crate) fn vp_glyph(frozen: bool, weak: Color32) -> (char, Color32) {
+    if frozen {
+        (icons::LAYER_LIST_FROZEN, weak)
+    } else {
+        (icons::LAYER_LIST_THAWED, SWITCH_ON)
+    }
+}
+
+/// How much smaller the sun or snowflake is in its square: just enough not
+/// to touch it.
+const VP_GLYPH_SCALE: f32 = 0.9;
+
+/// The VP Freeze switch: the sun or snowflake, a little smaller, in a square
+/// `size` wide, so it reads apart from the Freeze switch beside it. The
+/// square's line is one screen pixel, on whole pixels so it stays sharp.
+pub(crate) fn paint_vp_switch(
+    painter: &Painter,
+    center: Pos2,
+    size: f32,
+    (glyph, color): (char, Color32),
+) {
+    let ppp = painter.ctx().pixels_per_point();
+    let snap = |v: f32| (v * ppp).round() / ppp;
+    let side = snap(size);
+    let min = egui::pos2(snap(center.x - side / 2.0), snap(center.y - side / 2.0));
+    let square = Rect::from_min_size(min, egui::vec2(side, side));
+    painter.rect_stroke(
+        square,
+        0.0,
+        Stroke::new(1.0 / ppp, color),
+        egui::StrokeKind::Inside,
+    );
+    opendraft_ui::icon_set::paint(
+        painter,
+        square.center(),
+        Align2::CENTER_CENTER,
+        glyph,
+        size * VP_GLYPH_SCALE,
+        color,
+    );
 }
 
 fn switch_tip(layer: &Layer, flag: LayerFlag) -> &'static str {
@@ -258,24 +356,40 @@ pub(crate) fn switch_glyphs(layer: &Layer, weak: Color32) -> [(char, Color32); 3
 }
 
 /// A layer's switches, colour and name across `rect`, as AutoCAD's list.
-fn layer_row_contents(ui: &Ui, theme: &Theme, rect: Rect, layer: &Layer, text: Color32) {
+fn layer_row_contents(
+    ui: &Ui,
+    theme: &Theme,
+    rect: Rect,
+    layer: &Layer,
+    text: Color32,
+    vp_frozen: Option<bool>,
+) {
     let c = &theme.colors;
     let painter = ui.painter();
-    for (i, (glyph, color)) in switch_glyphs(layer, c.text_weak).into_iter().enumerate() {
-        opendraft_ui::icon_set::paint(
-            painter,
-            egui::pos2(
-                rect.left() + 2.0 + (i as f32 + 0.5) * SWITCH_W,
-                rect.center().y,
-            ),
-            Align2::CENTER_CENTER,
-            glyph,
-            13.0,
-            color,
+    let [on, thaw, lock] = switch_glyphs(layer, c.text_weak);
+    let toggles = toggles(vp_frozen.is_some());
+    for (i, toggle) in toggles.iter().enumerate() {
+        let at = egui::pos2(
+            rect.left() + 2.0 + (i as f32 + 0.5) * SWITCH_W,
+            rect.center().y,
         );
+        let (glyph, color) = match toggle {
+            Toggle::Flag(LayerFlag::On) => on,
+            Toggle::Flag(LayerFlag::Frozen) => thaw,
+            Toggle::Flag(LayerFlag::Locked) => lock,
+            Toggle::Viewport => {
+                let frozen = vp_frozen.unwrap_or(false);
+                paint_vp_switch(painter, at, 13.0, vp_glyph(frozen, c.text_weak));
+                continue;
+            }
+        };
+        opendraft_ui::icon_set::paint(painter, at, Align2::CENTER_CENTER, glyph, 13.0, color);
     }
     let swatch = Rect::from_center_size(
-        egui::pos2(rect.left() + 3.0 * SWITCH_W + 12.0, rect.center().y),
+        egui::pos2(
+            rect.left() + toggles.len() as f32 * SWITCH_W + 12.0,
+            rect.center().y,
+        ),
         egui::vec2(11.0, 11.0),
     );
     colour_ui::paint_swatch(painter, theme, swatch, layer.color);
@@ -308,5 +422,30 @@ mod tests {
         layer.on = false;
         layer.frozen = true;
         assert_eq!(colours(&layer), [grey; 3]);
+    }
+
+    #[test]
+    fn the_vp_freeze_switch_sits_between_the_sun_and_the_padlock_in_a_layout() {
+        use LayerFlag::{Frozen, Locked, On};
+        assert_eq!(
+            toggles(false),
+            [Toggle::Flag(On), Toggle::Flag(Frozen), Toggle::Flag(Locked)]
+        );
+        assert_eq!(
+            toggles(true),
+            [
+                Toggle::Flag(On),
+                Toggle::Flag(Frozen),
+                Toggle::Viewport,
+                Toggle::Flag(Locked)
+            ]
+        );
+    }
+
+    #[test]
+    fn the_vp_freeze_switch_is_a_yellow_sun_or_a_grey_snowflake() {
+        let grey = Color32::GRAY;
+        assert_eq!(vp_glyph(false, grey), (icons::LAYER_LIST_THAWED, SWITCH_ON));
+        assert_eq!(vp_glyph(true, grey), (icons::LAYER_LIST_FROZEN, grey));
     }
 }
