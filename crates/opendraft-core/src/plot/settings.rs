@@ -15,24 +15,8 @@ pub(super) fn apply(mut sheet: PlotSheet, settings: &PlotSettings) -> Result<Plo
         Point::new(0.0, 0.0),
         Point::new(settings.paper_width_mm, settings.paper_height_mm),
     );
-    let printable = upright_printable(settings);
     let source = source_bounds(&sheet, settings)?;
-    let factor = scale_factor(settings, &source, &printable);
-    let source_size = Point::new(source.max.x - source.min.x, source.max.y - source.min.y);
-    let scaled = Point::new(source_size.x * factor, source_size.y * factor);
-    // A layout plots from the corner of its printable area, centred or not.
-    let centred = settings.flags & flags::PLOT_CENTERED != 0 && settings.area != PlotArea::Layout;
-    let at = if centred {
-        Point::new(
-            printable.min.x + (printable.max.x - printable.min.x - scaled.x) / 2.0,
-            printable.min.y + (printable.max.y - printable.min.y - scaled.y) / 2.0,
-        )
-    } else {
-        Point::new(
-            printable.min.x + settings.origin_mm.x,
-            printable.min.y + settings.origin_mm.y,
-        )
-    };
+    let (at, factor) = placement(settings, &source);
     let map = |p: Point| {
         rotate(
             settings,
@@ -86,6 +70,63 @@ pub(super) fn apply(mut sheet: PlotSheet, settings: &PlotSettings) -> Result<Plo
     Ok(placed)
 }
 
+/// Where `source` goes on the upright paper: the paper point its lower-left
+/// corner lands on, and paper millimetres per source unit.
+pub(super) fn placement(settings: &PlotSettings, source: &Bounds) -> (Point, f64) {
+    let printable = upright_printable(settings);
+    let factor = scale_factor(settings, source, &printable);
+    let scaled = Point::new(
+        (source.max.x - source.min.x) * factor,
+        (source.max.y - source.min.y) * factor,
+    );
+    let at = if settings.area == PlotArea::Layout {
+        // A layout plots from the corner of its printable area, centred or
+        // not: as in AutoCAD, its sheet's origin is that corner.
+        Point::new(
+            printable.min.x + settings.origin_mm.x,
+            printable.min.y + settings.origin_mm.y,
+        )
+    } else if settings.flags & flags::PLOT_CENTERED != 0 {
+        Point::new(
+            printable.min.x + (printable.max.x - printable.min.x - scaled.x) / 2.0,
+            printable.min.y + (printable.max.y - printable.min.y - scaled.y) / 2.0,
+        )
+    } else {
+        // The offset, as AutoCAD's: on the page as it is read, from the
+        // printable corner to the plotted drawing's lower-left corner.
+        Point::new(
+            printable.min.x + settings.origin_mm.x,
+            printable.min.y + settings.origin_mm.y,
+        )
+    };
+    (at, factor)
+}
+
+/// The offset this placement comes to (what DXF codes 46 and 47 keep): from
+/// the printable corner of the page as it is read to the plotted drawing's
+/// lower-left corner, with paper millimetres per source unit. For a centred
+/// plot it is the centring.
+pub(super) fn placed_origin(settings: &PlotSettings, source: &Bounds) -> (Point, f64) {
+    let (at, factor) = placement(settings, source);
+    let printable = upright_printable(settings);
+    (
+        Point::new(at.x - printable.min.x, at.y - printable.min.y),
+        factor,
+    )
+}
+
+/// The paper upright, in the drawing's own orientation: the page as it is
+/// read, with its lower-left corner at the origin.
+pub(super) fn upright_paper(settings: &PlotSettings) -> Bounds {
+    Bounds::from_points(
+        unrotate(settings, Point::new(0.0, 0.0)),
+        unrotate(
+            settings,
+            Point::new(settings.paper_width_mm, settings.paper_height_mm),
+        ),
+    )
+}
+
 /// An upright point (the drawing's own orientation) to physical media.
 fn rotate(settings: &PlotSettings, p: Point) -> Point {
     let (w, h) = (settings.paper_width_mm, settings.paper_height_mm);
@@ -120,7 +161,10 @@ fn identity_layout(settings: &PlotSettings, sheet: &PlotSheet) -> bool {
         && settings.flags & flags::PRINT_LINEWEIGHTS != 0
 }
 
-fn source_bounds(sheet: &PlotSheet, settings: &PlotSettings) -> Result<Bounds, PlotError> {
+pub(super) fn source_bounds(
+    sheet: &PlotSheet,
+    settings: &PlotSettings,
+) -> Result<Bounds, PlotError> {
     match settings.area {
         PlotArea::Layout | PlotArea::Limits => Ok(Bounds::from_points(
             Point::new(0.0, 0.0),

@@ -9,7 +9,7 @@
 use eframe::egui;
 use opendraft_ui::widgets;
 
-use super::page_setup_dialog::boxes::{options_box, paper_box, plot_box};
+use super::page_setup_dialog::boxes::{options_box, paper_box, plot_box, Placed};
 use super::OpenDraftApp;
 use crate::plot_controls::control_state;
 use crate::plot_job::{PlotDialog, Printers, Target};
@@ -88,7 +88,11 @@ impl OpenDraftApp {
                             paper_box(ui, theme, &mut dialog.draft);
                             ui.add_space(6.0);
                             let mut pick = false;
-                            plot_box(ui, theme, &mut dialog.draft, Some(&mut pick));
+                            let file = !matches!(dialog.target, Target::Printer(_));
+                            let placed = dialog.preview.as_ref().and_then(|p| p.placed);
+                            let placed = placed.map(|(origin, scale)| Placed { origin, scale });
+                            let draft = &mut dialog.draft;
+                            plot_box(ui, theme, draft, Some(&mut pick), file, placed);
                             if pick {
                                 action = Some(Action::PickWindow);
                             }

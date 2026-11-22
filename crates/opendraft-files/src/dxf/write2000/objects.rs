@@ -1,6 +1,7 @@
 //! The OBJECTS section of the R2000 writer: the dictionaries and the LAYOUT
 //! object of each space.
 
+use opendraft_core::plot::PlotSpace;
 use opendraft_core::{
     paper_size_name, Document, PaperUnits, PlotArea, PlotRotation, PlotScale, PlotSettings,
     ShadePlotMode, ShadeResolution, StandardScale,
@@ -69,7 +70,15 @@ pub(super) fn write_objects(
     out.pair(5, hex(ids.placeholder));
     out.pair(330, hex(plot_styles));
 
-    let mut model_plot = document.model_plot().clone();
+    // A centred plot is written with the offset its centring comes to, as
+    // AutoCAD writes it: AutoCAD uses that offset until it centres again.
+    let centred = |mut plot: PlotSettings, space| {
+        if let Ok(Some(origin)) = opendraft_core::plot::centred_origin(document, space) {
+            plot.origin_mm = origin;
+        }
+        plot
+    };
+    let mut model_plot = centred(document.model_plot().clone(), PlotSpace::Model);
     model_plot.flags |= opendraft_core::plot_settings::flags::MODEL_TYPE;
     layout_object(
         out,
@@ -88,7 +97,7 @@ pub(super) fn write_objects(
             layout_dict,
             &dxf_name(&layout.name),
             i32::try_from(i + 1).unwrap_or(1),
-            &layout.plot,
+            &centred(layout.plot.clone(), PlotSpace::Layout(layout.id)),
             ids.records[i],
             Some(ids.overall[i]),
         );

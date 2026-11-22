@@ -398,7 +398,12 @@ impl AppState {
         let title = format!("Drawing{}", self.next_doc_number);
         self.next_doc_number += 1;
         self.abort_command();
-        self.push_document(title, Session::default());
+        // A new drawing's Model tab plots with the default margins.
+        let mut document = opendraft_core::Document::default();
+        let mut plot = document.model_plot().clone();
+        plot.margins_mm = [self.settings.plot_margins_mm; 4];
+        document.set_model_plot(plot);
+        self.push_document(title, Session::with_document(document));
     }
 
     /// Open a tab for `session` and make it the active one.

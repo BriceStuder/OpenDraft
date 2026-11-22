@@ -15,10 +15,11 @@ pub(super) fn write_viewports(
     index: usize,
 ) -> Result<(), FileError> {
     let owner = ids.records[index];
-    // The page as it is read, where the sheet's objects lie; the file keeps
-    // them from the printable corner.
+    // The paper on the sheet: the page as it is read, its printable corner
+    // at the origin.
     let (w, hgt) = layout.page_size();
     let corner = layout.printable_corner();
+    let middle = opendraft_core::Point::new(w / 2.0 - corner.x, hgt / 2.0 - corner.y);
     let viewport = |out: &mut Out,
                     handle: u32,
                     v: &Viewport,
@@ -33,12 +34,7 @@ pub(super) fn write_viewports(
         out.pair(67, 1);
         out.pair(8, 0);
         out.pair(100, "AcDbViewport");
-        out.point3(
-            10,
-            finite(v.center.x - corner.x)?,
-            finite(v.center.y - corner.y)?,
-            0.0,
-        );
+        out.point3(10, finite(v.center.x)?, finite(v.center.y)?, 0.0);
         out.pair(40, finite(v.width)?);
         out.pair(41, finite(v.height)?);
         out.pair(68, status);
@@ -78,10 +74,10 @@ pub(super) fn write_viewports(
     };
     let sheet = Viewport {
         id: opendraft_core::ViewportId(0),
-        center: opendraft_core::Point::new(w / 2.0, hgt / 2.0),
+        center: middle,
         width: w * 1.1,
         height: hgt * 1.1,
-        view_center: opendraft_core::Point::new(w / 2.0, hgt / 2.0),
+        view_center: middle,
         scale: 1.0,
         locked: false,
         on: true,

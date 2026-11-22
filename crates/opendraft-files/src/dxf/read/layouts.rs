@@ -39,8 +39,6 @@ const DEFAULT_SHEET: (f64, f64) = (297.0, 210.0);
 #[derive(Default)]
 pub(super) struct Spaces {
     layouts: Vec<Layout>,
-    /// Lower-left corner of each sheet's printable area, added to its coordinates.
-    offsets: HashMap<LayoutId, (f64, f64)>,
     by_record: HashMap<String, LayoutId>,
     by_block: HashMap<String, LayoutId>,
     by_name: HashMap<String, LayoutId>,
@@ -193,7 +191,7 @@ impl Spaces {
             {
                 spaces.first = Some(id);
             }
-            let layout = Layout {
+            spaces.layouts.push(Layout {
                 id,
                 name,
                 width,
@@ -201,12 +199,7 @@ impl Spaces {
                 plot,
                 viewports: Vec::new(),
                 paper_frozen: Vec::new(),
-            };
-            // The file keeps the sheet's objects from the printable corner of
-            // the page as it is read.
-            let corner = layout.printable_corner();
-            spaces.offsets.insert(id, (corner.x, corner.y));
-            spaces.layouts.push(layout);
+            });
         }
         spaces
     }
@@ -304,8 +297,9 @@ impl Spaces {
         }
     }
 
-    /// Resolve frozen layers, move sheet coordinates to the sheet's corner and
-    /// store the layouts.
+    /// Resolve frozen layers and store the layouts. A sheet's coordinates
+    /// are kept as they are: as in AutoCAD, its origin is the printable
+    /// corner.
     pub(super) fn finish(mut self, importer: &mut Importer) {
         for (layout, index, names) in std::mem::take(&mut self.frozen) {
             let layers: Vec<_> = names.iter().map(|n| importer.layer_named(n)).collect();
@@ -322,20 +316,6 @@ impl Spaces {
             }
         }
         let document = &mut importer.document;
-        for layout in &mut self.layouts {
-            let (dx, dy) = self.offsets.get(&layout.id).copied().unwrap_or((0.0, 0.0));
-            if dx == 0.0 && dy == 0.0 {
-                continue;
-            }
-            for vp in &mut layout.viewports {
-                vp.center = vp.center.translated(dx, dy);
-            }
-            for id in document.objects_of_layout(layout.id) {
-                if let Some(entity) = document.get(id).map(|e| e.translated(dx, dy)) {
-                    document.replace(id, entity);
-                }
-            }
-        }
         document.set_layouts(self.layouts);
         document.set_active_layout(None);
     }

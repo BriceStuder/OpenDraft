@@ -11,6 +11,18 @@ use crate::{Bounds, Document, PlotArea, Point};
 pub(super) fn plot_model(document: &Document) -> Result<PlotSheet, PlotError> {
     let plot = document.model_plot();
     validate_plot(plot).map_err(PlotError::Invalid)?;
+    let sheet = settings::apply(model_sheet(document)?, plot)?;
+    if within_limits(&sheet) {
+        Ok(sheet)
+    } else {
+        Err(PlotError::ResourceLimit)
+    }
+}
+
+/// The Model tab's objects over the plotted area, in drawing units, before
+/// the page setup places them on the paper.
+pub(super) fn model_sheet(document: &Document) -> Result<PlotSheet, PlotError> {
+    let plot = document.model_plot();
     let source = match &plot.area {
         PlotArea::Extents => extents(document)?,
         PlotArea::Window { first, second } => Bounds::from_points(*first, *second),
@@ -54,12 +66,7 @@ pub(super) fn plot_model(document: &Document) -> Result<PlotSheet, PlotError> {
             (&same, &frame, &frame),
         )?;
     }
-    let sheet = settings::apply(sheet, plot)?;
-    if within_limits(&sheet) {
-        Ok(sheet)
-    } else {
-        Err(PlotError::ResourceLimit)
-    }
+    Ok(sheet)
 }
 
 /// The box around everything visible in the Model tab.

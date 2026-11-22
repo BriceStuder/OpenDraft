@@ -285,9 +285,10 @@ impl Layout {
         (width, height)
     }
 
-    /// The lower-left corner of the printable area on the upright sheet,
-    /// where the plot puts it: the paper's margins (left, bottom, right, top)
-    /// turned with the plot. A DXF keeps the sheet's objects from this corner.
+    /// The lower-left corner of the printable area on the upright paper: the
+    /// paper's margins (left, bottom, right, top) turned with the plot. As in
+    /// AutoCAD, it is the sheet's origin, so the paper's own corner lies at
+    /// minus this.
     pub fn printable_corner(&self) -> Point {
         let [left, bottom, right, top] = self.plot.margins_mm;
         let (x, y) = match self.plot.rotation {
@@ -299,9 +300,27 @@ impl Layout {
         Point::new(x, y)
     }
 
+    /// The paper on the sheet, its printable corner at the origin (where a
+    /// plot of the layout area puts it; `plot::paper_on_sheet` follows the
+    /// other areas, the scale and the offset too).
     pub fn sheet_bounds(&self) -> Bounds {
         let (width, height) = self.page_size();
-        Bounds::from_points(Point::new(0.0, 0.0), Point::new(width, height))
+        let corner = self.printable_corner();
+        Bounds::from_points(
+            Point::new(-corner.x, -corner.y),
+            Point::new(width - corner.x, height - corner.y),
+        )
+    }
+
+    /// Give a new layout its margins, its viewports staying where they are
+    /// on the paper: the origin moves to the new printable corner.
+    pub fn set_margins_keeping_paper(&mut self, margins: [f64; 4]) {
+        let before = self.printable_corner();
+        self.plot.margins_mm = margins;
+        let after = self.printable_corner();
+        for vp in &mut self.viewports {
+            vp.center = vp.center.translated(before.x - after.x, before.y - after.y);
+        }
     }
 
     /// The top viewport that is on and holds the sheet point.
@@ -369,7 +388,11 @@ mod tests {
             paper_frozen: Vec::new(),
         };
         assert_eq!(layout.page_size(), (297.0, 210.0));
-        assert_eq!(layout.sheet_bounds().max, Point::new(297.0, 210.0));
+        let sheet = layout.sheet_bounds();
+        assert_eq!(
+            (sheet.min, sheet.max),
+            (Point::new(-5.0, -6.0), Point::new(292.0, 204.0))
+        );
         assert_eq!(layout.printable_corner(), Point::new(5.0, 6.0));
         layout.plot.rotation = crate::PlotRotation::Clockwise90;
         assert_eq!(layout.page_size(), (297.0, 210.0));
