@@ -5,7 +5,8 @@ use opendraft_commands::Command;
 
 use crate::arc_cmd::{draw_arc, draw_arc_sce};
 use crate::circle::{
-    draw_circle, draw_circle_2p, draw_circle_3p, draw_circle_diameter, draw_circle_ttr,
+    draw_circle, draw_circle_2p, draw_circle_3p, draw_circle_3t, draw_circle_diameter,
+    draw_circle_ttr,
 };
 use crate::state::AppState;
 
@@ -51,6 +52,12 @@ pub fn commands() -> Vec<Command<AppState>> {
             "Circle, Tan, Tan, Radius",
             "Circle",
             draw_circle_ttr
+        ),
+        editor!(
+            "draw.circle_3t",
+            "Circle, Tan, Tan, Tan",
+            "Circle",
+            draw_circle_3t
         ),
         editor!("draw.arc", "Arc, 3-Point", "Arc", draw_arc),
         editor!(

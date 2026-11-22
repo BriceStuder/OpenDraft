@@ -65,6 +65,7 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("draw.circle_2p", InteractiveInApp, Mutation),
     ("draw.circle_3p", InteractiveInApp, Mutation),
     ("draw.circle_ttr", InteractiveInApp, Mutation),
+    ("draw.circle_3t", InteractiveInApp, Mutation),
     ("draw.arc_sce", InteractiveInApp, Mutation),
     ("draw.circle", InteractiveInApp, Mutation),
     ("draw.arc", InteractiveInApp, Mutation),
@@ -157,6 +158,8 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("layout.vplayer", Denied, Mutation),
     ("layout.vplock", Denied, Mutation),
     ("layout.page_setup", Denied, Lifecycle),
+    // A view setting of the user's, as the grid is.
+    ("view.layout_paper", ImmediateSafe, Ui),
     // Dialogs and variables.
     ("tools.setvar", Denied, Lifecycle),
     ("format.units", Denied, Lifecycle),

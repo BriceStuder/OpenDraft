@@ -58,6 +58,7 @@ pub fn build_registry() -> Registry<AppState> {
         crate::primitive_commands::commands(),
         crate::dimension_commands::commands(),
         crate::dock::commands(),
+        crate::canvas_style::commands(),
     ];
     for command in all().into_iter().chain(tables.into_iter().flatten()) {
         registry

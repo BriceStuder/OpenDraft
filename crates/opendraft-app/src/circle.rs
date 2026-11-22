@@ -1,8 +1,11 @@
-//! CIRCLE: centre and radius or diameter, three points, two diameter ends, or
-//! tangent to two objects with a radius.
+//! CIRCLE: centre and radius or diameter, three points, two diameter ends,
+//! tangent to two objects with a radius, or (from the ribbon) tangent to
+//! three objects.
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
-use opendraft_core::{arc, tangent_circle, Entity, Point};
+use opendraft_core::{
+    arc, circle_tangent_to_three, tangent_circle, touchable_by_tangent_circle, Entity, Point,
+};
 
 use crate::draw::{add, distance, line, MIN_SIZE};
 
@@ -91,6 +94,37 @@ pub fn draw_circle_3p(ed: &mut Editor) -> Result<(), Cancelled> {
 /// CIRCLE, Tan, Tan, Radius: two objects to touch, then a radius.
 pub fn draw_circle_ttr(ed: &mut Editor) -> Result<(), Cancelled> {
     tangent_tangent_radius(ed)
+}
+
+/// CIRCLE, Tan, Tan, Tan: three lines, circles or arcs to touch.
+pub fn draw_circle_3t(ed: &mut Editor) -> Result<(), Cancelled> {
+    let first = pick_touchable(ed, "first")?;
+    let second = pick_touchable(ed, "second")?;
+    let third = pick_touchable(ed, "third")?;
+    let objects = [
+        (&first.0, first.1),
+        (&second.0, second.1),
+        (&third.0, third.1),
+    ];
+    match circle_tangent_to_three(objects) {
+        Some((center, radius)) if radius > MIN_SIZE => add(ed, circle(center, radius), "Circle"),
+        _ => {
+            ed.say("Circle does not exist.");
+            Ok(())
+        }
+    }
+}
+
+/// An object a tangent circle can touch, picked for the `which` tangent.
+fn pick_touchable(ed: &Editor, which: &str) -> Result<(Entity, Point), Cancelled> {
+    let message = format!("Specify point on object for {which} tangent");
+    loop {
+        let (entity, at) = pick_object(ed, &message)?;
+        if touchable_by_tangent_circle(&entity, at) {
+            return Ok((entity, at));
+        }
+        ed.say("Select a line, a circle or an arc.");
+    }
 }
 
 fn three_points(ed: &Editor) -> Result<(), Cancelled> {
@@ -350,6 +384,44 @@ mod tests {
             .log
             .iter()
             .any(|l| l.contains("Circle does not exist")));
+        assert!(!state.command_running());
+    }
+    #[test]
+    fn tan_tan_tan_fits_the_circle_inside_three_lines_and_skips_a_point() {
+        let mut state = AppState::new();
+        state.add_entity(line(p(0.0, 0.0), p(4.0, 0.0)));
+        state.add_entity(line(p(0.0, 0.0), p(0.0, 3.0)));
+        state.add_entity(line(p(4.0, 0.0), p(0.0, 3.0)));
+        state.add_entity(Entity::Point { at: p(9.0, 9.0) });
+        let ids: Vec<_> = state
+            .session()
+            .document()
+            .objects()
+            .iter()
+            .map(|o| o.id)
+            .collect();
+        state.start_command("Circle", draw_circle_3t);
+        state.settle_command();
+        state.answer_object(p(9.0, 9.0), Some(ids[3]), false);
+        state.settle_command();
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("Select a line")));
+        assert!(state.cmd_prompt().text.contains("first tangent"));
+        for (at, id) in [
+            (p(2.0, 0.0), ids[0]),
+            (p(0.0, 1.5), ids[1]),
+            (p(2.0, 1.5), ids[2]),
+        ] {
+            state.answer_object(at, Some(id), false);
+            state.settle_command();
+        }
+        let all = entities(&state);
+        let (centre, radius) = radius_and_centre(&all[4]);
+        assert!((centre.x - 1.0).abs() < 1e-9 && (centre.y - 1.0).abs() < 1e-9);
+        assert!((radius - 1.0).abs() < 1e-9);
         assert!(!state.command_running());
     }
 }

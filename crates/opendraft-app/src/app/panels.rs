@@ -7,6 +7,7 @@ use opendraft_ui::Theme;
 
 use super::command_line_strip::StripRows;
 use super::OpenDraftApp;
+use crate::canvas_style;
 use crate::dock::{self, PanelTab};
 use crate::state::AppState;
 
@@ -27,23 +28,10 @@ impl OpenDraftApp {
             Some(_) => (rows.height(2), rows.height(0)),
             None => (dock::COMMAND_LINE_MIN_HEIGHT, dock::COLLAPSED_HEIGHT),
         };
-        let colors = &self.theme.colors;
+        let (space, paper) = (self.state.space(), self.state.settings.layout_paper);
         let mut viewer = PanelViewer {
             theme: &self.theme,
-            style: CanvasStyle {
-                background: colors.canvas_bg,
-                grid_minor: colors.text.gamma_multiply(0.03),
-                grid_major: colors.text.gamma_multiply(0.06),
-                axis_x: egui::Color32::from_rgb(70, 190, 110).gamma_multiply(0.3),
-                axis_y: egui::Color32::from_rgb(220, 80, 80).gamma_multiply(0.3),
-                entity: colors.text,
-                hover: colors.accent.gamma_multiply(0.25),
-                selected: colors.accent.lerp_to_gamma(egui::Color32::WHITE, 0.35),
-                selected_glow: colors.accent.gamma_multiply(0.5),
-                snap: egui::Color32::from_rgb(255, 214, 90),
-                window: colors.accent,
-                crossing: egui::Color32::from_rgb(70, 190, 110),
-            },
+            style: canvas_style::canvas_style(&self.theme.colors, space, paper),
             grid: GridSettings {
                 visible: self.state.settings.show_grid,
                 spacing: self.state.settings.grid_spacing,
@@ -276,9 +264,12 @@ impl PanelViewer<'_> {
         if !matches!(self.command_line_strip, Some((dock::Strip::Below, _))) {
             self.layout_tabs(ui);
         }
+        // After the layout tabs, which may have changed the space this frame.
+        let (space, paper) = (self.state.space(), self.state.settings.layout_paper);
+        self.style = canvas_style::canvas_style(&self.theme.colors, space, paper);
+        let crosshair = self.state.settings.crosshair();
         let editing = self.state.mtext_editing() && self.state.run_doc == self.state.active;
         let sizes = self.state.settings.pointer_sizes();
-        let crosshair = self.state.settings.crosshair();
         let zoom_speed = self.state.settings.zoom_speed;
         let perf = self.state.settings.performance.clone();
         // `TK` holds each point to an axis from the one before.

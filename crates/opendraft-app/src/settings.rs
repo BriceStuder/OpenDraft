@@ -26,11 +26,23 @@ pub const ZOOM_SPEED_RANGE: (u32, u32) = (25, 400);
 /// Every moment `FIELDEVAL` can name: on open, on save, on plot.
 pub const FIELD_EVAL_ALL: u8 = 7;
 
+/// How a layout's sheet is shown: white paper with dark lines, as it will be
+/// printed, or the dark look of model space.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LayoutPaper {
+    #[default]
+    Light,
+    Dark,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
     pub dynamic_input: crate::dynamic_settings::DynamicInputSettings,
     pub palette: Palette,
+    /// The paper of layouts; model space keeps the palette's background.
+    pub layout_paper: LayoutPaper,
     pub show_grid: bool,
     /// The `[-][Top][2D Wireframe]` label in the drawing's top-left corner
     /// (`VPCONTROL`).
@@ -93,6 +105,7 @@ impl Default for Settings {
         Self {
             dynamic_input: Default::default(),
             palette: Palette::default(),
+            layout_paper: LayoutPaper::default(),
             show_grid: true,
             show_viewport_controls: true,
             grid_spacing: 10.0,
@@ -329,6 +342,7 @@ mod tests {
                 pointer_visibility: 2,
             },
             palette: Palette::Slate,
+            layout_paper: LayoutPaper::Dark,
             show_grid: false,
             show_viewport_controls: false,
             grid_spacing: 2.5,
@@ -419,6 +433,21 @@ mod tests {
         );
         assert_eq!(Settings::from_json("not json"), Settings::default());
         assert_eq!(Settings::from_json("[1]"), Settings::default());
+    }
+
+    #[test]
+    fn layout_paper_is_light_unless_saved_dark() {
+        assert_eq!(Settings::default().layout_paper, LayoutPaper::Light);
+        let dark = Settings::from_json(r#"{"layout_paper":"dark","grid_spacing":3.0}"#);
+        assert_eq!(dark.layout_paper, LayoutPaper::Dark);
+        let text = serde_json::to_string(&dark).unwrap();
+        assert!(text.contains(r#""layout_paper":"dark""#), "{text}");
+        // An unknown value costs only itself.
+        let odd = Settings::from_json(r#"{"layout_paper":"sepia","grid_spacing":3.0}"#);
+        assert_eq!(
+            (odd.layout_paper, odd.grid_spacing),
+            (LayoutPaper::Light, 3.0)
+        );
     }
 
     #[test]

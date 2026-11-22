@@ -65,6 +65,7 @@ mod split;
 mod stretch;
 mod tangent;
 mod tangent_arc;
+mod tangent_three;
 pub mod text;
 pub mod text_style;
 mod transform;
@@ -110,6 +111,7 @@ pub use polyline::PolylineError;
 pub use single_line_text::{SingleLineText, TextAlignment, TextAlignmentMode};
 pub use spline::{KnotParameterization, Spline, SplineError, SplineFitData};
 pub use tangent::tangent_circle;
+pub use tangent_three::{circle_tangent_to_three, touchable_by_tangent_circle};
 pub use text_style::{
     FontDescriptor, TextStyle, TextStyleId, DEFAULT_STROKE_WEIGHT, OD_ROMAN_FAMILY,
 };

@@ -444,7 +444,7 @@ mod tests {
         let ribbon = ribbon_for(Layout);
         let tab = ribbon.tabs.last().expect("the Layout tab");
         let panels: Vec<&str> = tab.panels.iter().map(|p| p.title).collect();
-        assert_eq!(panels, ["Layout", "Layout Viewports"]);
+        assert_eq!(panels, ["Layout", "Layout Viewports", "Display"]);
     }
 
     #[test]
