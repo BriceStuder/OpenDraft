@@ -105,6 +105,11 @@ pub(super) fn write_tables(
             out.pair(420, rgb);
         }
         out.pair(6, crate::dxf::linetypes::name_for(document, layer.linetype));
+        // AutoCAD never plots Defpoints and refuses the whole file when its
+        // plot flag (290, 1 when missing) says otherwise.
+        if layer.name.eq_ignore_ascii_case("Defpoints") {
+            out.pair(290, 0);
+        }
         out.pair(370, weight_code(layer.lineweight));
         out.pair(390, hex(ids.placeholder));
     }

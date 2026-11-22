@@ -648,6 +648,28 @@ mod tests {
         assert!(pairs.iter().any(|(c, v)| *c == 1 && v == "Layout1"));
     }
 
+    /// AutoCAD refuses a file whose Defpoints layer is plottable ("Invalid
+    /// AcDbLayerTableRecord plot flag"), and a missing group 290 means
+    /// plottable; other layers keep the default.
+    #[test]
+    fn the_defpoints_layer_is_written_not_plotted() {
+        let mut doc = drawing();
+        let id = doc.allocate_layer_id();
+        doc.push_layer(Layer::new(id, "DEFPOINTS"));
+        let pairs = pairs(&write(&doc).unwrap().bytes);
+        fn layer<'a>(pairs: &'a Pairs, name: &str) -> &'a [(i32, String)] {
+            let at = pairs
+                .iter()
+                .position(|(c, v)| *c == 2 && v == name)
+                .unwrap();
+            let start = pairs[..at].iter().rposition(|(c, _)| *c == 0).unwrap();
+            object(pairs, "LAYER", start).unwrap().1
+        }
+        assert_eq!(value(layer(&pairs, "DEFPOINTS"), 290), Some("0"));
+        assert_eq!(value(layer(&pairs, "Walls"), 290), None);
+        assert_eq!(value(layer(&pairs, "0"), 290), None);
+    }
+
     #[test]
     fn spaces_layouts_and_their_entities_are_where_autocad_puts_them() {
         let pairs = pairs(&write(&drawing()).unwrap().bytes);
