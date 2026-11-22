@@ -17,7 +17,7 @@ mod page;
 mod settings;
 
 use outlines::dashed_outlines;
-pub use page::{page_as_read, paper_on_sheet, plot_page};
+pub use page::{centred_origin, page_as_read, paper_on_sheet, plot_page};
 
 /// How far a flattened curve may stray from the true one, in paper millimetres.
 pub(crate) const TOLERANCE_MM: f64 = 0.02;

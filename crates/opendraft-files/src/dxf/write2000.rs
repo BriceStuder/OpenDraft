@@ -630,6 +630,9 @@ mod tests {
         assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
         let mut expected = plot;
         expected.flags |= opendraft_core::plot_settings::flags::MODEL_TYPE;
+        // Centred, it is written with its centring, as AutoCAD writes it: the
+        // 40 × 25 mm window in the 412 × 287 mm printable area.
+        expected.origin_mm = Point::new(186.0, 131.0);
         assert_eq!(loaded.document.model_plot(), &expected);
         let sheet = &loaded.document.layouts()[0].plot;
         assert_eq!(

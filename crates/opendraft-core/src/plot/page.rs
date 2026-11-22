@@ -113,6 +113,40 @@ pub fn paper_on_sheet(document: &Document, layout: LayoutId) -> Result<Bounds, P
     ))
 }
 
+/// The offset a centred plot of `space` comes to, as AutoCAD keeps it (DXF
+/// codes 46 and 47): the room left on each axis, halved. AutoCAD gives it
+/// along the paper as it feeds, so a plot turned a quarter has X and Y
+/// swapped (an AutoCAD landscape A4 with a 277 × 190 frame keeps 5.81,
+/// 5.19: 5.81 is the centring up the page). AutoCAD shows and plots a
+/// drawing it opens with this offset until it works the centring out again
+/// (when its printer is changed), so a file must carry it. `None` when the
+/// plot is not centred, or is a layout area (never centred).
+pub fn centred_origin(document: &Document, space: PlotSpace) -> Result<Option<Point>, PlotError> {
+    let (plot, sheet) = match space {
+        PlotSpace::Model => (document.model_plot(), None),
+        PlotSpace::Layout(id) => {
+            let layout = document.layout(id).ok_or(PlotError::NoLayout)?;
+            (&layout.plot, Some(layout))
+        }
+    };
+    let centred = plot.flags & crate::plot_settings::flags::PLOT_CENTERED != 0;
+    if !centred || plot.area == crate::PlotArea::Layout {
+        return Ok(None);
+    }
+    validate_plot(plot).map_err(PlotError::Invalid)?;
+    let drawn = match sheet {
+        None => super::model_space::model_sheet(document)?,
+        Some(layout) => super::layout_sheet(document, layout)?,
+    };
+    let source = super::settings::source_bounds(&drawn, plot)?;
+    let origin = super::settings::placed_origin(plot, &source);
+    Ok(Some(if quarter(plot.rotation) {
+        Point::new(origin.y, origin.x)
+    } else {
+        origin
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,6 +307,33 @@ mod tests {
             (paper.max.x - paper.min.x - 594.0).abs() < 1e-6,
             "{paper:?}"
         );
+    }
+
+    #[test]
+    fn a_centred_plot_keeps_its_centring_as_autocad_does() {
+        // The 100 × 50 box in the 287 × 200 printable area of a landscape A4.
+        let (mut doc, id) = sheet_with_a_line(crate::PlotArea::Extents);
+        let origin = centred_origin(&doc, PlotSpace::Layout(id))
+            .unwrap()
+            .unwrap();
+        assert!(near_point(origin, Point::new(93.5, 75.0)), "{origin:?}");
+        // Turned a quarter on portrait paper, AutoCAD gives it along the
+        // paper: X and Y swap.
+        let mut layouts = doc.layouts().to_vec();
+        let layout = &mut layouts[0];
+        (layout.width, layout.height) = (210.0, 297.0);
+        (layout.plot.paper_width_mm, layout.plot.paper_height_mm) = (210.0, 297.0);
+        layout.plot.rotation = PlotRotation::CounterClockwise90;
+        doc.set_layouts(layouts);
+        let origin = centred_origin(&doc, PlotSpace::Layout(id))
+            .unwrap()
+            .unwrap();
+        assert!(near_point(origin, Point::new(75.0, 93.5)), "{origin:?}");
+        // Not centred, or a layout area: the offset set is the one kept.
+        let mut layouts = doc.layouts().to_vec();
+        layouts[0].plot.flags &= !crate::plot_settings::flags::PLOT_CENTERED;
+        doc.set_layouts(layouts);
+        assert_eq!(centred_origin(&doc, PlotSpace::Layout(id)), Ok(None));
     }
 
     #[test]
