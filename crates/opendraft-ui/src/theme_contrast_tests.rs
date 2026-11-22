@@ -1,6 +1,13 @@
 //! WCAG 2.2 contrast of the theme's text and focus colours on the surfaces
 //! they are drawn on, in both palettes. Normal text needs 4.5:1, and what
-//! marks keyboard focus 3:1. The measured ratios are in `docs/ui_plan.md`.
+//! marks keyboard focus 3:1. Measured when these tests were written
+//! (23-10-2026): `text` is 7.2 or more on the base, surface and raised tones of
+//! both palettes; `text_weak` is 7.39 / 6.18 / 5.16 (neutral) and 7.07 / 5.61 /
+//! 4.74 (slate) on them (it went from #a6a6a6 to #b4b4b4 to pass); white on
+//! the accent is 4.54; the focus ring, `accent_text`, is 6.65 on raised.
+//! Knowingly not met: a card's edge against the page (1.43 neutral, 1.49
+//! slate, against 3:1 for a component's boundary) and `text_weak` on the
+//! hover tone (4.14 / 3.35, only while the pointer is on it).
 
 use egui::Color32;
 
