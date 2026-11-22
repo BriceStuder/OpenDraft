@@ -184,9 +184,6 @@ impl Spaces {
                 spaces.by_block.insert(block.clone(), id);
             }
             spaces.by_record.insert(raw.record.clone(), id);
-            spaces
-                .offsets
-                .insert(id, (plot.margins_mm[0], plot.margins_mm[1]));
             if spaces.first.is_none()
                 || block_names
                     .get(&raw.record)
@@ -194,7 +191,7 @@ impl Spaces {
             {
                 spaces.first = Some(id);
             }
-            spaces.layouts.push(Layout {
+            let layout = Layout {
                 id,
                 name,
                 width,
@@ -202,7 +199,12 @@ impl Spaces {
                 plot,
                 viewports: Vec::new(),
                 paper_frozen: Vec::new(),
-            });
+            };
+            // The file keeps the sheet's objects from the printable corner of
+            // the page as it is read.
+            let corner = layout.printable_corner();
+            spaces.offsets.insert(id, (corner.x, corner.y));
+            spaces.layouts.push(layout);
         }
         spaces
     }
