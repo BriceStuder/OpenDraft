@@ -251,7 +251,7 @@ impl View {
         // shows the drawing as missing, which is worse than waiting.
         let by = cache
             .built_view()
-            .map(|from| move_between(&camera_of(from), &self.camera, frame.rect));
+            .and_then(|from| move_between(&camera_of(from), &self.camera, frame.rect));
         smooth && by.is_some_and(|by| covered(by, frame.rect, frame.canvas) >= MIN_COVERED)
     }
 
@@ -331,8 +331,8 @@ impl View {
             let cache = self.cache(f);
             (cache.base_meshes(), cache.built_view())
         };
-        if let Some(from) = from {
-            let by = move_between(&camera_of(from), &self.camera, f.rect);
+        if let Some(by) = from.and_then(|from| move_between(&camera_of(from), &self.camera, f.rect))
+        {
             let drawn = self.cache(f).draw_bitmap(f.painter, Some(by));
             if let (false, Some(meshes)) = (drawn, meshes) {
                 draw_moved(f.painter, &meshes, by);

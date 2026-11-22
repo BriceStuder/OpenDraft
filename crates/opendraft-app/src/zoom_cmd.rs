@@ -17,6 +17,12 @@ pub enum ZoomTo {
     Window(Point, Point),
     Extents,
     Previous,
+    /// Turn the drawing on the screen to this twist (ROTATEVIEW), then show
+    /// the extents when `plan` (PLAN).
+    Twist {
+        twist: f64,
+        plan: bool,
+    },
 }
 
 /// Where a running ZOOM leaves its answer for the drawing it started in.
@@ -102,8 +108,18 @@ fn start_with(
     state: &mut AppState,
     ask: impl FnOnce(&Editor) -> Result<Option<ZoomTo>, Cancelled> + Send + 'static,
 ) {
+    start_view_command(state, "ZOOM", ask);
+}
+
+/// Run command `name`, which asks how the view is to change and leaves the
+/// answer in the drawing's slot.
+pub(crate) fn start_view_command(
+    state: &mut AppState,
+    name: &'static str,
+    ask: impl FnOnce(&Editor) -> Result<Option<ZoomTo>, Cancelled> + Send + 'static,
+) {
     let slot = Arc::clone(&state.docs[state.active].zoom_to);
-    state.start_command("ZOOM", move |ed| {
+    state.start_command(name, move |ed| {
         if let Some(to) = ask(ed)? {
             if let Ok(mut place) = slot.lock() {
                 *place = Some(to);
@@ -148,6 +164,8 @@ impl AppState {
                 Some(ZoomTo::Window(a, b)) => doc.view.request_zoom_window(a, b),
                 Some(ZoomTo::Extents) => doc.view.request_zoom_extents(),
                 Some(ZoomTo::Previous) => no_previous |= !doc.view.zoom_previous(),
+                Some(ZoomTo::Twist { twist, plan: true }) => doc.view.request_plan(twist),
+                Some(ZoomTo::Twist { twist, plan: false }) => doc.view.request_twist(twist),
                 None => {}
             }
         }

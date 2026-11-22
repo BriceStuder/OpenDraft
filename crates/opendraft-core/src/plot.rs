@@ -480,6 +480,7 @@ mod tests {
             on: true,
             frozen: Vec::new(),
             ccs: crate::ccs::Ccs::WORLD,
+            twist: 0.0,
         };
         let id = doc.allocate_layout_id();
         let layout = crate::Layout {

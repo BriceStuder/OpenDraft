@@ -684,6 +684,37 @@ only changes how points and angles are typed and shown, and which way is
   DWG's UCS table and viewports, turning the view (PLAN), `UCSICON`
   settings, a manager dialog.
 
+## View rotation (built)
+
+The Model tab's view, and the view of an unlocked layout viewport, can turn on
+the screen (AutoCAD's view twist). It is the `twist` of the canvas `Camera`
+(radians counter-clockwise, 0 = unturned); `world_to_screen`, `screen_to_world`
+and `visible_world` all honour it, so painters that go through them need no
+change. `visible_world` returns the box round the turned screen, so culling
+stays safe (it keeps a little more than is seen). Objects are never touched:
+only the camera turns.
+
+- **Ways to turn it.** Ctrl+middle-drag about the canvas centre
+  (`opendraft-canvas/src/view/twist.rs`; the angle is measured from where the
+  button went down, Shift holds it to 15 degree steps, Esc puts the view back
+  and goes no further, so it does not cancel a running command); `ROTATEVIEW`
+  (alias `RV`: an angle, Points for a line to read level, Reset) and `PLAN`
+  (Current, Named or World: turns the view so that system's X axis reads
+  level, then shows the extents), both in `opendraft-app/src/view_twist_cmd.rs`.
+  Like ZOOM they only ask: the answer goes to the drawing's `zoom_to` slot and
+  the UI thread applies it (`View::request_twist`, `request_plan`). A layout's
+  sheet never turns, and a locked viewport refuses with a message.
+- **What follows the turn.** The layer cache key includes the twist (a turn
+  repaints the picture); the grid, axes, crosshair, CCS icon and the dynamic
+  input's arc are drawn turned; selection windows and grips stay square to the
+  screen; a rectangle is drawn as its four corners when the view is turned;
+  CCS View lines the system up with the turned view.
+- **Saved.** A viewport's twist is `Viewport::twist` in `.odraft` and DXF
+  group 51 (degrees), with the view centre in the viewport's own axes. The
+  Model tab's twist is a view setting like its zoom: it is not saved.
+- **Not built.** See `docs/parking_lot.md`, "Plan: custom coordinate system and
+  view rotation".
+
 ## Layouts (built, phases 1-3)
 
 A layout is a sheet (millimetres) with viewports that show model space; the design follows AutoCAD's paper space but keeps this project's structures (no slotmap graph, handles or `nalgebra`).

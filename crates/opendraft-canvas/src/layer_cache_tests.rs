@@ -63,6 +63,7 @@ fn camera() -> Camera {
     Camera {
         center: Point::new(400.0, 300.0),
         zoom: 1.0,
+        twist: 0.0,
     }
 }
 

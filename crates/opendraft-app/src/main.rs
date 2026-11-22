@@ -193,6 +193,7 @@ mod units_state;
 mod units_vars;
 mod updates;
 mod view_freeze;
+mod view_twist_cmd;
 mod whats_new;
 mod window_memory;
 mod xline_cmd;

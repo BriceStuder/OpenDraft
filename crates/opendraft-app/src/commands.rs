@@ -61,6 +61,7 @@ pub fn build_registry() -> Registry<AppState> {
         crate::canvas_style::commands(),
         crate::ccs_cmd::commands(),
         crate::zoom_cmd::commands(),
+        crate::view_twist_cmd::commands(),
     ];
     for command in all().into_iter().chain(tables.into_iter().flatten()) {
         registry

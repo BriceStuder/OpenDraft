@@ -75,6 +75,7 @@ impl PanelViewer<'_> {
             prompt: &prompt,
             settings: &settings,
             units: &units,
+            twist: doc.view.twist(),
             canvas,
             anchor,
             clearance,

@@ -79,6 +79,7 @@ fn fit(entities: &[Entity], rect: Rect) -> Option<Camera> {
             (bounds.min.y + bounds.max.y) / 2.0,
         ),
         zoom,
+        twist: 0.0,
     })
 }
 

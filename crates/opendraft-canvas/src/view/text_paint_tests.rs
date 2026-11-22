@@ -54,6 +54,7 @@ fn zoomed_in_on_a_long_text_only_the_visible_lines_are_built() {
     let camera = Camera {
         center: Point::new(30.0, -8.0),
         zoom: 16.0,
+        twist: 0.0,
     };
     let all = painted(&text, &camera, big);
     let few = painted(&text, &camera, small);
@@ -76,6 +77,7 @@ fn what_reaches_the_screen_is_painted_exactly_as_without_the_shortcut() {
     let camera = Camera {
         center: Point::new(30.0, -3.0),
         zoom: 16.0,
+        twist: 0.0,
     };
     // The same world point must land at the same pixel in both viewports.
     let shift = Vec2::new(0.0, (4000.0 - 120.0) / 2.0);

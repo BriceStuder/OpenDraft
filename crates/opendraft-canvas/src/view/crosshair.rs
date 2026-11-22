@@ -233,7 +233,12 @@ impl View {
             size: self.crosshair.size,
             color: self.crosshair.color.unwrap_or(over),
             pick: self.sizes.pick,
-            axes: (ccs.angle != 0.0).then(|| super::backdrop::screen_axes(ccs)),
+            // Straight unless the system is turned on the screen.
+            axes: {
+                let on_screen = opendraft_core::Ccs::new(ccs.origin, ccs.angle + self.camera.twist);
+                let turned = on_screen.angle.min(std::f64::consts::TAU - on_screen.angle) > 1e-9;
+                turned.then(|| super::backdrop::screen_axes(ccs, self.camera.twist))
+            },
         };
         paint(&painter, canvas, at, shape, &look);
     }

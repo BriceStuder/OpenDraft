@@ -110,6 +110,7 @@ impl Document {
             active_layout: None,
             active_frozen: Vec::new(),
             active_viewport: None,
+            view_twist: 0.0,
             model_ccs: crate::ccs::Ccs::WORLD,
             ccs_previous: Vec::new(),
             ..self.clone_tables()
@@ -145,6 +146,7 @@ impl Document {
             active_layout: self.active_layout,
             active_frozen: self.active_frozen.clone(),
             active_viewport: self.active_viewport,
+            view_twist: self.view_twist,
             model_ccs: self.model_ccs,
             named_ccs: self.named_ccs.clone(),
             ccs_previous: self.ccs_previous.clone(),

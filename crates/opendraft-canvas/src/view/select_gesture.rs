@@ -102,6 +102,7 @@ impl View {
     /// The keys of a selection under way, taken before the app's own: Esc
     /// drops it, and Space cycles a lasso between Window, Crossing and Fence.
     pub fn take_selection_keys(&mut self, ctx: &egui::Context) {
+        self.take_twist_keys(ctx);
         let Some(pending) = &mut self.pending else {
             return;
         };
@@ -182,7 +183,7 @@ impl View {
                         self.camera.screen_to_world(end, rect),
                     );
                     out.region = Some(RegionSelect {
-                        region: box_region(a, b),
+                        region: box_region(a, b, &self.camera),
                         remove: press.shift,
                     });
                 }
@@ -211,7 +212,7 @@ impl View {
             if let (true, Some(to)) = (released, pointer) {
                 self.pending = None;
                 out.region = Some(RegionSelect {
-                    region: box_region(corner, to),
+                    region: box_region(corner, to, &self.camera),
                     remove: press.shift,
                 });
             }
@@ -300,11 +301,12 @@ impl View {
     }
 }
 
-/// A box between two corners: Window when drawn to the right, Crossing to
+/// A box between two corners, square to the screen (so in a turned view a
+/// turned box in the drawing): Window when drawn to the right, Crossing to
 /// the left.
-fn box_region(a: Point, b: Point) -> Region {
-    let corners = Region::rect_corners(a, b);
-    if b.x >= a.x {
+fn box_region(a: Point, b: Point, camera: &crate::camera::Camera) -> Region {
+    let corners = Region::view_corners(a, b, camera.twist);
+    if camera.to_view(b).x >= camera.to_view(a).x {
         Region::Window(corners)
     } else {
         Region::Crossing(corners)

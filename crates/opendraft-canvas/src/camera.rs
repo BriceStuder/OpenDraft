@@ -5,11 +5,15 @@ pub const MIN_ZOOM: f64 = 0.001;
 pub const MAX_ZOOM: f64 = 100_000.0;
 
 /// Maps drawing units to screen points. `center` is the world point shown at
-/// the middle of the viewport; `zoom` is screen points per drawing unit.
+/// the middle of the viewport; `zoom` is screen points per drawing unit;
+/// `twist` is how far the drawing is turned on the screen, in radians
+/// counter-clockwise (AutoCAD's `VIEWTWIST`): with a twist of 30 degrees the
+/// world's X axis points 30 degrees up the screen.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Camera {
     pub center: Point,
     pub zoom: f64,
+    pub twist: f64,
 }
 
 impl Default for Camera {
@@ -17,31 +21,74 @@ impl Default for Camera {
         Self {
             center: Point::new(150.0, 100.0),
             zoom: 2.0,
+            twist: 0.0,
         }
     }
 }
 
+/// The cosine and sine of `twist`, exact when there is none so an unturned
+/// view maps exactly as it always has.
+fn turn(twist: f64) -> (f64, f64) {
+    if twist == 0.0 {
+        (1.0, 0.0)
+    } else {
+        let (s, c) = twist.sin_cos();
+        (c, s)
+    }
+}
+
 impl Camera {
+    /// `v`, a world offset, as an offset along the screen's axes (y still up).
+    pub fn to_view(&self, v: Point) -> Point {
+        let (c, s) = turn(self.twist);
+        Point::new(v.x * c - v.y * s, v.x * s + v.y * c)
+    }
+
+    /// The reverse of [`to_view`](Self::to_view).
+    pub fn from_view(&self, v: Point) -> Point {
+        let (c, s) = turn(self.twist);
+        Point::new(v.x * c + v.y * s, -v.x * s + v.y * c)
+    }
+
     pub fn world_to_screen(&self, p: Point, viewport: Rect) -> Pos2 {
         let c = viewport.center();
+        let v = self.to_view(Point::new(p.x - self.center.x, p.y - self.center.y));
         Pos2::new(
-            c.x + ((p.x - self.center.x) * self.zoom) as f32,
-            c.y - ((p.y - self.center.y) * self.zoom) as f32,
+            c.x + (v.x * self.zoom) as f32,
+            c.y - (v.y * self.zoom) as f32,
         )
     }
 
     pub fn screen_to_world(&self, pos: Pos2, viewport: Rect) -> Point {
         let c = viewport.center();
-        Point::new(
-            self.center.x + f64::from(pos.x - c.x) / self.zoom,
-            self.center.y - f64::from(pos.y - c.y) / self.zoom,
-        )
+        let v = self.from_view(Point::new(
+            f64::from(pos.x - c.x) / self.zoom,
+            -f64::from(pos.y - c.y) / self.zoom,
+        ));
+        Point::new(self.center.x + v.x, self.center.y + v.y)
     }
 
     /// Drag the drawing along with the pointer.
     pub fn pan_by_pixels(&mut self, delta: Vec2) {
-        self.center.x -= f64::from(delta.x) / self.zoom;
-        self.center.y += f64::from(delta.y) / self.zoom;
+        let v = self.from_view(Point::new(
+            f64::from(delta.x) / self.zoom,
+            -f64::from(delta.y) / self.zoom,
+        ));
+        self.center.x -= v.x;
+        self.center.y -= v.y;
+    }
+
+    /// Turn the drawing on the screen to `twist` about the world point at
+    /// the middle of the viewport.
+    pub fn set_twist(&mut self, twist: f64) {
+        if twist.is_finite() {
+            let twist = twist.rem_euclid(std::f64::consts::TAU);
+            self.twist = if twist >= std::f64::consts::TAU - 1e-12 {
+                0.0
+            } else {
+                twist
+            };
+        }
     }
 
     /// Zoom by `factor`, keeping the world point under `pos` fixed.
@@ -72,8 +119,10 @@ impl Camera {
         self.frame(b, viewport, 1.0);
     }
 
-    /// Centre on `b` and fill `usable` of the viewport with it.
+    /// Centre on `b` and fill `usable` of the viewport with it. In a turned
+    /// view the box is measured along the screen's axes.
     fn frame(&mut self, b: Bounds, viewport: Rect, usable: f64) {
+        let b = self.view_box(b);
         let (w, h) = (b.max.x - b.min.x, b.max.y - b.min.y);
         let (vw, vh) = (f64::from(viewport.width()), f64::from(viewport.height()));
         if vw < 1.0 || vh < 1.0 {
@@ -86,16 +135,56 @@ impl Camera {
             (false, false) => Self::default().zoom,
         };
         self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
-        self.center = Point::new((b.min.x + b.max.x) / 2.0, (b.min.y + b.max.y) / 2.0);
+        self.center = self.from_view(Point::new(
+            (b.min.x + b.max.x) / 2.0,
+            (b.min.y + b.max.y) / 2.0,
+        ));
     }
 
-    /// World rectangle currently visible in `viewport`.
-    pub fn visible_world(&self, viewport: Rect) -> Bounds {
-        Bounds::from_points(
-            self.screen_to_world(viewport.left_bottom(), viewport),
-            self.screen_to_world(viewport.right_top(), viewport),
-        )
+    /// The box round `b` measured along the screen's axes (in turned
+    /// coordinates; `b` itself when the view is not turned).
+    fn view_box(&self, b: Bounds) -> Bounds {
+        if self.twist == 0.0 {
+            return b;
+        }
+        let corners = [
+            b.min,
+            Point::new(b.max.x, b.min.y),
+            b.max,
+            Point::new(b.min.x, b.max.y),
+        ];
+        bounds_of(corners.map(|p| self.to_view(p)))
     }
+
+    /// The world box round what is visible in `viewport` (all of it, and in
+    /// a turned view more besides).
+    pub fn visible_world(&self, viewport: Rect) -> Bounds {
+        if self.twist == 0.0 {
+            return Bounds::from_points(
+                self.screen_to_world(viewport.left_bottom(), viewport),
+                self.screen_to_world(viewport.right_top(), viewport),
+            );
+        }
+        let corners = [
+            viewport.left_top(),
+            viewport.right_top(),
+            viewport.right_bottom(),
+            viewport.left_bottom(),
+        ];
+        bounds_of(corners.map(|c| self.screen_to_world(c, viewport)))
+    }
+}
+
+/// The box round four points.
+fn bounds_of(points: [Point; 4]) -> Bounds {
+    let mut b = Bounds::from_points(points[0], points[1]);
+    for p in &points[2..] {
+        b = Bounds::from_points(
+            Point::new(b.min.x.min(p.x), b.min.y.min(p.y)),
+            Point::new(b.max.x.max(p.x), b.max.y.max(p.y)),
+        );
+    }
+    b
 }
 
 #[cfg(test)]
@@ -111,6 +200,7 @@ mod tests {
         let cam = Camera {
             center: Point::new(12.0, -7.0),
             zoom: 3.5,
+            twist: 0.0,
         };
         let p = Point::new(40.0, 25.0);
         let back = cam.screen_to_world(cam.world_to_screen(p, viewport()), viewport());
@@ -184,6 +274,7 @@ mod tests {
         let mut cam = Camera {
             center: Point::new(9.0, 9.0),
             zoom: 77.0,
+            twist: 0.0,
         };
         let pt = Bounds::from_points(Point::new(5.0, 5.0), Point::new(5.0, 5.0));
         cam.fit(Some(pt), viewport());
@@ -204,5 +295,59 @@ mod tests {
         assert!((min.x - viewport().left()).abs() < 1e-3);
         assert!((max.x - viewport().right()).abs() < 1e-3);
         assert_eq!(cam.center, Point::new(210.0, 15.0));
+    }
+
+    #[test]
+    fn a_turned_view_maps_both_ways_and_turns_the_drawing_counter_clockwise() {
+        let cam = Camera {
+            center: Point::new(10.0, 5.0),
+            zoom: 2.0,
+            twist: std::f64::consts::FRAC_PI_2,
+        };
+        // The world's X axis points up the screen.
+        let o = cam.world_to_screen(cam.center, viewport());
+        let x = cam.world_to_screen(Point::new(20.0, 5.0), viewport());
+        assert!((x.x - o.x).abs() < 1e-3 && (o.y - x.y - 20.0).abs() < 1e-3);
+        let p = Point::new(-3.0, 40.0);
+        let back = cam.screen_to_world(cam.world_to_screen(p, viewport()), viewport());
+        assert!((back.x - p.x).abs() < 1e-3 && (back.y - p.y).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_turned_view_pans_with_the_pointer_and_frames_along_the_screen() {
+        let mut cam = Camera {
+            twist: 0.7,
+            ..Camera::default()
+        };
+        let p = Point::new(10.0, 10.0);
+        let before = cam.world_to_screen(p, viewport());
+        cam.pan_by_pixels(Vec2::new(25.0, -10.0));
+        let after = cam.world_to_screen(p, viewport());
+        assert!(
+            (after.x - before.x - 25.0).abs() < 1e-3 && (after.y - before.y + 10.0).abs() < 1e-3
+        );
+        let b = Bounds::from_points(Point::new(0.0, 0.0), Point::new(1000.0, 500.0));
+        cam.fit(Some(b), viewport());
+        for corner in [
+            b.min,
+            b.max,
+            Point::new(0.0, 500.0),
+            Point::new(1000.0, 0.0),
+        ] {
+            assert!(viewport().contains(cam.world_to_screen(corner, viewport())));
+        }
+        let seen = cam.visible_world(viewport());
+        assert!(seen.min.x <= 0.0 && seen.max.x >= 1000.0);
+    }
+
+    #[test]
+    fn twist_is_kept_in_one_turn() {
+        let mut cam = Camera::default();
+        cam.set_twist(-std::f64::consts::FRAC_PI_2);
+        assert!((cam.twist - 1.5 * std::f64::consts::PI).abs() < 1e-12);
+        cam.set_twist(f64::NAN);
+        assert!((cam.twist - 1.5 * std::f64::consts::PI).abs() < 1e-12);
+        cam.set_twist(std::f64::consts::TAU);
+        assert_eq!(cam.twist, 0.0);
     }
 }

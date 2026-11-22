@@ -21,6 +21,17 @@ impl Document {
         self.active_viewport = viewport;
     }
 
+    /// How far the view being worked in turns the drawing on the screen, in
+    /// radians counter-clockwise (AutoCAD's `VIEWTWIST`).
+    pub fn view_twist(&self) -> f64 {
+        self.view_twist
+    }
+
+    /// Say how the view being worked in is turned. Not an edit.
+    pub fn set_view_twist(&mut self, twist: f64) {
+        self.view_twist = if twist.is_finite() { twist } else { 0.0 };
+    }
+
     /// The space whose coordinate system is in force: the viewport being
     /// worked through, or else the Model tab. A layout's sheet has none.
     pub fn active_ccs_space(&self) -> Option<CcsSpace> {

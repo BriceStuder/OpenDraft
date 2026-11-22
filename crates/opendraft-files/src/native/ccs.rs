@@ -193,4 +193,23 @@ mod tests {
         };
         assert!((kept.angle - frame.angle).abs() < 1e-9);
     }
+
+    #[test]
+    fn a_turned_viewport_keeps_its_twist_and_view() {
+        let mut document = Document::default();
+        let mut layout = document.new_layout("Sheet", 297.0, 210.0);
+        layout.viewports[0].twist = 0.6;
+        layout.viewports[0].view_center = Point::new(40.0, -12.0);
+        let before = layout.viewports[0].clone();
+        document.set_layouts(vec![layout]);
+        let back = roundtrip(&document);
+        let vp = &back.layouts()[0].viewports[0];
+        assert!((vp.twist - 0.6).abs() < 1e-9);
+        let p = Point::new(55.0, 3.0);
+        let (a, b) = (before.model_to_paper(p), vp.model_to_paper(p));
+        assert!(
+            (a.x - b.x).abs() < 1e-6 && (a.y - b.y).abs() < 1e-6,
+            "{a:?} {b:?}"
+        );
+    }
 }
