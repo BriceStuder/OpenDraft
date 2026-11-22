@@ -13,6 +13,8 @@ pub(super) const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(600.0, 4
 pub(super) fn style() -> CanvasStyle {
     CanvasStyle {
         background: Color32::BLACK,
+        surround: Color32::BLACK,
+        crosshair: Color32::WHITE,
         grid_minor: Color32::DARK_GRAY,
         grid_major: Color32::GRAY,
         axis_x: Color32::RED,

@@ -6,8 +6,8 @@ use opendraft_ui::{widgets, Palette, Theme};
 
 use crate::locations::Location;
 use crate::settings::{
-    Settings, AUTOSAVE_CHOICES, CROSSHAIR_SIZE_RANGE, GRID_SPACING_RANGE, GRIP_SIZE_RANGE,
-    PICK_SIZE_RANGE, SNAP_APERTURE_RANGE, UI_SCALES, ZOOM_SPEED_RANGE,
+    LayoutPaper, Settings, AUTOSAVE_CHOICES, CROSSHAIR_SIZE_RANGE, GRID_SPACING_RANGE,
+    GRIP_SIZE_RANGE, PICK_SIZE_RANGE, SNAP_APERTURE_RANGE, UI_SCALES, ZOOM_SPEED_RANGE,
 };
 
 /// A folder the user asked to pick on the page; the dialog shows the picker
@@ -132,6 +132,15 @@ fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
                 }
             },
         );
+    });
+    ui.add_space(6.0);
+    // One row, so the page still fits without scrolling.
+    widgets::group_box(ui, theme, "Layout paper", |ui| {
+        ui.horizontal(|ui| {
+            let paper = &mut draft.layout_paper;
+            ui.radio_value(paper, LayoutPaper::Light, "Light, as printed");
+            ui.radio_value(paper, LayoutPaper::Dark, "Dark, as model space");
+        });
     });
 }
 

@@ -2,8 +2,9 @@
 //! screen. Its panels follow AutoCAD 2020's Layout tab as far as the commands
 //! exist: Layout (New, Page Setup, and Plot, which AutoCAD keeps on its Output
 //! tab, a tab this ribbon does not have) and Layout Viewports (Rectangular,
-//! Lock, and the viewport scale and layers). It never takes the focus (see
-//! the module notes in `ribbon_def.rs`).
+//! Lock, and the viewport scale and layers). Display is OpenDraft's own: the
+//! Light Paper toggle (`canvas_style.rs`). It never takes the focus (see the
+//! module notes in `ribbon_def.rs`).
 
 use opendraft_ui::icons;
 use opendraft_ui::ribbon::{Column, Item, Panel, Tab};
@@ -42,6 +43,15 @@ pub(super) fn layout() -> Tab {
                         Item::new("layout.vplayer", "Viewport Layers", icons::LAYOUT_VPLAYER),
                     ]),
                 ],
+                ..Default::default()
+            },
+            Panel {
+                title: "Display",
+                columns: vec![Column::Large(Item::new(
+                    "view.layout_paper",
+                    "Light Paper",
+                    icons::VIEW_LAYOUT_PAPER,
+                ))],
                 ..Default::default()
             },
         ],

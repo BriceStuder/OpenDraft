@@ -215,6 +215,8 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("VPLOCK", "VPLOCK", "layout.vplock"),
     ("VPLAYER", "VPLAYER", "layout.vplayer"),
     ("PAGESETUP", "PAGESETUP", "layout.page_setup"),
+    // OpenDraft's own: AutoCAD sets the layout colours in Options.
+    ("LAYOUTPAPER", "LAYOUTPAPER", "view.layout_paper"),
     ("PLOT", "PLOT", "file.plot"),
     ("PRINT", "PLOT", "file.plot"),
     ("PREVIEW", "PREVIEW", "file.plot_preview"),
