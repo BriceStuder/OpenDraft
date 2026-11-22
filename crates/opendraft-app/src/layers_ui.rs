@@ -3,7 +3,7 @@
 //! application state does it.
 
 use eframe::egui::{self, Align2, Rect, Sense, Stroke, Ui};
-use opendraft_core::{Document, Layer, LayerId, Lineweight, Viewport};
+use opendraft_core::{Document, Layer, LayerId, Lineweight};
 use opendraft_ui::{icons, menu, widgets, Theme};
 
 use crate::colour_ui::{self, Pick};
@@ -13,15 +13,16 @@ use crate::layer_menu::{self, MenuPick};
 use crate::layer_selection::LayerSelection;
 use crate::layers::{LayerEdit, LayerFlag};
 use crate::linetype_ui;
+use crate::view_freeze::{FreezeTarget, VpSwitch};
 
-/// `viewport` is the viewport being worked on in a layout, if any: it adds a
-/// VP Freeze column that freezes layers in that viewport only.
+/// `target` is where the VP Freeze column freezes layers, if anywhere: the
+/// viewport being worked on in a layout, or the Model tab.
 pub fn show(
     ui: &mut Ui,
     theme: &Theme,
     document: &Document,
     token: (u64, u64),
-    viewport: Option<&Viewport>,
+    target: Option<FreezeTarget>,
 ) -> Option<LayerEdit> {
     let in_use = layers_in_use(ui, document, token);
     let base = ui.make_persistent_id("layers_panel");
@@ -63,13 +64,13 @@ pub fn show(
     egui::ScrollArea::both()
         .auto_shrink([false, false])
         .show(ui, |ui| {
-            let core = core_width(viewport.is_some());
+            let core = core_width(target.is_some());
             let wide = ui.available_width() >= NAME_MIN + core + EXTRA_W;
             let width = ui.available_width().max(NAME_MIN + core);
             let shape = Layout {
                 width,
                 wide,
-                vp: viewport.is_some(),
+                vp: target.is_some(),
             };
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
             header(ui, theme, shape);
@@ -86,7 +87,7 @@ pub fn show(
                         in_use: in_use.contains(&layer.id),
                         selected: selection.contains(layer.id),
                         targets: selection.targets(layer.id),
-                        vp_frozen: viewport.map(|v| v.is_frozen(layer.id)),
+                        vp: target.map(|t| t.switch(layer)),
                     },
                 );
                 if let Some(action) = picked.edit {
@@ -159,8 +160,8 @@ struct RowState {
     selected: bool,
     /// The layers a change on this row applies to (see `LayerSelection::targets`).
     targets: Vec<LayerId>,
-    /// Whether the layer is frozen in the target viewport (`None`: no column).
-    vp_frozen: Option<bool>,
+    /// The layer's VP Freeze switch (`None`: no column).
+    vp: Option<VpSwitch>,
 }
 
 fn row(
@@ -177,7 +178,7 @@ fn row(
         in_use,
         selected,
         targets,
-        vp_frozen,
+        vp,
     } = state;
     let c = &theme.colors;
     let mut result = RowResult::default();
@@ -320,11 +321,10 @@ fn row(
             !layer.frozen,
         ));
     }
-    if let Some(frozen) = vp_frozen {
-        let glyph = crate::ribbon_slots::vp_glyph(frozen, c.text_weak);
-        let tip = crate::ribbon_slots::vp_tip(frozen);
-        if switch(ui, cols.vp_freeze, "vp_freeze", glyph, tip) {
-            result.edit = Some(LayerEdit::SetInViewport(targets.clone(), !frozen));
+    if let Some(vp) = vp {
+        let glyph = crate::ribbon_slots::vp_glyph(vp.frozen, c.text_weak);
+        if switch(ui, cols.vp_freeze, "vp_freeze", glyph, vp.tip()) {
+            result.edit = Some(LayerEdit::SetInViewport(targets.clone(), !vp.frozen));
         }
     }
     let lock_tip = if layer.locked {

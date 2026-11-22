@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use opendraft_core::Document;
 
 use super::{block_name, hex, true_color, weight_code, Handles, Ids};
+use crate::dxf::model_freeze;
 use crate::dxf::write::{aci_for, dxf_name, Out};
 
 pub(super) fn write_tables(
@@ -107,6 +108,7 @@ pub(super) fn write_tables(
         out.pair(6, crate::dxf::linetypes::name_for(document, layer.linetype));
         out.pair(370, weight_code(layer.lineweight));
         out.pair(390, hex(ids.placeholder));
+        model_freeze::write(out, layer);
     }
     out.pair(0, "ENDTAB");
 
@@ -117,10 +119,16 @@ pub(super) fn write_tables(
     table(out, h, "UCS", 0);
     out.pair(0, "ENDTAB");
 
-    let owner = table(out, h, "APPID", 1);
+    let ours = model_freeze::any(document.layers());
+    let owner = table(out, h, "APPID", 1 + usize::from(ours));
     record(out, "APPID", owner, "AcDbRegAppTableRecord", h.next());
     out.pair(2, "ACAD");
     out.pair(70, 0);
+    if ours {
+        record(out, "APPID", owner, "AcDbRegAppTableRecord", h.next());
+        out.pair(2, model_freeze::APP);
+        out.pair(70, 0);
+    }
     out.pair(0, "ENDTAB");
 
     let owner = table(out, h, "DIMSTYLE", document.dim_styles().len());

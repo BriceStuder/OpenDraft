@@ -10,6 +10,7 @@ mod header;
 #[cfg(test)]
 mod linetype_tests;
 mod linetypes;
+mod model_freeze;
 mod point_style;
 mod read;
 mod units;
