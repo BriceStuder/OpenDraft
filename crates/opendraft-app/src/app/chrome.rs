@@ -159,24 +159,15 @@ impl OpenDraftApp {
     }
 
     pub(super) fn ribbon(&mut self, ctx: &egui::Context) {
-        // The Block Editor brings its own tab, and it opens on it.
-        let editing = self.state.in_block_editor();
-        let showing = self
-            .ribbon
-            .tabs
-            .last()
-            .is_some_and(|t| t.title == crate::ribbon_def::BLOCK_EDITOR_TAB);
-        if editing != showing {
-            self.ribbon = if editing {
-                crate::ribbon_def::block_editor_ribbon()
-            } else {
-                crate::ribbon_def::default_ribbon()
-            };
-            self.ribbon_state.active_tab = if editing {
-                self.ribbon.tabs.len() - 1
-            } else {
-                0
-            };
+        // The Block Editor and layouts bring a tab of their own.
+        use crate::ribbon_def::{ribbon_for, tab_after_change, RibbonContext};
+        let context = RibbonContext::of(&self.state);
+        if context != RibbonContext::shown(&self.ribbon) {
+            let next = ribbon_for(context);
+            let active = self.ribbon_state.active_tab;
+            self.ribbon_state.active_tab = tab_after_change(active, &self.ribbon, &next, context);
+            self.ribbon_state.open_panel = None;
+            self.ribbon = next;
         }
         let mut clicked = None;
         let mut edit = None;

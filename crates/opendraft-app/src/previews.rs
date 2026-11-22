@@ -23,7 +23,10 @@ use crate::recent::RecentId;
 /// Bumped when the renderer's output changes on purpose, so old pictures are
 /// not shown.
 pub const RENDERER_VERSION: u32 = 4;
-/// What the cache folder may hold, measured on real drawings (see `docs/ui_plan.md`).
+/// What the cache folder may hold. Measured on 23-10-2026 with
+/// `cargo run --release -p opendraft-app --example preview_bench` on the
+/// sample drawings and three large site drawings: a picture takes 0.2 to 36 ms
+/// to render and is 1 to 42 KB as PNG, so 64 of them come to about 3 MB.
 const MAX_FILES: usize = 64;
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
 /// A picture larger than this is not kept (the card shows its placeholder).

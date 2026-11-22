@@ -42,6 +42,7 @@ pub(super) fn home() -> Tab {
             clipboard(),
             view(),
         ],
+        contextual: false,
     }
 }
 
@@ -399,6 +400,7 @@ fn view() -> Panel {
 mod tests {
     use super::*;
     use crate::commands::build_registry;
+    use crate::ribbon_def::commands;
 
     /// AutoCAD's Home items whose commands are not built yet; they show
     /// dimmed. Take an id off when its command lands.
@@ -430,32 +432,6 @@ mod tests {
         "view.base_model",
         "view.base_inventor",
     ];
-
-    fn commands(tab: &Tab) -> Vec<&'static str> {
-        let mut ids = Vec::new();
-        for panel in &tab.panels {
-            for column in &panel.columns {
-                match column {
-                    Column::Large(item) => ids.push(item.command),
-                    Column::LargeSplit(split) => ids.extend(split.items.iter().map(|i| i.command)),
-                    Column::Stack(items) => ids.extend(items.iter().map(|i| i.command)),
-                    Column::Rows(rows) => {
-                        for cell in rows.iter().flatten() {
-                            match cell {
-                                Cell::Button(item) | Cell::Icon(item) => ids.push(item.command),
-                                Cell::Split(split) | Cell::IconSplit(split) => {
-                                    ids.extend(split.items.iter().map(|i| i.command))
-                                }
-                                Cell::Slot { .. } => {}
-                            }
-                        }
-                    }
-                }
-            }
-            ids.extend(panel.extra.iter().map(|i| i.command));
-        }
-        ids
-    }
 
     #[test]
     fn every_home_item_runs_a_command_or_waits_for_one() {

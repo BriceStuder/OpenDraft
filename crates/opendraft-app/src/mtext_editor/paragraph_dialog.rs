@@ -5,8 +5,10 @@
 //!
 //! Only what the text format is known to carry is live: left tab stops,
 //! first line and hanging indent, left, centre, right and justified
-//! alignment, space before and after, and a line-spacing multiple. The rest of AutoCAD's dialog is drawn greyed out until there
-//! are AutoCAD-made samples of its controls (see `docs/ui_plan.md`, slice 13).
+//! alignment, space before and after, and a line-spacing multiple. The rest
+//! of AutoCAD's dialog (centre, right and decimal tabs and the decimal style,
+//! Right indent, Distributed, and the At least and Exactly line spacings) is
+//! drawn greyed out until AutoCAD-made samples show their `\p` codes.
 
 mod draft;
 mod parts;

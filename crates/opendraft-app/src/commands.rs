@@ -289,7 +289,8 @@ fn all() -> Vec<Command<AppState>> {
         })
         .checked(|s| s.is_running("VPLAYER"))
         .transparent(),
-        cmd("layout.vplock", "VPLOCK", |s| s.toggle_viewport_lock()),
+        cmd("layout.vplock", "VPLOCK", |s| s.toggle_viewport_lock())
+            .checked(AppState::target_viewport_locked),
         cmd("layout.page_setup", "Page Setup", |s| s.open_page_setup())
             .when(AppState::has_drawings),
         cmd("tools.setvar", "Set Variable", |s| s.begin_setvar()),
@@ -324,10 +325,12 @@ fn all() -> Vec<Command<AppState>> {
         cmd("view.zoom_in", "Zoom In", |s| {
             s.docs[s.active].view.request_zoom_step(true)
         })
+        .key("Ctrl+Plus")
         .transparent(),
         cmd("view.zoom_out", "Zoom Out", |s| {
             s.docs[s.active].view.request_zoom_step(false)
         })
+        .key("Ctrl+Minus")
         .transparent(),
         cmd("view.zoom_previous", "Zoom Previous", |s| {
             if !s.docs[s.active].view.zoom_previous() {
