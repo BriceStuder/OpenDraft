@@ -5,6 +5,13 @@
 pub const ALIASES: &[(&str, &str, &str)] = &[
     ("L", "LINE", "draw.line"),
     ("C", "CIRCLE", "draw.circle"),
+    // The ribbon's circle types, which AutoCAD reaches only by options or
+    // button macros.
+    ("CD", "CIRCLE DIAMETER", "draw.circle_diameter"),
+    ("C2", "CIRCLE 2P", "draw.circle_2p"),
+    ("C3", "CIRCLE 3P", "draw.circle_3p"),
+    ("TTR", "CIRCLE TTR", "draw.circle_ttr"),
+    ("TTT", "CIRCLE TTT", "draw.circle_3t"),
     ("A", "ARC", "draw.arc"),
     ("EL", "ELLIPSE", "draw.ellipse"),
     ("SPL", "SPLINE", "draw.spline"),
