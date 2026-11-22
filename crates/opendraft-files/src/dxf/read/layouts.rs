@@ -54,6 +54,8 @@ pub(super) struct Spaces {
     unsupported_views: usize,
     clipped: usize,
     unsupported_plot_settings: usize,
+    /// Viewports whose own coordinate system was 3D or mirrored.
+    tilted_ccs: usize,
 }
 
 /// What a `LAYOUT` object says before the layouts are built.
@@ -285,7 +287,15 @@ impl Spaces {
             locked: flags & 0x4000 != 0,
             on: record.int(68).unwrap_or(1) != 0,
             frozen: Vec::new(),
-            ccs: opendraft_core::Ccs::WORLD,
+            // The viewport's own coordinate system (AutoCAD's per-viewport UCS).
+            ccs: match super::ucs::axes(record, 110) {
+                Some(Some(ccs)) => ccs,
+                Some(None) => {
+                    self.tilted_ccs += 1;
+                    opendraft_core::Ccs::WORLD
+                }
+                None => opendraft_core::Ccs::WORLD,
+            },
         };
         if let Some(sheet) = self.layouts.iter_mut().find(|l| l.id == layout) {
             self.frozen
@@ -331,7 +341,9 @@ impl Spaces {
     }
 
     pub(super) fn warnings(&self) -> Vec<String> {
-        let mut warnings = Vec::new();
+        let mut warnings: Vec<String> = crate::dxf::ccs::warning(self.tilted_ccs)
+            .into_iter()
+            .collect();
         if self.unsupported_views > 0 {
             warnings.push(format!(
                 "Skipped {} viewport{} that show a rotated, perspective or 3D view.",

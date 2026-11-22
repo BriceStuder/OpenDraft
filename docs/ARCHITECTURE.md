@@ -622,6 +622,17 @@ only changes how points and angles are typed and shown, and which way is
   space, in `ccs_previous`, which undo also takes back) and `SetNamedCcs`;
   both report `Changes::ccs`. Saved in `.odraft` (`model_ccs`, `named_ccs`,
   each viewport's `ccs`; left out when world; no version bump).
+- **DXF and DWG** keep a system as AutoCAD keeps a UCS: three points, an
+  origin and the X and Y directions. `Ccs::from_axes` accepts only a flat,
+  right-handed one; a 3D or mirrored UCS is read as World and the DXF reader
+  says how many. DXF (`dxf/ccs.rs`, `dxf/read/ucs.rs`), R12 and R2000: the
+  header's `$UCSNAME`, `$UCSORG`, `$UCSXDIR` and `$UCSYDIR` are the Model
+  tab's system, the UCS table holds the saved ones, and each VIEWPORT's
+  groups 110 to 112 its own (with 71, `UCSVP`, set when it is not World;
+  R2000 only, as R12 has no layouts). Checked against a file ezdxf wrote
+  (`tests/fixtures/make_ezdxf_ucs.py`), and ezdxf reads ours strictly with a
+  clean audit. DWG (R2010 and later): the header's model-space `UCSORG`,
+  `UCSXDIR` and `UCSYDIR` only.
 - **Reading and showing values** go through `coordinates::Reading` (the units
   and the system in force; `AppState::reading()`). Typed coordinates are in the
   system, and `*` after any `@` or `#` means world (`*10,20`, `@*5<0`). A
@@ -657,8 +668,8 @@ only changes how points and angles are typed and shown, and which way is
   (`automation/policy.rs`); the automation API stays in world coordinates.
 - **Not built** (see `docs/parking_lot.md`, "Plan: custom coordinate system"):
   DIMORDINATE from the system's origin (the ordinate dimension stores no
-  origin or direction), hatch angle and origin, MLEADER, DXF and DWG, turning
-  the view (PLAN), `UCSICON` settings, a manager dialog.
+  origin or direction), hatch angle and origin, MLEADER, DWG's UCS table and
+  viewports, turning the view (PLAN), `UCSICON` settings, a manager dialog.
 
 ## Layouts (built, phases 1-3)
 

@@ -57,6 +57,24 @@ impl Ccs {
         (dx.hypot(dy) > 1e-12).then(|| Self::new(origin, dy.atan2(dx)))
     }
 
+    /// The system a file's origin and X and Y directions describe (DXF and
+    /// DWG keep a UCS as three points), if it is flat and right-handed: both
+    /// directions in the XY plane, Y a quarter turn counter-clockwise from X.
+    /// A tilted (3D) or mirrored one is none. The origin's height is dropped.
+    pub fn from_axes(origin: [f64; 3], x: [f64; 3], y: [f64; 3]) -> Option<Self> {
+        let all = origin.iter().chain(&x).chain(&y);
+        if !all.into_iter().all(|v| v.is_finite()) {
+            return None;
+        }
+        let (xl, yl) = (x[0].hypot(x[1]), y[0].hypot(y[1]));
+        if x[2].abs() >= 1e-9 || y[2].abs() >= 1e-9 || xl <= 1e-9 || yl <= 1e-9 {
+            return None;
+        }
+        let (ux, uy) = ((x[0] / xl, x[1] / xl), (y[0] / yl, y[1] / yl));
+        let turned = (uy.0 + ux.1).abs() < 1e-6 && (uy.1 - ux.0).abs() < 1e-6;
+        turned.then(|| Self::new(Point::new(origin[0], origin[1]), ux.1.atan2(ux.0)))
+    }
+
     /// The angle in `0..TAU` and finite numbers throughout; a damaged value
     /// falls back to the world's.
     pub fn sanitized(self) -> Self {
@@ -237,6 +255,17 @@ mod tests {
         assert_eq!(c.angle_from_world(0.5), 0.0);
         assert!((c.turned(0.25).angle - 0.75).abs() < 1e-12);
         assert_eq!(c.moved_to(p(4.0, 4.0)).origin, p(4.0, 4.0));
+    }
+
+    #[test]
+    fn flat_right_handed_axes_are_a_system_and_others_are_not() {
+        let c = Ccs::from_axes([1.0, 2.0, 7.0], [0.0, 2.0, 0.0], [-3.0, 0.0, 0.0]).unwrap();
+        assert_eq!(c.origin, p(1.0, 2.0));
+        assert!((c.angle - FRAC_PI_2).abs() < 1e-12);
+        let mirrored = Ccs::from_axes([0.0; 3], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]);
+        let tilted = Ccs::from_axes([0.0; 3], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+        assert!(mirrored.is_none() && tilted.is_none());
+        assert!(Ccs::from_axes([0.0; 3], [0.0; 3], [0.0, 1.0, 0.0]).is_none());
     }
 
     #[test]

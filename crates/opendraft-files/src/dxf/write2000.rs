@@ -332,6 +332,7 @@ pub fn write(document: &Document) -> Result<Encoded, FileError> {
         out.pair(9, name);
         out.pair(code, value);
     }
+    super::ccs::write_header(&mut out, document);
     out.pair(9, "$INSBASE");
     out.point3(10, 0.0, 0.0, 0.0);
     let (lo, hi) = match document.model_bounds() {
