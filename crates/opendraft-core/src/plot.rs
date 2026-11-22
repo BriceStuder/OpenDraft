@@ -629,6 +629,21 @@ mod tests {
     }
 
     #[test]
+    fn a_layer_frozen_in_the_model_tab_still_plots_in_viewports() {
+        let (mut doc, id) = plotted(&[line((4500.0, 4000.0), (5500.0, 4000.0))]);
+        let layer = doc.allocate_layer_id();
+        doc.push_layer(Layer {
+            frozen_in_model: true,
+            ..Layer::new(layer, "Hatching")
+        });
+        doc.add_with(
+            line((4600.0, 4100.0), (5400.0, 4100.0)),
+            Attributes::on_layer(layer),
+        );
+        assert_eq!(plot_layout(&doc, id).unwrap().paths.len(), 2);
+    }
+
+    #[test]
     fn text_plots_as_filled_glyphs_clipped_to_its_viewport() {
         use crate::TextStyleId;
         let text = |at: Point, contents: &str| {

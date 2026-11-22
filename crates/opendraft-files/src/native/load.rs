@@ -39,6 +39,7 @@ impl DrawingDto {
                 on: layer.on,
                 frozen: layer.frozen,
                 locked: layer.locked,
+                frozen_in_model: layer.frozen_in_model,
             };
             // The drawing always has layer 0, first; the file's version of
             // it replaces the stock one.

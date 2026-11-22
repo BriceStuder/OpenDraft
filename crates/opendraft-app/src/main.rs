@@ -188,6 +188,7 @@ mod trim_memory;
 mod units_state;
 mod units_vars;
 mod updates;
+mod view_freeze;
 mod whats_new;
 mod window_memory;
 mod xline_cmd;

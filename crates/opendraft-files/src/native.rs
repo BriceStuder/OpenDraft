@@ -288,6 +288,9 @@ struct LayerDto {
     on: bool,
     frozen: bool,
     locked: bool,
+    /// Frozen in the Model tab only (layout viewports still show it).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    frozen_in_model: bool,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -369,6 +372,7 @@ impl DrawingDto {
                 on: l.on,
                 frozen: l.frozen,
                 locked: l.locked,
+                frozen_in_model: l.frozen_in_model,
             })
             .collect();
         let mut styles = StylePool::new();
@@ -552,6 +556,7 @@ mod tests {
             on: true,
             frozen: false,
             locked: true,
+            frozen_in_model: true,
         });
         let hidden = document.allocate_layer_id();
         document.push_layer(Layer {
