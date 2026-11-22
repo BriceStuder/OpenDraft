@@ -17,7 +17,7 @@ mod page;
 mod settings;
 
 use outlines::dashed_outlines;
-pub use page::{page_as_read, plot_page};
+pub use page::{page_as_read, paper_on_sheet, plot_page};
 
 /// How far a flattened curve may stray from the true one, in paper millimetres.
 pub(crate) const TOLERANCE_MM: f64 = 0.02;
@@ -143,6 +143,17 @@ pub fn plot_sheet(document: &Document, space: PlotSpace) -> Result<PlotSheet, Pl
 pub fn plot_layout(document: &Document, layout: LayoutId) -> Result<PlotSheet, PlotError> {
     let layout = document.layout(layout).ok_or(PlotError::NoLayout)?;
     validate_plot(&layout.plot).map_err(PlotError::Invalid)?;
+    let sheet = settings::apply(layout_sheet(document, layout)?, &layout.plot)?;
+    if within_limits(&sheet) {
+        Ok(sheet)
+    } else {
+        Err(PlotError::ResourceLimit)
+    }
+}
+
+/// The layout's objects and viewports on its sheet, before the page setup
+/// places them on the paper.
+fn layout_sheet(document: &Document, layout: &crate::Layout) -> Result<PlotSheet, PlotError> {
     // The sheet's objects lie on the page as it is read; the page setup turns
     // them onto the paper.
     let (width, height) = layout.page_size();
@@ -162,12 +173,7 @@ pub fn plot_layout(document: &Document, layout: LayoutId) -> Result<PlotSheet, P
         add_paper(&mut sheet, document, layout)?;
         add_viewports(&mut sheet, document, layout)?;
     }
-    let sheet = settings::apply(sheet, &layout.plot)?;
-    if within_limits(&sheet) {
-        Ok(sheet)
-    } else {
-        Err(PlotError::ResourceLimit)
-    }
+    Ok(sheet)
 }
 
 /// What each viewport shows of model space, and its border when the plot

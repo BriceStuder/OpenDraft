@@ -35,6 +35,7 @@ mod insert_pieces;
 mod layer_paint;
 mod layout;
 mod paint;
+mod paper;
 mod path_stroke;
 mod point_paint;
 mod previous;
@@ -138,6 +139,9 @@ pub struct View {
     sheet: Camera,
     /// Frame the whole sheet on the next frame.
     sheet_fit: bool,
+    /// Where the paper lies on the sheet, kept while the drawing is as it
+    /// was (see `paper.rs`).
+    paper: std::cell::RefCell<Option<paper::KeptPaper>>,
     /// The active viewport's window on screen: input outside it is ignored.
     clip: Option<Rect>,
     /// Whether the running middle-drag pans the viewport (decided where it

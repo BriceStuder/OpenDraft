@@ -14,6 +14,7 @@ use crate::plot_controls::control_state;
 
 const CUSTOM: &str = "Custom";
 
+mod margins;
 mod stored;
 
 pub(in crate::app) use stored::{shade_box, style_box};
@@ -67,7 +68,8 @@ pub(in crate::app) fn left_column(
     ui.add_space(6.0);
     paper_box(ui, theme, draft);
     ui.add_space(6.0);
-    plot_box(ui, theme, draft, None);
+    let file = [DEVICE_PDF, DEVICE_SVG].contains(&draft.plot.device_name.as_str());
+    plot_box(ui, theme, draft, None, file);
 }
 
 /// Page Setup's right column: what is stored but not applied yet, and the options.
@@ -230,11 +232,14 @@ fn orientation_row(ui: &mut egui::Ui, draft: &mut PageDraft) {
 /// What is plotted and how big: the area, the scale and the offset as one
 /// form, a caption and its controls on each row.
 /// With `pick`, a Window area gets a Pick button that sets it to true.
+/// For a `file` device (PDF, SVG) the margins can be changed; a printer's
+/// are only shown.
 pub(in crate::app) fn plot_box(
     ui: &mut egui::Ui,
     theme: &opendraft_ui::Theme,
     draft: &mut PageDraft,
     pick: Option<&mut bool>,
+    file: bool,
 ) {
     widgets::group_box(ui, theme, "Plot", |ui| {
         let controls = controls_of(draft);
@@ -271,9 +276,13 @@ pub(in crate::app) fn plot_box(
                 widgets::field_label(ui, theme, "Offset");
                 offset_row(ui, theme, draft, &controls);
                 ui.end_row();
+                if file {
+                    margins::margins_row(ui, theme, draft);
+                    ui.end_row();
+                }
             });
         let (.., m) = draft.page_as_read();
-        if m.iter().any(|v| *v != 0.0) {
+        if !file && m.iter().any(|v| *v != 0.0) {
             ui.small(format!(
                 "Printable margins L {:.1}, B {:.1}, R {:.1}, T {:.1} mm",
                 m[0], m[1], m[2], m[3]
@@ -393,13 +402,16 @@ fn offset_row(
 }
 
 /// Turn the page a quarter: swap the sheet's sides, or, when the plot is
-/// already turned on the sheet, undo that turn (keeping upside-down).
+/// already turned on the sheet, undo that turn (keeping upside-down). The
+/// margins stay with the edges of the page as it is read.
 fn turn_page(draft: &mut PageDraft) {
+    let (.., read) = draft.page_as_read();
     match draft.plot.rotation {
         PlotRotation::CounterClockwise90 => draft.plot.rotation = PlotRotation::Degrees0,
         PlotRotation::Clockwise90 => draft.plot.rotation = PlotRotation::Degrees180,
         _ => std::mem::swap(&mut draft.width, &mut draft.height),
     }
+    margins::set_as_read(draft, read);
 }
 
 pub(super) fn area_name(area: &PlotArea) -> &'static str {

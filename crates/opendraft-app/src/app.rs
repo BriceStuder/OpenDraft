@@ -145,7 +145,7 @@ impl OpenDraftApp {
         state.recent = recent;
         state.templates_dir = Location::Templates.resolve(&settings);
         let recovery = Location::Recovery.resolve(&settings);
-        state.settings = settings;
+        state.set_settings(settings);
         let home_previews = crate::preview_textures::PreviewTextures::start(&mut state.previews);
         if open.is_empty() {
             state.start_on_home();

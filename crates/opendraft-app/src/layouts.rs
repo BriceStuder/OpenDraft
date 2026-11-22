@@ -310,7 +310,8 @@ impl AppState {
         }
         let document = &self.session().document();
         let (_, width, height) = PAPER_SIZES[0];
-        let layout = document.new_layout(document.unused_layout_name(), width, height);
+        let mut layout = document.new_layout(document.unused_layout_name(), width, height);
+        layout.set_margins_keeping_paper([self.settings.plot_margins_mm; 4]);
         let id = layout.id;
         self.add_layout(layout, "New layout");
         self.enter_layout(id);
@@ -462,6 +463,22 @@ mod tests {
         let vp = &layout.viewports[0];
         let shown = vp.model_bounds();
         assert!(shown.min.x <= 0.0 && shown.max.x >= 10000.0, "{shown:?}");
+        // The default margins (5 mm), the viewport still in the middle of
+        // the paper.
+        assert_eq!(layout.plot.margins_mm, [5.0; 4]);
+        let paper = layout.sheet_bounds();
+        let middle = (paper.min.x + paper.max.x) / 2.0;
+        assert!((vp.center.x - middle).abs() < 1e-9, "{paper:?} {vp:?}");
+    }
+
+    #[test]
+    fn a_new_drawing_plots_its_model_with_the_default_margins() {
+        let mut state = AppState::new();
+        state.settings.plot_margins_mm = 3.0;
+        state.new_document();
+        let plot = state.session().document().model_plot();
+        assert_eq!(plot.margins_mm, [3.0; 4]);
+        assert!(!state.session().is_modified());
     }
 
     #[test]
@@ -635,7 +652,7 @@ mod tests {
             "again changes nothing"
         );
         state.undo();
-        assert_eq!(state.session().document().model_plot().margins_mm, [0.0; 4]);
+        assert_eq!(state.session().document().model_plot().margins_mm, [5.0; 4]);
         assert!(state
             .set_page_setup(&PageDraft {
                 width: 2.0,

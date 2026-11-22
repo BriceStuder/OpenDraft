@@ -88,7 +88,8 @@ impl OpenDraftApp {
                             paper_box(ui, theme, &mut dialog.draft);
                             ui.add_space(6.0);
                             let mut pick = false;
-                            plot_box(ui, theme, &mut dialog.draft, Some(&mut pick));
+                            let file = !matches!(dialog.target, Target::Printer(_));
+                            plot_box(ui, theme, &mut dialog.draft, Some(&mut pick), file);
                             if pick {
                                 action = Some(Action::PickWindow);
                             }

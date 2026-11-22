@@ -49,6 +49,9 @@ pub struct CommandDefaults {
     pub spline: Slot<spline_memory::Memory>,
     pub text: Slot<text_memory::Memory>,
     pub trim: Slot<trim_memory::Memory>,
+    /// The margin of every side of a new layout, in mm: the user setting
+    /// `plot_margins_mm`, kept here for the LAYOUT command (not saved here).
+    pub plot_margins: Slot<f64>,
 }
 
 impl CommandDefaults {
@@ -67,6 +70,7 @@ impl CommandDefaults {
             spline: Slot::new(spline_memory::load(storage)),
             text: Slot::new(text_memory::load(storage)),
             trim: Slot::new(trim_memory::load(storage)),
+            plot_margins: Slot::default(),
         }
     }
 
@@ -89,6 +93,14 @@ impl AppState {
     /// What commands remember between uses.
     pub fn defaults(&self) -> &Arc<CommandDefaults> {
         &self.defaults
+    }
+
+    /// Make `settings` the user's settings, and hand the commands what they
+    /// read of them (the margins of a new layout).
+    pub fn set_settings(&mut self, settings: crate::settings::Settings) {
+        let margins = settings.plot_margins_mm;
+        self.defaults.plot_margins.change(|m| *m = margins);
+        self.settings = settings;
     }
 
     /// Use `defaults` (read from the saved settings) from now on.

@@ -402,4 +402,20 @@ fn files(
             .color(theme.colors.text_weak),
         );
     });
+    ui.add_space(6.0);
+    widgets::group_box(ui, theme, "Plot", |ui| {
+        ui.horizontal(|ui| {
+            widgets::field_label(ui, theme, "Default margins");
+            let margin = &mut draft.plot_margins_mm;
+            widgets::number_field_width(ui, theme, margin, "mm", 0.1, 80.0);
+            *margin = margin.clamp(0.0, 100.0);
+        });
+        ui.label(
+            egui::RichText::new(
+                "For PDF and SVG plots of a new drawing, and of a drawing whose printer is not                  on this computer.",
+            )
+            .size(theme.font_size_small)
+            .color(theme.colors.text_weak),
+        );
+    });
 }
