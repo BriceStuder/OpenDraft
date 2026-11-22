@@ -4,8 +4,10 @@
 //! centre. The centres that touch both objects are where those offset curves
 //! cross. Objects count as the whole line or circle they lie on, as in
 //! AutoCAD, so the circle may touch beyond the drawn end of a line or arc.
+//! With an ellipse see `fillet_ellipse`; with a spline, `tangent_spline`.
 
 use crate::intersect::{circle_circle, dedupe, line_circle, line_line, Curve};
+use crate::tangent_three::contact;
 use crate::{Entity, Point};
 
 const EPS: f64 = 1e-9;
@@ -134,6 +136,12 @@ pub fn tangent_circle(
     if radius <= EPS {
         return None;
     }
+    if matches!(first, Entity::Spline(_)) || matches!(second, Entity::Spline(_)) {
+        return crate::tangent_spline::tangent_circle_spline(
+            [(first, pick_first), (second, pick_second)],
+            radius,
+        );
+    }
     if matches!(first, Entity::Ellipse(_)) || matches!(second, Entity::Ellipse(_)) {
         let (a, b) = (
             as_entity(first, pick_first)?,
@@ -149,11 +157,26 @@ pub fn tangent_circle(
     }
     let a = carrier(&picked_curve(first, pick_first)?)?;
     let b = carrier(&picked_curve(second, pick_second)?)?;
-    let mut centres = Vec::new();
     let middle = Point::new(
         (pick_first.x + pick_second.x) / 2.0,
         (pick_first.y + pick_second.y) / 2.0,
     );
+    centres(a, b, radius, middle)
+        .into_iter()
+        .filter_map(|centre| {
+            // Where it really touches: the far side of a circle it holds.
+            let (ta, tb) = (contact(a, centre, radius)?, contact(b, centre, radius)?);
+            Some((distance(ta, pick_first) + distance(tb, pick_second), centre))
+        })
+        .min_by(|x, y| x.0.total_cmp(&y.0))
+        .map(|(_, centre)| centre)
+}
+
+/// Every centre of a circle of `radius` touching both `a` and `b`. Where
+/// two parallel lines a diameter apart allow a whole line of them, the one
+/// across from `middle`.
+pub(crate) fn centres(a: Carrier, b: Carrier, radius: f64, middle: Point) -> Vec<Point> {
+    let mut centres = Vec::new();
     for oa in offsets(a, radius) {
         for ob in offsets(b, radius) {
             let found = cross(oa, ob);
@@ -171,13 +194,6 @@ pub fn tangent_circle(
         }
     }
     dedupe(centres)
-        .into_iter()
-        .filter_map(|centre| {
-            let (ta, tb) = (touch(a, centre)?, touch(b, centre)?);
-            Some((distance(ta, pick_first) + distance(tb, pick_second), centre))
-        })
-        .min_by(|x, y| x.0.total_cmp(&y.0))
-        .map(|(_, centre)| centre)
 }
 
 #[cfg(test)]
@@ -255,5 +271,18 @@ mod tests {
         let a = line((0.0, 0.0), (10.0, 0.0));
         let b = line((0.0, 0.0), (0.0, 10.0));
         assert!(tangent_circle(&a, p(5.0, 0.0), &b, p(0.0, 5.0), 0.0).is_none());
+    }
+    #[test]
+    fn a_circle_holding_the_other_counts_where_it_really_touches() {
+        // Radius 3 on the ground beside a wheel of radius 1 at (0, 3): the
+        // circle at (2, 3) holds the wheel and touches it at (-1, 3), across
+        // from the pick at (1, 3); the one at (4, 3) touches it there.
+        let ground = line((-10.0, 0.0), (10.0, 0.0));
+        let wheel = Entity::Circle {
+            center: p(0.0, 3.0),
+            radius: 1.0,
+        };
+        let centre = tangent_circle(&ground, p(2.5, 0.0), &wheel, p(1.0, 3.0), 3.0).unwrap();
+        assert!(near(centre, p(4.0, 3.0)), "{centre:?}");
     }
 }

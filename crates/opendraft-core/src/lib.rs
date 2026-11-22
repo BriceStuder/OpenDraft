@@ -65,6 +65,7 @@ mod split;
 mod stretch;
 mod tangent;
 mod tangent_arc;
+mod tangent_spline;
 mod tangent_three;
 mod tangent_three_curves;
 pub mod text;

@@ -8,7 +8,6 @@ Keep it current: when something here is built, delete its line in the same chang
 
 - Blend Curves, gradient hatches from the ribbon, Table and Table Style, Groups (all of the Groups panel), Radius, Angle, Volume and ID Point, Calculator, Isolate and Unisolate, Layer States, and the Base view items: shown dimmed on the Home tab (`NOT_BUILT` in `opendraft-app/src/ribbon_def/home.rs`, kept true by a test). The Arc split button lists only 3-Point and Start, Center, End; AutoCAD lists eleven forms (the ARC command reaches them through its options).
 - Ellipse: Isocircle (needs isometric snap) and `PELLIPSE`.
-- Circle Ttr: splines (refused as "Circle does not exist"; Tan, Tan, Tan takes them).
 - Spline: closed and periodic creation, end tangents, a fit tolerance above 0, the Object option, SPLINEDIT and multifunction grips.
 - Boundary: the Region object type, the dialog's Boundary set and Advanced options (gap tolerance, Object Type), and a polyline that follows an ellipse or spline exactly.
 - Construction lines in blocks (refused: they have no size to give a block); writing points, construction lines and rays through the automation API.

@@ -22,26 +22,26 @@ use crate::{Ellipse, Entity, Point, Spline};
 /// Most correction steps for the circle, and for each foot along a curve.
 const STEPS: usize = 60;
 
-fn sub(a: Point, b: Point) -> Point {
+pub(crate) fn sub(a: Point, b: Point) -> Point {
     Point::new(a.x - b.x, a.y - b.y)
 }
 
-fn dot(a: Point, b: Point) -> f64 {
+pub(crate) fn dot(a: Point, b: Point) -> f64 {
     a.x * b.x + a.y * b.y
 }
 
-fn length(a: Point) -> f64 {
+pub(crate) fn length(a: Point) -> f64 {
     a.x.hypot(a.y)
 }
 
 /// The unit vector a quarter turn left of `d`.
-fn left(d: Point) -> Option<Point> {
+pub(crate) fn left(d: Point) -> Option<Point> {
     let len = length(d);
     (len > 0.0).then(|| Point::new(-d.y / len, d.x / len))
 }
 
 /// A line, circle, whole ellipse or spline, run along by a parameter.
-enum Path<'a> {
+pub(crate) enum Path<'a> {
     Line(Point, Point),
     Circle(Point, f64),
     Ellipse(Ellipse),
@@ -61,7 +61,7 @@ pub(crate) fn is_curve(entity: &Entity) -> bool {
 }
 
 impl<'a> Path<'a> {
-    fn of(entity: &'a Entity, pick: Point) -> Option<Self> {
+    pub(crate) fn of(entity: &'a Entity, pick: Point) -> Option<Self> {
         match entity {
             Entity::Ellipse(e) => Some(Path::Ellipse(Ellipse {
                 start: 0.0,
@@ -76,7 +76,7 @@ impl<'a> Path<'a> {
         }
     }
 
-    fn point(&self, t: f64) -> Point {
+    pub(crate) fn point(&self, t: f64) -> Point {
         match self {
             Path::Line(a, b) => Point::new(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y)),
             Path::Circle(c, r) => Point::new(c.x + r * t.cos(), c.y + r * t.sin()),
@@ -86,7 +86,7 @@ impl<'a> Path<'a> {
     }
 
     /// The first derivative along the parameter.
-    fn d1(&self, t: f64) -> Point {
+    pub(crate) fn d1(&self, t: f64) -> Point {
         match self {
             Path::Line(a, b) => sub(*b, *a),
             Path::Circle(_, r) => Point::new(-r * t.sin(), r * t.cos()),
@@ -138,7 +138,7 @@ impl<'a> Path<'a> {
     }
 
     /// The parameter of the point nearest `p`.
-    fn nearest(&self, p: Point) -> f64 {
+    pub(crate) fn nearest(&self, p: Point) -> f64 {
         match self {
             Path::Line(a, b) => {
                 let d = sub(*b, *a);
@@ -152,7 +152,7 @@ impl<'a> Path<'a> {
 
     /// The foot of `centre` on the path, searched from parameter `t`: where
     /// the line from the curve to `centre` is square to the curve.
-    fn foot(&self, centre: Point, mut t: f64) -> f64 {
+    pub(crate) fn foot(&self, centre: Point, mut t: f64) -> f64 {
         for _ in 0..STEPS {
             let (off, d1, d2) = (sub(centre, self.point(t)), self.d1(t), self.d2(t));
             let speed = dot(d1, d1);
@@ -179,7 +179,7 @@ impl<'a> Path<'a> {
     /// What stands in for the path near `t` in the exact solver: the path
     /// itself for a line or circle, else its circle of curvature, or its
     /// tangent line (`straight`, or where it hardly bends).
-    fn stand_in(&self, t: f64, size: f64, straight: bool) -> Option<Carrier> {
+    pub(crate) fn stand_in(&self, t: f64, size: f64, straight: bool) -> Option<Carrier> {
         match self {
             Path::Line(a, b) => Some(Carrier::Line(*a, *b)),
             Path::Circle(c, r) => Some(Carrier::Circle(*c, *r)),
@@ -198,7 +198,7 @@ impl<'a> Path<'a> {
 
     /// Whether the circle is the path itself (a circle, or an ellipse with
     /// equal axes).
-    fn is_itself(&self, centre: Point, radius: f64, tolerance: f64) -> bool {
+    pub(crate) fn is_itself(&self, centre: Point, radius: f64, tolerance: f64) -> bool {
         let round = matches!(self, Path::Circle(..))
             || matches!(self, Path::Ellipse(e) if (1.0 - e.radius_ratio).abs() < 1e-9);
         round
