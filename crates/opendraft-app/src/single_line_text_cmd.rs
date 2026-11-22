@@ -38,11 +38,9 @@ enum PlacementMode {
 }
 
 fn choose_justification(ed: &Editor) -> Result<PlacementMode, Cancelled> {
-    let mut options = Options::<String>::new(
-        "Enter an option [Align/Fit/Left/Center/Middle/Right/TL/TC/TR/ML/MC/MR/BL/BC/BR]",
-    )
-    .keyword("Align", "A")
-    .keyword("Fit", "F");
+    let mut options = Options::<String>::new("Enter an option")
+        .keyword("Align", "A")
+        .keyword("Fit", "F");
     for (name, key, _, _) in JUSTIFY {
         options = options.keyword(name, key);
     }

@@ -73,7 +73,7 @@ fn chain(ed: &mut Editor, baseline: bool) -> Result<(), Cancelled> {
         };
         let make = Arc::new(next);
         let ghost = make.clone();
-        let options = PointOptions::new("Specify a second extension line origin or [Undo/Select]")
+        let options = PointOptions::new("Specify a second extension line origin")
             .keyword("Undo", "U")
             .keyword("Select", "S")
             .base(from.dimension.origin(from.from_second).unwrap_or_default())

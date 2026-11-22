@@ -14,6 +14,35 @@ const INPUT_BAR_PAD: f32 = 4.0;
 /// Space kept clear along the top and bottom of the panel.
 pub(super) const MARGIN: f32 = 4.0;
 
+/// Space between the log's last line and the input row: the input bar's
+/// pad plus some clear space, so the log does not run into the bar.
+pub(super) const LOG_CLEARANCE: f32 = INPUT_BAR_PAD + 6.0;
+
+/// Space kept clear left and right of the log and the input row.
+const SIDE_MARGIN: f32 = 8.0;
+
+/// Space between the log's scroll bar and the panel's right edge, and room
+/// kept for the bar so lines wrap before it.
+const SCROLL_BAR_EDGE: f32 = 3.0;
+const SCROLL_BAR_ROOM: f32 = 12.0;
+
+/// Height of the input row: just the text's, to keep the command line
+/// compact.
+pub(super) const INPUT_ROW_HEIGHT: f32 = 16.0;
+
+/// Behind the log: the window's darkest tone, below the panels'.
+pub(super) fn log_fill(theme: &Theme) -> egui::Color32 {
+    theme.colors.window_bg
+}
+
+/// Behind the input row: lighter than any of the theme's panel tones (half
+/// way from `raised_high` to `border_strong`), so it stays a step above
+/// the active layout tab under it.
+fn input_band_fill(theme: &Theme) -> egui::Color32 {
+    let c = &theme.colors;
+    c.raised_high.lerp_to_gamma(c.border_strong, 0.5)
+}
+
 /// Where the log and the input row go in a panel's inside: the row keeps
 /// its height along the bottom, whatever the panel's, and the log has what
 /// is left `gap` above it.
@@ -32,6 +61,10 @@ impl PanelViewer<'_> {
             // A strip shows whatever history fits: one line or more.
             self.command_line_body(ui, rows.height(1) - rows.tabs - 0.5);
         } else {
+            // The log is recessed, darker than the panels, as output to
+            // read. (A strip fills its own, grip and all.)
+            ui.painter()
+                .rect_filled(ui.max_rect(), 0.0, log_fill(self.theme));
             self.command_line_body(ui, 90.0);
         }
     }
@@ -91,20 +124,21 @@ impl PanelViewer<'_> {
         // The input row is pinned to the bottom of the panel, so it shows at
         // any height; the log takes what is left above it.
         let panel = ui.max_rect();
-        let row_height = ui.spacing().interact_size.y.max(22.0);
+        let row_height = INPUT_ROW_HEIGHT;
         let (log_rect, row_rect) = rows(
-            panel.shrink2(egui::vec2(8.0, MARGIN)),
+            panel.shrink2(egui::vec2(SIDE_MARGIN, MARGIN)),
             row_height,
-            ui.spacing().item_spacing.y,
+            LOG_CLEARANCE,
         );
-        // The input line sits on a lighter band than the log above it, as
+        let log_rect = log_rect.with_max_x(panel.right() - SCROLL_BAR_EDGE);
+        // The input line sits on a lighter band than the recessed log, as
         // in AutoCAD, so it reads as the line being typed into.
         let bar_rect = egui::Rect::from_min_max(
             egui::pos2(panel.left(), row_rect.top() - INPUT_BAR_PAD),
             panel.right_bottom(),
         );
         ui.painter()
-            .rect_filled(bar_rect, 0.0, theme.colors.panel_raised);
+            .rect_filled(bar_rect, 0.0, input_band_fill(theme));
         if expanded {
             let mut log = ui.new_child(egui::UiBuilder::new().max_rect(log_rect).id_salt("log"));
             egui::ScrollArea::vertical()
@@ -113,6 +147,7 @@ impl PanelViewer<'_> {
                 .auto_shrink([false, false])
                 .stick_to_bottom(true)
                 .show(&mut log, |ui| {
+                    ui.set_max_width((ui.available_width() - SCROLL_BAR_ROOM).max(0.0));
                     for line in &self.state.cmdline.log {
                         ui.label(
                             egui::RichText::new(line)
@@ -144,6 +179,7 @@ impl PanelViewer<'_> {
             let chevron = ui
                 .add(
                     opendraft_ui::icon_set::Icon::new(icon, 13.0)
+                        .padding(1.0)
                         .clickable()
                         .color(theme.colors.text_weak),
                 )
@@ -182,6 +218,7 @@ impl PanelViewer<'_> {
                 egui::TextEdit::singleline(&mut input)
                     .id(input_id)
                     .frame(false)
+                    .margin(egui::Margin::symmetric(4, 0))
                     .lock_focus(true)
                     .desired_width(f32::INFINITY),
             );

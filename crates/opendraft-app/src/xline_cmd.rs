@@ -155,8 +155,7 @@ fn point_on(entity: &Entity) -> Option<Point> {
 /// Construction lines parallel to an object, at a distance or through a
 /// point, on the side picked.
 fn offset(ed: &Editor) -> Result<(), Cancelled> {
-    let options =
-        NumberOptions::new("Specify offset distance or [Through]").keyword("Through", "T");
+    let options = NumberOptions::new("Specify offset distance").keyword("Through", "T");
     let distance = match ed.ask_distance(options)? {
         Answer::Value(d) if d > MIN_SIZE => Some(d),
         Answer::Value(_) => {

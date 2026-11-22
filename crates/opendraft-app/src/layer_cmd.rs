@@ -196,7 +196,7 @@ pub fn match_layer(ed: &mut Editor) -> Result<(), Cancelled> {
 /// The layer LAYMCH moves objects to: an object's, or one typed by name.
 fn destination(ed: &mut Editor) -> Result<Option<LayerId>, Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select object on destination layer or [Name]")
+        let options = Options::<Picked>::new("Select object on destination layer")
             .keyword("Name", "N")
             .allow_empty();
         match ed.ask_object(options)? {

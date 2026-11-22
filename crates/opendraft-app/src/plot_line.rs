@@ -126,7 +126,7 @@ fn say_names(ed: &Editor, what: &str, names: &[String]) {
 }
 
 fn yes_no(ed: &Editor, message: &str, default: bool) -> Result<bool, Cancelled> {
-    let options = Options::<String>::new(format!("{message} [Yes/No]"))
+    let options = Options::<String>::new(message)
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .default(if default { "Yes" } else { "No" }.to_owned());
@@ -176,7 +176,7 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
             ed.say(format!("\"{answer}\" is not a paper size."));
         }
     }
-    let units = Options::<String>::new("Enter paper units [Inches/Millimeters]")
+    let units = Options::<String>::new("Enter paper units")
         .keyword("Inches", "I")
         .keyword("Millimeters", "M")
         .default("Millimeters".to_owned());
@@ -193,7 +193,7 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
     } else {
         "Portrait"
     };
-    let orientation = Options::<String>::new("Enter drawing orientation [Portrait/Landscape]")
+    let orientation = Options::<String>::new("Enter drawing orientation")
         .keyword("Portrait", "P")
         .keyword("Landscape", "L")
         .default(now.to_owned());
@@ -238,15 +238,14 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
 
 fn area(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
     loop {
-        let options =
-            Options::<String>::new("Enter plot area [Display/Extents/Limits/View/Window/Layout]")
-                .keyword("Display", "D")
-                .keyword("Extents", "E")
-                .keyword("Limits", "L")
-                .keyword("View", "V")
-                .keyword("Window", "W")
-                .keyword("Layout", "La")
-                .default("Layout".to_owned());
+        let options = Options::<String>::new("Enter plot area")
+            .keyword("Display", "D")
+            .keyword("Extents", "E")
+            .keyword("Limits", "L")
+            .keyword("View", "V")
+            .keyword("Window", "W")
+            .keyword("Layout", "La")
+            .default("Layout".to_owned());
         match ed.ask_keyword(options)?.as_deref().unwrap_or("Layout") {
             "Display" | "View" => {
                 ed.say("That plot area is not available: use Extents, Limits, Window or Layout.");

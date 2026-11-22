@@ -49,7 +49,7 @@ fn refusal(target: &Entity) -> Option<&'static str> {
 /// should move. Each change is one undo step; Enter ends.
 pub fn lengthen_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select an object or [DElta/Percent/Total/DYnamic]")
+        let options = Options::<Picked>::new("Select an object")
             .keyword("DElta", "DE")
             .keyword("Percent", "P")
             .keyword("Total", "T")
@@ -130,7 +130,7 @@ enum Amount {
 /// A length, or (by the Angle keyword) an angle. `signed`: may be negative
 /// (a change); otherwise it must be positive (a total).
 fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Cancelled> {
-    let options = NumberOptions::new(format!("{message} or [Angle]")).keyword("Angle", "A");
+    let options = NumberOptions::new(message).keyword("Angle", "A");
     let ok = |v: f64| signed || v > 0.0;
     Ok(match ed.ask_distance(options)? {
         Answer::Value(v) if ok(v) => Amount::Length(v),
@@ -156,7 +156,7 @@ fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Ca
 /// Pick objects one after another and change each by `mode`.
 fn change_objects(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select an object to change or [Undo]")
+        let options = Options::<Picked>::new("Select an object to change")
             .keyword("Undo", "U")
             .allow_empty();
         let Picked { id, at, .. } = match ed.ask_object(options)? {

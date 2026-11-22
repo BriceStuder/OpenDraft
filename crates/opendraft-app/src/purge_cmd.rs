@@ -120,7 +120,7 @@ fn confirmed(ed: &Editor, p: &Purgeable, all: &mut bool) -> Result<bool, Cancell
         return Ok(true);
     }
     let what = p.item.category().title();
-    let options = Options::<String>::new(format!("Purge {what} \"{}\"? [Yes/No/All]", p.name))
+    let options = Options::<String>::new(format!("Purge {what} \"{}\"?", p.name))
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .keyword("All", "A")

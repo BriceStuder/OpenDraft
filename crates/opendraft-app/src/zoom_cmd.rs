@@ -1,12 +1,13 @@
 //! ZOOM (`Z`): a window given by two corners, as a click with no option does
-//! in AutoCAD, or the Extents or Previous view. The command only asks; the
+//! in AutoCAD, the Extents or Previous view, or the box round some objects
+//! (Objects, and `ZO` on its own). The command only asks; the
 //! drawing's view is changed on the UI thread, through the drawing's
 //! `zoom_to` slot, as soon as the answer is in.
 
 use std::sync::{Arc, Mutex};
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options};
-use opendraft_core::{Entity, Point};
+use opendraft_core::{Bounds, Entity, Object, Point};
 
 use crate::state::AppState;
 
@@ -24,6 +25,7 @@ pub type ZoomSlot = Arc<Mutex<Option<ZoomTo>>>;
 fn first_corner(prompt: &str) -> Options<Point> {
     Options::new(prompt)
         .keyword("Extents", "E")
+        .keyword("Objects", "O")
         .keyword("Previous", "P")
         .keyword("Window", "W")
         .no_snap()
@@ -45,12 +47,13 @@ fn opposite_corner(first: Point) -> Options<Point> {
 
 /// Ask what to zoom to. Enter ends with nothing changed.
 fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
-    let mut prompt = first_corner("Specify first corner of window or [Extents/Previous/Window]");
+    let mut prompt = first_corner("Specify first corner of window");
     loop {
         let first = match ed.ask_point(prompt)? {
             Answer::Value(at) => at,
             Answer::Keyword(k) if k == "Extents" => return Ok(Some(ZoomTo::Extents)),
             Answer::Keyword(k) if k == "Previous" => return Ok(Some(ZoomTo::Previous)),
+            Answer::Keyword(k) if k == "Objects" => return zoom_objects(ed),
             Answer::Keyword(_) => {
                 // Window: the corners are asked anyway.
                 prompt = first_corner("Specify first corner of window");
@@ -66,22 +69,59 @@ fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
             return Ok(Some(ZoomTo::Window(first, second)));
         }
         ed.say("The window has no size.");
-        prompt = first_corner("Specify first corner of window or [Extents/Previous/Window]");
+        prompt = first_corner("Specify first corner of window");
     }
 }
 
+/// The window round the selected objects, or round objects asked for when
+/// nothing is selected. Objects with no box (construction lines and rays,
+/// which run off to infinity) are left out, as ZE leaves them out.
+fn zoom_objects(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
+    let ids = match ed.pickset() {
+        [] => ed.get_selection("Select objects")?,
+        picked => picked.to_vec(),
+    };
+    let found = ed.read(move |doc| {
+        ids.iter()
+            .filter_map(|id| doc.object(*id))
+            .map(Object::bounds)
+            .filter(Bounds::is_finite)
+            .reduce(Bounds::union)
+    })?;
+    match found {
+        Some(b) => Ok(Some(ZoomTo::Window(b.min, b.max))),
+        None => {
+            ed.say("These objects have no extents to zoom to.");
+            Ok(None)
+        }
+    }
+}
+
+/// Run a zoom command that leaves its answer in the drawing's slot.
+fn start_with(
+    state: &mut AppState,
+    ask: impl FnOnce(&Editor) -> Result<Option<ZoomTo>, Cancelled> + Send + 'static,
+) {
+    let slot = Arc::clone(&state.docs[state.active].zoom_to);
+    state.start_command("ZOOM", move |ed| {
+        if let Some(to) = ask(ed)? {
+            if let Ok(mut place) = slot.lock() {
+                *place = Some(to);
+            }
+        }
+        Ok(())
+    });
+}
+
 impl AppState {
+    /// Start ZOOM Objects (`ZO`): the selected objects, or objects asked for.
+    pub fn start_zoom_objects(&mut self) {
+        start_with(self, zoom_objects);
+    }
+
     /// Start ZOOM on the active drawing.
     pub fn start_zoom(&mut self) {
-        let slot = Arc::clone(&self.docs[self.active].zoom_to);
-        self.start_command("ZOOM", move |ed| {
-            if let Some(to) = ask_zoom(ed)? {
-                if let Ok(mut place) = slot.lock() {
-                    *place = Some(to);
-                }
-            }
-            Ok(())
-        });
+        start_with(self, ask_zoom);
     }
 
     /// Change the view of each drawing whose ZOOM has answered.
@@ -125,6 +165,17 @@ mod tests {
 
     fn zoomed(state: &AppState) -> Option<ZoomTo> {
         *state.docs[state.active].zoom_to.lock().unwrap()
+    }
+
+    #[test]
+    fn the_options_are_listed_once() {
+        let mut state = AppState::new();
+        state.start_zoom();
+        state.settle_command();
+        assert_eq!(
+            state.cmd_prompt().plain(),
+            "ZOOM Specify first corner of window or [Extents/Objects/Previous/Window]:"
+        );
     }
 
     #[test]
@@ -205,5 +256,77 @@ mod tests {
         state.settle_command();
         assert!(state.runner.is_none());
         assert_eq!(state.message, "No previous view saved.");
+    }
+
+    /// Two lines whose box runs from (0, 0) to (10, 5).
+    fn two_lines(state: &mut AppState) -> Vec<opendraft_core::EntityId> {
+        [((0.0, 0.0), (4.0, 5.0)), ((2.0, 1.0), (10.0, 3.0))]
+            .into_iter()
+            .map(|((x1, y1), (x2, y2))| {
+                state.perform(opendraft_commands::AddEntity::new(Entity::Line {
+                    start: Point::new(x1, y1),
+                    end: Point::new(x2, y2),
+                }));
+                state.docs[state.active]
+                    .session
+                    .document()
+                    .objects()
+                    .last()
+                    .unwrap()
+                    .id
+            })
+            .collect()
+    }
+
+    /// Run `ask` as a command and keep what it answers.
+    fn run(
+        state: &mut AppState,
+        ask: fn(&Editor) -> Result<Option<ZoomTo>, Cancelled>,
+    ) -> Arc<Mutex<Option<ZoomTo>>> {
+        let answer = Arc::new(Mutex::new(None));
+        let slot = Arc::clone(&answer);
+        state.start_command("ZOOM", move |ed| {
+            *slot.lock().unwrap() = ask(ed)?;
+            Ok(())
+        });
+        state.settle_command();
+        answer
+    }
+
+    fn round_the_lines() -> Option<ZoomTo> {
+        Some(ZoomTo::Window(Point::new(0.0, 0.0), Point::new(10.0, 5.0)))
+    }
+
+    #[test]
+    fn zoom_objects_uses_the_selection_without_asking() {
+        let mut state = AppState::new();
+        two_lines(&mut state);
+        state.select_all();
+        let answer = run(&mut state, zoom_objects);
+        assert!(state.runner.is_none());
+        assert_eq!(*answer.lock().unwrap(), round_the_lines());
+    }
+
+    #[test]
+    fn zoom_objects_with_nothing_selected_asks_for_objects() {
+        let mut state = AppState::new();
+        let ids = two_lines(&mut state);
+        let answer = run(&mut state, zoom_objects);
+        assert_eq!(asked(&state), "Select objects");
+        state.select_ids(ids, false);
+        state.answer_enter();
+        state.settle_command();
+        assert_eq!(*answer.lock().unwrap(), round_the_lines());
+    }
+
+    #[test]
+    fn zoom_has_an_objects_option() {
+        let mut state = AppState::new();
+        two_lines(&mut state);
+        state.select_all();
+        let answer = run(&mut state, ask_zoom);
+        assert!(state.answer_typed("O"));
+        state.settle_command();
+        assert_eq!(*answer.lock().unwrap(), round_the_lines());
     }
 }

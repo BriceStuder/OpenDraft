@@ -18,9 +18,9 @@ enum Switch {
 impl Switch {
     fn prompt(self) -> &'static str {
         match self {
-            Switch::Off => "Select an object on the layer to be turned off or [Undo]",
-            Switch::Freeze => "Select an object on the layer to be frozen or [Undo]",
-            Switch::Lock => "Select an object on the layer to be locked or [Undo]",
+            Switch::Off => "Select an object on the layer to be turned off",
+            Switch::Freeze => "Select an object on the layer to be frozen",
+            Switch::Lock => "Select an object on the layer to be locked",
         }
     }
 
@@ -156,7 +156,7 @@ fn switch_one(ed: &Editor, switch: Switch, layer: Layer) -> Result<bool, Cancell
         return Ok(false);
     }
     if current && switch == Switch::Off {
-        let question = format!("Really want layer \"{name}\" (the CURRENT layer) off? [Yes/No]");
+        let question = format!("Really want layer \"{name}\" (the CURRENT layer) off?");
         let options = Options::<String>::new(question)
             .keyword("Yes", "Y")
             .keyword("No", "N")

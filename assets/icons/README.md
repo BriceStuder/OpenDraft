@@ -43,7 +43,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](annotate-mtext.svg) | `annotate-mtext.svg` | type | Multiline Text |
 | ![](annotate-table.svg) | `annotate-table.svg` | table | Table |
 | ![](annotate-tablestyle.svg) | `annotate-tablestyle.svg` | table | Table Style |
-| ![](annotate-text.svg) | `annotate-text.svg` | text-cursor-input | Single Line |
+| ![](annotate-text.svg) | `annotate-text.svg` | text-cursor-input | Single Line, Single Line Text |
 | ![](annotate-textstyle.svg) | `annotate-textstyle.svg` | case-sensitive | Text Style |
 | ![](assistant-add.svg) | `assistant-add.svg` | plus | (not used) |
 | ![](assistant-burger.svg) | `assistant-burger.svg` | menu | assistant/panel/composer.rs |
@@ -167,28 +167,29 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](layer-freeze.svg) | `layer-freeze.svg` | snowflake | Freeze |
 | ![](layer-hide.svg) | `layer-hide.svg` | lightbulb-off | Off |
 | ![](layer-isolate.svg) | `layer-isolate.svg` | focus | Isolate |
-| ![](layer-list-frozen.svg) | `layer-list-frozen.svg` | snowflake | ribbon_slots.rs |
+| ![](layer-list-frozen.svg) | `layer-list-frozen.svg` | snowflake | layers_ui.rs, ribbon_slots.rs |
 | ![](layer-list-locked.svg) | `layer-list-locked.svg` | lock | ribbon_slots.rs |
 | ![](layer-list-off.svg) | `layer-list-off.svg` | lightbulb-off | ribbon_slots.rs |
-| ![](layer-list-on.svg) | `layer-list-on.svg` | lightbulb | ribbon_slots.rs |
-| ![](layer-list-thawed.svg) | `layer-list-thawed.svg` | sun | ribbon_slots.rs |
-| ![](layer-list-unlocked.svg) | `layer-list-unlocked.svg` | lock-open | ribbon_slots.rs |
+| ![](layer-list-on.svg) | `layer-list-on.svg` | lightbulb | layer_columns.rs, ribbon_slots.rs |
+| ![](layer-list-thawed.svg) | `layer-list-thawed.svg` | sun | layer_columns.rs, layers_ui.rs, ribbon_slots.rs |
+| ![](layer-list-unlocked.svg) | `layer-list-unlocked.svg` | lock-open | layer_columns.rs, ribbon_slots.rs |
 | ![](layer-lock.svg) | `layer-lock.svg` | lock | Lock |
 | ![](layer-make-current.svg) | `layer-make-current.svg` | layers-2 | Make Current |
 | ![](layer-match.svg) | `layer-match.svg` | pipette | Match Layer |
 | ![](layer-panel-current.svg) | `layer-panel-current.svg` | check | layers_ui.rs |
-| ![](layer-panel-frozen.svg) | `layer-panel-frozen.svg` | snowflake | freeze |
-| ![](layer-panel-locked.svg) | `layer-panel-locked.svg` | lock | layers_ui.rs |
-| ![](layer-panel-off.svg) | `layer-panel-off.svg` | eye-off | layers_ui.rs |
-| ![](layer-panel-on.svg) | `layer-panel-on.svg` | eye | layers_ui.rs |
-| ![](layer-panel-unlocked.svg) | `layer-panel-unlocked.svg` | lock-open | layers_ui.rs |
-| ![](layer-panel-vp-frozen.svg) | `layer-panel-vp-frozen.svg` | snowflake | vp_freeze |
+| ![](layer-panel-frozen.svg) | `layer-panel-frozen.svg` | snowflake | (not used) |
+| ![](layer-panel-locked.svg) | `layer-panel-locked.svg` | lock | (not used) |
+| ![](layer-panel-off.svg) | `layer-panel-off.svg` | eye-off | (not used) |
+| ![](layer-panel-on.svg) | `layer-panel-on.svg` | eye | (not used) |
+| ![](layer-panel-unlocked.svg) | `layer-panel-unlocked.svg` | lock-open | (not used) |
+| ![](layer-panel-vp-frozen.svg) | `layer-panel-vp-frozen.svg` | snowflake | (not used) |
 | ![](layer-properties.svg) | `layer-properties.svg` | layers | Layer Properties |
 | ![](layer-show.svg) | `layer-show.svg` | lightbulb | Turn All Layers On |
 | ![](layer-states.svg) | `layer-states.svg` | list | Layer States |
 | ![](layer-thaw-all.svg) | `layer-thaw-all.svg` | sun | Thaw All Layers |
 | ![](layer-unisolate.svg) | `layer-unisolate.svg` | scan | Unisolate |
 | ![](layer-unlock.svg) | `layer-unlock.svg` | lock-open | Unlock |
+| ![](layout-tabs-new.svg) | `layout-tabs-new.svg` | plus | layout_tabs.rs (New layout, after the Model and layout tabs.) |
 | ![](manage-settings.svg) | `manage-settings.svg` | settings | Settings |
 | ![](modify-array-path.svg) | `modify-array-path.svg` | waves | Path Array |
 | ![](modify-array-polar.svg) | `modify-array-polar.svg` | refresh-ccw-dot | Polar Array |

@@ -4,7 +4,7 @@
 
 use eframe::egui;
 
-use super::command_line::MARGIN;
+use super::command_line::{LOG_CLEARANCE, MARGIN};
 use super::panels::PanelViewer;
 use crate::dock::{self, LayoutRequest, PanelTab, Strip};
 
@@ -35,9 +35,9 @@ impl StripRows {
         Self {
             log: ctx.fonts(|f| f.row_height(&font)).ceil(),
             gap: spacing.item_spacing.y,
-            input: spacing.interact_size.y.max(22.0),
+            input: super::command_line::INPUT_ROW_HEIGHT,
             tabs: match strip {
-                Some(Strip::Below) => spacing.interact_size.y + 2.0 * TABS_MARGIN,
+                Some(Strip::Below) => crate::layout_tabs::TAB_HEIGHT + 2.0 * TABS_MARGIN,
                 _ => 0.0,
             },
         }
@@ -45,7 +45,12 @@ impl StripRows {
 
     /// Height of a strip showing `lines` of history above its input row.
     pub fn height(&self, lines: usize) -> f32 {
-        2.0 * MARGIN + lines as f32 * (self.log + self.gap) + self.input + self.tabs
+        // Lines have a gap between them and the clearance under the last.
+        let log = match lines {
+            0 => 0.0,
+            n => n as f32 * (self.log + self.gap) - self.gap + LOG_CLEARANCE,
+        };
+        2.0 * MARGIN + log + self.input + self.tabs
     }
 }
 
@@ -122,9 +127,15 @@ impl PanelViewer<'_> {
         over.interact(tab_bar, id.with("cover"), egui::Sense::click_and_drag())
             .on_hover_cursor(egui::CursorIcon::Default);
         let painter = over.painter().clone();
-        painter.rect_filled(whole, 0.0, colors.sidebar_bg);
-        painter.rect_filled(grip, 0.0, colors.tab_strip());
-        painter.rect_filled(tabs, 0.0, colors.tab_strip());
+        // Grip and log share one recessed tone, with a line along the top
+        // to part the strip from the drawing, as along the layout tabs.
+        painter.rect_filled(whole, 0.0, super::command_line::log_fill(theme));
+        let edge = egui::Stroke::new(1.0_f32, colors.border);
+        painter.hline(whole.x_range(), whole.top() + 0.5, edge);
+        painter.rect_filled(tabs, 0.0, crate::layout_tabs::bar_fill(theme));
+        if tabs.height() > 0.0 {
+            crate::layout_tabs::paint_bar_line(&painter, theme, tabs);
+        }
 
         let (close_rect, handle_rect) = grip.split_top_bottom_at_y(grip.top() + GRIP_WIDTH);
         let handle = over
@@ -239,8 +250,11 @@ mod tests {
 
     #[test]
     fn the_least_strip_is_two_lines_of_history_and_the_input_row() {
-        // Margins, two lines each with the space under it, and the row.
-        assert_eq!(ROWS.height(2), 4.0 + 18.0 + 18.0 + 26.0 + 4.0);
+        // Margins, two lines with a gap between, the clearance and the row.
+        assert_eq!(
+            ROWS.height(2),
+            4.0 + 14.0 + 4.0 + 14.0 + LOG_CLEARANCE + 26.0 + 4.0
+        );
         assert_eq!(ROWS.height(0), 4.0 + 26.0 + 4.0);
         let with_tabs = StripRows { tabs: 30.0, ..ROWS };
         assert_eq!(with_tabs.height(2), ROWS.height(2) + 30.0);
