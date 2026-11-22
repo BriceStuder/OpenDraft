@@ -189,6 +189,12 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](layer-thaw-all.svg) | `layer-thaw-all.svg` | sun | Thaw All Layers |
 | ![](layer-unisolate.svg) | `layer-unisolate.svg` | scan | Unisolate |
 | ![](layer-unlock.svg) | `layer-unlock.svg` | lock-open | Unlock |
+| ![](layout-mview.svg) | `layout-mview.svg` | picture-in-picture-2 | (not used) (Rectangular viewport (MVIEW), on the Layout tab: a frame on a sheet.) |
+| ![](layout-new.svg) | `layout-new.svg` | file-plus | (not used) |
+| ![](layout-page-setup.svg) | `layout-page-setup.svg` | file-cog | (not used) |
+| ![](layout-vplayer.svg) | `layout-vplayer.svg` | layers | (not used) |
+| ![](layout-vplock.svg) | `layout-vplock.svg` | lock | (not used) |
+| ![](layout-vpscale.svg) | `layout-vpscale.svg` | scaling | (not used) |
 | ![](layout-tabs-new.svg) | `layout-tabs-new.svg` | plus | layout_tabs.rs (New layout, after the Model and layout tabs.) |
 | ![](manage-settings.svg) | `manage-settings.svg` | settings | Settings |
 | ![](modify-array-path.svg) | `modify-array-path.svg` | waves | Path Array |

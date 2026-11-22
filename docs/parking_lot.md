@@ -103,7 +103,9 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 ## Layouts and plotting
 
 - Non-rectangular viewport clips (see the plan below); rotated, twisted and perspective viewports; new viewports taking a layer state.
-- The LAYOUT Set option and a ribbon Layout tab.
+- The LAYOUT Set option.
+- Light or dark paper for layouts: a per-user setting, light by default, with a Light Paper toggle on the Layout tab and `LAYOUTPAPER`; model space keeps its own look (`docs/ROADMAP.md`, next steps).
+- The Layout tab's other AutoCAD items: viewport Clip, Lock as a Lock/Unlock list, and the Create View, Modify View, Update and Styles and Standards panels.
 - Display and named View plot areas (no saved view state).
 - Plotting: `-PAGESETUP`, cancel and progress in the dialog, the last printer remembered, margins and media from the printer, a Page Setup Manager with named setups, collation, plot-style tables; proof on real printers and cutters (`docs/ROADMAP.md`, Phase 3).
 - Annotative scales, and `PSLTSCALE`/`MSLTSCALE`.
@@ -120,7 +122,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 ## Interface
 
-- Ribbon: responsive collapse when the window is narrower than the ribbon, pinning a flyout open, contextual tabs for a selected object (only the Block Editor has one), Alt-key hints.
+- Ribbon: responsive collapse when the window is narrower than the ribbon, pinning a flyout open, contextual tabs for a selected object (only the Block Editor and layouts have contextual tabs), Alt-key hints.
 - Command line: history kept between sessions and answers typed inside a command recorded, a user-editable alias table, user-rebindable shortcuts, icons in suggestions.
 - Command line strip: dragging the grip straight to a new place (it floats first), a settings button on the grip, Ctrl+9 reopening it where it was.
 - Docking: a target above the drawing, docking along the whole window's edge; a panel that shared a floating window returns to it only while another of its panels is still open there.
@@ -131,7 +133,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Crosshair in the Block and text editors' own surfaces.
 - Settings > Files: search paths for fonts, hatch patterns and linetypes, a plot output folder.
 - Units: Direction Control's Pick button, areas in non-decimal units, a unit-aware grid spacing.
-- Icons: reloading while the app runs, recolouring for a light theme.
+- Icons: reloading while the app runs, recolouring for a light theme; the Layout tab's six icons (`assets/icons/layout-*.svg`) are Lucide's outlines, not yet redrawn in the Home tab's style.
 - Purge: a confirmation window, previews beyond blocks.
 - Crash log: telling the user, when it happens, that a crash was recorded.
 
