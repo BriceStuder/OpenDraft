@@ -121,6 +121,7 @@ impl View {
                 .and_then(|p| p.base)
                 .filter(|_| held),
             from: self.point_prompt.as_ref().and_then(|p| p.base),
+            along: self.point_prompt.as_ref().and_then(|p| p.along),
             chosen: None,
             tracks: Vec::new(),
             track: None,
