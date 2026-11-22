@@ -144,6 +144,9 @@ pub struct PointPrompt {
     pub sweep: bool,
     /// No object snaps, tracking or ortho: the point is where the pointer is.
     pub no_snap: bool,
+    /// The direction of the line the point places, for Tangent and
+    /// Perpendicular when there is no base (XLINE's Ang).
+    pub along: Option<Point>,
 }
 
 #[derive(Default)]

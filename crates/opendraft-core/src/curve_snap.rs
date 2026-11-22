@@ -92,6 +92,78 @@ impl Curve {
             }),
         }
     }
+
+    /// Every point of the curve where a line running along `direction`
+    /// meets it at a right angle (the line goes through a circle's centre).
+    /// For a line whose direction is fixed and whose point is not (XLINE's
+    /// Ang, Hor and Ver). A segment has none.
+    pub fn perpendicular_along(&self, direction: Point) -> Vec<Point> {
+        let Some(d) = unit(direction) else {
+            return Vec::new();
+        };
+        match *self {
+            Curve::Segment { .. } => Vec::new(),
+            Curve::Circle { center, radius } => opposite_pair(center, radius, d),
+            Curve::Arc {
+                center,
+                radius,
+                start,
+                end,
+            } => opposite_pair(center, radius, d)
+                .into_iter()
+                .filter(|p| arc::contains(start, end, arc::angle_of(center, *p)))
+                .collect(),
+            Curve::Ellipse(e) => roots_on_ellipse(&e, |t| {
+                let v = e.tangent_at(t);
+                v.x * d.x + v.y * d.y
+            }),
+        }
+    }
+
+    /// Every point of the curve where a line running along `direction`
+    /// just touches it. For a line whose direction is fixed and whose point
+    /// is not (XLINE's Ang, Hor and Ver). A segment has none.
+    pub fn tangent_along(&self, direction: Point) -> Vec<Point> {
+        let Some(d) = unit(direction) else {
+            return Vec::new();
+        };
+        let side = Point::new(-d.y, d.x);
+        match *self {
+            Curve::Segment { .. } => Vec::new(),
+            Curve::Circle { center, radius } => opposite_pair(center, radius, side),
+            Curve::Arc {
+                center,
+                radius,
+                start,
+                end,
+            } => opposite_pair(center, radius, side)
+                .into_iter()
+                .filter(|p| arc::contains(start, end, arc::angle_of(center, *p)))
+                .collect(),
+            Curve::Ellipse(e) => roots_on_ellipse(&e, |t| {
+                let v = e.tangent_at(t);
+                v.x * d.y - v.y * d.x
+            }),
+        }
+    }
+}
+
+/// `direction` scaled to length one; none for a zero direction.
+pub(crate) fn unit(direction: Point) -> Option<Point> {
+    let len = direction.x.hypot(direction.y);
+    (len > EPS).then(|| Point::new(direction.x / len, direction.y / len))
+}
+
+/// The two points of a circle on the line through its centre along `unit`.
+fn opposite_pair(center: Point, radius: f64, unit: Point) -> Vec<Point> {
+    if radius < EPS {
+        return Vec::new();
+    }
+    let (ux, uy) = (unit.x * radius, unit.y * radius);
+    vec![
+        Point::new(center.x + ux, center.y + uy),
+        Point::new(center.x - ux, center.y - uy),
+    ]
 }
 
 /// The two points of a circle on the line through its centre and `from`.
@@ -269,6 +341,60 @@ mod tests {
         let touch = Curve::Ellipse(e).tangent_points(p(20.0, 0.0));
         assert_eq!(touch.len(), 1, "{touch:?}");
         assert!(touch[0].y > 0.0);
+    }
+
+    #[test]
+    fn a_circle_touches_a_line_of_known_direction_at_two_points() {
+        let c = Curve::Circle {
+            center: p(1.0, 2.0),
+            radius: 5.0,
+        };
+        // A horizontal line touches the top and the bottom.
+        let touch = c.tangent_along(p(3.0, 0.0));
+        assert_eq!(touch.len(), 2);
+        assert!(touch.iter().any(|t| near(*t, p(1.0, 7.0))), "{touch:?}");
+        assert!(touch.iter().any(|t| near(*t, p(1.0, -3.0))), "{touch:?}");
+        // At 30°, the radius to the touching point is square to the line.
+        let d = p((PI / 6.0).cos(), (PI / 6.0).sin());
+        for t in c.tangent_along(d) {
+            let dot = (t.x - 1.0) * d.x + (t.y - 2.0) * d.y;
+            assert!(dot.abs() < 1e-9, "{t:?}");
+        }
+        // Square to a horizontal line: the left and right ends.
+        let feet = c.perpendicular_along(p(1.0, 0.0));
+        assert!(feet.iter().any(|f| near(*f, p(6.0, 2.0))), "{feet:?}");
+        assert!(feet.iter().any(|f| near(*f, p(-4.0, 2.0))), "{feet:?}");
+        assert!(c.tangent_along(p(0.0, 0.0)).is_empty());
+    }
+
+    #[test]
+    fn along_a_direction_an_arc_keeps_its_own_points_and_a_segment_has_none() {
+        let a = Curve::Arc {
+            center: p(0.0, 0.0),
+            radius: 5.0,
+            start: 0.0,
+            end: PI,
+        };
+        assert_eq!(a.tangent_along(p(1.0, 0.0)), [p(0.0, 5.0)]);
+        let s = Curve::Segment {
+            a: p(0.0, 0.0),
+            b: p(10.0, 0.0),
+        };
+        assert!(s.tangent_along(p(0.0, 1.0)).is_empty());
+        assert!(s.perpendicular_along(p(0.0, 1.0)).is_empty());
+    }
+
+    #[test]
+    fn an_ellipse_touches_a_line_of_known_direction_numerically() {
+        let e = Ellipse::full(p(0.0, 0.0), p(10.0, 0.0), 0.5).unwrap();
+        let c = Curve::Ellipse(e);
+        let touch = c.tangent_along(p(1.0, 0.0));
+        assert_eq!(touch.len(), 2, "{touch:?}");
+        assert!(touch.iter().any(|t| near(*t, p(0.0, 5.0))), "{touch:?}");
+        assert!(touch.iter().any(|t| near(*t, p(0.0, -5.0))), "{touch:?}");
+        let feet = c.perpendicular_along(p(1.0, 0.0));
+        assert!(feet.iter().any(|f| near(*f, p(10.0, 0.0))), "{feet:?}");
+        assert!(feet.iter().any(|f| near(*f, p(-10.0, 0.0))), "{feet:?}");
     }
 
     #[test]

@@ -30,6 +30,9 @@ pub(crate) struct Aim<'a> {
     /// The prompt's base point, the last point Perpendicular and Tangent
     /// work from (ortho or not).
     pub from: Option<Point>,
+    /// The direction of the line the point places, when the prompt has no
+    /// base point (see `opendraft_commands::Options::along`).
+    pub along: Option<Point>,
     /// The snap point the user cycled to, if it is still under the pointer.
     pub chosen: Option<SnapId>,
     /// A one-shot override is waiting: a point with no snap is not placed.
@@ -52,6 +55,7 @@ impl Aim<'_> {
             grid_step: Some(self.step),
             modes: &self.modes,
             from: self.from,
+            along: self.along,
             defer: self.insist,
             tracks: &self.tracks,
             track: self.track.as_ref(),
@@ -174,6 +178,7 @@ mod tests {
             ortho: Ortho::default(),
             base: None,
             from: None,
+            along: None,
             chosen: None,
             insist: over.as_ref().is_some_and(crate::SnapOverride::insists),
             tracks: Vec::new(),

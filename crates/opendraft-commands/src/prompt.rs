@@ -9,6 +9,8 @@ use opendraft_core::block::block_draft::BlockDraft;
 use opendraft_core::block::{DataField, FieldDraft};
 use opendraft_core::{overkill, Entity, EntityId, MText, Point};
 
+pub use crate::answer::{Answer, NumberOrPoint, Picked, Swept};
+
 /// The user cancelled (Esc), or the command was abandoned. Commands pass it up
 /// with `?`; a cancelled transaction leaves no trace in the drawing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,6 +104,10 @@ pub struct Options<T> {
     pub sweep: bool,
     /// For a point prompt: no object snaps, tracking or ortho (ZOOM's window).
     pub no_snap: bool,
+    /// For a point prompt: the direction of the line the point places, when
+    /// that is all there is of it (XLINE's Ang). Tangent and Perpendicular
+    /// then find their point from the direction, with no last point.
+    pub along: Option<Point>,
 }
 
 pub type PointOptions = Options<Point>;
@@ -126,6 +132,7 @@ impl<T> Options<T> {
             esc_backs: false,
             sweep: false,
             no_snap: false,
+            along: None,
         }
     }
 
@@ -143,6 +150,13 @@ impl<T> Options<T> {
     /// Measure from `base`: shows a rubber band and lets `@x,y` be relative.
     pub fn base(mut self, base: Point) -> Self {
         self.base = Some(base);
+        self
+    }
+
+    /// The point places a line running along `direction` (see
+    /// [`Options::along`]).
+    pub fn along(mut self, direction: Point) -> Self {
+        self.along = Some(direction);
         self
     }
 
@@ -299,6 +313,8 @@ pub struct Prompt {
     /// See [`Options::sweep`].
     pub sweep: bool,
     pub no_snap: bool,
+    /// See [`Options::along`].
+    pub along: Option<Point>,
     /// For [`Wants::MTextEditor`]: the text to edit.
     pub mtext: Option<Box<MText>>,
     /// For [`Wants::MTextEditor`]: the text object being edited, if there is
@@ -338,6 +354,7 @@ impl Prompt {
             esc_backs: options.esc_backs,
             sweep: options.sweep,
             no_snap: options.no_snap,
+            along: options.along,
             mtext: None,
             mtext_of: None,
             single_line: false,
@@ -409,40 +426,4 @@ pub enum Reply {
     /// Esc at a prompt that asked for [`Options::esc_backs`]: that ask fails
     /// with `Cancelled`, and the command goes on.
     Back,
-}
-
-/// The answer to `Editor::ask_object`: the object that was clicked, the point
-/// it was clicked at, and whether Shift was held.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Picked {
-    pub id: EntityId,
-    pub at: Point,
-    pub shift: bool,
-}
-
-/// The answer to `Editor::ask_object_or_sweep`: an object clicked, a click
-/// in empty space, or a path dragged from there; each says whether Shift
-/// was held.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Swept {
-    Object(Picked),
-    Missed { at: Point, shift: bool },
-    Path { points: Vec<Point>, shift: bool },
-}
-
-/// The answer to `Editor::ask_angle_or_point` and `ask_distance_or_point`: a
-/// typed number (radians for an angle), or a point that was picked.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum NumberOrPoint {
-    Number(f64),
-    Point(Point),
-}
-
-/// An answer to an `ask_*` call: a value, a keyword, or a bare Enter.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Answer<T> {
-    Value(T),
-    /// The label of the keyword chosen.
-    Keyword(String),
-    Enter,
 }

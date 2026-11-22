@@ -364,6 +364,9 @@ pub struct Probe<'a> {
     pub grid_step: Option<f64>,
     pub modes: &'a SnapModes,
     pub from: Option<Point>,
+    /// With no `from`: the direction of the line the point places, which
+    /// Perpendicular and Tangent work from instead (XLINE's Ang).
+    pub along: Option<Point>,
     /// Offer deferred Perpendicular and Tangent when there is no `from`: only
     /// a one-shot override (Shift+right-click menu) asks for them, never the
     /// running snaps.
@@ -450,15 +453,7 @@ pub fn snap_all<'a>(
         }
         if modes.perpendicular || modes.tangent {
             let want = (modes.perpendicular, modes.tangent);
-            found.extend(context::from_point(
-                &scene,
-                &capture,
-                cursor,
-                tolerance,
-                probe.from,
-                probe.defer,
-                want,
-            ));
+            found.extend(context::from_point(&scene, &capture, probe, want));
         }
     }
     if modes.extension || modes.parallel {
@@ -543,6 +538,7 @@ pub fn snap<'a>(
         grid_step,
         modes,
         from: None,
+        along: None,
         defer: true,
         tracks: &[],
         track: None,
