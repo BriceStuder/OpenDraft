@@ -1,23 +1,24 @@
-<!-- @license lucide-static v0.469.0 - ISC -->
-<svg
-  class="lucide lucide-sun"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <circle cx="12" cy="12" r="4" />
-  <path d="M12 2v2" />
-  <path d="M12 20v2" />
-  <path d="m4.93 4.93 1.41 1.41" />
-  <path d="m17.66 17.66 1.41 1.41" />
-  <path d="M2 12h2" />
-  <path d="M20 12h2" />
-  <path d="m6.34 17.66-1.41 1.41" />
-  <path d="m19.07 4.93-1.41 1.41" />
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1,0,0,1,0,-1184)">
+        <rect id="view-layout-paper" x="0" y="1184" width="64" height="64" style="fill:none;"/>
+        <g id="view-layout-paper1" affinity:id="view-layout-paper">
+            <g transform="matrix(1.009061,0,0,1,0.972816,1)">
+                <path d="M58.497,1196L58.497,1234L23.402,1234L45.144,1196L58.497,1196Z" style="fill:white;"/>
+            </g>
+            <g transform="matrix(1.009061,0,0,1,0.972816,1)">
+                <path d="M38.973,1196L17.23,1234L3,1234L3,1196L38.973,1196Z" style="fill:rgb(44,44,44);"/>
+            </g>
+            <g transform="matrix(0.971271,0,0,0.941176,1.146219,71.577042)">
+                <path d="M45.505,1197.938L58.532,1197.938L58.532,1234.063L25.294,1234.063L25.889,1233L45.151,1233L45.151,1199L44.91,1199L45.505,1197.938ZM57.503,1221.312L57.503,1199L46.181,1199L46.181,1221.312L57.503,1221.312ZM46.181,1233L57.503,1233L57.503,1222.375L46.181,1222.375L46.181,1233ZM37.724,1211.845C38.363,1212.877 38.734,1214.103 38.734,1215.418C38.734,1219.088 35.847,1222.068 32.29,1222.068C32.196,1222.068 32.102,1222.066 32.008,1222.062L37.724,1211.845Z" style="fill:rgb(105,105,105);"/>
+            </g>
+            <g transform="matrix(0.971271,0,0,0.941176,1.146219,71.577042)">
+                <path d="M18.883,1234.063L4.99,1234.062L4.99,1197.938L39.093,1197.938L38.499,1199L6.02,1199L6.02,1233L19.477,1233L18.883,1234.063ZM22.503,1210.991L22.503,1219.845L11.178,1222.375L11.178,1208.461L22.503,1210.991ZM27.105,1219.365C26.314,1218.261 25.846,1216.895 25.846,1215.418C25.846,1211.748 28.734,1208.768 32.29,1208.768C32.534,1208.768 32.774,1208.782 33.011,1208.81L27.105,1219.365Z" style="fill:white;"/>
+            </g>
+            <g transform="matrix(0.242487,0.14,-0.5,0.866025,634.07931,158.71553)">
+                <rect x="24.48" y="1191.004" width="5.393" height="51.01" style="fill:rgb(0,199,154);"/>
+            </g>
+        </g>
+    </g>
 </svg>
