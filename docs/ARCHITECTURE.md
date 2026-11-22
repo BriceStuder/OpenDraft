@@ -394,6 +394,11 @@ optional shortcut, `enabled` and `checked` predicates. The one flag built is
 `transparent` (may run inside another command, for example zoom). Still to
 build: finer flags (document-mutating, file operation) if `transparent` proves
 too coarse, and a user-editable alias table in place of `cmdline::ALIASES`.
+Shortcuts are matched by `opendraft_ui::shortcuts::consume_shortcut`, where
+`Plus` also answers to `Equals` (Ctrl+= as Ctrl+Plus, as browsers do), so
+Ctrl+Plus and Ctrl+Minus zoom the drawing (`view.zoom_in`, `view.zoom_out`)
+with or without Shift. egui's own Ctrl+Plus/Minus/0 interface zoom is turned
+off (`zoom_with_keyboard`); the interface scale is set in Options.
 
 **Change reporting.** Every `Action` reports a `Changes` value: the ids it
 added, removed and changed, and whether it touched layers. `Session::perform`

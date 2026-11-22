@@ -325,10 +325,12 @@ fn all() -> Vec<Command<AppState>> {
         cmd("view.zoom_in", "Zoom In", |s| {
             s.docs[s.active].view.request_zoom_step(true)
         })
+        .key("Ctrl+Plus")
         .transparent(),
         cmd("view.zoom_out", "Zoom Out", |s| {
             s.docs[s.active].view.request_zoom_step(false)
         })
+        .key("Ctrl+Minus")
         .transparent(),
         cmd("view.zoom_previous", "Zoom Previous", |s| {
             if !s.docs[s.active].view.zoom_previous() {

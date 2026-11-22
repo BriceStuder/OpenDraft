@@ -52,7 +52,7 @@ use egui_dock::DockState;
 use opendraft_commands::Registry;
 use opendraft_ui::icons;
 use opendraft_ui::ribbon::{CommandSource, Ribbon, RibbonState};
-use opendraft_ui::shortcuts::{modifier_count, parse_shortcut};
+use opendraft_ui::shortcuts::{consume_shortcut, modifier_count, parse_shortcut};
 use opendraft_ui::Theme;
 
 use crate::dock::{self, PanelTab};
@@ -355,7 +355,7 @@ impl OpenDraftApp {
             self.shortcuts
                 .iter()
                 .find(|(shortcut, id)| {
-                    *id != "view.dynamic_input" && input.consume_shortcut(shortcut)
+                    *id != "view.dynamic_input" && consume_shortcut(input, shortcut)
                 })
                 .map(|(_, id)| *id)
         });
