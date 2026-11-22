@@ -79,21 +79,36 @@ pub(super) fn placement(settings: &PlotSettings, source: &Bounds) -> (Point, f64
         (source.max.x - source.min.x) * factor,
         (source.max.y - source.min.y) * factor,
     );
-    // A layout plots from the corner of its printable area, centred or not:
-    // as in AutoCAD, its sheet's origin is that corner.
-    let centred = settings.flags & flags::PLOT_CENTERED != 0 && settings.area != PlotArea::Layout;
-    let at = if centred {
+    let at = if settings.area == PlotArea::Layout {
+        // A layout plots from the corner of its printable area, centred or
+        // not: as in AutoCAD, its sheet's origin is that corner.
+        Point::new(
+            printable.min.x + settings.origin_mm.x,
+            printable.min.y + settings.origin_mm.y,
+        )
+    } else if settings.flags & flags::PLOT_CENTERED != 0 {
         Point::new(
             printable.min.x + (printable.max.x - printable.min.x - scaled.x) / 2.0,
             printable.min.y + (printable.max.y - printable.min.y - scaled.y) / 2.0,
         )
     } else {
+        // The offset, as AutoCAD's: on the page as it is read, from the
+        // printable corner to the plotted drawing's lower-left corner.
         Point::new(
             printable.min.x + settings.origin_mm.x,
             printable.min.y + settings.origin_mm.y,
         )
     };
     (at, factor)
+}
+
+/// The offset this placement comes to (what DXF codes 46 and 47 keep): from
+/// the printable corner of the page as it is read to the plotted drawing's
+/// lower-left corner. For a centred plot it is the centring.
+pub(super) fn placed_origin(settings: &PlotSettings, source: &Bounds) -> Point {
+    let (at, _) = placement(settings, source);
+    let printable = upright_printable(settings);
+    Point::new(at.x - printable.min.x, at.y - printable.min.y)
 }
 
 /// The paper upright, in the drawing's own orientation: the page as it is
