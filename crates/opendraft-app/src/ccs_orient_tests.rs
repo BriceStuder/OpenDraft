@@ -139,3 +139,35 @@ fn a_rectangular_array_steps_along_the_system() {
         ccs.from_world(start)
     );
 }
+
+#[test]
+fn a_hatch_pattern_lies_along_the_system_from_its_origin() {
+    let mut state = AppState::new();
+    let frame = Ccs::new(Point::new(5.0, 5.0), FRAC_PI_6);
+    state.perform(SetCcs::new(CcsSpace::Model, frame));
+    state.add_entity(Entity::Rectangle {
+        min: Point::new(0.0, 0.0),
+        max: Point::new(10.0, 10.0),
+    });
+    state.select_all();
+    state.start_command("Hatch", crate::hatch_cmd::hatch_objects);
+    state.settle_command();
+    state.answer_enter();
+    state.settle_command();
+    let hatch = state
+        .session()
+        .document()
+        .objects()
+        .iter()
+        .find_map(|o| match &o.entity {
+            Entity::Hatch(h) => Some((**h).clone()),
+            _ => None,
+        })
+        .expect("a hatch");
+    let opendraft_core::hatch::HatchFill::Pattern(pattern) = hatch.fill else {
+        panic!("the remembered fill is a pattern");
+    };
+    // Angle 0 and origin 0,0 in the system: its X axis and its origin.
+    assert!((pattern.angle - FRAC_PI_6).abs() < 1e-12);
+    assert!(near(pattern.origin, Point::new(5.0, 5.0)));
+}

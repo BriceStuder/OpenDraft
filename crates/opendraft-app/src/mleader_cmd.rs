@@ -18,8 +18,9 @@ fn same(a: Point, b: Point) -> bool {
     (a.x - b.x).abs() < SAME && (a.y - b.y).abs() < SAME
 }
 
-/// The multileader the ghost shows: `points` and the pointer as the last one.
-fn ghost(style: &MLeaderStyle, points: &[Point], at: Point) -> Vec<Entity> {
+/// The multileader the ghost shows: `points` and the pointer as the last one,
+/// its text level with a coordinate system turned by `level`.
+fn ghost(style: &MLeaderStyle, points: &[Point], at: Point, level: f64) -> Vec<Entity> {
     let mut all = points.to_vec();
     if all.last().is_some_and(|last| same(*last, at)) {
         return Vec::new();
@@ -29,7 +30,7 @@ fn ghost(style: &MLeaderStyle, points: &[Point], at: Point) -> Vec<Entity> {
         "" => PLACEHOLDER,
         text => text,
     };
-    MLeader::build(style, all, text)
+    MLeader::build_turned(style, all, text, level)
         .map(|m| Entity::MLeader(Box::new(m)))
         .into_iter()
         .collect()
@@ -45,6 +46,8 @@ pub fn draw_mleader(ed: &mut Editor) -> Result<(), Cancelled> {
         ed.say("Spline leaders are not supported yet; make a style with straight leaders current.");
         return Ok(());
     }
+    // The text is level with the coordinate system's X axis.
+    let level = ed.read(|doc| doc.ccs().angle)?;
     let mut points = vec![ed.get_point("Specify leader arrowhead location")?];
     let most = style.max_points.map_or(usize::MAX, |n| n as usize);
     loop {
@@ -60,7 +63,7 @@ pub fn draw_mleader(ed: &mut Editor) -> Result<(), Cancelled> {
         let options = PointOptions::new(message)
             .base(points[points.len() - 1])
             .snap_to(path_through(&points))
-            .ghost(move |at| ghost(&shown, &so_far, at));
+            .ghost(move |at| ghost(&shown, &so_far, at, level));
         match ed.ask_point(options)? {
             Answer::Value(at) if same(at, points[points.len() - 1]) => {
                 ed.say("That point is where the last one is.");
@@ -76,7 +79,7 @@ pub fn draw_mleader(ed: &mut Editor) -> Result<(), Cancelled> {
         }
     }
     let default = style.content.default_text.clone();
-    let Some(mut made) = MLeader::build(&style, points, &default) else {
+    let Some(mut made) = MLeader::build_turned(&style, points, &default, level) else {
         return Err(Cancelled);
     };
     if let MLeaderContent::MText(t) = &made.content {
@@ -168,6 +171,23 @@ mod tests {
         assert!(made(&state).is_empty());
         state.redo();
         assert_eq!(made(&state).len(), 1);
+    }
+
+    #[test]
+    fn in_a_turned_system_the_text_is_level_with_it() {
+        use opendraft_commands::SetCcs;
+        use opendraft_core::{Ccs, CcsSpace};
+        let mut state = AppState::new();
+        let frame = Ccs::new(Point::new(0.0, 0.0), std::f64::consts::FRAC_PI_6);
+        state.perform(SetCcs::new(CcsSpace::Model, frame));
+        start(&mut state);
+        submit(&mut state, &["0,0", "20,10"]);
+        finish_text(&mut state, "Note", Outcome::Accept);
+        let m = &made(&state)[0];
+        let x = frame.x_axis();
+        assert!((m.landing_dir.x - x.x).abs() < 1e-9 && (m.landing_dir.y - x.y).abs() < 1e-9);
+        let direction = m.text().unwrap().text.direction;
+        assert!((direction.x - x.x).abs() < 1e-9 && (direction.y - x.y).abs() < 1e-9);
     }
 
     #[test]

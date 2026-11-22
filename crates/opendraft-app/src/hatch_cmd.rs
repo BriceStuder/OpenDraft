@@ -147,9 +147,11 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
             ed.defaults().hatch.change(|m| m.scale = scale);
         }
         "Angle" => {
+            // Counted from the coordinate system's X axis, as AutoCAD's HPANG.
             let angle = ed.get_angle(
                 NumberOptions::new("Specify an angle for the pattern")
-                    .default(ed.defaults().hatch.get().angle),
+                    .default(ed.defaults().hatch.get().angle)
+                    .turn(),
             )?;
             ed.defaults().hatch.change(|m| m.angle = angle);
         }
@@ -198,6 +200,8 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
         }
         "Origin" => {
             let origin = ed.get_point(PointOptions::new("Specify an origin point"))?;
+            // Kept in the coordinate system, as AutoCAD's HPORIGIN.
+            let origin = ed.read(move |doc| doc.ccs().from_world(origin))?;
             ed.defaults().hatch.change(|m| m.origin = origin);
         }
         _ => {}
@@ -323,7 +327,8 @@ pub fn hatch_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             }
             continue;
         };
-        let mut hatch = match ed.defaults().hatch.get().hatch(current.loops.clone()) {
+        let ccs = ed.read(|doc| doc.ccs())?;
+        let mut hatch = match ed.defaults().hatch.get().hatch(current.loops.clone(), ccs) {
             Ok(h) => h,
             Err(why) => {
                 ed.say(format!("Unable to hatch: {why}"));

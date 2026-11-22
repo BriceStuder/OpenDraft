@@ -10,7 +10,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked, PointOptions};
 use opendraft_core::hatch::{HatchEntity, HatchFill, HatchLimits, PatternType};
-use opendraft_core::{Entity, EntityId};
+use opendraft_core::{Ccs, Entity, EntityId};
 
 use crate::defaults::{CommandDefaults, EditorDefaults};
 use crate::hatch_cmd::{adjust, check_tolerance, summary, with_keywords};
@@ -26,9 +26,9 @@ impl Drop for Restore {
     }
 }
 
-/// The settings that describe `h`, or why they cannot (a pattern that is not
-/// in the catalog cannot be rebuilt from its name).
-fn settings_of(h: &HatchEntity, mut m: Memory) -> Result<Memory, String> {
+/// The settings that describe `h` in the coordinate system `ccs`, or why they
+/// cannot (a pattern that is not in the catalog cannot be rebuilt from its name).
+fn settings_of(h: &HatchEntity, mut m: Memory, ccs: Ccs) -> Result<Memory, String> {
     m.style = h.style;
     match &h.fill {
         HatchFill::Solid => m.fill = FillChoice::Solid,
@@ -36,8 +36,8 @@ fn settings_of(h: &HatchEntity, mut m: Memory) -> Result<Memory, String> {
             return Err("A gradient hatch cannot be edited here yet.".to_owned());
         }
         HatchFill::Pattern(p) => {
-            m.angle = p.angle;
-            m.origin = p.origin;
+            m.angle = ccs.angle_from_world(p.angle);
+            m.origin = ccs.from_world(p.origin);
             if p.pattern_type == PatternType::UserDefined {
                 m.fill = FillChoice::UserDefined;
                 m.spacing = p.scale_or_spacing;
@@ -58,9 +58,9 @@ fn settings_of(h: &HatchEntity, mut m: Memory) -> Result<Memory, String> {
     Ok(m)
 }
 
-/// `h` with the fill and style the settings now describe.
-fn edited(h: &HatchEntity, settings: &Memory) -> Result<HatchEntity, String> {
-    let fresh = settings.hatch(h.loops.clone())?;
+/// `h` with the fill and style the settings now describe in `ccs`.
+fn edited(h: &HatchEntity, settings: &Memory, ccs: Ccs) -> Result<HatchEntity, String> {
+    let fresh = settings.hatch(h.loops.clone(), ccs)?;
     Ok(HatchEntity {
         elevation: h.elevation,
         associative: h.associative,
@@ -105,7 +105,8 @@ fn choose(ed: &Editor) -> Result<(EntityId, HatchEntity), Cancelled> {
 pub fn hatch_edit(ed: &mut Editor) -> Result<(), Cancelled> {
     let (id, hatch) = choose(ed)?;
     let _restore = Restore(ed.defaults(), ed.defaults().hatch.get());
-    match settings_of(&hatch, ed.defaults().hatch.get()) {
+    let ccs = ed.read(|doc| doc.ccs())?;
+    match settings_of(&hatch, ed.defaults().hatch.get(), ccs) {
         Ok(m) => ed.defaults().hatch.change(|now| *now = m),
         Err(why) => {
             ed.say(why);
@@ -114,7 +115,7 @@ pub fn hatch_edit(ed: &mut Editor) -> Result<(), Cancelled> {
     }
     loop {
         let settings = ed.defaults().hatch.get();
-        let new = match edited(&hatch, &settings) {
+        let new = match edited(&hatch, &settings, ccs) {
             Ok(h) => h,
             Err(why) => {
                 ed.say(format!("Unable to hatch: {why}"));

@@ -199,16 +199,14 @@ Not included: a clipped viewport inside a nested viewport.
 
 AutoCAD's UCS under our own name: the **custom coordinate system** (`CCS`, alias `UCS`). Decided with James on 22-11-2026: the Model tab and each layout viewport have their own, never affecting each other; a layout's sheet has none; named systems are shared; every change is an undo step and is saved in the drawing; the automation API stays in world coordinates. What is built is in `docs/ARCHITECTURE.md`, "Custom coordinate system".
 
-Left for pull request 1:
+Pull request 1 (the system) is built. Left out of it:
 
-- **Hatch angle and origin** in the system (AutoCAD measures `HPANG` from the system's X axis and puts the default origin at its origin).
-- **MLEADER** text level with the system.
 - **DWG**: the UCS table (named systems, object type 0x3F) and viewports' own systems are not decoded; only the header's model-space UCS is (and DWG skips layouts anyway). DXF does all three.
 - Polyline and rectangle Object rule: ours takes the segment nearest the pick; AutoCAD takes a polyline's first segment. Kept on purpose; say so if users expect AutoCAD's.
 
 Pull request 2, view rotation: the camera turns (painting, picking, caches, layout viewport twist, plotting); a command to rotate the view and a gesture (not chosen yet); PLAN; View then lines up with a turned view (today it takes the corner of an unturned view).
 
-Later: `UCSICON` settings (the icon cannot be switched off or moved to the origin), a manager dialog (`UCSMAN`), dragging the icon by its grips, the dimension arcs of the dynamic input drawn along a turned system's axes (the Cartesian legs are still screen-aligned), the systems through MCP.
+Later: `UCSICON` settings (the icon cannot be switched off or moved to the origin), a manager dialog (`UCSMAN`), dragging the icon by its grips, the dimension arcs of the dynamic input drawn along a turned system's axes (the Cartesian legs are still screen-aligned), the systems through MCP, the legacy LEADER's text (it is level with the world).
 
 ## Plan: hatch gradients
 

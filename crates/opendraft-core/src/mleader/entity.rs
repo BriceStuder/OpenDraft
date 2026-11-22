@@ -157,6 +157,25 @@ impl MLeader {
         Some(mleader)
     }
 
+    /// [`build`](Self::build) with its text level with a coordinate system
+    /// turned by `angle` (the landing and the text run along its X axis, and
+    /// left and right are its). The leader keeps exactly the points given.
+    pub fn build_turned(
+        style: &MLeaderStyle,
+        points: Vec<Point>,
+        contents: &str,
+        angle: f64,
+    ) -> Option<MLeader> {
+        if angle == 0.0 {
+            return Self::build(style, points, contents);
+        }
+        let pivot = *points.first()?;
+        let level = points.iter().map(|p| p.rotated(pivot, -angle)).collect();
+        let mut made = Self::build(style, level, contents)?.rotated(pivot, angle);
+        made.lines = vec![points];
+        Some(made)
+    }
+
     /// Where the last point of the first line is, which the landing leaves.
     pub fn landing_start(&self) -> Option<Point> {
         self.lines.first()?.last().copied()
@@ -226,6 +245,21 @@ mod tests {
 
     fn p(x: f64, y: f64) -> Point {
         Point::new(x, y)
+    }
+
+    #[test]
+    fn turned_the_landing_and_text_run_along_the_systems_x_axis() {
+        let style = MLeaderStyle::standard();
+        let angle = std::f64::consts::FRAC_PI_2;
+        // Up the world's Y is to the right in a system turned a quarter.
+        let points = vec![p(3.0, 4.0), p(5.0, 20.0)];
+        let m = MLeader::build_turned(&style, points.clone(), "Note", angle).unwrap();
+        assert_eq!(m.lines[0], points, "the given points, exactly");
+        assert!(m.landing_dir.x.abs() < 1e-12 && (m.landing_dir.y - 1.0).abs() < 1e-12);
+        let direction = m.text().unwrap().text.direction;
+        assert!(direction.x.abs() < 1e-9 && (direction.y - 1.0).abs() < 1e-9);
+        let level = MLeader::build_turned(&style, points.clone(), "Note", 0.0).unwrap();
+        assert_eq!(level, MLeader::build(&style, points, "Note").unwrap());
     }
 
     #[test]
