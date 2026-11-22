@@ -509,6 +509,28 @@ mod tests {
     }
 
     #[test]
+    fn each_circle_type_has_an_alias_and_c_stays_circle() {
+        let mut state = AppState::new();
+        for (typed, id) in [
+            ("C", "draw.circle"),
+            ("cd", "draw.circle_diameter"),
+            ("C2", "draw.circle_2p"),
+            ("C3", "draw.circle_3p"),
+            ("TTR", "draw.circle_ttr"),
+            ("ttt", "draw.circle_3t"),
+            ("CIRCLE TTT", "draw.circle_3t"),
+        ] {
+            assert_eq!(state.cmd_submit(typed), Some(id), "{typed}");
+        }
+        assert_eq!(suggestions("c", |_| true)[0].command, "draw.circle");
+        // Echoed, and so recalled by Up, by a name that can be typed again.
+        assert_eq!(
+            echo_name("draw.circle_ttr", "Circle, Tan, Tan, Radius"),
+            "CIRCLE TTR"
+        );
+    }
+
+    #[test]
     fn typing_a_command_name_returns_its_id() {
         let mut state = AppState::new();
         assert_eq!(state.cmd_submit("l"), Some("draw.line"));
