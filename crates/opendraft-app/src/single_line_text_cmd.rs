@@ -193,11 +193,13 @@ fn add_text(
 /// accepted line is one undo step.
 pub fn draw_text(ed: &mut Editor) -> Result<(), Cancelled> {
     let start = ask_start(ed)?;
+    // Level with the coordinate system's X axis unless turned.
+    let level = ed.read(|doc| doc.ccs().angle)?;
     let rotation = match start.second {
         Some(second) => (second.y - start.at.y).atan2(second.x - start.at.x),
         None => ed.get_angle(
             NumberOptions::new("Specify rotation of text")
-                .default(0.0)
+                .default(level)
                 .base(start.at),
         )?,
     };
@@ -227,12 +229,13 @@ pub fn draw_text(ed: &mut Editor) -> Result<(), Cancelled> {
 pub fn draw_text_line(ed: &mut Editor) -> Result<(), Cancelled> {
     let start = ask_start(ed)?;
     let height = ask_height(ed, &start, true)?;
+    let level = ed.read(|doc| doc.ccs().angle)?;
     let rotation = if start.second.is_some() {
         0.0
     } else {
         ed.get_angle(
             NumberOptions::new("Specify rotation angle of text")
-                .default(0.0)
+                .default(level)
                 .base(start.at),
         )?
     };

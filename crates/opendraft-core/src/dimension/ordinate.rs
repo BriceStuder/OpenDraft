@@ -1,6 +1,6 @@
 //! Ordinate dimensions: the X or Y coordinate of a feature, on a leader that
 //! runs along the other axis to the text. Coordinates are those of the
-//! drawing's origin (there is no user coordinate system).
+//! drawing's origin (the custom coordinate system does not reach them yet).
 
 use std::f64::consts::FRAC_PI_2;
 

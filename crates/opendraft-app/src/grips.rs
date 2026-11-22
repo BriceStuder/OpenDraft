@@ -153,10 +153,11 @@ fn lengthenable(hot: &[Hot]) -> bool {
     matches!(hot, [h] if single(h).is_some_and(|i| h.entity.end_grip(*i).is_some()))
 }
 
-/// What the pointer at `at` stands for in `mode`.
-fn from_pointer(mode: Mode, base: Point, at: Point) -> Given {
+/// What the pointer at `at` stands for in `mode`; an angle counts from
+/// `zero`, the coordinate system's X axis.
+fn from_pointer(mode: Mode, base: Point, at: Point, zero: f64) -> Given {
     match mode {
-        Mode::Rotate => Given::Angle((at.y - base.y).atan2(at.x - base.x)),
+        Mode::Rotate => Given::Angle((at.y - base.y).atan2(at.x - base.x) - zero),
         Mode::Scale => Given::Factor((at.x - base.x).hypot(at.y - base.y)),
         _ => Given::At(at),
     }
@@ -178,10 +179,11 @@ fn ask(
     copies: usize,
 ) -> Result<Reply, Cancelled> {
     let ghosts = hot.to_vec();
+    let zero = ed.read(|doc| doc.ccs().angle)?;
     let ghost = move |at: Point| -> Vec<Entity> {
         ghosts
             .iter()
-            .filter_map(|h| result(mode, h, base, from_pointer(mode, base, at)))
+            .filter_map(|h| result(mode, h, base, from_pointer(mode, base, at, zero)))
             .collect()
     };
     let message = match (mode, copy) {
@@ -219,7 +221,7 @@ fn ask(
         }};
     }
     Ok(match mode {
-        Mode::Rotate => match ed.ask_angle(options!(NumberOptions::new(message)))? {
+        Mode::Rotate => match ed.ask_angle(options!(NumberOptions::new(message).turn()))? {
             Answer::Value(angle) => Reply::Given(Given::Angle(angle)),
             Answer::Keyword(k) => Reply::Keyword(k),
             Answer::Enter => Reply::Enter,

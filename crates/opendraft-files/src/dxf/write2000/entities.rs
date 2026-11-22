@@ -88,6 +88,7 @@ pub(super) fn write_viewports(
         on: true,
         // AutoCAD keeps the paper space's frozen layers here.
         frozen: layout.paper_frozen.clone(),
+        ccs: opendraft_core::Ccs::WORLD,
     };
     viewport(out, ids.overall[index], &sheet, 1, 1, 557_088)?;
     for (i, v) in layout.viewports.iter().enumerate() {

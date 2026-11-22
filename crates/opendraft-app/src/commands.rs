@@ -59,6 +59,8 @@ pub fn build_registry() -> Registry<AppState> {
         crate::dimension_commands::commands(),
         crate::dock::commands(),
         crate::canvas_style::commands(),
+        crate::ccs_cmd::commands(),
+        crate::zoom_cmd::commands(),
     ];
     for command in all().into_iter().chain(tables.into_iter().flatten()) {
         registry
@@ -339,10 +341,6 @@ fn all() -> Vec<Command<AppState>> {
             }
         })
         .transparent(),
-        cmd("view.zoom", "Zoom", |s| s.start_zoom()).checked(|s| s.is_running("ZOOM")),
-        cmd("view.zoom_objects", "Zoom Objects", |s| {
-            s.start_zoom_objects()
-        }),
         toggle_command!("view.grid", "Grid", show_grid)
             .key("F7")
             .transparent(),

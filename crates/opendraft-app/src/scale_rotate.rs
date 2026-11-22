@@ -181,14 +181,17 @@ pub fn rotate_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     let originals = entities_of(ed, &ids)?;
     let base = ed.get_point("Specify base point")?;
     let mut copy = false;
+    // A picked angle counts from the coordinate system's X axis.
+    let zero = ed.read(|doc| doc.ccs().angle)?;
     let angle = loop {
         let shown = originals.clone();
         let options = NumberOptions::new("Specify rotation angle")
+            .turn()
             .base(base)
             .keyword("Copy", "C")
             .keyword("Reference", "R")
             .ghost(move |at| {
-                let angle = direction(base, at);
+                let angle = direction(base, at) - zero;
                 shown.iter().map(|e| e.rotated(base, angle)).collect()
             });
         match ed.ask_angle(options)? {

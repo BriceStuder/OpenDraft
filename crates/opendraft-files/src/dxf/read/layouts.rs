@@ -285,6 +285,7 @@ impl Spaces {
             locked: flags & 0x4000 != 0,
             on: record.int(68).unwrap_or(1) != 0,
             frozen: Vec::new(),
+            ccs: opendraft_core::Ccs::WORLD,
         };
         if let Some(sheet) = self.layouts.iter_mut().find(|l| l.id == layout) {
             self.frozen

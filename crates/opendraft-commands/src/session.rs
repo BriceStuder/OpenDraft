@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use opendraft_core::{Document, LayerId, Layout, LayoutId};
+use opendraft_core::{Document, LayerId, Layout, LayoutId, ViewportId};
 
 use crate::transaction::Batch;
 use crate::{Action, Changes, History, ModifyEntities, Provenance, Step, StepInfo, Transaction};
@@ -85,15 +85,25 @@ impl Session {
         self.document_mut().allocate_layer_id()
     }
 
-    /// Tell the document which space the view is in, and which layers the
-    /// viewport being worked through has frozen. Not an edit: no revision,
-    /// no history.
-    pub fn set_active_space(&mut self, layout: Option<LayoutId>, frozen: Vec<LayerId>) {
+    /// Tell the document which space the view is in (a layout, and the
+    /// viewport of it being worked through), and which layers that viewport
+    /// has frozen. Not an edit: no revision, no history.
+    pub fn set_active_space(
+        &mut self,
+        layout: Option<LayoutId>,
+        viewport: Option<ViewportId>,
+        frozen: Vec<LayerId>,
+    ) {
         // Run every frame: change nothing (and so copy nothing) when the
         // space is as it was.
-        if self.document.active_layout() != layout || self.document.active_frozen() != frozen {
+        let viewport = viewport.filter(|_| layout.is_some());
+        if self.document.active_layout() != layout
+            || self.document.active_viewport() != viewport
+            || self.document.active_frozen() != frozen
+        {
             let document = self.document_mut();
             document.set_active_layout(layout);
+            document.set_active_viewport(viewport);
             document.set_active_frozen(frozen);
         }
     }
@@ -326,9 +336,9 @@ mod tests {
     #[test]
     fn telling_the_session_the_space_it_is_in_again_changes_nothing() {
         let mut session = Session::default();
-        session.set_active_space(None, Vec::new());
+        session.set_active_space(None, None, Vec::new());
         let shared = session.shared_document();
-        session.set_active_space(None, Vec::new());
+        session.set_active_space(None, None, Vec::new());
         assert!(
             Arc::ptr_eq(&shared, &session.shared_document()),
             "not copied"

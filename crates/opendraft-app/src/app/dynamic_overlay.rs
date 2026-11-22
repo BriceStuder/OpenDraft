@@ -39,7 +39,7 @@ impl PanelViewer<'_> {
             return;
         };
         let prompt = self.state.cmd_prompt();
-        let units = self.state.units();
+        let units = self.state.reading();
         let readonly = ui.ctx().wants_keyboard_input() && !owns_focus(ui.ctx(), self.state);
         let colors = &self.theme.colors;
         let light = colors.text;

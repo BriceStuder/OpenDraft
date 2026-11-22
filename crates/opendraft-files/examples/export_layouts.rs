@@ -70,6 +70,7 @@ fn main() {
         locked: false,
         on: false,
         frozen: Vec::new(),
+        ccs: opendraft_core::Ccs::WORLD,
     };
     a3.viewports.push(second);
     let a3_id = a3.id;

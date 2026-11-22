@@ -140,7 +140,7 @@ fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Ca
         }
         Answer::Keyword(_) => {
             let what = if signed { "delta" } else { "total" };
-            match ed.ask_angle(NumberOptions::new(format!("Enter {what} angle")))? {
+            match ed.ask_angle(NumberOptions::new(format!("Enter {what} angle")).turn())? {
                 Answer::Value(a) if ok(a) => Amount::Angle(a),
                 Answer::Value(_) => {
                     ed.say("Requires a positive value.");

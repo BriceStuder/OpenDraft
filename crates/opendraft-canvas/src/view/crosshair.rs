@@ -55,17 +55,34 @@ fn arm_segments(center: f32, extent: f32, gap: f32) -> Option<[(f32, f32); 2]> {
     ])
 }
 
-fn paint(
-    painter: &Painter,
-    canvas: Rect,
-    at: Pos2,
-    shape: CursorShape,
+/// How the cursor is drawn: its size, colour, pickbox and the turn of the
+/// coordinate system its arms follow.
+struct Look {
     size: u32,
     color: Color32,
     pick: f64,
-) {
+    axes: Option<(Vec2, Vec2)>,
+}
+
+fn paint(painter: &Painter, canvas: Rect, at: Pos2, shape: CursorShape, look: &Look) {
+    let Look {
+        size, color, pick, ..
+    } = *look;
     let stroke = Stroke::new(1.0_f32, color);
-    if shape != CursorShape::PickBox {
+    if let (Some((x, y)), true) = (look.axes, shape != CursorShape::PickBox) {
+        // Along a turned system's axes: the same arms, at its angle.
+        let arm = arms(size, canvas.size());
+        let gap = pick as f32 + stroke.width * 0.5;
+        for (dir, extent) in [(x, arm.x), (y, arm.y)] {
+            for [from, to] in arm_segments(0.0, extent, gap)
+                .into_iter()
+                .flatten()
+                .map(|(a, b)| [a, b])
+            {
+                painter.line_segment([at + dir * from, at + dir * to], stroke);
+            }
+        }
+    } else if shape != CursorShape::PickBox {
         let arm = arms(size, canvas.size());
         let gap = pick as f32 + stroke.width * 0.5;
         if let Some([(left, left_end), (right_start, right)]) = arm_segments(at.x, arm.x, gap) {
@@ -126,6 +143,7 @@ impl View {
             tracks: Vec::new(),
             track: None,
             extra: self.snap_extra(),
+            ccs: document.ccs(),
             insist: self
                 .snap_cycle
                 .over
@@ -207,12 +225,17 @@ impl View {
         at: Pos2,
         shape: CursorShape,
         over: Color32,
+        ccs: opendraft_core::Ccs,
     ) {
         ui.ctx().set_cursor_icon(egui::CursorIcon::None);
         let painter = ui.painter_at(canvas);
-        let color = self.crosshair.color.unwrap_or(over);
-        let size = self.crosshair.size;
-        paint(&painter, canvas, at, shape, size, color, self.sizes.pick);
+        let look = Look {
+            size: self.crosshair.size,
+            color: self.crosshair.color.unwrap_or(over),
+            pick: self.sizes.pick,
+            axes: (ccs.angle != 0.0).then(|| super::backdrop::screen_axes(ccs)),
+        };
+        paint(&painter, canvas, at, shape, &look);
     }
 }
 

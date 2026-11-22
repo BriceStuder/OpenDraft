@@ -154,7 +154,9 @@ pub fn draw_rectangle(ed: &mut Editor) -> Result<(), Cancelled> {
     };
     let m = ed.defaults().rect.get();
     let (style, width) = (corners(&m), m.width);
-    let (mut angle, mut size): (f64, Option<Size>) = (0.0, None);
+    // Square to the coordinate system's axes (a polyline when they are turned).
+    let level = ed.read(|doc| doc.ccs().angle)?;
+    let (mut angle, mut size): (f64, Option<Size>) = (level, None);
     let (dx, dy) = loop {
         let options = PointOptions::new("Specify other corner point")
             .keyword("Area", "A")

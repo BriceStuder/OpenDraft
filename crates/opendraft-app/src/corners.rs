@@ -117,7 +117,8 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
             )?;
             let angle = ed.get_angle(
                 Options::<f64>::new("Specify chamfer angle from the first line")
-                    .default(m.angle.to_radians()),
+                    .default(m.angle.to_radians())
+                    .turn(),
             )?;
             ed.defaults().corner.change(|m| {
                 m.length = length.max(0.0);

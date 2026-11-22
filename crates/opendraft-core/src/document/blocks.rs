@@ -109,6 +109,9 @@ impl Document {
             layouts: Vec::new(),
             active_layout: None,
             active_frozen: Vec::new(),
+            active_viewport: None,
+            model_ccs: crate::ccs::Ccs::WORLD,
+            ccs_previous: Vec::new(),
             ..self.clone_tables()
         };
         for e in &block.entities {
@@ -141,6 +144,10 @@ impl Document {
             next_viewport_id: self.next_viewport_id,
             active_layout: self.active_layout,
             active_frozen: self.active_frozen.clone(),
+            active_viewport: self.active_viewport,
+            model_ccs: self.model_ccs,
+            named_ccs: self.named_ccs.clone(),
+            ccs_previous: self.ccs_previous.clone(),
             text_styles: self.text_styles.clone(),
             next_text_style_id: self.next_text_style_id,
             current_text_style: self.current_text_style,

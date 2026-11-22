@@ -167,11 +167,11 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](layer-freeze.svg) | `layer-freeze.svg` | snowflake | Freeze |
 | ![](layer-hide.svg) | `layer-hide.svg` | lightbulb-off | Off |
 | ![](layer-isolate.svg) | `layer-isolate.svg` | focus | Isolate |
-| ![](layer-list-frozen.svg) | `layer-list-frozen.svg` | snowflake | layers_ui.rs, ribbon_slots.rs |
+| ![](layer-list-frozen.svg) | `layer-list-frozen.svg` | snowflake | ribbon_slots.rs |
 | ![](layer-list-locked.svg) | `layer-list-locked.svg` | lock | ribbon_slots.rs |
 | ![](layer-list-off.svg) | `layer-list-off.svg` | lightbulb-off | ribbon_slots.rs |
 | ![](layer-list-on.svg) | `layer-list-on.svg` | lightbulb | layer_columns.rs, ribbon_slots.rs |
-| ![](layer-list-thawed.svg) | `layer-list-thawed.svg` | sun | layer_columns.rs, layers_ui.rs, ribbon_slots.rs |
+| ![](layer-list-thawed.svg) | `layer-list-thawed.svg` | sun | layer_columns.rs, ribbon_slots.rs |
 | ![](layer-list-unlocked.svg) | `layer-list-unlocked.svg` | lock-open | layer_columns.rs, ribbon_slots.rs |
 | ![](layer-lock.svg) | `layer-lock.svg` | lock | Lock |
 | ![](layer-make-current.svg) | `layer-make-current.svg` | layers-2 | Make Current |
@@ -266,6 +266,9 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](tool-select.svg) | `tool-select.svg` | mouse-pointer-2 | Select |
 | ![](view-assistant.svg) | `view-assistant.svg` | bot | Assistant |
 | ![](view-base-inventor.svg) | `view-base-inventor.svg` | file | From Inventor |
+| ![](view-ccs.svg) | `view-ccs.svg` | axis-3d | Coordinate System (The CCS command (custom coordinate system).) |
+| ![](view-ccs-previous.svg) | `view-ccs-previous.svg` | history | Previous |
+| ![](view-ccs-world.svg) | `view-ccs-world.svg` | globe | World |
 | ![](view-base-model.svg) | `view-base-model.svg` | frame | From Model Space |
 | ![](view-command-line.svg) | `view-command-line.svg` | rectangle-horizontal | Command Line |
 | ![](view-grid.svg) | `view-grid.svg` | grid-3x3 | Grid |

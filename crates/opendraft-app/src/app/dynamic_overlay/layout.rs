@@ -2,7 +2,7 @@
 //! painted and no egui context, so the placement rules read in one place.
 use eframe::egui::{self, Pos2, Rect};
 use opendraft_commands::{DynamicDimensions, Prompt as Ask, Wants};
-use opendraft_core::{Point, Units};
+use opendraft_core::Point;
 
 use crate::cmdline::Prompt;
 use crate::dynamic_input::{avoid, dimensions, DynamicInputState, Field};
@@ -17,7 +17,7 @@ pub(super) struct Inputs<'a> {
     pub ask: &'a Ask,
     pub prompt: &'a Prompt,
     pub settings: &'a DynamicInputSettings,
-    pub units: &'a Units,
+    pub units: &'a crate::coordinates::Reading,
     pub canvas: Rect,
     /// The pointer, on screen.
     pub anchor: Pos2,
@@ -108,8 +108,8 @@ fn ghost_dimensions(
         [Field::Distance, Field::Angle] => dimensions::polar(
             base,
             end,
-            -(cx.units.base_angle as f32),
-            if cx.units.clockwise { 1.0 } else { -1.0 },
+            -((cx.units.units.base_angle + cx.units.ccs.angle) as f32),
+            if cx.units.units.clockwise { 1.0 } else { -1.0 },
         ),
         [Field::Distance] => dimensions::linear(base, end),
         [Field::X, Field::Y] if relative => dimensions::cartesian(base, end),
@@ -145,7 +145,7 @@ pub(super) fn plan(
     // Dimensions follow the point the answer would give, so a typed or locked
     // length shortens them with the line.
     let end = input
-        .constrained_point(ask, settings, units)
+        .constrained_point(ask, settings, *units)
         .map_or(anchor, to_screen);
     let ghost = ghost_dimensions(cx, &fields, end, to_screen);
     let rubberband = match (&ghost, ask.base) {

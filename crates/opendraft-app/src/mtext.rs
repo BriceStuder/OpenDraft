@@ -64,7 +64,8 @@ pub fn draw_mtext(ed: &mut Editor) -> Result<(), Cancelled> {
         ed.defaults().text.get().height,
         ed.defaults().text.get().attachment,
     );
-    let (mut rotation, mut width) = (0.0, None);
+    // Level with the coordinate system's X axis unless turned.
+    let (mut rotation, mut width) = (ed.read(|doc| doc.ccs().angle)?, None);
     let second = loop {
         let options = PointOptions::new(format!("Specify opposite corner or (height {height})"))
             .keyword("Height", "H")

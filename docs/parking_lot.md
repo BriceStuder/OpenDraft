@@ -166,6 +166,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
 - **In AutoCAD** (open, `AUDIT`, edit, save): the Model-tab freeze's XDATA on LAYER records (it should survive a save), everything the DXF writer emits for dimensions, multileaders, legacy leaders and block attributes, ByBlock, and the R2000 layout export; the DWG reader's object counts against an AutoCAD listing; the ellipse angle convention and the spline prompts; MTEXT tracking at the end of a line; the rectangular array's default spacing; the multileader style's angle constraints and attachment codes.
+- **By hand in the real app, the custom coordinate system:** tried 22-11-2026 in the Model tab only (UCS, Rotate 30, the turned grid, axes, icon and crosshair, and LINE with `@100,0` and `@0,50`). Not yet tried: inside a layout viewport, ortho, polar and object snap tracking and grid snap by hand, the dynamic input fields, Object and View, ROTATE and grip rotate, and the commands that orient what they make.
 - **By hand in the real app** (tests drive the commands through `AppState` only): DIMEDIT and DIMTEDIT, TEXTEDIT and TEXT typed in place, DIST and AREA, Overkill and Purge, ByBlock, the attribute editor's double-click and the ATTDEF dialog, the warning before a large file opens, the window and lasso selection style, snapping to a polyline while drawing it, the Ortho pointer test, the Paragraph dialog (nobody has seen it), DIVIDE, MEASURE, grips, TRIM and BREAK on points and construction lines, and whether the Settings dialog's Files and Automation pages fit its height without scrolling.
 - **On real machines:** Linux desktops beyond Mint (and on Mint: the Home page's templates and file actions, the assistant's key in the Secret Service, the crash log); the Windows exe on a machine with no Visual C++ Redistributable; the MSI's shortcut and file association opening with no console window; physical printers, and CUPS versions other than the one tried; the update check against the real GitHub.
 - **With a real model:** the assistant with Mistral on a real drawing, including its warning before it generates shapes (it needs your API key, and sends drawing data to the service).
@@ -192,6 +193,22 @@ Suggested order:
 2. Later: MVIEW Polygonal and Object options, and grips to drag the outline's vertices (fiddly, least needed).
 
 Not included: a clipped viewport inside a nested viewport.
+
+## Plan: custom coordinate system and view rotation
+
+AutoCAD's UCS under our own name: the **custom coordinate system** (`CCS`, alias `UCS`). Decided with James on 22-11-2026: the Model tab and each layout viewport have their own, never affecting each other; a layout's sheet has none; named systems are shared; every change is an undo step and is saved in the drawing; the automation API stays in world coordinates. What is built is in `docs/ARCHITECTURE.md`, "Custom coordinate system".
+
+Left for pull request 1:
+
+- **DIMORDINATE from the system's origin.** `DimKind::Ordinate` stores only the feature, leader end and datum, measured from the world origin along world axes. It needs the origin and direction it measures from (DXF keeps the origin in group 10 and the direction in group 51), in `.odraft`, the picture (the leader runs along the system's axes), DXF read and write, and DIMORDINATE.
+- **Hatch angle and origin** in the system (AutoCAD measures `HPANG` from the system's X axis and puts the default origin at its origin).
+- **MLEADER** text level with the system.
+- **DXF**: the header (`$UCSORG`, `$UCSXDIR`, `$UCSYDIR`, `$UCSNAME`, and the paper space `$PUCS*` as world), the `UCS` table for the named systems (written empty today), each `VIEWPORT` entity's own system (groups 110, 111, 112, 79); read and write. **DWG**: read the same.
+- Polyline and rectangle Object rule: ours takes the segment nearest the pick; AutoCAD takes a polyline's first segment. Kept on purpose; say so if users expect AutoCAD's.
+
+Pull request 2, view rotation: the camera turns (painting, picking, caches, layout viewport twist, plotting); a command to rotate the view and a gesture (not chosen yet); PLAN; View then lines up with a turned view (today it takes the corner of an unturned view).
+
+Later: `UCSICON` settings (the icon cannot be switched off or moved to the origin), a manager dialog (`UCSMAN`), dragging the icon by its grips, the dimension arcs of the dynamic input drawn along a turned system's axes (the Cartesian legs are still screen-aligned), the systems through MCP.
 
 ## Plan: hatch gradients
 

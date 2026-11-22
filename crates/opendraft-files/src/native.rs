@@ -45,6 +45,7 @@ use crate::{Encoded, FileError, FileFormat, Loaded};
 
 pub(super) mod attribute;
 mod block;
+mod ccs;
 mod dimension;
 mod dimension_style;
 mod entity;
@@ -274,6 +275,9 @@ struct DrawingDto {
     /// `PDMODE` and `PDSIZE`.
     #[serde(flatten)]
     point_style: point_style::PointStyleDto,
+    /// The Model tab's coordinate system and the ones saved by name.
+    #[serde(flatten)]
+    ccs: ccs::TableDto,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -433,6 +437,7 @@ impl DrawingDto {
             linetypes: linetype::TableDto::of(document),
             new_style: new_style::NewStyleDto::of(document),
             point_style: point_style::PointStyleDto::of(document),
+            ccs: ccs::TableDto::of(document),
         })
     }
 }

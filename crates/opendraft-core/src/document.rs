@@ -69,6 +69,17 @@ pub struct Document {
     /// Layers frozen in the viewport being worked through (VPLAYER): hidden
     /// from the object queries like a globally frozen layer.
     active_frozen: Vec<LayerId>,
+    /// The viewport of `active_layout` being worked through, if any (none:
+    /// its sheet). Not part of the drawing's history or file.
+    active_viewport: Option<crate::layout::ViewportId>,
+    /// The Model tab's custom coordinate system (each layout viewport keeps
+    /// its own; see `opendraft_core::ccs`).
+    model_ccs: crate::ccs::Ccs,
+    /// Coordinate systems saved by name, shared by every space.
+    named_ccs: Vec<crate::ccs::NamedCcs>,
+    /// The systems each space had before, latest last, for the Previous
+    /// option. Kept by the undoable action that changes a system; not saved.
+    ccs_previous: Vec<(crate::ccs::CcsSpace, crate::ccs::Ccs)>,
     /// Text styles in table order; `Standard` is always first.
     text_styles: Vec<TextStyle>,
     next_text_style_id: u64,
@@ -96,6 +107,7 @@ pub struct Document {
 
 mod attributes;
 mod blocks;
+mod ccs;
 mod defaults;
 mod layer_table;
 mod layouts;
