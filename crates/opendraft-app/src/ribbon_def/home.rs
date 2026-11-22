@@ -405,7 +405,6 @@ mod tests {
     /// AutoCAD's Home items whose commands are not built yet; they show
     /// dimmed. Take an id off when its command lands.
     const NOT_BUILT: &[&str] = &[
-        "draw.circle_3t",
         "draw.gradient",
         "modify.blend",
         "annotate.mleader_add",

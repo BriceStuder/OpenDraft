@@ -11,7 +11,7 @@ use crate::{Entity, Point};
 const EPS: f64 = 1e-9;
 
 #[derive(Clone, Copy)]
-enum Carrier {
+pub(crate) enum Carrier {
     Line(Point, Point),
     Circle(Point, f64),
 }
@@ -20,7 +20,7 @@ fn distance(a: Point, b: Point) -> f64 {
     (a.x - b.x).hypot(a.y - b.y)
 }
 
-fn carrier(curve: &Curve) -> Option<Carrier> {
+pub(crate) fn carrier(curve: &Curve) -> Option<Carrier> {
     match *curve {
         Curve::Segment { a, b } if distance(a, b) > EPS => Some(Carrier::Line(a, b)),
         Curve::Circle { center, radius } | Curve::Arc { center, radius, .. } if radius > EPS => {
@@ -62,7 +62,7 @@ fn cross(a: Carrier, b: Carrier) -> Vec<Point> {
 }
 
 /// Where a circle centred at `centre` touches `carrier`.
-fn touch(carrier: Carrier, centre: Point) -> Option<Point> {
+pub(crate) fn touch(carrier: Carrier, centre: Point) -> Option<Point> {
     match carrier {
         Carrier::Line(a, b) => {
             let (dx, dy) = (b.x - a.x, b.y - a.y);
@@ -114,7 +114,7 @@ fn as_entity(entity: &Entity, pick: Point) -> Option<Entity> {
 }
 
 /// The curve of `entity` nearest `pick`.
-fn picked_curve(entity: &Entity, pick: Point) -> Option<Curve> {
+pub(crate) fn picked_curve(entity: &Entity, pick: Point) -> Option<Curve> {
     entity.curves().into_iter().min_by(|a, b| {
         distance(a.nearest_point(pick), pick).total_cmp(&distance(b.nearest_point(pick), pick))
     })
