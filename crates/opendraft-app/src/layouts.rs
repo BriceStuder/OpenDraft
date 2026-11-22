@@ -150,6 +150,16 @@ impl AppState {
         }
     }
 
+    /// Whether the viewport VPLOCK acts on is locked (its ribbon button shows
+    /// pressed).
+    pub fn target_viewport_locked(&self) -> bool {
+        self.target_viewport().is_some_and(|(layout, viewport)| {
+            let document = self.session().document();
+            let vp = document.layout(layout).and_then(|l| l.viewport(viewport));
+            vp.is_some_and(|v| v.locked)
+        })
+    }
+
     /// A viewport is picked on the sheet (Erase would remove it).
     pub fn viewport_picked(&self) -> bool {
         matches!(self.space(), Space::Paper(_))
@@ -398,12 +408,8 @@ impl AppState {
             self.message = "Pick a viewport, or enter one with MSPACE".to_owned();
             return;
         };
+        let locked = self.target_viewport_locked();
         let layouts = self.session().document().layouts();
-        let locked = layouts
-            .iter()
-            .find(|l| l.id == layout)
-            .and_then(|l| l.viewport(viewport))
-            .is_some_and(|v| v.locked);
         if let Some(layouts) = with_viewport(layouts, layout, viewport, |v| v.locked = !locked) {
             self.perform(SetLayouts::new(
                 if locked {

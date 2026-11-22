@@ -213,6 +213,13 @@ icons! {
     LAYER_THAW_ALL = '\u{e17b}';
     LAYER_UNISOLATE = '\u{e256}';
     LAYER_UNLOCK = '\u{e10f}';
+    /// Rectangular viewport (MVIEW), on the Layout tab: a frame on a sheet.
+    LAYOUT_MVIEW = '\u{e3b2}';
+    LAYOUT_NEW = '\u{e0cd}';
+    LAYOUT_PAGE_SETUP = '\u{e318}';
+    LAYOUT_VPLAYER = '\u{e52d}';
+    LAYOUT_VPLOCK = '\u{e10e}';
+    LAYOUT_VPSCALE = '\u{e2eb}';
     /// New layout, after the Model and layout tabs.
     LAYOUT_TABS_NEW = '\u{e140}';
     MANAGE_SETTINGS = '\u{e157}';

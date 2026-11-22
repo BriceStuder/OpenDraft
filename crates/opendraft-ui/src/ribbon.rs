@@ -15,16 +15,21 @@
 //! control the app draws itself, such as the layer list: [`Ribbon::show`]
 //! says where each slot went.
 //!
+//! A [`Tab`] marked `contextual` is drawn with the accent (see `tabs.rs`);
+//! which tabs the ribbon holds, and which is shown when they change, is the
+//! app's business.
+//!
 //! Not implemented yet: responsive collapse, galleries, pinning an expanded
 //! panel open.
 
 use std::collections::HashMap;
 
-use egui::{pos2, vec2, Align2, CornerRadius, FontId, Frame, Margin, Rect, Sense, Stroke, Ui};
+use egui::{pos2, vec2, Align2, FontId, Frame, Margin, Rect, Sense, Stroke, Ui};
 
 mod buttons;
 mod rows;
 mod split;
+mod tabs;
 
 use crate::Theme;
 use buttons::{icon_button, large_button, paint_hover, stack, text_width};
@@ -137,6 +142,9 @@ pub struct Panel {
 pub struct Tab {
     pub title: &'static str,
     pub panels: Vec<Panel>,
+    /// There only because of where the user is (the Block Editor, a layout):
+    /// drawn with the accent so it stands out (see `tabs.rs`).
+    pub contextual: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -209,9 +217,8 @@ impl Ribbon {
         state.active_tab = state.active_tab.min(self.tabs.len().saturating_sub(1));
         ui.spacing_mut().item_spacing = vec2(0.0, 0.0);
 
-        let titles: Vec<&str> = self.tabs.iter().map(|t| t.title).collect();
         let before = state.active_tab;
-        ribbon_tabs(ui, theme, &mut state.active_tab, &titles);
+        tabs::show(ui, theme, &mut state.active_tab, &self.tabs);
         if state.active_tab != before {
             state.open_panel = None;
         }
@@ -240,57 +247,6 @@ impl Ribbon {
     }
 }
 
-/// AutoCAD-style tab strip: the active tab takes the ribbon body's color so
-/// it merges into the body below it.
-fn ribbon_tabs(ui: &mut Ui, theme: &Theme, selected: &mut usize, titles: &[&str]) {
-    let c = &theme.colors;
-    let top_rounded = CornerRadius {
-        nw: 4,
-        ne: 4,
-        sw: 0,
-        se: 0,
-    };
-    Frame::new()
-        .fill(c.tab_strip())
-        .inner_margin(Margin {
-            left: 8,
-            right: 8,
-            top: 3,
-            bottom: 0,
-        })
-        .show(ui, |ui| {
-            ui.set_min_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 2.0;
-                for (i, title) in titles.iter().enumerate() {
-                    let width = text_width(ui, title, theme.font_size_tab) + 24.0;
-                    let (rect, response) =
-                        ui.allocate_exact_size(vec2(width, 25.0), Sense::click());
-                    let is_selected = *selected == i;
-                    if is_selected {
-                        ui.painter().rect_filled(rect, top_rounded, c.ribbon_bg);
-                    } else if response.hovered() {
-                        ui.painter().rect_filled(rect, top_rounded, c.surface);
-                    }
-                    ui.painter().text(
-                        rect.center(),
-                        Align2::CENTER_CENTER,
-                        title,
-                        FontId::proportional(theme.font_size_tab),
-                        if is_selected || response.hovered() {
-                            c.text
-                        } else {
-                            c.text_weak
-                        },
-                    );
-                    crate::widgets::focus_ring(ui, theme, &response, rect);
-                    if response.clicked() {
-                        *selected = i;
-                    }
-                }
-            });
-        });
-}
 /// The panel title centered in `rect`, with the flyout arrow beside it when
 /// the panel is expandable. Returns true when the bar is clicked.
 fn title_bar(ui: &mut Ui, cx: &Ctx, panel: &Panel, rect: Rect, open: bool) -> bool {
