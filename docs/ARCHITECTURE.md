@@ -924,7 +924,9 @@ centre or on an edge, for POLYGON), `array` (where array items go:
 - **Building shapes from the command's options** is pure geometry in
   `opendraft-core`, tested there: `arc_make` (an arc from start, centre, end, included
   angle, chord, radius or direction), `tangent` (the circle tangent to two
-  objects with a radius), `tangent_three` (the circle tangent to three lines,
+  objects with a radius, scored by where it really touches, the far side of a
+  circle it holds; with a spline, `tangent_spline` takes the steps described
+  below for `tangent_three_curves`, in the centre alone), `tangent_three` (the circle tangent to three lines,
   circles or arcs, for the ribbon's Circle Tan, Tan, Tan: Apollonius' problem
   solved exactly for each choice of sides, in coordinates scaled to the picks
   so it holds far from the origin; of up to eight circles, the one touching
