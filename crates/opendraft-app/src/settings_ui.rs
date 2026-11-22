@@ -19,14 +19,18 @@ pub enum FolderRequest {
     Choose(Location),
 }
 
-pub const TABS: &[&str] = &[
-    "Display",
-    "Drafting",
-    "Files",
-    "Performance",
-    "Automation",
-    "Updates",
-];
+/// The page titles, in the interface language.
+pub fn tabs() -> [std::borrow::Cow<'static, str>; 6] {
+    use rust_i18n::t;
+    [
+        t!("Display"),
+        t!("Drafting"),
+        t!("Files"),
+        t!("Performance"),
+        t!("Automation"),
+        t!("Updates"),
+    ]
+}
 
 pub fn page(
     ui: &mut egui::Ui,
@@ -136,6 +140,8 @@ fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
             },
         );
     });
+    ui.add_space(6.0);
+    crate::language::settings_group(ui, theme, draft);
 }
 
 fn drafting(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {

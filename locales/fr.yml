@@ -1,0 +1,9 @@
+# French translation of OpenDraft (issue #138).
+#
+# Each key is an English text exactly as it is written in the code, inside
+# `t!("…")`; the value is its French translation. A text missing here is
+# shown in English. Keep the %{name} placeholders of a key in its
+# translation. A test checks that every key here is still used in the code.
+
+"Display": "Affichage"
+"Language": "Langue"
