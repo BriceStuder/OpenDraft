@@ -404,6 +404,16 @@ it to refresh panels, and plugins can later subscribe to document events.
 document's list (`Object::layout`); objects of a block definition live in its
 `BlockDef` (see "Blocks").
 
+**Zoom** (`zoom_cmd.rs`). `ZOOM` (`Z`) asks "Specify first corner of window or
+[Extents/Objects/Previous/Window]" and shows the window as large as the canvas
+allows (`Camera::show_window`); the command leaves its answer in `Doc::zoom_to`,
+which the UI thread empties into the view, and each zoom is a step for `ZP`. In a
+layout the window frames the sheet, inside an unlocked viewport its view.
+`ZO` (`view.zoom_objects`) and the Objects option zoom to the box round the
+selected objects (asking "Select objects" with none); construction lines and rays
+have no box and are left out, as `ZE` leaves them out. `ZO` was Zoom Out's alias;
+Zoom Out keeps its command and ribbon button.
+
 **Not taken from the SDK:** a global application object (the context is passed
 in), mutable entity objects that are built and then appended, `Dispose`/`using`,
 and 3D types.

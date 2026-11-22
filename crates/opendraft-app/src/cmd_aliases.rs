@@ -52,7 +52,7 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("ZOOM", "ZOOM", "view.zoom"),
     ("ZE", "ZOOM EXTENTS", "view.zoom_extents"),
     ("ZI", "ZOOM IN", "view.zoom_in"),
-    ("ZO", "ZOOM OUT", "view.zoom_out"),
+    ("ZO", "ZOOM OBJECTS", "view.zoom_objects"),
     ("ZP", "ZOOM PREVIOUS", "view.zoom_previous"),
     ("GRID", "GRID", "view.grid"),
     ("SNAP", "SNAP", "view.snap"),

@@ -38,7 +38,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - Snapping to the shape being drawn: ELLIPSE's first axis and a CV spline's control frame are not passed.
 - Window and lasso selection style: the command line does not say "Specify opposite corner", the lasso does not show its kind by the pointer, no option to start a lasso only from empty space, no highlight of what the box or lasso would take.
 - Transparent commands (`'Z` inside another command) and Ctrl+Z routed to a command's own Undo option.
-- ZOOM: All, Center, Dynamic, Scale, Object and a typed scale; ribbon items for ZOOM Window and Previous; Previous for the views of a layout viewport.
+- ZOOM: All, Center, Dynamic, Scale and a typed scale; ribbon items for ZOOM Window, Objects and Previous; a typed alias for Zoom Out (its `ZO` went to Zoom Objects); Previous for the views of a layout viewport.
 - Measuring: Radius, Angle and the MEASUREGEOM wrapper, hatch and region areas, the DISTANCE, AREA and PERIMETER variables, area units such as square feet.
 - Find (and replace), greyed in the context menu.
 - Power Select: answers at the command line, colour by name or number, attribute properties.
