@@ -145,8 +145,11 @@ impl View {
         }
         let followed = matches!(snapped.kind, SnapKind::Tracking | SnapKind::Polar);
         if (modes.tooltip && !followed) || (followed && self.snap_cycle.tracking.tooltips) {
-            let galley =
-                painter.layout_no_wrap(snapped.label(), FontId::proportional(11.0), style.snap);
+            let galley = painter.layout_no_wrap(
+                snapped.label_from(self.ccs.angle),
+                FontId::proportional(11.0),
+                style.snap,
+            );
             // Beside the marker, or on its other side if that runs off the canvas.
             let right = c.x + R + 6.0;
             let at = if right + galley.size().x > rect.right() {

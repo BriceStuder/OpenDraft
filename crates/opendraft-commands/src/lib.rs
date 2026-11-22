@@ -8,6 +8,7 @@ mod action;
 mod answer;
 mod associations;
 mod block_action;
+mod ccs_action;
 mod changes;
 mod context;
 mod corner;
@@ -33,6 +34,7 @@ mod units_action;
 
 pub use action::{Action, AddCopies, AddEntity, ModifyAttributes, ModifyEntities, RemoveEntities};
 pub use block_action::SetBlocks;
+pub use ccs_action::{SetCcs, SetNamedCcs};
 pub use changes::Changes;
 pub use context::Context;
 pub use dim_style_action::SetDimStyle;

@@ -182,11 +182,13 @@ pub(crate) fn change_swept(
 
 /// The rest of a crossing window started at `first`: its four corners.
 pub(crate) fn ask_window(ed: &Editor, first: Point) -> Result<Vec<Point>, Cancelled> {
+    // Square to the screen, however the view is turned.
+    let twist = ed.read(|doc| doc.view_twist())?;
     let options = PointOptions::new("Specify opposite corner")
         .ghost_style(GhostStyle::Crossing)
-        .ghost(move |at| vec![outline(Region::rect_corners(first, at), true)]);
+        .ghost(move |at| vec![outline(Region::view_corners(first, at, twist), true)]);
     let opposite = ed.get_point(options)?;
-    Ok(Region::rect_corners(first, opposite))
+    Ok(Region::view_corners(first, opposite, twist))
 }
 
 /// The Fence option: points of a fence, Enter to finish. `None` when fewer

@@ -31,7 +31,7 @@ impl AppState {
         let Some(ask) = self.dynamic_ask() else {
             return;
         };
-        let units = self.units();
+        let reading = self.reading();
         // A distance alone, typed while the pointer follows a path, is
         // measured along the path from where it starts. With no base point
         // the first field is X, so a lone number there is that distance too.
@@ -39,15 +39,15 @@ impl AppState {
         let along = (ask.wants == Wants::Point
             && matches!(input.active, Some(Field::Distance | Field::X))
             && input.locks.is_empty())
-        .then(|| parse_field(Field::Distance, &input.draft, &units))
+        .then(|| parse_field(Field::Distance, &input.draft, reading))
         .flatten()
         .and_then(|n| self.track_point_at(n))
-        .map(|p| format!("#{},{}", p.x, p.y));
+        .map(|p| format!("#*{},{}", p.x, p.y));
         let result = match along {
             Some(text) => self.answer_dynamic(&text),
             None => self.docs[self.active]
                 .dynamic_input
-                .submission(&ask, &self.settings.dynamic_input, &units)
+                .submission(&ask, &self.settings.dynamic_input, reading)
                 .map_err(str::to_owned)
                 .and_then(|text| self.answer_dynamic(&text)),
         };
@@ -83,6 +83,7 @@ impl AppState {
                 sweep: false,
                 no_snap: false,
                 along: None,
+                turn: false,
                 mtext: None,
                 mtext_of: None,
                 single_line: false,
@@ -118,6 +119,7 @@ impl AppState {
             sweep: false,
             no_snap: false,
             along: None,
+            turn: false,
             mtext: None,
             mtext_of: None,
             single_line: false,
@@ -222,7 +224,7 @@ impl OpenDraftApp {
             return false;
         };
         let settings = self.state.settings.dynamic_input.clone();
-        let units = self.state.units();
+        let reading = self.state.reading();
         let prompt = self.state.cmd_prompt();
         let signature = format!(
             "{:?}:{:?}:{}:{:?}",
@@ -343,7 +345,7 @@ impl OpenDraftApp {
             let reverse = !cycles && i.consume_key(Modifiers::SHIFT, Key::Tab);
             if reverse || (!cycles && i.consume_key(Modifiers::NONE, Key::Tab)) {
                 if input.draft.contains([',', '<']) || input.draft.starts_with(['#', '@']) {
-                    if let Some(point) = input.constrained_point(&ask, &settings, &units) {
+                    if let Some(point) = input.constrained_point(&ask, &settings, reading) {
                         input.locked_coordinate = Some(point);
                         input.draft.clear();
                         input.begin(Field::Coordinate);
@@ -351,11 +353,11 @@ impl OpenDraftApp {
                         why = Some("Invalid coordinate expression.");
                     }
                 } else if input.editing {
-                    why = input.cycle(&fields, reverse, &units).err();
+                    why = input.cycle(&fields, reverse, reading).err();
                 } else {
                     // The first field already looks active, so Tab moves past it.
                     input.begin(fields.first().copied().unwrap_or(Field::Keyword));
-                    why = input.cycle(&fields, reverse, &units).err();
+                    why = input.cycle(&fields, reverse, reading).err();
                 }
             }
             let space_submits = ask.wants != Wants::Text && !input.draft.contains([',', '<']);
@@ -396,7 +398,7 @@ impl PanelViewer<'_> {
             || (ctx.wants_keyboard_input() && !owns_focus(ctx, self.state));
         let ask = self.state.dynamic_ask();
         let settings = self.state.settings.dynamic_input.clone();
-        let units = self.state.units();
+        let reading = self.state.reading();
         let doc = &mut self.state.docs[self.state.active];
         doc.dynamic_input.origin = ask.as_ref().and_then(|a| a.base).or(doc.view.last_point());
         let input = doc.dynamic_input.clone();
@@ -405,7 +407,7 @@ impl PanelViewer<'_> {
                 let mut input = input.clone();
                 input.cursor = Some(at);
                 input
-                    .constrained_point(&ask, &settings, &units)
+                    .constrained_point(&ask, &settings, reading)
                     .unwrap_or(at)
             })
                 as std::sync::Arc<

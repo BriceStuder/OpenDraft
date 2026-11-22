@@ -50,6 +50,7 @@ pub(super) fn preview(ui: &mut egui::Ui, theme: &Theme, draft: &Draft) {
     let camera = Camera {
         center: middle,
         zoom,
+        twist: 0.0,
     };
     paint_text(&painter, &camera, rect, &text, &layout, &|_| Color32::BLACK);
 }

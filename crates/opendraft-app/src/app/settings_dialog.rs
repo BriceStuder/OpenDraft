@@ -81,7 +81,7 @@ impl OpenDraftApp {
         // Fixed, so the dialog does not change size between tabs: tall enough
         // for Display and Drafting, the longest pages, and smaller on short
         // screens.
-        let page_height = (screen.height() - 230.0).clamp(100.0, 400.0);
+        let page_height = (screen.height() - 230.0).clamp(100.0, 430.0);
         let width = (screen.width() - 80.0).clamp(360.0, 880.0);
 
         widgets::dialog(ctx, &self.theme, "Settings", &mut open, width, |ui| {
@@ -96,7 +96,10 @@ impl OpenDraftApp {
                 ui,
                 &self.theme,
                 &mut tab,
-                settings_ui::TABS,
+                &settings_ui::tabs()
+                    .iter()
+                    .map(AsRef::as_ref)
+                    .collect::<Vec<_>>(),
                 page_height,
                 |ui, i| {
                     egui::ScrollArea::vertical()
@@ -189,6 +192,9 @@ impl OpenDraftApp {
         }
         if new.ui_scale_percent != self.state.settings.ui_scale_percent {
             ctx.set_zoom_factor(new.zoom_factor());
+        }
+        if new.language != self.state.settings.language {
+            crate::language::apply(new.language.as_deref());
         }
         self.state.templates_dir = Location::Templates.resolve(&new);
         self.state.set_settings(new);

@@ -116,16 +116,17 @@ Dynamic blocks are last, and may never be worth it.
 
 What to build next, roughly in order, beside the phases above. The details of each are in `docs/parking_lot.md`; take an item off this list when it is done.
 
-1. PEDIT's Fit, Spline, Jointype and vertex Tangent (curve fitting of a polyline).
-2. Spline editing: exact Trim, Extend, Break and Join, then Offset and Fillet; and JOIN of arcs across gaps, with Close.
-3. The commands still dimmed on the Home tab (`NOT_BUILT` in `opendraft-app/src/ribbon_def/home.rs`): Groups, Table, Radius, Angle and ID Point, Isolate, Layer States and the rest.
-4. Associative arrays.
-5. Annotation: the MTEXT toolbar's font menu and symbols, then its ruler (waits for AutoCAD paragraph samples); the dimensions that are left, starting with DWG dimension import; leaders and multileaders.
-6. OD Roman: the PDF hidden text layer, the DXF round trip, and the glyphs still to draw.
-7. Linetypes from `.lin` files (a self-contained plan in `docs/parking_lot.md`).
-8. Layouts: non-rectangular viewport clips (planned in `docs/parking_lot.md`); open the R2000 export in AutoCAD.
-9. Properties panel parity with AutoCAD (`private_material/properties_gap.md`, cheap rows first).
-10. Housekeeping: split `dxf/read.rs`, make the Document mutators return `Result`, a progress bar for large files.
+1. The custom coordinate system (in progress, 22-11-2026): the system is built; next, turning the view (PLAN and a gesture). Plan in `docs/parking_lot.md`.
+2. PEDIT's Fit, Spline, Jointype and vertex Tangent (curve fitting of a polyline).
+3. Spline editing: exact Trim, Extend, Break and Join, then Offset and Fillet; and JOIN of arcs across gaps, with Close.
+4. The commands still dimmed on the Home tab (`NOT_BUILT` in `opendraft-app/src/ribbon_def/home.rs`): Groups, Table, Radius, Angle and ID Point, Isolate, Layer States and the rest.
+5. Associative arrays.
+6. Annotation: the MTEXT toolbar's font menu and symbols, then its ruler (waits for AutoCAD paragraph samples); the dimensions that are left, starting with DWG dimension import; leaders and multileaders.
+7. OD Roman: the PDF hidden text layer, the DXF round trip, and the glyphs still to draw.
+8. Linetypes from `.lin` files (a self-contained plan in `docs/parking_lot.md`).
+9. Layouts: non-rectangular viewport clips (planned in `docs/parking_lot.md`); open the R2000 export in AutoCAD.
+10. Properties panel parity with AutoCAD (`private_material/properties_gap.md`, cheap rows first).
+11. Housekeeping: split `dxf/read.rs`, make the Document mutators return `Result`, a progress bar for large files.
 
 ## Not now
 

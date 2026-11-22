@@ -39,8 +39,11 @@ pub(super) fn write_viewports(
         out.pair(41, finite(v.height)?);
         out.pair(68, status);
         out.pair(69, id);
-        out.pair(12, finite(v.view_center.x)?);
-        out.pair(22, finite(v.view_center.y)?);
+        // The view centre in the view's own axes, which the twist turns.
+        let (s, c) = v.twist.sin_cos();
+        let (x, y) = (v.view_center.x, v.view_center.y);
+        out.pair(12, finite(x * c - y * s)?);
+        out.pair(22, finite(x * s + y * c)?);
         out.pair(13, 0.0);
         out.pair(23, 0.0);
         out.pair(14, 10.0);
@@ -54,7 +57,7 @@ pub(super) fn write_viewports(
         out.pair(44, 0.0);
         out.pair(45, finite(v.height / v.scale)?);
         out.pair(50, 0.0);
-        out.pair(51, 0.0);
+        out.pair(51, finite(v.twist.to_degrees())?);
         out.pair(72, 100);
         for layer in &v.frozen {
             if let Some(handle) = ids.layers.get(layer) {
@@ -64,11 +67,10 @@ pub(super) fn write_viewports(
         out.pair(90, flags);
         out.pair(1, "");
         out.pair(281, 0);
-        out.pair(71, 0);
+        // The viewport keeps its own coordinate system (UCSVP) when it has one.
+        out.pair(71, i32::from(!v.ccs.is_world()));
         out.pair(74, 0);
-        out.point3(110, 0.0, 0.0, 0.0);
-        out.point3(111, 1.0, 0.0, 0.0);
-        out.point3(112, 0.0, 1.0, 0.0);
+        crate::dxf::ccs::write_axes(out, 110, v.ccs);
         out.pair(79, 0);
         out.pair(146, 0.0);
         Ok(())
@@ -84,6 +86,8 @@ pub(super) fn write_viewports(
         on: true,
         // AutoCAD keeps the paper space's frozen layers here.
         frozen: layout.paper_frozen.clone(),
+        ccs: opendraft_core::Ccs::WORLD,
+        twist: 0.0,
     };
     viewport(out, ids.overall[index], &sheet, 1, 1, 557_088)?;
     for (i, v) in layout.viewports.iter().enumerate() {

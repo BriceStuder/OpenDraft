@@ -153,8 +153,9 @@ impl View {
             }))
             .collect(),
             base,
-            track_dirs: directions(&tracking.track_angles()),
-            polar_dirs: directions(&tracking.polar_angles()),
+            // Measured from the X axis of the coordinate system in force.
+            track_dirs: turned(directions(&tracking.track_angles()), aim.ccs),
+            polar_dirs: turned(directions(&tracking.polar_angles()), aim.ccs),
             view,
         })
         .filter(|t| !t.origins.is_empty() || t.base.is_some());
@@ -198,4 +199,15 @@ impl View {
         }
         (aim, resolved)
     }
+}
+
+/// Path directions measured in `ccs`, as world directions.
+fn turned(directions: Vec<Point>, ccs: opendraft_core::Ccs) -> Vec<Point> {
+    if ccs.angle == 0.0 {
+        return directions;
+    }
+    directions
+        .into_iter()
+        .map(|d| ccs.vector_to_world(d))
+        .collect()
 }

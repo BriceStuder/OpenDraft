@@ -175,6 +175,7 @@ fn rotation(ed: &Editor, center: Point, first: Point) -> Result<Axes, Cancelled>
     let length = first.x.hypot(first.y);
     loop {
         let options = NumberOptions::new("Specify rotation around major axis")
+            .turn()
             .base(center)
             .ghost(move |at| {
                 let other = length * tilt_of(center, first, at).cos();
@@ -248,6 +249,7 @@ fn arc_ends(ed: &Editor, axes: Axes, whole: Ellipse) -> Result<Ellipse, Cancelle
             Mode::Parameter => ("Specify start parameter", ("Angle", "A")),
         };
         let options = NumberOptions::new(message)
+            .turn()
             .base(center)
             .keyword(other.0, other.1)
             .ghost(move |_| vec![Entity::Ellipse(whole)]);
@@ -264,6 +266,7 @@ fn arc_ends(ed: &Editor, axes: Axes, whole: Ellipse) -> Result<Ellipse, Cancelle
             Mode::Parameter => ("Specify end parameter", ("Angle", "A")),
         };
         let options = NumberOptions::new(message)
+            .turn()
             .base(center)
             .keyword(other.0, other.1)
             .keyword(INCLUDED, "I")
@@ -275,7 +278,9 @@ fn arc_ends(ed: &Editor, axes: Axes, whole: Ellipse) -> Result<Ellipse, Cancelle
                 continue;
             }
             Answer::Keyword(k) if k == INCLUDED => {
-                let options = NumberOptions::new("Specify included angle for arc").default(PI);
+                let options = NumberOptions::new("Specify included angle for arc")
+                    .default(PI)
+                    .turn();
                 included(&whole, start, ed.get_angle(options)?)
             }
             Answer::Keyword(_) => {

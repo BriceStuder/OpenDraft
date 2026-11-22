@@ -51,6 +51,8 @@ pub(crate) fn place(
     make: Make,
 ) -> Result<(), Cancelled> {
     let mut tweaks = Tweaks::default();
+    // Horizontal and Vertical are along the coordinate system's axes.
+    let level = ed.read(|doc| doc.ccs().angle)?;
     loop {
         let (shown, current) = (make.clone(), tweaks.clone());
         let mut options = PointOptions::new(message).ghost(move |at| {
@@ -72,8 +74,8 @@ pub(crate) fn place(
             }
             Answer::Keyword(k) => match k.as_str() {
                 "Text" => tweaks.text = ask_text(ed, &make, sample, &tweaks)?,
-                "Horizontal" => tweaks.rotation = Some(0.0),
-                "Vertical" => tweaks.rotation = Some(FRAC_PI_2),
+                "Horizontal" => tweaks.rotation = Some(level),
+                "Vertical" => tweaks.rotation = Some(level + FRAC_PI_2),
                 "Leader" => tweaks.leader = true,
                 "Xdatum" => tweaks.datum = Some(true),
                 "Ydatum" => tweaks.datum = Some(false),
@@ -154,11 +156,17 @@ fn place_linear(
         ed.say("The extension line origins are the same point.");
         return Ok(());
     }
+    // Which way the cursor is, measured along the coordinate system's axes.
+    let ccs = ed.read(|doc| doc.ccs())?;
+    let auto = move |at| {
+        let local = |p| ccs.from_world(p);
+        ccs.angle_to_world(auto_rotation(local(p1), local(p2), local(at)))
+    };
     let make: Make = Arc::new(move |at, tweaks| {
         let mut dimension = if aligned {
             Dimension::aligned(p1, p2, at, &style)
         } else {
-            let rotation = tweaks.rotation.unwrap_or_else(|| auto_rotation(p1, p2, at));
+            let rotation = tweaks.rotation.unwrap_or_else(|| auto(at));
             Dimension::linear(p1, p2, at, rotation, &style)
         };
         dimension.text = tweaks.text.clone();

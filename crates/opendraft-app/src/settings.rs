@@ -43,6 +43,8 @@ pub struct Settings {
     pub palette: Palette,
     /// The paper of layouts; model space keeps the palette's background.
     pub layout_paper: LayoutPaper,
+    /// The colour of light paper (white unless chosen).
+    pub layout_paper_colour: crate::paper_colour::PaperColour,
     pub show_grid: bool,
     /// The `[-][Top][2D Wireframe]` label in the drawing's top-left corner
     /// (`VPCONTROL`).
@@ -101,6 +103,9 @@ pub struct Settings {
     pub update_checks: Option<bool>,
     /// The drawing cache and the frame-time readout (the Performance page).
     pub performance: crate::performance_settings::PerformanceSettings,
+    /// The interface language (a code of `language::LANGUAGES`); `None`
+    /// follows the system's.
+    pub language: Option<String>,
 }
 
 impl Default for Settings {
@@ -109,6 +114,7 @@ impl Default for Settings {
             dynamic_input: Default::default(),
             palette: Palette::default(),
             layout_paper: LayoutPaper::default(),
+            layout_paper_colour: Default::default(),
             show_grid: true,
             show_viewport_controls: true,
             grid_spacing: 10.0,
@@ -135,6 +141,7 @@ impl Default for Settings {
             recovery_dir: None,
             update_checks: None,
             performance: Default::default(),
+            language: None,
         }
     }
 }
@@ -235,6 +242,10 @@ impl Settings {
     pub fn sanitized(mut self) -> Self {
         self.dynamic_input = self.dynamic_input.sanitized();
         self.performance = self.performance.sanitized();
+        // A language this version does not offer follows the system.
+        self.language = self
+            .language
+            .filter(|code| crate::language::is_offered(code));
         let (min, max) = GRID_SPACING_RANGE;
         self.grid_spacing = if self.grid_spacing.is_finite() {
             self.grid_spacing.clamp(min, max)
@@ -347,6 +358,7 @@ mod tests {
             },
             palette: Palette::Slate,
             layout_paper: LayoutPaper::Dark,
+            layout_paper_colour: crate::paper_colour::PaperColour::Cream,
             show_grid: false,
             show_viewport_controls: false,
             grid_spacing: 2.5,
@@ -404,6 +416,7 @@ mod tests {
                 draw_as: opendraft_canvas::Render::Triangles,
                 show_frame_time: true,
             },
+            language: Some("fr".into()),
         };
         settings.save(&mut storage);
         assert_eq!(Settings::load(Some(&storage)), settings);
@@ -453,6 +466,24 @@ mod tests {
             (odd.layout_paper, odd.grid_spacing),
             (LayoutPaper::Light, 3.0)
         );
+    }
+
+    #[test]
+    fn paper_colour_is_white_unless_chosen() {
+        use crate::paper_colour::PaperColour;
+        // Saves from before the choice existed have white paper.
+        let old = Settings::from_json(r#"{"layout_paper":"light"}"#);
+        assert_eq!(old.layout_paper_colour, PaperColour::White);
+        let grey = Settings::from_json(r#"{"layout_paper_colour":"light_grey"}"#);
+        assert_eq!(grey.layout_paper_colour, PaperColour::LightGrey);
+        let odd = Settings::from_json(r#"{"layout_paper_colour":"purple","grid_spacing":3.0}"#);
+        assert_eq!(
+            (odd.layout_paper_colour, odd.grid_spacing),
+            (PaperColour::White, 3.0)
+        );
+        // Not a name: a colour of one's own is not offered.
+        let rgb = Settings::from_json(r#"{"layout_paper_colour":{"custom":[0,0,0]}}"#);
+        assert_eq!(rgb.layout_paper_colour, PaperColour::White);
     }
 
     #[test]

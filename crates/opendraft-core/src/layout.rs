@@ -69,6 +69,13 @@ pub struct Viewport {
     /// Layers hidden in this viewport only (VPLAYER), kept sorted. Other
     /// viewports and model space still show them.
     pub frozen: Vec<LayerId>,
+    /// The custom coordinate system used while working through this
+    /// viewport; the Model tab and other viewports have their own.
+    pub ccs: crate::ccs::Ccs,
+    /// How far the view turns model space on the sheet, in radians
+    /// counter-clockwise (AutoCAD's view twist): `view_center` stays at
+    /// `center` and model space turns about it.
+    pub twist: f64,
 }
 
 impl Viewport {
@@ -91,6 +98,8 @@ impl Viewport {
             locked: false,
             on: true,
             frozen: Vec::new(),
+            ccs: crate::ccs::Ccs::WORLD,
+            twist: 0.0,
         };
         if let Some(b) = model {
             vp.view_center = Point::new((b.min.x + b.max.x) / 2.0, (b.min.y + b.max.y) / 2.0);
@@ -123,24 +132,42 @@ impl Viewport {
             self.width,
             self.height,
             self.scale,
+            self.twist,
         ]
         .iter()
         .all(|v| v.is_finite());
         finite && self.width > 0.0 && self.height > 0.0 && self.scale > 0.0
     }
 
+    /// A model offset turned as the sheet shows it (exact with no twist).
+    fn turned(&self, v: Point, sign: f64) -> Point {
+        if self.twist == 0.0 {
+            return v;
+        }
+        let (s, c) = (sign * self.twist).sin_cos();
+        Point::new(v.x * c - v.y * s, v.x * s + v.y * c)
+    }
+
     pub fn model_to_paper(&self, p: Point) -> Point {
+        let v = self.turned(
+            Point::new(p.x - self.view_center.x, p.y - self.view_center.y),
+            1.0,
+        );
         Point::new(
-            self.center.x + self.scale * (p.x - self.view_center.x),
-            self.center.y + self.scale * (p.y - self.view_center.y),
+            self.center.x + self.scale * v.x,
+            self.center.y + self.scale * v.y,
         )
     }
 
     pub fn paper_to_model(&self, p: Point) -> Point {
-        Point::new(
-            self.view_center.x + (p.x - self.center.x) / self.scale,
-            self.view_center.y + (p.y - self.center.y) / self.scale,
-        )
+        let v = self.turned(
+            Point::new(
+                (p.x - self.center.x) / self.scale,
+                (p.y - self.center.y) / self.scale,
+            ),
+            -1.0,
+        );
+        Point::new(self.view_center.x + v.x, self.view_center.y + v.y)
     }
 
     /// The window on the sheet.
@@ -157,10 +184,45 @@ impl Viewport {
         )
     }
 
-    /// The part of model space the window shows.
+    /// The box round the part of model space the window shows.
     pub fn model_bounds(&self) -> Bounds {
         let b = self.paper_bounds();
-        Bounds::from_points(self.paper_to_model(b.min), self.paper_to_model(b.max))
+        let corners = [
+            b.min,
+            Point::new(b.max.x, b.min.y),
+            b.max,
+            Point::new(b.min.x, b.max.y),
+        ]
+        .map(|p| self.paper_to_model(p));
+        corners[1..]
+            .iter()
+            .fold(Bounds::from_points(corners[0], corners[0]), |b, p| {
+                b.union(Bounds::from_points(*p, *p))
+            })
+    }
+
+    /// The same window with its view changed to frame `model` (the box of
+    /// what is to be seen) as large as it fits, measured along the sheet,
+    /// at a tidy scale; its twist is kept.
+    pub fn refit(&self, model: Bounds) -> Self {
+        let corners = [
+            model.min,
+            Point::new(model.max.x, model.min.y),
+            model.max,
+            Point::new(model.min.x, model.max.y),
+        ]
+        .map(|p| self.turned(p, 1.0));
+        let along = corners[1..]
+            .iter()
+            .fold(Bounds::from_points(corners[0], corners[0]), |b, p| {
+                b.union(Bounds::from_points(*p, *p))
+            });
+        let framed = Viewport::framing(self.id, self.center, self.width, self.height, Some(along));
+        Viewport {
+            view_center: self.turned(framed.view_center, -1.0),
+            scale: framed.scale,
+            ..self.clone()
+        }
     }
 
     pub fn contains_paper(&self, p: Point) -> bool {
@@ -187,10 +249,8 @@ impl Viewport {
     /// Slide the view of model space so its content moves by (`dx`, `dy`) on the sheet.
     pub fn panned_by_paper(&self, dx: f64, dy: f64) -> Self {
         let mut vp = self.clone();
-        vp.view_center = Point::new(
-            self.view_center.x - dx / self.scale,
-            self.view_center.y - dy / self.scale,
-        );
+        let v = self.turned(Point::new(dx / self.scale, dy / self.scale), -1.0);
+        vp.view_center = Point::new(self.view_center.x - v.x, self.view_center.y - v.y);
         vp
     }
 }
@@ -369,6 +429,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_turned_viewport_maps_both_ways_pans_and_refits() {
+        let vp = Viewport {
+            twist: std::f64::consts::FRAC_PI_2,
+            scale: 0.5,
+            view_center: Point::new(100.0, 0.0),
+            center: Point::new(50.0, 40.0),
+            ..viewport()
+        };
+        // Model +X runs up the sheet.
+        let up = vp.model_to_paper(Point::new(110.0, 0.0));
+        assert!((up.x - 50.0).abs() < 1e-9 && (up.y - 45.0).abs() < 1e-9);
+        let p = Point::new(-30.0, 77.0);
+        let back = vp.paper_to_model(vp.model_to_paper(p));
+        assert!((back.x - p.x).abs() < 1e-9 && (back.y - p.y).abs() < 1e-9);
+        let moved = vp.panned_by_paper(0.0, 5.0);
+        let still = moved.model_to_paper(Point::new(110.0, 0.0));
+        assert!((still.y - 50.0).abs() < 1e-9, "content moved up the sheet");
+        let b = Bounds::from_points(Point::new(0.0, 0.0), Point::new(400.0, 10.0));
+        let fitted = vp.refit(b);
+        for corner in [b.min, b.max] {
+            assert!(fitted.contains_paper(fitted.model_to_paper(corner)));
+        }
+        assert_eq!(fitted.twist, vp.twist);
+    }
+
+    #[test]
     fn a_plot_turned_a_quarter_turns_the_sheet_as_it_is_read() {
         // AutoCAD's landscape A4: portrait paper, plot turned a quarter.
         let mut plot = PlotSettings::for_layout(210.0, 297.0);
@@ -411,6 +497,8 @@ mod tests {
             locked: false,
             on: true,
             frozen: Vec::new(),
+            ccs: crate::ccs::Ccs::WORLD,
+            twist: 0.0,
         }
     }
 

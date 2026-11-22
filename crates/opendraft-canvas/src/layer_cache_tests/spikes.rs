@@ -31,6 +31,7 @@ fn an_outline_that_doubles_back_draws_no_streak() {
             rig.view.camera = Camera {
                 center: Point::new(923_500.0, 40_230.0),
                 zoom,
+                twist: 0.0,
             };
             for v in rig.frame(&doc, &none()) {
                 let (x, y) = (f32::from_bits(v[0]), f32::from_bits(v[1]));

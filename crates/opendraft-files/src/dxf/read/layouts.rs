@@ -52,6 +52,8 @@ pub(super) struct Spaces {
     unsupported_views: usize,
     clipped: usize,
     unsupported_plot_settings: usize,
+    /// Viewports whose own coordinate system was 3D or mirrored.
+    tilted_ccs: usize,
 }
 
 /// What a `LAYOUT` object says before the layouts are built.
@@ -250,16 +252,13 @@ impl Spaces {
         let flags = record.int(90).unwrap_or(0);
         let looks_down =
             number(16, 0.0).abs() < 1e-9 && number(26, 0.0).abs() < 1e-9 && number(36, 1.0) > 0.0;
-        let untwisted = number(51, 0.0).abs() < 1e-9;
+        // The view twist (51), in degrees counter-clockwise.
+        let twist = number(51, 0.0)
+            .to_radians()
+            .rem_euclid(std::f64::consts::TAU);
         let view_height = number(45, 0.0);
         let (width, height) = (number(40, 0.0), number(41, 0.0));
-        if !looks_down
-            || !untwisted
-            || flags & 1 != 0
-            || view_height <= 0.0
-            || width <= 0.0
-            || height <= 0.0
-        {
+        if !looks_down || flags & 1 != 0 || view_height <= 0.0 || width <= 0.0 || height <= 0.0 {
             self.unsupported_views += 1;
             return;
         }
@@ -269,15 +268,30 @@ impl Spaces {
             center: Point::new(number(10, 0.0), number(20, 0.0)),
             width,
             height,
-            // The view centre is relative to the target, in the view's own axes.
-            view_center: Point::new(
-                number(17, 0.0) + number(12, 0.0),
-                number(27, 0.0) + number(22, 0.0),
-            ),
+            // The view centre is relative to the target, in the view's own
+            // axes, which the twist turns.
+            view_center: {
+                let (s, c) = (-twist).sin_cos();
+                let (x, y) = (number(12, 0.0), number(22, 0.0));
+                Point::new(
+                    number(17, 0.0) + x * c - y * s,
+                    number(27, 0.0) + x * s + y * c,
+                )
+            },
             scale: height / view_height,
             locked: flags & 0x4000 != 0,
             on: record.int(68).unwrap_or(1) != 0,
             frozen: Vec::new(),
+            // The viewport's own coordinate system (AutoCAD's per-viewport UCS).
+            ccs: match super::ucs::axes(record, 110) {
+                Some(Some(ccs)) => ccs,
+                Some(None) => {
+                    self.tilted_ccs += 1;
+                    opendraft_core::Ccs::WORLD
+                }
+                None => opendraft_core::Ccs::WORLD,
+            },
+            twist,
         };
         if let Some(sheet) = self.layouts.iter_mut().find(|l| l.id == layout) {
             self.frozen
@@ -310,10 +324,12 @@ impl Spaces {
     }
 
     pub(super) fn warnings(&self) -> Vec<String> {
-        let mut warnings = Vec::new();
+        let mut warnings: Vec<String> = crate::dxf::ccs::warning(self.tilted_ccs)
+            .into_iter()
+            .collect();
         if self.unsupported_views > 0 {
             warnings.push(format!(
-                "Skipped {} viewport{} that show a rotated, perspective or 3D view.",
+                "Skipped {} viewport{} that show a perspective or 3D view.",
                 self.unsupported_views,
                 if self.unsupported_views == 1 { "" } else { "s" }
             ));

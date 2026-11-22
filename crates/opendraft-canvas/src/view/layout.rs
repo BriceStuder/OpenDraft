@@ -112,10 +112,9 @@ impl View {
     fn viewport_camera(&self, vp: &Viewport) -> Camera {
         Camera {
             zoom: self.sheet.zoom * vp.scale,
-            center: Point::new(
-                vp.view_center.x - (vp.center.x - self.sheet.center.x) / vp.scale,
-                vp.view_center.y - (vp.center.y - self.sheet.center.y) / vp.scale,
-            ),
+            // The model point under the middle of the sheet's view.
+            center: vp.paper_to_model(self.sheet.center),
+            twist: vp.twist,
         }
     }
 
@@ -179,12 +178,7 @@ impl View {
                     .filter(|v| !v.locked)
                     .zip(document.model_bounds());
                 if let Some((v, b)) = fit {
-                    let framed = Viewport::framing(v.id, v.center, v.width, v.height, Some(b));
-                    vp = Some(Viewport {
-                        view_center: framed.view_center,
-                        scale: framed.scale,
-                        ..v.clone()
-                    });
+                    vp = Some(v.refit(b));
                     edited = true;
                 } else {
                     self.sheet
@@ -196,13 +190,7 @@ impl View {
             // a locked viewport's model, turned into paper).
             Some(Request::Window(a, b)) => match vp.as_ref() {
                 Some(v) if !v.locked => {
-                    let window = Bounds::from_points(a, b);
-                    let framed = Viewport::framing(v.id, v.center, v.width, v.height, Some(window));
-                    vp = Some(Viewport {
-                        view_center: framed.view_center,
-                        scale: framed.scale,
-                        ..v.clone()
-                    });
+                    vp = Some(v.refit(Bounds::from_points(a, b)));
                     edited = true;
                 }
                 Some(v) => {
@@ -218,9 +206,27 @@ impl View {
                     .map_or(rect.center(), |c| c.center());
                 self.zoom_view(&mut vp, &mut edited, rect, at, factor);
             }
+            // Only the view of an unlocked viewport turns; the sheet never does.
+            Some(Request::Twist(twist, fit)) => {
+                if let Some(v) = vp.as_mut().filter(|v| !v.locked) {
+                    v.twist = twist.rem_euclid(std::f64::consts::TAU);
+                    if let (true, Some(b)) = (fit, document.model_bounds()) {
+                        *v = v.refit(b);
+                    }
+                    edited = true;
+                }
+            }
             None => {}
         }
-        if !response.dragged_by(PointerButton::Middle) {
+        let origin = ui.input(|i| i.pointer.press_origin());
+        let twisted = match (self.drives_viewport(&vp, origin), self.clip) {
+            (true, Some(clip)) => self.twist_by_drag(ui, response, clip.center()),
+            _ => None,
+        };
+        if let (Some(twist), Some(v)) = (twisted, vp.as_mut()) {
+            v.twist = twist.rem_euclid(std::f64::consts::TAU);
+            edited = true;
+        } else if !response.dragged_by(PointerButton::Middle) {
             self.pan_viewport = None;
         } else {
             let delta = response.drag_delta();
@@ -365,9 +371,9 @@ impl View {
                 };
                 if is_active {
                     if grid.visible {
-                        self.paint_grid(&clipped, rect, style, grid);
+                        self.paint_grid(&clipped, rect, style, grid, vp.ccs);
                     }
-                    self.paint_axes(&clipped, rect, style);
+                    self.paint_axes(&clipped, rect, style, vp.ccs);
                     let args = (&clipped, rect, style, document);
                     let slot = Slot::Viewport(vp.id);
                     self.paint_space(slot, args, None, &vp.frozen, selection, hover);
@@ -444,6 +450,7 @@ mod tests {
             sheet: Camera {
                 center: Point::new(120.0, 90.0),
                 zoom: 3.0,
+                twist: 0.0,
             },
             ..View::default()
         };
@@ -457,6 +464,8 @@ mod tests {
             locked: false,
             on: true,
             frozen: Vec::new(),
+            ccs: opendraft_core::Ccs::WORLD,
+            twist: 0.0,
         };
         let rect = Rect::from_min_size(Pos2::new(10.0, 20.0), egui::vec2(900.0, 600.0));
         let camera = view.viewport_camera(&vp);
@@ -487,6 +496,7 @@ mod tests {
             sheet: Camera {
                 center: Point::new(148.5, 105.0),
                 zoom: 2.0,
+                twist: 0.0,
             },
             ..View::default()
         };
@@ -506,6 +516,7 @@ mod tests {
             camera: Camera {
                 center: Point::new(7.0, 7.0),
                 zoom: 9.0,
+                twist: 0.0,
             },
             ..View::default()
         };

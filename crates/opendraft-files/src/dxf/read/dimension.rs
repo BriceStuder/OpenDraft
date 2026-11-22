@@ -187,7 +187,13 @@ impl Importer {
             }
             4 if large => Dimension::jogged(at(10)?, at(13)?, at(14)?, at(15)?, &style),
             4 => Dimension::radius(at(10)?, at(15)?, &style),
-            6 => Dimension::ordinate(at(13)?, at(14)?, flags & 64 != 0, &style),
+            6 => {
+                // Measured from the UCS origin (10), its X axis turned by
+                // the negative of the horizontal direction (51).
+                let turn = -degrees(record, 51).unwrap_or(0.0);
+                let frame = opendraft_core::Ccs::new(at(10).unwrap_or_default(), turn);
+                Dimension::ordinate_in(frame, at(13)?, at(14)?, flags & 64 != 0, &style)
+            }
             _ => return None,
         };
         if let opendraft_core::DimKind::Radial {

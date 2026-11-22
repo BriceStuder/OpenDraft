@@ -87,7 +87,7 @@ pub(crate) fn arc_option(
 }
 
 fn by_angle(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
-    let angle = ed.get_angle(NumberOptions::new("Specify included angle"))?;
+    let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
     let options = PointOptions::new("Specify endpoint of arc")
         .base(from)
         .keyword("CEnter", "CE")
@@ -132,7 +132,7 @@ fn by_radius(ed: &Editor, from: Point, heading: Point) -> Result<Option<Entity>,
     Ok(match ed.ask_point(options)? {
         Answer::Value(end) => radius_arc(from, end, heading, radius),
         Answer::Keyword(_) => {
-            let angle = ed.get_angle(NumberOptions::new("Specify included angle"))?;
+            let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
             let direction = ed.get_angle(
                 NumberOptions::new("Specify direction of chord")
                     .default(0.0)

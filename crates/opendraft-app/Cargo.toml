@@ -47,6 +47,11 @@ chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 # Version ordering for that check (MIT OR Apache-2.0; already in the lock file).
 semver = "1"
+# Translations of the interface (MIT): the English text in the code is the key,
+# and `locales/<language>.yml` gives the other languages (issue #138).
+rust-i18n.workspace = true
+# The system's language, the default choice in Settings (MIT OR Apache-2.0).
+sys-locale = "0.3.2"
 
 [target.'cfg(windows)'.build-dependencies]
 # The program's icon and version information in the Windows exe (MIT).

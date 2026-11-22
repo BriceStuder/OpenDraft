@@ -4,15 +4,22 @@
 
 use opendraft_commands::{Hint, SetProperties, SetUnits, Wants};
 use opendraft_core::drawing_properties::DrawingProperties;
-use opendraft_core::units::{format_angle, format_length, format_point};
+use opendraft_core::units::{format_angle, format_length};
 use opendraft_core::{AngleFormat, Units};
 
+use crate::coordinates::Reading;
 use crate::state::AppState;
 
 impl AppState {
     /// The active drawing's units.
     pub fn units(&self) -> Units {
         *self.session().document().units()
+    }
+
+    /// The active drawing's units in the coordinate system of the space
+    /// being edited: how typed values are read and shown.
+    pub fn reading(&self) -> Reading {
+        Reading::of(self.session().document())
     }
 
     /// Change the active drawing's units as one undo step. Nothing is done
@@ -45,29 +52,33 @@ impl AppState {
     }
 }
 
-/// An angle for a message such as "Rotated 2 objects 30.00°": the drawing's
-/// angle format, with at least two decimals so a typed 30.5 is not reported
-/// as 31.
+/// An amount turned by, for a message such as "Rotated 2 objects 30.00°":
+/// the drawing's angle format (not counted from its base angle), with at
+/// least two decimals so a typed 30.5 is not reported as 31.
 pub fn angle_message(units: &Units, angle: f64) -> String {
     let precise = Units {
         angle_precision: units.angle_precision.max(2),
         ..*units
     };
-    let text = format_angle(&precise, angle);
+    let text = format_angle(&precise, angle + units.from_display_angle(0.0));
     match units.angle {
         AngleFormat::DecimalDegrees => format!("{text}\u{b0}"),
         _ => text,
     }
 }
 
-/// A prompt's default as it is written between `<` and `>`.
-pub fn hint_text(units: &Units, wants: Wants, hint: &Hint) -> String {
+/// A prompt's default as it is written between `<` and `>`: points in the
+/// coordinate system, an angle as a direction in it or, when `turn`, as an
+/// amount to turn by.
+pub fn hint_text(reading: impl Into<Reading>, wants: Wants, turn: bool, hint: &Hint) -> String {
+    let reading = reading.into();
     match hint {
         Hint::Text(text) => text.clone(),
-        Hint::Point(p) => format_point(units, *p),
+        Hint::Point(p) => reading.show_point(*p),
         Hint::Number(n) => match wants {
-            Wants::Distance | Wants::DistanceOrPoint => format_length(units, *n),
-            Wants::Angle | Wants::AngleOrPoint => format_angle(units, *n),
+            Wants::Distance | Wants::DistanceOrPoint => format_length(&reading.units, *n),
+            Wants::Angle | Wants::AngleOrPoint if turn => reading.show_turn(*n),
+            Wants::Angle | Wants::AngleOrPoint => reading.show_direction(*n),
             _ => n.to_string(),
         },
     }
@@ -87,24 +98,33 @@ mod tests {
             ..Units::default()
         };
         assert_eq!(
-            hint_text(&units, Wants::Distance, &Hint::Number(63.5)),
+            hint_text(&units, Wants::Distance, false, &Hint::Number(63.5)),
             "5'-3 1/2\""
         );
         assert_eq!(
-            hint_text(&units, Wants::Angle, &Hint::Number(std::f64::consts::PI)),
+            hint_text(
+                &units,
+                Wants::Angle,
+                false,
+                &Hint::Number(std::f64::consts::PI)
+            ),
             "180"
         );
-        assert_eq!(hint_text(&units, Wants::Number, &Hint::Number(2.5)), "2.5");
+        assert_eq!(
+            hint_text(&units, Wants::Number, false, &Hint::Number(2.5)),
+            "2.5"
+        );
         assert_eq!(
             hint_text(
                 &Units::default(),
                 Wants::Point,
+                false,
                 &Hint::Point(Point::new(1.0, 2.0))
             ),
             "1.0000,2.0000"
         );
         assert_eq!(
-            hint_text(&units, Wants::Keyword, &Hint::Text("Yes".into())),
+            hint_text(&units, Wants::Keyword, false, &Hint::Text("Yes".into())),
             "Yes"
         );
     }

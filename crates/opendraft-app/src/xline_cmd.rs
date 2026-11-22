@@ -40,14 +40,16 @@ pub fn draw_xline(ed: &mut Editor) -> Result<(), Cancelled> {
         .keyword("Bisecting", "B")
         .keyword("Offset", "O")
         .ghost(|_| Vec::new());
+    // Horizontal and vertical are along the coordinate system's axes.
+    let ccs = ed.read(|doc| doc.ccs())?;
     match ed.ask_point(options)? {
         Answer::Value(base) => through(ed, base, xline, NAME),
         Answer::Keyword(k) => match k.as_str() {
-            "Horizontal" => parallel(ed, Point::new(1.0, 0.0)),
-            "Vertical" => parallel(ed, Point::new(0.0, 1.0)),
+            "Horizontal" => parallel(ed, ccs.x_axis()),
+            "Vertical" => parallel(ed, ccs.y_axis()),
             "Angle" => {
-                let angle =
-                    ed.get_angle(NumberOptions::new("Enter angle of xline (0)").default(0.0))?;
+                let options = NumberOptions::new("Enter angle of xline (0)").default(ccs.angle);
+                let angle = ed.get_angle(options)?;
                 parallel(ed, infinite::from_angle(angle))
             }
             "Bisecting" => bisect(ed),
@@ -264,19 +266,6 @@ mod tests {
     }
 
     #[test]
-    fn ang_hor_and_ver_tell_the_snaps_their_direction() {
-        // Tangent and Perpendicular need it: there is no last point.
-        let along = |inputs: &[&str]| run(draw_xline, inputs).waiting().and_then(|a| a.along);
-        let d = along(&["a", "30"]).unwrap();
-        let (sin, cos) = 30f64.to_radians().sin_cos();
-        assert!(near(d, Point::new(cos, sin)), "{d:?}");
-        assert_eq!(along(&["h"]), Some(Point::new(1.0, 0.0)));
-        assert_eq!(along(&["v"]), Some(Point::new(0.0, 1.0)));
-        // A line through two points has its first point instead.
-        assert_eq!(along(&["0,0"]), None);
-    }
-
-    #[test]
     fn the_options_are_written_in_full_and_autocad_words_still_work() {
         let state = run(draw_xline, &[]);
         let ask = state.waiting().unwrap();
@@ -295,6 +284,19 @@ mod tests {
         assert!(near(d, Point::new(0.0, 1.0)));
         let state = run(draw_xline, &["bisect", "0,0", "10,0", "0,10"]);
         assert_eq!(lines(&state).len(), 1);
+    }
+
+    #[test]
+    fn ang_hor_and_ver_tell_the_snaps_their_direction() {
+        // Tangent and Perpendicular need it: there is no last point.
+        let along = |inputs: &[&str]| run(draw_xline, inputs).waiting().and_then(|a| a.along);
+        let d = along(&["a", "30"]).unwrap();
+        let (sin, cos) = 30f64.to_radians().sin_cos();
+        assert!(near(d, Point::new(cos, sin)), "{d:?}");
+        assert_eq!(along(&["h"]), Some(Point::new(1.0, 0.0)));
+        assert_eq!(along(&["v"]), Some(Point::new(0.0, 1.0)));
+        // A line through two points has its first point instead.
+        assert_eq!(along(&["0,0"]), None);
     }
 
     #[test]

@@ -6,8 +6,8 @@ use opendraft_ui::{widgets, Palette, Theme};
 
 use crate::locations::Location;
 use crate::settings::{
-    LayoutPaper, Settings, AUTOSAVE_CHOICES, CROSSHAIR_SIZE_RANGE, GRID_SPACING_RANGE,
-    GRIP_SIZE_RANGE, PICK_SIZE_RANGE, SNAP_APERTURE_RANGE, UI_SCALES, ZOOM_SPEED_RANGE,
+    Settings, AUTOSAVE_CHOICES, CROSSHAIR_SIZE_RANGE, GRID_SPACING_RANGE, GRIP_SIZE_RANGE,
+    PICK_SIZE_RANGE, SNAP_APERTURE_RANGE, UI_SCALES, ZOOM_SPEED_RANGE,
 };
 
 /// A folder the user asked to pick on the page; the dialog shows the picker
@@ -19,14 +19,18 @@ pub enum FolderRequest {
     Choose(Location),
 }
 
-pub const TABS: &[&str] = &[
-    "Display",
-    "Drafting",
-    "Files",
-    "Performance",
-    "Automation",
-    "Updates",
-];
+/// The page titles, in the interface language.
+pub fn tabs() -> [std::borrow::Cow<'static, str>; 6] {
+    use rust_i18n::t;
+    [
+        t!("Display"),
+        t!("Drafting"),
+        t!("Files"),
+        t!("Performance"),
+        t!("Automation"),
+        t!("Updates"),
+    ]
+}
 
 pub fn page(
     ui: &mut egui::Ui,
@@ -100,6 +104,9 @@ fn display_left(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
     crosshair(ui, theme, draft);
     ui.add_space(6.0);
     sizes(ui, theme, draft);
+    ui.add_space(6.0);
+    // Here, not on the right, so the page still fits without scrolling.
+    crate::paper_colour::settings_group(ui, theme, draft);
 }
 
 fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
@@ -142,14 +149,7 @@ fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         );
     });
     ui.add_space(6.0);
-    // One row, so the page still fits without scrolling.
-    widgets::group_box(ui, theme, "Layout paper", |ui| {
-        ui.horizontal(|ui| {
-            let paper = &mut draft.layout_paper;
-            ui.radio_value(paper, LayoutPaper::Light, "Light, as printed");
-            ui.radio_value(paper, LayoutPaper::Dark, "Dark, as model space");
-        });
-    });
+    crate::language::settings_group(ui, theme, draft);
 }
 
 fn drafting(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {

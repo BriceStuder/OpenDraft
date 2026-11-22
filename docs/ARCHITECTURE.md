@@ -602,6 +602,119 @@ an angle is radians counter-clockwise from east. Units only decide the text.
   2D), architectural display of areas (areas stay decimal), and a unit-aware
   grid spacing and Settings suffix (both still say `mm`).
 
+## Custom coordinate system (built: the system, input, drawing aids and the CCS command)
+
+AutoCAD's user coordinate system (UCS) under our own name: the **custom
+coordinate system**, command `CCS` (alias `UCS`), View tab > Coordinates. It is
+an origin and a turn about Z (`opendraft_core::ccs::Ccs`; 2D only, no tilt
+about X or Y). **Objects are always stored in world coordinates**: a system
+only changes how points and angles are typed and shown, and which way is
+"horizontal".
+
+- **Where it lives.** The Model tab has one (`Document::model_ccs`) and each
+  layout viewport its own (`Viewport::ccs`), used while working through it;
+  changing one never changes another. A layout's sheet has none (the world).
+  `Document::ccs()` is the one in force: the document knows the viewport being
+  worked through (`set_active_viewport`, set with the active layout by
+  `Session::set_active_space` every frame). Systems saved by name
+  (`named_ccs`) are shared by every space. Each change is one undo step:
+  `SetCcs` (one space's system; it keeps the old one for Previous, ten per
+  space, in `ccs_previous`, which undo also takes back) and `SetNamedCcs`;
+  both report `Changes::ccs`. Saved in `.odraft` (`model_ccs`, `named_ccs`,
+  each viewport's `ccs`; left out when world; no version bump).
+- **DXF and DWG** keep a system as AutoCAD keeps a UCS: three points, an
+  origin and the X and Y directions. `Ccs::from_axes` accepts only a flat,
+  right-handed one; a 3D or mirrored UCS is read as World and the DXF reader
+  says how many. DXF (`dxf/ccs.rs`, `dxf/read/ucs.rs`), R12 and R2000: the
+  header's `$UCSNAME`, `$UCSORG`, `$UCSXDIR` and `$UCSYDIR` are the Model
+  tab's system, the UCS table holds the saved ones, and each VIEWPORT's
+  groups 110 to 112 its own (with 71, `UCSVP`, set when it is not World;
+  R2000 only, as R12 has no layouts). Checked against a file ezdxf wrote
+  (`tests/fixtures/make_ezdxf_ucs.py`), and ezdxf reads ours strictly with a
+  clean audit. DWG (R2010 and later): the header's model-space `UCSORG`,
+  `UCSXDIR` and `UCSYDIR` only.
+- **Reading and showing values** go through `coordinates::Reading` (the units
+  and the system in force; `AppState::reading()`). Typed coordinates are in the
+  system, and `*` after any `@` or `#` means world (`*10,20`, `@*5<0`). A
+  typed angle is a **direction** (counted from the system's X axis and
+  `ANGBASE`) unless the prompt says it is an **amount to turn by**
+  (`Options::turn`, `Prompt::turn`: ROTATE, grip rotate, included angles,
+  chamfer and array angles, ellipse angles, LENGTHEN), which ignores the base
+  angle and the system and measures a picked point from the system's X axis.
+  Prompt defaults, the status bar readout and the dynamic input fields show
+  values in the system; the dynamic input submits points as `#x,y` in the
+  system so they read back the same. A new place that shows a point uses
+  `Reading::show_point`, not `format_point`.
+- **Drawing aids follow its axes**: ortho (`ortho::axis_of_turned`,
+  `on_axis_turned`), grid snap (`Probe::grid_frame`), polar and object snap
+  tracking paths and their tooltips, the grid, the axes (drawn from the
+  system's origin), and the crosshair. A system other than the world shows an
+  icon in the lower-left corner of the canvas or viewport. With the world
+  system everything is exactly as before (the turned paths are only taken for
+  a non-zero angle).
+- **Commands that orient what they make** use the system: TEXT, -TEXT, MTEXT,
+  INSERT and ATTDEF default to its X axis; RECTANG is square to it (a polyline
+  when turned); XLINE Horizontal, Vertical and Angle; DIMLINEAR's automatic,
+  Horizontal and Vertical directions; ARRAYRECT's rows and columns;
+  DIMORDINATE, which measures from the system's origin along its axes. An
+  ordinate dimension keeps the system it was made in (`DimKind::Ordinate`'s
+  `frame`, World by default): its value and picture are worked out in it,
+  moving or turning the dimension leaves it where it is, `.odraft` keeps it
+  as an optional `frame`, and DXF as the definition point (group 10, the
+  origin) and the horizontal direction (group 51, the negative of the
+  system's turn; ezdxf writes the same sign). The automation API sends the
+  points in world coordinates and not the frame. HATCH and HATCHEDIT keep
+  the remembered pattern angle and origin in the system, as AutoCAD's
+  `HPANG` and `HPORIGIN` (the angle is an amount from its X axis, the
+  origin its coordinates), and a hatch gets them turned into world values
+  (`hatch_memory::Memory::hatch`). MLEADER builds the multileader level with
+  the system (`MLeader::build_turned`: left, right, the landing and the text
+  along its X axis), keeping the points given exactly.
+- **The command** (`ccs_cmd.rs`): two points (origin, then a point on X;
+  Enter keeps the direction), Object (`ccs_align::aligned_to`: a line or
+  segment from its nearer end along it, arcs and circles from the centre,
+  text, inserts and construction lines from their insertion point and
+  rotation, a point keeps the current turn; for polylines and rectangles the
+  segment nearest the pick, where AutoCAD takes the first), View (origin at
+  the bottom-left of the view, from `View::visible_area`), Rotate, Previous,
+  World, Named (Restore, Save, Delete, ?). Enter alone is World. The World and
+  Previous ribbon buttons act at once. Outside callers cannot run any of them
+  (`automation/policy.rs`); the automation API stays in world coordinates.
+- **Not built** (see `docs/parking_lot.md`, "Plan: custom coordinate system"):
+  DWG's UCS table and viewports, turning the view (PLAN), `UCSICON`
+  settings, a manager dialog.
+
+## View rotation (built)
+
+The Model tab's view, and the view of an unlocked layout viewport, can turn on
+the screen (AutoCAD's view twist). It is the `twist` of the canvas `Camera`
+(radians counter-clockwise, 0 = unturned); `world_to_screen`, `screen_to_world`
+and `visible_world` all honour it, so painters that go through them need no
+change. `visible_world` returns the box round the turned screen, so culling
+stays safe (it keeps a little more than is seen). Objects are never touched:
+only the camera turns.
+
+- **Ways to turn it.** Ctrl+middle-drag about the canvas centre
+  (`opendraft-canvas/src/view/twist.rs`; the angle is measured from where the
+  button went down, Shift holds it to 15 degree steps, Esc puts the view back
+  and goes no further, so it does not cancel a running command); `ROTATEVIEW`
+  (alias `RV`: an angle, Points for a line to read level, Reset) and `PLAN`
+  (Current, Named or World: turns the view so that system's X axis reads
+  level, then shows the extents), both in `opendraft-app/src/view_twist_cmd.rs`.
+  Like ZOOM they only ask: the answer goes to the drawing's `zoom_to` slot and
+  the UI thread applies it (`View::request_twist`, `request_plan`). A layout's
+  sheet never turns, and a locked viewport refuses with a message.
+- **What follows the turn.** The layer cache key includes the twist (a turn
+  repaints the picture); the grid, axes, crosshair, CCS icon and the dynamic
+  input's arc are drawn turned; selection windows and grips stay square to the
+  screen; a rectangle is drawn as its four corners when the view is turned;
+  CCS View lines the system up with the turned view.
+- **Saved.** A viewport's twist is `Viewport::twist` in `.odraft` and DXF
+  group 51 (degrees), with the view centre in the viewport's own axes. The
+  Model tab's twist is a view setting like its zoom: it is not saved.
+- **Not built.** See `docs/parking_lot.md`, "Plan: custom coordinate system and
+  view rotation".
+
 ## Layouts (built, phases 1-3)
 
 A layout is a sheet (millimetres) with viewports that show model space; the design follows AutoCAD's paper space but keeps this project's structures (no slotmap graph, handles or `nalgebra`).
@@ -610,7 +723,7 @@ A layout is a sheet (millimetres) with viewports that show model space; the desi
 - **Spaces share one object list.** `Object::layout` is `None` for model space or the layout whose sheet holds it; ids are shared. The document has an active space (`active_layout`, set by the app when the view changes space; not undoable or saved), and `visible_objects`, `selectable_objects`, `bounds`, `has_objects_here` and the add actions follow it, so every command, snap, pick, grip and undo works on a sheet unchanged. `visible_in(space)`, `model_bounds` and `model_objects` ask for one space explicitly (viewports show model space; DXF writes model space). Actions that create objects remember their space the first time they run, so undo and redo put them back where they were. Deleting a layout removes its objects in the same transaction.
 - **Spaces** (`opendraft-canvas/src/view/layout.rs`): `Space::{Model, Paper, Viewport}` per drawing, held by `View`. `View::camera` always maps the space being edited to the screen: the sheet in paper space, and in a viewport the sheet camera composed with the viewport's scale and offset, so picking, snapping, grips and ghosts are unchanged and only the clip window (`View::blocked`) is new. `show` reports `viewport_edit`, `enter_viewport` and `leave_viewport`; the app applies them (`layouts.rs`). On the bare sheet the commands edit paper space: new objects are tagged with the layout, so a drawing command never puts an object into the model at sheet coordinates.
 - **App** (`opendraft-app/src/layouts.rs`, `layout_cmd.rs`, `layout_tabs.rs`): switching spaces, the tab strip, and `LAYOUT`, `MVIEW`, `VPSCALE`, `VPLOCK`, `MSPACE`, `PSPACE`. Every command is a registry entry like the rest. While a layout is on screen the ribbon carries the contextual Layout tab (see "Ribbon").
-- **Light or dark paper** (`opendraft-app/src/canvas_style.rs`): a layout's sheet is white paper with black lines by default, as AutoCAD shows layouts (a preview of the printed sheet), or the dark look of model space (`Settings::layout_paper`, `LayoutPaper::{Light, Dark}`; per user, not saved in the drawing). It is switched by the Layout tab's Light Paper toggle, `LAYOUTPAPER` (`view.layout_paper`, shown pressed while light; OpenDraft's own command, as AutoCAD sets these colours in Options) or Settings > Display. Model space never changes. `canvas_style(colors, space, paper)` builds the whole `CanvasStyle` each frame, after the layout tabs have run so a space switched by them is painted right at once. The light look covers the bare sheet and the model seen through its viewports, and every mark drawn over the drawing changes with it so it can be seen on white (a test checks at least 3:1 for lines, selection, window and crossing boxes and the crosshair, and 4.5:1 for the snap label): the selection is the accent itself, the snap marker dark amber, the crossing box a darker green, the grid dark, the crosshair dark grey. `CanvasStyle::surround`, the area around the sheet, stays dark on either paper, so off the sheet the canvas draws the crosshair in `Crosshair::OFF_WHITE` (`View::sheet_on_screen`); a crosshair colour the user chose is kept everywhere. The layer cache needs nothing new: its pictures are keyed by the line colour, so a toggle rebuilds the layout's pictures and leaves the model's alone, and text pictures are keyed by their resolved colour.
+- **Light or dark paper** (`opendraft-app/src/canvas_style.rs`): a layout's sheet is white paper with black lines by default, as AutoCAD shows layouts (a preview of the printed sheet), or the dark look of model space (`Settings::layout_paper`, `LayoutPaper::{Light, Dark}`; per user, not saved in the drawing). It is switched by the Layout tab's Light Paper toggle, `LAYOUTPAPER` (`view.layout_paper`, shown pressed while light; OpenDraft's own command, as AutoCAD sets these colours in Options) or Settings > Display. Light paper is white unless the user chose one of the other presets, which glare less in the dark interface: Off-white (#F5F5F5), Light grey (#EEEEEE), Grey (#E0E0E0), Cream (#F0EAD6) or Sepia (#E8DCC0) (`Settings::layout_paper_colour`, `PaperColour` in `opendraft-app/src/paper_colour.rs`, saved by name so a preset's exact colour can be tuned; a row of swatches in Settings > Display > Layout paper). Presets rather than any colour, so every paper offered is tested and a picker never offers colours it would refuse: each is at least relative luminance 0.70 (`paper_colour::FLOOR`, about #D9D9D9), and a preset added must be too. Plots are on white whatever is chosen. Model space never changes. `canvas_style(colors, space, paper, colour)` builds the whole `CanvasStyle` each frame, after the layout tabs have run so a space switched by them is painted right at once. The light look covers the bare sheet and the model seen through its viewports, and every mark drawn over the drawing changes with it so it can be seen on any paper allowed (a test checks at least 3:1 for lines, selection, window and crossing boxes and the crosshair, and 4.5:1 for the snap label, on every preset; a darker preset may need darker marks): the selection is the accent itself, the snap marker dark amber, the crossing box a darker green, the grid dark, the crosshair dark grey. `CanvasStyle::surround`, the area around the sheet, stays dark on either paper, so off the sheet the canvas draws the crosshair in `Crosshair::OFF_WHITE` (`View::sheet_on_screen`); a crosshair colour the user chose is kept everywhere. The layer cache needs nothing new: its pictures are keyed by the line colour, so a toggle rebuilds the layout's pictures and leaves the model's alone, and text pictures are keyed by their resolved colour.
 - **Per-viewport layer freeze:** `Viewport::frozen`, edited by `VPLAYER`. `Doc::keep_space_valid` runs every frame and copies the active viewport's list into `Document::active_frozen`, which `visible_objects` and `selectable_objects` honour; viewport painting passes the list to `paint_entities`. Stale ids (a layer deleted since) are harmless and are not validated.
 - **Per-layout paper-space freeze** (AutoCAD's VP Freeze with no viewport active): `Layout::paper_frozen`. On a sheet with no viewport picked, `keep_space_valid` puts it in `Document::active_frozen`, the sheet's painting and the layout plot leave those layers' sheet objects out, and the VP Freeze switch acts on it (`view_freeze::FreezeTarget::Paper`, current layer left thawed). The layout's viewports and other layouts are not affected. DXF keeps it as the `331` handles of the layout's sheet-wide `VIEWPORT` (id 1), as AutoCAD does; `.odraft` has an optional `paper_frozen` list. Purge keeps such layers.
 - **Freeze in the Model tab only** (an OpenDraft extension; AutoCAD has no such switch): `Layer::frozen_in_model`. In the Model tab, `keep_space_valid` puts those layers in `Document::active_frozen` (`Document::frozen_in_model`), so the Model tab hides them from painting, snapping, picking (`is_selectable` also honours `active_frozen`, and a newly frozen layer's objects leave the selection) and zoom extents; the Model-tab plot and its extents leave them out too. Layout viewports, and work inside one, ignore the flag. The Layers panel's VP Freeze column and the ribbon layer list's switch act on it in the Model tab (`view_freeze::FreezeTarget`); the current layer stays thawed, as Freeze leaves it. Files: an optional field in `.odraft`; in DXF, XDATA on the LAYER record (`1001 OPENDRAFT`, `1000 FrozenInModel`, `1070 1`, see `dxf::model_freeze`), with `OPENDRAFT` in the APPID table, so such a drawing is written as R2000. Home-page thumbnails still draw every visible layer.
@@ -1013,6 +1126,9 @@ A Windows **release** build of `opendraft` is a windowed program (`#![cfg_attr(a
 
 ## Update checks (`opendraft-app/src/updates/`)
 The program can tell the user a newer version exists. It only informs: nothing is downloaded or installed (installing is a later phase that needs signed installers). It is **off until the user says yes** (`Settings::update_checks` is `None` until answered; the Updates card on Home asks, Settings > Updates mirrors it), so a fresh install makes no network request. Once allowed, `Updates::tick` (every frame, cheap) starts a check on its own thread when none was made for 24 hours (an hour after a failure; "Check now" forces one). The thread does one HTTPS GET of the project's releases list (`fetch.rs`, `ureq` with `rustls`; 10 s timeout, 2 MiB cap) sending only `User-Agent: OpenDraft/<version>` and the ETag of the last answer, so an unchanged list costs a 304. `releases::newest` (pure) takes the highest semver above this build's version, skipping drafts, tags that are not `v<semver>`, prereleases unless this is a beta build, and releases lacking this system's package (`OpenDraft-<version>-windows.zip` / `-linux.tar.gz`, the names `scripts/package.sh` makes), so a release still being uploaded is not announced. The newest `/releases/latest` is not used (it is by creation date, so a late backport would win). The answer is stored (`update_state` key: last check, ETag, newest found, skipped version, remind-after), so the notice shows at the next start with no network. "Skip this version" hides that version only; "Remind me later" hides for three days. The address opened on "View changes" is built from the version (`release_page`), never read from the reply, and release text is never shown. Failure is silent: the card says it could not check, the title bar does not change. Development (debug) builds never check; `OPENDRAFT_UPDATES_URL` replaces the list's address (and lets a debug build check) to try it against a local server. What it shows: the Updates card (`app/home_page/updates.rs`), the title bar's right-hand text (`app/update_notice.rs`: the name, "Allow internet access to stay up to date" before the user has answered, "Version X is available. See Home" when there is one), and Settings > Updates.
+
+## Translations (the setup built; texts are wrapped step by step, issue #138)
+Texts are written in English in the code and wrapped in `rust_i18n::t!("...")` (crate `rust-i18n` 4, MIT): the English text itself is the key, with no `minify_key`, so the code still reads in English and a translator reads whole sentences. `locales/<code>.yml` at the root of the repository, one file per language shared by every crate, maps each English text to its translation; a text a file leaves out is shown in English, so a language can be translated a few texts at a time and English is never changed. Placeholders are named, `t!("Same as the system (%{language})", language = ...)`, and a translation keeps them. A crate that translates calls `rust_i18n::i18n!("../../locales")` at its root (the app does, in `main.rs`); the files are read at compile time, and `opendraft-app/build.rs` rebuilds when `locales/` changes. The language is `Settings::language` (`None` follows the system's, through `sys-locale`, when it is offered, otherwise English), chosen in Settings > Display and applied by `language::apply` at start and on OK or Apply: every frame draws its texts again, so it takes effect at once, except for what is already written in the command history. Tests (`language_tests.rs`) check that every key of every translation file is still the text of a `t!` in the code, and that translations keep their placeholders. Built so far: the setting and two texts ("Language", the "Display" page). Typed command names and prompt options are to stay bilingual, as in a localised AutoCAD (`LIGNE` or `_LINE`): see the plan in #138.
 
 ## Plugins (design decision, not yet implemented)
 

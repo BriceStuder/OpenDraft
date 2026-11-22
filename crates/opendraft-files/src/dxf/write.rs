@@ -200,6 +200,7 @@ pub(super) fn write_r12(document: &Document) -> Result<Encoded, FileError> {
         out.pair(9, name);
         out.pair(code, value);
     }
+    super::ccs::write_header(&mut out, document);
     if let Some(bounds) = document.model_bounds() {
         out.pair(9, "$EXTMIN");
         out.point(10, finite(bounds.min.x)?, finite(bounds.min.y)?);
@@ -240,6 +241,7 @@ pub(super) fn write_r12(document: &Document) -> Result<Encoded, FileError> {
         out.pair(6, super::linetypes::name_for(document, layer.linetype));
     }
     out.pair(0, "ENDTAB");
+    super::ccs::write_r12_table(&mut out, document);
     out.end_section();
 
     let layer_name = |id: LayerId| -> String {

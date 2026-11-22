@@ -187,6 +187,14 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("view.zoom_previous", ImmediateSafe, Ui),
     ("view.zoom", InteractiveInApp, Ui),
     ("view.zoom_objects", InteractiveInApp, Ui),
+    // The coordinate systems are the user's working frame and part of the
+    // drawing; outside callers work in world coordinates and leave them be.
+    ("view.ccs", Denied, Mutation),
+    ("view.ccs_world", Denied, Mutation),
+    ("view.ccs_previous", Denied, Mutation),
+    // They ask the user; a layout viewport's turn is kept in the drawing.
+    ("view.rotate", InteractiveInApp, Ui),
+    ("view.plan", InteractiveInApp, Ui),
     ("view.grid", ImmediateSafe, Ui),
     ("view.dynamic_input", ImmediateSafe, Ui),
     ("view.snap", ImmediateSafe, Ui),

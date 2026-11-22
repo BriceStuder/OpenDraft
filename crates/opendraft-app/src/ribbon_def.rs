@@ -282,6 +282,17 @@ fn view() -> Tab {
                 ..Default::default()
             },
             Panel {
+                title: "Coordinates",
+                columns: vec![
+                    Column::Large(Item::new("view.ccs", "Coordinate System", icons::VIEW_CCS)),
+                    Column::Stack(vec![
+                        Item::new("view.ccs_world", "World", icons::VIEW_CCS_WORLD),
+                        Item::new("view.ccs_previous", "Previous", icons::VIEW_CCS_PREVIOUS),
+                    ]),
+                ],
+                ..Default::default()
+            },
+            Panel {
                 title: "Drafting Aids",
                 columns: vec![Column::Stack(vec![
                     Item::new("view.grid", "Grid", icons::VIEW_GRID),

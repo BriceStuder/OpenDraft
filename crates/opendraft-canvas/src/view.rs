@@ -50,6 +50,7 @@ mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
 pub(crate) mod text_raster;
+mod twist;
 pub use text_paint::paint_text;
 mod types;
 
@@ -79,6 +80,9 @@ enum Request {
     Zoom(f64),
     /// ZOOM Window: two corners in the space being worked in.
     Window(Point, Point),
+    /// Turn the drawing on the screen to this twist, then (when `true`)
+    /// show the extents (PLAN).
+    Twist(f64, bool),
 }
 
 /// Per-drawing view state.
@@ -90,6 +94,11 @@ pub struct View {
     ortho: Ortho,
     /// How point objects look: the drawing's, copied in when it is shown.
     point_style: opendraft_core::PointStyle,
+    /// The coordinate system in force this frame (tooltip angles count from
+    /// its X axis).
+    ccs: opendraft_core::Ccs,
+    /// A Ctrl+middle-drag turning the view, while one is under way.
+    twist_drag: Option<twist::TwistDrag>,
     /// Wheel zoom speed as a multiple of the base rate; none means 1.
     zoom_speed: Option<f32>,
     constraint: Option<Arc<dyn Fn(Point) -> Point + Send + Sync>>,
@@ -182,6 +191,7 @@ impl View {
         let rect = ui.available_rect_before_wrap();
         self.slice_spent.set(std::time::Duration::ZERO);
         self.point_style = document.point_style();
+        self.ccs = document.ccs();
         opendraft_core::infinite::set_pixel_size(1.0 / self.camera.zoom);
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
         let painter = ui.painter_at(rect);
@@ -209,9 +219,17 @@ impl View {
                 Some(Request::Window(a, b)) => {
                     self.camera.show_window(Bounds::from_points(a, b), rect);
                 }
+                Some(Request::Twist(twist, fit)) => {
+                    self.camera.set_twist(twist);
+                    if fit {
+                        self.camera.fit(document.bounds(), rect);
+                    }
+                }
                 None => {}
             }
-            if response.dragged_by(PointerButton::Middle) {
+            if let Some(twist) = self.twist_by_drag(ui, &response, rect.center()) {
+                self.camera.set_twist(twist);
+            } else if response.dragged_by(PointerButton::Middle) {
                 self.camera.pan_by_pixels(response.drag_delta());
             } else {
                 self.pan_through_editor(ui, rect);
@@ -357,9 +375,9 @@ impl View {
             self.paint_layout(&painter, rect, style, grid, document, selection, hover);
         } else {
             if grid.visible {
-                self.paint_grid(&painter, rect, style, grid);
+                self.paint_grid(&painter, rect, style, grid, document.ccs());
             }
-            self.paint_axes(&painter, rect, style);
+            self.paint_axes(&painter, rect, style, document.ccs());
             self.paint_model(&painter, rect, style, document, selection, hover);
         }
         // Inside a viewport the model is only drawn within its window.
@@ -399,7 +417,7 @@ impl View {
             } else {
                 style.crosshair
             };
-            self.paint_cursor(ui, rect, at, shape, over);
+            self.paint_cursor(ui, rect, at, shape, over, document.ccs());
         }
 
         let double_click = (selecting

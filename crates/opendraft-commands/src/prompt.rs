@@ -108,6 +108,10 @@ pub struct Options<T> {
     /// that is all there is of it (XLINE's Ang). Tangent and Perpendicular
     /// then find their point from the direction, with no last point.
     pub along: Option<Point>,
+    /// For an angle prompt: the angle is an amount to turn by (ROTATE's), not
+    /// a direction, so it is read without the base angle or the coordinate
+    /// system's turn, and a picked point measures from the system's X axis.
+    pub turn: bool,
 }
 
 pub type PointOptions = Options<Point>;
@@ -133,6 +137,7 @@ impl<T> Options<T> {
             sweep: false,
             no_snap: false,
             along: None,
+            turn: false,
         }
     }
 
@@ -157,6 +162,12 @@ impl<T> Options<T> {
     /// [`Options::along`]).
     pub fn along(mut self, direction: Point) -> Self {
         self.along = Some(direction);
+        self
+    }
+
+    /// The angle asked for is an amount to turn by (see [`Options::turn`]).
+    pub fn turn(mut self) -> Self {
+        self.turn = true;
         self
     }
 
@@ -315,6 +326,8 @@ pub struct Prompt {
     pub no_snap: bool,
     /// See [`Options::along`].
     pub along: Option<Point>,
+    /// See [`Options::turn`].
+    pub turn: bool,
     /// For [`Wants::MTextEditor`]: the text to edit.
     pub mtext: Option<Box<MText>>,
     /// For [`Wants::MTextEditor`]: the text object being edited, if there is
@@ -355,6 +368,7 @@ impl Prompt {
             sweep: options.sweep,
             no_snap: options.no_snap,
             along: options.along,
+            turn: options.turn,
             mtext: None,
             mtext_of: None,
             single_line: false,

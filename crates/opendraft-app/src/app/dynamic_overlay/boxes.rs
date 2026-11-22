@@ -3,7 +3,6 @@
 //! by `layout` and the state it edits.
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke};
 use opendraft_commands::Prompt as Ask;
-use opendraft_core::Units;
 use opendraft_ui::icons;
 
 use super::layout::{GAP, HEIGHT};
@@ -71,7 +70,7 @@ pub(super) fn prompt_box(
 pub(super) struct FieldView<'a> {
     pub ask: &'a Ask,
     pub settings: &'a DynamicInputSettings,
-    pub units: &'a Units,
+    pub units: &'a crate::coordinates::Reading,
     /// The field takes the typing.
     pub active: bool,
     /// Nothing is being asked: the box shows values but takes no clicks.
@@ -97,7 +96,7 @@ pub(super) fn field_box(
     } = *view;
     let (light, grey, ink) = (look.light, look.grey, look.ink);
     let locked = input.locks.contains_key(&field);
-    let live = input.live_text(field, ask, settings, units);
+    let live = input.live_text(field, ask, settings, *units);
     let slot = usize::from(matches!(field, Field::Y | Field::Angle));
     area(ctx, (uid, slot), rect, |ui, rect| {
         box_fill(
@@ -136,7 +135,7 @@ pub(super) fn field_box(
             }
             ui.memory_mut(|m| m.set_focus_lock_filter(id, dynamic_filter()));
         } else {
-            let text = shown_text(field, &live, units);
+            let text = shown_text(field, &live, &units.units);
             ui.painter().text(
                 rect.left_center() + egui::vec2(5.0, 0.0),
                 Align2::LEFT_CENTER,

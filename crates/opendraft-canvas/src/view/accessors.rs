@@ -85,6 +85,20 @@ impl View {
         self.selecting_objects
     }
 
+    /// How far the view turns the drawing on the screen, in radians
+    /// counter-clockwise.
+    pub fn twist(&self) -> f64 {
+        self.camera.twist
+    }
+
+    /// The drawing point at the lower-left corner of the canvas (of the
+    /// viewport being worked through, in a layout) at the last frame.
+    pub fn view_corner(&self) -> Option<opendraft_core::Point> {
+        let rect = self.snap_cycle.rect?;
+        let area = self.clip.map_or(rect, |c| c.intersect(rect));
+        Some(self.camera.screen_to_world(area.left_bottom(), rect))
+    }
+
     pub fn last_point(&self) -> Option<Point> {
         self.last_point
     }
@@ -161,7 +175,7 @@ impl View {
     }
 
     /// A zoom for the next frame; it is a step of its own for ZOOM Previous.
-    fn request(&mut self, request: Request) {
+    pub(super) fn request(&mut self, request: Request) {
         self.previous.new_step();
         self.request = Some(request);
     }
