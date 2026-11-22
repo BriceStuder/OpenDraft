@@ -370,6 +370,34 @@ mod tests {
     }
 
     #[test]
+    fn a_viewport_has_its_own_system_and_the_sheet_none() {
+        let mut state = AppState::new();
+        run(&mut state, &["r", "30"]);
+        let model = ccs(&state);
+        state.new_layout();
+        run(&mut state, &["r", "45"]);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("has no custom")));
+        state.mspace();
+        let (layout, viewport) = state.target_viewport().expect("in a viewport");
+        assert!(ccs(&state).is_world(), "a new viewport starts at World");
+        run(&mut state, &["r", "45"]);
+        let doc = state.session().document();
+        let own = doc.ccs_of(CcsSpace::Viewport(layout, viewport)).unwrap();
+        assert!((own.angle - 45.0_f64.to_radians()).abs() < 1e-12);
+        assert_eq!(
+            doc.ccs_of(CcsSpace::Model),
+            Some(model),
+            "the Model tab's is untouched"
+        );
+        state.enter_model();
+        assert_eq!(ccs(&state), model);
+    }
+
+    #[test]
     fn the_buttons_go_to_world_and_back() {
         let mut state = AppState::new();
         run(&mut state, &["r", "90"]);

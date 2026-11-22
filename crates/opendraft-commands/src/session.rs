@@ -85,18 +85,18 @@ impl Session {
         self.document_mut().allocate_layer_id()
     }
 
-    /// Tell the document which space the view is in (a layout, and the
-    /// viewport of it being worked through), and which layers that viewport
-    /// has frozen. Not an edit: no revision, no history.
+    /// Tell the document which space the view is in (the layout whose sheet
+    /// is edited, or the layout viewport worked through, when the layout is
+    /// none), and which layers are frozen there. Not an edit: no revision,
+    /// no history.
     pub fn set_active_space(
         &mut self,
         layout: Option<LayoutId>,
-        viewport: Option<ViewportId>,
+        viewport: Option<(LayoutId, ViewportId)>,
         frozen: Vec<LayerId>,
     ) {
         // Run every frame: change nothing (and so copy nothing) when the
         // space is as it was.
-        let viewport = viewport.filter(|_| layout.is_some());
         if self.document.active_layout() != layout
             || self.document.active_viewport() != viewport
             || self.document.active_frozen() != frozen

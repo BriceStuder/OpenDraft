@@ -4,29 +4,30 @@
 
 use super::Document;
 use crate::ccs::{Ccs, CcsSpace, NamedCcs, PREVIOUS_KEPT};
-use crate::layout::ViewportId;
+use crate::layout::{LayoutId, ViewportId};
 
 impl Document {
-    /// The viewport being worked through, if a layout's viewport is (see
+    /// The layout viewport being worked through, if one is (see
     /// `set_active_viewport`).
-    pub fn active_viewport(&self) -> Option<ViewportId> {
+    pub fn active_viewport(&self) -> Option<(LayoutId, ViewportId)> {
         self.active_viewport
-            .filter(|_| self.active_layout.is_some())
     }
 
-    /// Say which viewport of the active layout is being worked through (none:
-    /// its sheet). Not an edit: neither undone nor saved.
-    pub fn set_active_viewport(&mut self, viewport: Option<ViewportId>) {
+    /// Say which layout viewport is being worked through (none: the Model
+    /// tab or a layout's sheet, as `active_layout` says). While one is, the
+    /// active layout is none, as new objects go to model space. Not an edit:
+    /// neither undone nor saved.
+    pub fn set_active_viewport(&mut self, viewport: Option<(LayoutId, ViewportId)>) {
         self.active_viewport = viewport;
     }
 
-    /// The space whose coordinate system is in force: the Model tab, or the
-    /// viewport being worked through. A layout's sheet has none.
+    /// The space whose coordinate system is in force: the viewport being
+    /// worked through, or else the Model tab. A layout's sheet has none.
     pub fn active_ccs_space(&self) -> Option<CcsSpace> {
-        match (self.active_layout, self.active_viewport) {
-            (None, _) => Some(CcsSpace::Model),
-            (Some(l), Some(v)) => Some(CcsSpace::Viewport(l, v)),
-            (Some(_), None) => None,
+        match (self.active_viewport, self.active_layout) {
+            (Some((l, v)), _) => Some(CcsSpace::Viewport(l, v)),
+            (None, None) => Some(CcsSpace::Model),
+            (None, Some(_)) => None,
         }
     }
 
@@ -135,13 +136,15 @@ mod tests {
         assert_eq!(doc.ccs(), turned(1.0), "the Model tab");
         doc.set_active_layout(Some(lid));
         assert_eq!(doc.ccs(), Ccs::WORLD, "a sheet has none");
-        doc.set_active_viewport(Some(vp));
+        // Inside a viewport the active layout is none (objects go to model
+        // space), and the viewport is told apart.
+        doc.set_active_layout(None);
+        doc.set_active_viewport(Some((lid, vp)));
         assert_eq!(doc.ccs(), turned(0.5), "the viewport's own");
         doc.set_ccs_of(CcsSpace::Viewport(lid, vp), turned(0.25));
         assert_eq!(doc.ccs_of(CcsSpace::Model), Some(turned(1.0)));
         assert_eq!(doc.ccs(), turned(0.25));
-        doc.set_active_layout(None);
-        assert_eq!(doc.active_viewport(), None);
+        doc.set_active_viewport(None);
         assert_eq!(doc.ccs(), turned(1.0));
         let gone = CcsSpace::Viewport(lid, ViewportId(999));
         assert_eq!(doc.set_ccs_of(gone, turned(2.0)), None);

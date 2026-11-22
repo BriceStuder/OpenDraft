@@ -69,9 +69,10 @@ pub struct Document {
     /// Layers frozen in the viewport being worked through (VPLAYER): hidden
     /// from the object queries like a globally frozen layer.
     active_frozen: Vec<LayerId>,
-    /// The viewport of `active_layout` being worked through, if any (none:
-    /// its sheet). Not part of the drawing's history or file.
-    active_viewport: Option<crate::layout::ViewportId>,
+    /// The layout viewport being worked through, if any. Its layout is not
+    /// `active_layout` (which is none there, as new objects go to model
+    /// space). Not part of the drawing's history or file.
+    active_viewport: Option<(LayoutId, crate::layout::ViewportId)>,
     /// The Model tab's custom coordinate system (each layout viewport keeps
     /// its own; see `opendraft_core::ccs`).
     model_ccs: crate::ccs::Ccs,

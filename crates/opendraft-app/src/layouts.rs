@@ -99,7 +99,10 @@ impl Doc {
         let document = self.session.document();
         let (layout, frozen) = crate::view_freeze::active_space(document, self.view.space());
         let more_frozen = frozen.iter().any(|l| !document.active_frozen().contains(l));
-        let viewport = self.view.space().viewport();
+        let viewport = match self.view.space() {
+            Space::Viewport(l, v) => Some((l, v)),
+            _ => None,
+        };
         self.session.set_active_space(layout, viewport, frozen);
         if more_frozen {
             self.prune_selection();
