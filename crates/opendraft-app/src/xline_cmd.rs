@@ -2,10 +2,12 @@
 //! `opendraft_core::infinite`; these only ask.
 //!
 //! XLINE takes a point and then through points (one line each, until Enter),
-//! or Hor and Ver (through points), Ang (an angle, then through points),
-//! Bisect (a vertex and the two sides of an angle) or Offset (parallel to a
-//! line, construction line or ray). RAY takes a start and then through
-//! points. Ang's Reference option is not built.
+//! or Horizontal and Vertical (through points), Angle (an angle, then
+//! through points), Bisecting (a vertex and the two sides of an angle) or
+//! Offset (parallel to a line, construction line or ray). The options are
+//! written in full (AutoCAD shortens them to Hor, Ver, Ang, Bisect); typing
+//! AutoCAD's words still picks them. RAY takes a start and then through
+//! points. Angle's Reference option is not built.
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked, PointOptions};
 use opendraft_core::{infinite, Entity, Point};
@@ -32,23 +34,23 @@ fn toward(from: Point, to: Point) -> Option<Point> {
 /// XLINE.
 pub fn draw_xline(ed: &mut Editor) -> Result<(), Cancelled> {
     let options = PointOptions::new("Specify a point")
-        .keyword("Hor", "H")
-        .keyword("Ver", "V")
-        .keyword("Ang", "A")
-        .keyword("Bisect", "B")
+        .keyword("Horizontal", "H")
+        .keyword("Vertical", "V")
+        .keyword("Angle", "A")
+        .keyword("Bisecting", "B")
         .keyword("Offset", "O")
         .ghost(|_| Vec::new());
     match ed.ask_point(options)? {
         Answer::Value(base) => through(ed, base, xline, NAME),
         Answer::Keyword(k) => match k.as_str() {
-            "Hor" => parallel(ed, Point::new(1.0, 0.0)),
-            "Ver" => parallel(ed, Point::new(0.0, 1.0)),
-            "Ang" => {
+            "Horizontal" => parallel(ed, Point::new(1.0, 0.0)),
+            "Vertical" => parallel(ed, Point::new(0.0, 1.0)),
+            "Angle" => {
                 let angle =
                     ed.get_angle(NumberOptions::new("Enter angle of xline (0)").default(0.0))?;
                 parallel(ed, infinite::from_angle(angle))
             }
-            "Bisect" => bisect(ed),
+            "Bisecting" => bisect(ed),
             _ => offset(ed),
         },
         Answer::Enter => Ok(()),
@@ -259,6 +261,27 @@ mod tests {
         let state = run(draw_xline, &["a", "90", "1,1"]);
         let (_, d, _) = lines(&state)[0].infinite_line().unwrap();
         assert!(near(d, Point::new(0.0, 1.0)));
+    }
+
+    #[test]
+    fn the_options_are_written_in_full_and_autocad_words_still_work() {
+        let state = run(draw_xline, &[]);
+        let ask = state.waiting().unwrap();
+        let labels: Vec<_> = ask.keywords.iter().map(|k| k.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            ["Horizontal", "Vertical", "Angle", "Bisecting", "Offset"]
+        );
+        let state = run(draw_xline, &["hor", "3,4"]);
+        assert_eq!(
+            lines(&state),
+            [xline(Point::new(3.0, 4.0), Point::new(1.0, 0.0))]
+        );
+        let state = run(draw_xline, &["ang", "90", "1,1"]);
+        let (_, d, _) = lines(&state)[0].infinite_line().unwrap();
+        assert!(near(d, Point::new(0.0, 1.0)));
+        let state = run(draw_xline, &["bisect", "0,0", "10,0", "0,10"]);
+        assert_eq!(lines(&state).len(), 1);
     }
 
     #[test]
