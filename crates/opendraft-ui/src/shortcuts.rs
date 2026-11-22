@@ -36,6 +36,15 @@ fn parse_key(name: &str) -> Option<Key> {
         .find_map(|candidate| Key::from_name(candidate))
 }
 
+/// Whether `shortcut` was pressed this frame, and if so take the key press.
+/// A shortcut on `Plus` also answers to `Equals`, the same key without Shift
+/// on many keyboards (US, and the French one, where `+` is Shift+`=`), as
+/// browsers do for Ctrl+Plus.
+pub fn consume_shortcut(input: &mut egui::InputState, shortcut: &KeyboardShortcut) -> bool {
+    input.consume_shortcut(shortcut)
+        || (shortcut.logical_key == Key::Plus && input.consume_key(shortcut.modifiers, Key::Equals))
+}
+
 /// Number of modifier keys in a shortcut. Check shortcuts with more modifiers
 /// first so `Ctrl+Shift+Z` is not swallowed by `Ctrl+Z`.
 pub fn modifier_count(shortcut: &KeyboardShortcut) -> usize {
@@ -64,6 +73,56 @@ mod tests {
         assert_eq!(s.logical_key, Key::Delete);
         assert_eq!(s.modifiers, Modifiers::NONE);
         assert!(parse_shortcut("ctrl+n").is_some());
+    }
+
+    #[test]
+    fn parses_plus_and_minus_by_name() {
+        assert_eq!(parse_shortcut("Ctrl+Plus").unwrap().logical_key, Key::Plus);
+        assert_eq!(
+            parse_shortcut("Ctrl+Minus").unwrap().logical_key,
+            Key::Minus
+        );
+    }
+
+    fn pressed(key: Key, modifiers: Modifiers) -> egui::InputState {
+        let event = egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        };
+        let raw = egui::RawInput {
+            events: vec![event],
+            modifiers,
+            ..Default::default()
+        };
+        egui::InputState::default().begin_pass(raw, false, 1.0, &egui::Options::default())
+    }
+
+    #[test]
+    fn ctrl_plus_also_answers_to_ctrl_equals_and_ctrl_shift() {
+        let zoom_in = parse_shortcut("Ctrl+Plus").unwrap();
+        let ctrl_shift = Modifiers::COMMAND | Modifiers::SHIFT;
+        for (key, modifiers) in [
+            (Key::Plus, Modifiers::COMMAND),
+            (Key::Equals, Modifiers::COMMAND),
+            (Key::Plus, ctrl_shift),
+        ] {
+            assert!(
+                consume_shortcut(&mut pressed(key, modifiers), &zoom_in),
+                "{key:?}"
+            );
+        }
+        assert!(!consume_shortcut(
+            &mut pressed(Key::Equals, Modifiers::NONE),
+            &zoom_in
+        ));
+        let zoom_out = parse_shortcut("Ctrl+Minus").unwrap();
+        assert!(!consume_shortcut(
+            &mut pressed(Key::Equals, Modifiers::COMMAND),
+            &zoom_out
+        ));
     }
 
     #[test]
