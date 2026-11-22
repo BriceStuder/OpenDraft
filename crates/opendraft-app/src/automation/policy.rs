@@ -65,6 +65,7 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("draw.circle_2p", InteractiveInApp, Mutation),
     ("draw.circle_3p", InteractiveInApp, Mutation),
     ("draw.circle_ttr", InteractiveInApp, Mutation),
+    ("draw.circle_3t", InteractiveInApp, Mutation),
     ("draw.arc_sce", InteractiveInApp, Mutation),
     ("draw.circle", InteractiveInApp, Mutation),
     ("draw.arc", InteractiveInApp, Mutation),

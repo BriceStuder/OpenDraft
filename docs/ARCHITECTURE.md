@@ -924,7 +924,11 @@ centre or on an edge, for POLYGON), `array` (where array items go:
 - **Building shapes from the command's options** is pure geometry in
   `opendraft-core`, tested there: `arc_make` (an arc from start, centre, end, included
   angle, chord, radius or direction), `tangent` (the circle tangent to two
-  objects with a radius) and `rect` (a rectangle at an angle with rounded or
+  objects with a radius), `tangent_three` (the circle tangent to three lines,
+  circles or arcs, for the ribbon's Circle Tan, Tan, Tan: Apollonius' problem
+  solved exactly for each choice of sides, in coordinates scaled to the picks
+  so it holds far from the origin; of up to eight circles, the one touching
+  nearest the picks, never a picked circle itself) and `rect` (a rectangle at an angle with rounded or
   bevelled corners and a width, as a plain `Rectangle` when it can be).
 - **Results are lists of entities.** A trim, split or join returns the
   entities that replace the old one; the first keeps the object's id and draw
