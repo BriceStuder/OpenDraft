@@ -143,9 +143,12 @@ pub fn plot_sheet(document: &Document, space: PlotSpace) -> Result<PlotSheet, Pl
 pub fn plot_layout(document: &Document, layout: LayoutId) -> Result<PlotSheet, PlotError> {
     let layout = document.layout(layout).ok_or(PlotError::NoLayout)?;
     validate_plot(&layout.plot).map_err(PlotError::Invalid)?;
+    // The sheet's objects lie on the page as it is read; the page setup turns
+    // them onto the paper.
+    let (width, height) = layout.page_size();
     let mut sheet = PlotSheet {
-        width: layout.width,
-        height: layout.height,
+        width,
+        height,
         paths: Vec::new(),
         fills: Vec::new(),
         notes: Vec::new(),

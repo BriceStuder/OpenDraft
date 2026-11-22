@@ -6,7 +6,7 @@
 //! object: a viewport only maps coordinates (`model_to_paper`, `paper_to_model`).
 //! Views are plan views, so the mapping is a uniform scale and an offset.
 
-use crate::{Bounds, LayerId, PlotSettings, Point};
+use crate::{Bounds, LayerId, PlotRotation, PlotSettings, Point};
 
 /// Permanent identity of a layout. Never reused within a drawing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -267,8 +267,37 @@ impl Layout {
         self.viewports.iter().find(|v| v.id == id)
     }
 
+    /// The sheet as it is read: `width` by `height` is the paper as it feeds
+    /// the printer, so a plot turned a quarter on it (how AutoCAD keeps a
+    /// landscape A4) reads the other way round. The sheet's objects and
+    /// viewports lie on this page.
+    pub fn page_size(&self) -> (f64, f64) {
+        let (width, height, _) = crate::plot::page_as_read(
+            self.width,
+            self.height,
+            self.plot.margins_mm,
+            self.plot.rotation,
+        );
+        (width, height)
+    }
+
+    /// The lower-left corner of the printable area on the upright sheet,
+    /// where the plot puts it: the paper's margins (left, bottom, right, top)
+    /// turned with the plot. A DXF keeps the sheet's objects from this corner.
+    pub fn printable_corner(&self) -> Point {
+        let [left, bottom, right, top] = self.plot.margins_mm;
+        let (x, y) = match self.plot.rotation {
+            PlotRotation::Degrees0 => (left, bottom),
+            PlotRotation::CounterClockwise90 => (bottom, right),
+            PlotRotation::Degrees180 => (right, top),
+            PlotRotation::Clockwise90 => (top, left),
+        };
+        Point::new(x, y)
+    }
+
     pub fn sheet_bounds(&self) -> Bounds {
-        Bounds::from_points(Point::new(0.0, 0.0), Point::new(self.width, self.height))
+        let (width, height) = self.page_size();
+        Bounds::from_points(Point::new(0.0, 0.0), Point::new(width, height))
     }
 
     /// The top viewport that is on and holds the sheet point.
@@ -319,6 +348,34 @@ fn set_in(list: &mut Vec<LayerId>, layers: &[LayerId], freeze: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_plot_turned_a_quarter_turns_the_sheet_as_it_is_read() {
+        // AutoCAD's landscape A4: portrait paper, plot turned a quarter.
+        let mut plot = PlotSettings::for_layout(210.0, 297.0);
+        plot.margins_mm = [4.0, 5.0, 6.0, 7.0];
+        plot.rotation = crate::PlotRotation::CounterClockwise90;
+        let mut layout = Layout {
+            id: LayoutId(1),
+            name: "A4".into(),
+            width: 210.0,
+            height: 297.0,
+            plot,
+            viewports: Vec::new(),
+            paper_frozen: Vec::new(),
+        };
+        assert_eq!(layout.page_size(), (297.0, 210.0));
+        assert_eq!(layout.sheet_bounds().max, Point::new(297.0, 210.0));
+        assert_eq!(layout.printable_corner(), Point::new(5.0, 6.0));
+        layout.plot.rotation = crate::PlotRotation::Clockwise90;
+        assert_eq!(layout.page_size(), (297.0, 210.0));
+        assert_eq!(layout.printable_corner(), Point::new(7.0, 4.0));
+        layout.plot.rotation = crate::PlotRotation::Degrees180;
+        assert_eq!(layout.page_size(), (210.0, 297.0));
+        assert_eq!(layout.printable_corner(), Point::new(6.0, 7.0));
+        layout.plot.rotation = crate::PlotRotation::Degrees0;
+        assert_eq!(layout.printable_corner(), Point::new(4.0, 5.0));
+    }
 
     fn viewport() -> Viewport {
         Viewport {
