@@ -7,7 +7,7 @@ use opendraft_commands::{Kind, SysVar, Value};
 use opendraft_core::hatch::{
     builtin, HatchEntity, HatchFill, HatchLoop, HatchPattern, HatchStyle, PatternType,
 };
-use opendraft_core::Point;
+use opendraft_core::{Ccs, Point};
 
 use crate::state::AppState;
 
@@ -24,12 +24,14 @@ pub enum FillChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Memory {
     pub fill: FillChoice,
-    /// Radians.
+    /// Radians, from the X axis of the coordinate system in force (as
+    /// AutoCAD's `HPANG`).
     pub angle: f64,
     pub scale: f64,
     pub spacing: f64,
     pub double: bool,
     pub style: HatchStyle,
+    /// In the coordinate system in force (as AutoCAD's `HPORIGIN`).
     pub origin: Point,
     /// Whether a new hatch follows its boundary objects (`HPASSOCIATIVE`).
     pub associative: bool,
@@ -76,12 +78,14 @@ impl Memory {
     }
 
     /// A hatch of `loops` in the remembered style, fill, angle, scale and
-    /// origin, or why there is none.
-    pub fn hatch(&self, loops: Vec<HatchLoop>) -> Result<HatchEntity, String> {
+    /// origin, or why there is none. The angle and origin are read in `ccs`,
+    /// the coordinate system in force.
+    pub fn hatch(&self, loops: Vec<HatchLoop>, ccs: Ccs) -> Result<HatchEntity, String> {
+        let (angle, origin) = (ccs.angle_to_world(self.angle), ccs.to_world(self.origin));
         let fill = match &self.fill {
             FillChoice::Solid => HatchFill::Solid,
             FillChoice::UserDefined => HatchFill::Pattern(
-                HatchPattern::user_defined(self.spacing, self.angle, self.double, self.origin)
+                HatchPattern::user_defined(self.spacing, angle, self.double, origin)
                     .map_err(|e| e.to_string())?,
             ),
             FillChoice::Named(name) => {
@@ -93,8 +97,8 @@ impl Memory {
                         def,
                         PatternType::Predefined,
                         self.scale,
-                        self.angle,
-                        self.origin,
+                        angle,
+                        origin,
                     )
                     .map_err(|e| e.to_string())?,
                 )
@@ -339,7 +343,7 @@ mod tests {
             style: HatchStyle::Outer,
             ..Memory::default()
         };
-        let h = m.hatch(Vec::new()).unwrap();
+        let h = m.hatch(Vec::new(), Ccs::WORLD).unwrap();
         assert_eq!(h.style, HatchStyle::Outer);
         let HatchFill::Pattern(p) = &h.fill else {
             panic!("pattern");
@@ -347,8 +351,11 @@ mod tests {
         // The same numbers AutoCAD stored for ANSI31 at scale 10 and 45 degrees.
         assert!((p.lines[0].offset[0] + 1.25).abs() < 1e-12);
         m.fill = FillChoice::Solid;
-        assert_eq!(m.hatch(Vec::new()).unwrap().fill, HatchFill::Solid);
+        assert_eq!(
+            m.hatch(Vec::new(), Ccs::WORLD).unwrap().fill,
+            HatchFill::Solid
+        );
         m.fill = FillChoice::Named("NOSUCH".into());
-        assert!(m.hatch(Vec::new()).is_err());
+        assert!(m.hatch(Vec::new(), Ccs::WORLD).is_err());
     }
 }

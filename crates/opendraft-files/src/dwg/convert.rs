@@ -314,6 +314,11 @@ pub(super) fn to_document(
     let mut document = Document::default();
     document.begin_bulk_load();
     document.set_units(units(&drawing.header));
+    // The Model tab's coordinate system; a 3D or mirrored UCS stays World.
+    let [origin, x, y] = drawing.header.model_ucs;
+    if let Some(ccs) = opendraft_core::Ccs::from_axes(origin, x, y) {
+        document.set_ccs_of(opendraft_core::CcsSpace::Model, ccs);
+    }
     let mut notes = Notes::default();
     let mut ids: HashMap<DwgHandle, LayerId> = HashMap::new();
     let mut taken: HashSet<String> = HashSet::new();

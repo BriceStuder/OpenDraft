@@ -3,11 +3,11 @@
 //! are tested without a running command.
 
 use opendraft_commands::{Prompt as Ask, Reply, Wants};
-use opendraft_core::units::{parse_angle, parse_length};
-use opendraft_core::{Point, Units};
+use opendraft_core::units::parse_length;
+use opendraft_core::{Ccs, Point};
 
 use crate::cmdline::parse_number;
-use crate::coordinates::{parse_point_with_mode, CoordinateMode};
+use crate::coordinates::{parse_point_with_mode, CoordinateMode, Reading};
 
 /// Whether the prompt is answered by clicking a point (so snaps apply).
 pub(crate) fn takes_clicked_points(ask: &Ask) -> bool {
@@ -19,12 +19,17 @@ pub(crate) fn takes_clicked_points(ask: &Ask) -> bool {
 }
 
 /// The reply a placed point gives: itself, or its distance or direction from
-/// the prompt's base point.
-pub(crate) fn reply_for_point(wants: Wants, base: Option<Point>, at: Point) -> Option<Reply> {
-    match (wants, base) {
+/// the prompt's base point. An amount to turn by is measured from the X axis
+/// of the coordinate system `ccs`.
+pub(crate) fn reply_for_point(ask: &Ask, ccs: Ccs, at: Point) -> Option<Reply> {
+    match (ask.wants, ask.base) {
         (Wants::Point | Wants::AngleOrPoint | Wants::DistanceOrPoint, _) => Some(Reply::Point(at)),
         (Wants::Distance, Some(b)) => Some(Reply::Number((at.x - b.x).hypot(at.y - b.y))),
-        (Wants::Angle, Some(b)) => Some(Reply::Number((at.y - b.y).atan2(at.x - b.x))),
+        (Wants::Angle, Some(b)) => {
+            let direction = (at.y - b.y).atan2(at.x - b.x);
+            let turn = if ask.turn { ccs.angle } else { 0.0 };
+            Some(Reply::Number(direction - turn))
+        }
         _ => None,
     }
 }
@@ -38,7 +43,7 @@ pub(crate) fn typed_reply(
     text: &str,
     origin: Point,
     cursor: Option<Point>,
-    units: &Units,
+    reading: impl Into<Reading>,
 ) -> Option<Result<Reply, &'static str>> {
     typed_reply_with_mode(
         ask,
@@ -46,7 +51,7 @@ pub(crate) fn typed_reply(
         origin,
         cursor,
         CoordinateMode::CommandLine,
-        units,
+        reading,
     )
 }
 
@@ -56,12 +61,20 @@ pub(crate) fn typed_reply_with_mode(
     origin: Point,
     cursor: Option<Point>,
     mode: CoordinateMode,
-    units: &Units,
+    reading: impl Into<Reading>,
 ) -> Option<Result<Reply, &'static str>> {
+    let reading = reading.into();
     let text = text.trim();
     let length = parse_length(text);
-    let point = parse_point_with_mode(text, origin, mode, units);
-    let by_point = |p: Point| reply_for_point(ask.wants, ask.base, p).map(Ok);
+    let point = parse_point_with_mode(text, origin, mode, reading);
+    let by_point = |p: Point| reply_for_point(ask, reading.ccs, p).map(Ok);
+    let angle = |text: &str| {
+        if ask.turn {
+            reading.turn(text)
+        } else {
+            reading.direction(text)
+        }
+    };
     let answer = match ask.wants {
         Wants::Point => match (point, length, ask.base) {
             (Some(p), _, _) => Some(Ok(Reply::Point(p))),
@@ -89,12 +102,12 @@ pub(crate) fn typed_reply_with_mode(
             (None, Some(p)) => by_point(p),
             _ => None,
         },
-        Wants::Angle => match (parse_angle(units, text), point) {
+        Wants::Angle => match (angle(text), point) {
             (Some(angle), _) => Some(Ok(Reply::Number(angle))),
             (None, Some(p)) => by_point(p),
             _ => None,
         },
-        Wants::AngleOrPoint => match (parse_angle(units, text), point) {
+        Wants::AngleOrPoint => match (angle(text), point) {
             (Some(angle), _) => Some(Ok(Reply::Number(angle))),
             (None, Some(p)) => Some(Ok(Reply::Point(p))),
             _ => None,

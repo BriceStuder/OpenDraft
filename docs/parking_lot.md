@@ -166,6 +166,8 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
 - **In AutoCAD** (open, `AUDIT`, edit, save): the Model-tab freeze's XDATA on LAYER records (it should survive a save), everything the DXF writer emits for dimensions, multileaders, legacy leaders and block attributes, ByBlock, and the R2000 layout export; the DWG reader's object counts against an AutoCAD listing; the ellipse angle convention and the spline prompts; MTEXT tracking at the end of a line; the rectangular array's default spacing; the multileader style's angle constraints and attachment codes.
+- **Custom coordinate systems in files:** an ordinate dimension made in a turned system has not been checked against one AutoCAD made (only the sign of group 51 against ezdxf); a DXF with a turned UCS has not been opened in AutoCAD (ezdxf reads ours cleanly), and no DWG with a turned UCS has been read: every local sample has the World UCS, so the decoded values are proven only to keep the header aligned. The paper space `$PUCS*` variables are not written (AutoCAD's defaults are World).
+- **By hand in the real app, the custom coordinate system:** tried 22-11-2026: Rotate, Object (on a line) and View in the Model tab; the turned grid, axes, icon and crosshair; grid snap to the turned grid; ortho holding a line along the turned X axis, with the dynamic input fields; LINE with typed relative points; the refusal on a layout's sheet; a viewport's own system (entered with MSPACE, turned 45 degrees while the Model tab's stayed at 30). Not yet tried: polar and object snap tracking, ROTATE and grip rotate, and the commands that orient what they make (TEXT, RECTANG, DIMLINEAR, DIMORDINATE, ARRAYRECT, HATCH, MLEADER), which are covered by tests only.
 - **By hand in the real app** (tests drive the commands through `AppState` only): DIMEDIT and DIMTEDIT, TEXTEDIT and TEXT typed in place, DIST and AREA, Overkill and Purge, ByBlock, the attribute editor's double-click and the ATTDEF dialog, the warning before a large file opens, the window and lasso selection style, snapping to a polyline while drawing it, the Ortho pointer test, the Paragraph dialog (nobody has seen it), DIVIDE, MEASURE, grips, TRIM and BREAK on points and construction lines, and whether the Settings dialog's Files and Automation pages fit its height without scrolling.
 - **On real machines:** Linux desktops beyond Mint (and on Mint: the Home page's templates and file actions, the assistant's key in the Secret Service, the crash log); the Windows exe on a machine with no Visual C++ Redistributable; the MSI's shortcut and file association opening with no console window; physical printers, and CUPS versions other than the one tried; the update check against the real GitHub.
 - **With a real model:** the assistant with Mistral on a real drawing, including its warning before it generates shapes (it needs your API key, and sends drawing data to the service).
@@ -192,6 +194,19 @@ Suggested order:
 2. Later: MVIEW Polygonal and Object options, and grips to drag the outline's vertices (fiddly, least needed).
 
 Not included: a clipped viewport inside a nested viewport.
+
+## Plan: custom coordinate system and view rotation
+
+AutoCAD's UCS under our own name: the **custom coordinate system** (`CCS`, alias `UCS`). Decided with James on 22-11-2026: the Model tab and each layout viewport have their own, never affecting each other; a layout's sheet has none; named systems are shared; every change is an undo step and is saved in the drawing; the automation API stays in world coordinates. What is built is in `docs/ARCHITECTURE.md`, "Custom coordinate system".
+
+Pull request 1 (the system) is built. Left out of it:
+
+- **DWG**: the UCS table (named systems, object type 0x3F) and viewports' own systems are not decoded; only the header's model-space UCS is (and DWG skips layouts anyway). DXF does all three.
+- Polyline and rectangle Object rule: ours takes the segment nearest the pick; AutoCAD takes a polyline's first segment. Kept on purpose; say so if users expect AutoCAD's.
+
+Pull request 2, view rotation: the camera turns (painting, picking, caches, layout viewport twist, plotting); a command to rotate the view and a gesture (not chosen yet); PLAN; View then lines up with a turned view (today it takes the corner of an unturned view).
+
+Later: `UCSICON` settings (the icon cannot be switched off or moved to the origin), a manager dialog (`UCSMAN`), dragging the icon by its grips, the dimension arcs of the dynamic input drawn along a turned system's axes (the Cartesian legs are still screen-aligned), the systems through MCP, the legacy LEADER's text (it is level with the world).
 
 ## Plan: hatch gradients
 

@@ -292,9 +292,11 @@ impl OpenDraftApp {
             egui::Layout::right_to_left(egui::Align::Center),
             |ui| {
                 ui.set_min_width(READOUT_WIDTH);
+                // In the coordinate system in force, as AutoCAD shows it.
                 let text = match self.state.cursor {
                     Some(p) => {
-                        let units = self.state.units();
+                        let reading = self.state.reading();
+                        let (units, p) = (reading.units, reading.ccs.from_world(p));
                         format!(
                             "X: {}   Y: {}",
                             format_length(&units, p.x),

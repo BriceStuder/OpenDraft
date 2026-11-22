@@ -3,11 +3,11 @@ use eframe::egui;
 use std::collections::BTreeMap;
 
 use opendraft_commands::{DynamicDimensions, Prompt, Wants};
-use opendraft_core::units::{format_angle, format_length, format_point, parse_angle, parse_length};
+use opendraft_core::units::{format_angle, format_length, parse_angle, parse_length};
 use opendraft_core::{AngleFormat, Point, Units};
 
 use crate::cmdline::parse_number;
-use crate::coordinates::{parse_point_with_mode, CoordinateMode};
+use crate::coordinates::{parse_point_with_mode, CoordinateMode, Reading};
 use crate::dynamic_settings::DynamicInputSettings;
 
 pub mod dimensions;
@@ -28,13 +28,42 @@ pub enum Field {
 
 /// What was typed into `field`, as the number the field holds: a length in
 /// drawing units, an angle in degrees counted from the base angle, or a plain
-/// number.
-pub fn parse_field(field: Field, text: &str, units: &Units) -> Option<f64> {
+/// number. The coordinate system plays no part: a field holds what is shown.
+pub fn parse_field(field: Field, text: &str, reading: impl Into<Reading>) -> Option<f64> {
+    let units = &reading.into().units;
     match field {
         Field::Angle => parse_angle(units, text).map(|a| units.to_display_angle(a).to_degrees()),
         Field::Number => parse_number(text),
         _ => parse_length(text),
     }
+}
+
+/// The number an angle field holds for the world direction `direction`:
+/// degrees measured in the coordinate system, from the base angle, or for an
+/// amount to turn by (`turn`), from the system's X axis.
+fn angle_field(direction: f64, turn: bool, reading: Reading) -> f64 {
+    let units = &reading.units;
+    let local = reading.ccs.angle_from_world(direction);
+    let from = if turn {
+        units.from_display_angle(0.0)
+    } else {
+        0.0
+    };
+    units.to_display_angle(local + from).to_degrees()
+}
+
+/// The world direction of an angle field holding `degrees` (see
+/// [`angle_field`]).
+fn field_direction(degrees: f64, turn: bool, reading: Reading) -> f64 {
+    let units = &reading.units;
+    let from = if turn {
+        units.from_display_angle(0.0)
+    } else {
+        0.0
+    };
+    reading
+        .ccs
+        .angle_to_world(units.from_display_angle(degrees.to_radians()) - from)
 }
 
 /// A field's number written the way the drawing's units write it.
@@ -142,8 +171,9 @@ impl DynamicInputState {
         &mut self,
         fields: &[Field],
         reverse: bool,
-        units: &Units,
+        reading: impl Into<Reading>,
     ) -> Result<(), &'static str> {
+        let reading = reading.into();
         if fields.is_empty() {
             return Ok(());
         }
@@ -152,7 +182,7 @@ impl DynamicInputState {
             return Ok(());
         }
         if !self.draft.trim().is_empty() {
-            let value = parse_field(current, &self.draft, units)
+            let value = parse_field(current, &self.draft, reading)
                 .ok_or("Enter a finite numeric value before locking this field.")?;
             self.locks.insert(current, value);
         }
@@ -172,10 +202,11 @@ impl DynamicInputState {
         field: Field,
         ask: &Prompt,
         settings: &DynamicInputSettings,
-        units: &Units,
+        reading: impl Into<Reading>,
     ) -> Option<f64> {
+        let reading = reading.into();
         if self.active == Some(field) && !self.draft.is_empty() {
-            if let Some(value) = parse_field(field, &self.draft, units) {
+            if let Some(value) = parse_field(field, &self.draft, reading) {
                 return Some(value);
             }
         }
@@ -185,16 +216,22 @@ impl DynamicInputState {
         let cursor = self.cursor?;
         let base = ask.base.unwrap_or(Point::new(0.0, 0.0));
         let relative = ask.base.is_some() && !settings.pointer_absolute;
+        // X and Y are the cursor's coordinates in the system, or its offset
+        // from the base measured along the system's axes.
+        let ccs = reading.ccs;
+        let shown = if relative {
+            ccs.vector_from_world(Point::new(cursor.x - base.x, cursor.y - base.y))
+        } else {
+            ccs.from_world(cursor)
+        };
         match field {
-            Field::X => Some(cursor.x - if relative { base.x } else { 0.0 }),
-            Field::Y => Some(cursor.y - if relative { base.y } else { 0.0 }),
+            Field::X => Some(shown.x),
+            Field::Y => Some(shown.y),
             Field::Distance => Some((cursor.x - base.x).hypot(cursor.y - base.y)),
             Field::Angle => {
                 // Half a turn either way, so 270 reads as -90.
-                let degrees = units
-                    .to_display_angle((cursor.y - base.y).atan2(cursor.x - base.x))
-                    .to_degrees()
-                    .rem_euclid(360.0);
+                let direction = (cursor.y - base.y).atan2(cursor.x - base.x);
+                let degrees = angle_field(direction, ask.turn, reading).rem_euclid(360.0);
                 Some(if degrees > 180.0 {
                     degrees - 360.0
                 } else {
@@ -211,14 +248,15 @@ impl DynamicInputState {
         field: Field,
         ask: &Prompt,
         settings: &DynamicInputSettings,
-        units: &Units,
+        reading: impl Into<Reading>,
     ) -> String {
-        self.value(field, ask, settings, units)
-            .map(|v| field_text(field, v, units))
+        let reading = reading.into();
+        self.value(field, ask, settings, reading)
+            .map(|v| field_text(field, v, &reading.units))
             .or_else(|| {
                 self.locked_coordinate
                     .filter(|_| field == Field::Coordinate)
-                    .map(|p| format_point(units, p))
+                    .map(|p| reading.show_point(p))
             })
             .unwrap_or_default()
     }
@@ -227,8 +265,9 @@ impl DynamicInputState {
         &self,
         ask: &Prompt,
         settings: &DynamicInputSettings,
-        units: &Units,
+        reading: impl Into<Reading>,
     ) -> Option<Point> {
+        let reading = reading.into();
         if self.draft.is_empty() && self.locked_coordinate.is_some() {
             return self.locked_coordinate;
         }
@@ -244,30 +283,31 @@ impl DynamicInputState {
                 CoordinateMode::DynamicPointer {
                     default_relative: ask.base.is_some() && !settings.pointer_absolute,
                 },
-                units,
+                reading,
             );
         }
-        if !self.draft.is_empty() && parse_field(active, &self.draft, units).is_none() {
+        if !self.draft.is_empty() && parse_field(active, &self.draft, reading).is_none() {
             return None;
         }
         let point = match active {
             Field::X | Field::Y => {
-                let origin = if ask.base.is_some() && !settings.pointer_absolute {
-                    ask.base?
+                let shown = Point::new(
+                    self.value(Field::X, ask, settings, reading)?,
+                    self.value(Field::Y, ask, settings, reading)?,
+                );
+                if ask.base.is_some() && !settings.pointer_absolute {
+                    let base = ask.base?;
+                    let v = reading.ccs.vector_to_world(shown);
+                    Point::new(base.x + v.x, base.y + v.y)
                 } else {
-                    Point::new(0.0, 0.0)
-                };
-                Point::new(
-                    origin.x + self.value(Field::X, ask, settings, units)?,
-                    origin.y + self.value(Field::Y, ask, settings, units)?,
-                )
+                    reading.ccs.to_world(shown)
+                }
             }
             Field::Distance | Field::Angle => {
                 let base = ask.base?;
-                let distance = self.value(Field::Distance, ask, settings, units)?;
-                let angle = units.from_display_angle(
-                    self.value(Field::Angle, ask, settings, units)?.to_radians(),
-                );
+                let distance = self.value(Field::Distance, ask, settings, reading)?;
+                let degrees = self.value(Field::Angle, ask, settings, reading)?;
+                let angle = field_direction(degrees, false, reading);
                 if distance != 0.0
                     && self.cursor == Some(base)
                     && !self.locks.contains_key(&Field::Angle)
@@ -289,8 +329,15 @@ impl DynamicInputState {
         &self,
         ask: &Prompt,
         settings: &DynamicInputSettings,
-        units: &Units,
+        reading: impl Into<Reading>,
     ) -> Result<String, &'static str> {
+        let reading = reading.into();
+        // A point goes back as its coordinates in the system, so it reads the
+        // same way and the command line shows what the fields showed.
+        let point_text = |p: Point| {
+            let p = reading.ccs.from_world(p);
+            format!("#{},{}", p.x, p.y)
+        };
         if ask.wants != Wants::Point && self.draft.is_empty() {
             if let Some(value) = self.active.and_then(|f| self.locks.get(&f)) {
                 // A locked angle is in degrees whatever the drawing's angle format.
@@ -302,7 +349,7 @@ impl DynamicInputState {
             }
         }
         if let Some(point) = self.locked_coordinate.filter(|_| self.draft.is_empty()) {
-            return Ok(format!("#{},{}", point.x, point.y));
+            return Ok(point_text(point));
         }
         if self.draft.is_empty() && self.locks.is_empty() {
             return Ok(String::new());
@@ -313,13 +360,13 @@ impl DynamicInputState {
                 .is_some_and(|f| matches!(f, Field::X | Field::Y | Field::Distance | Field::Angle))
             && (self
                 .active
-                .is_some_and(|f| parse_field(f, &self.draft, units).is_some())
+                .is_some_and(|f| parse_field(f, &self.draft, reading).is_some())
                 || (self.draft.is_empty() && !self.locks.is_empty()))
         {
             let point = self
-                .constrained_point(ask, settings, units)
+                .constrained_point(ask, settings, reading)
                 .ok_or("Move the cursor to set a direction first.")?;
-            return Ok(format!("#{},{}", point.x, point.y));
+            return Ok(point_text(point));
         }
         Ok(self.draft.clone())
     }

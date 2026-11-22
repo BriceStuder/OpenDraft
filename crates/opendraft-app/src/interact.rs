@@ -223,7 +223,10 @@ impl AppState {
             text.push_str(" or");
         }
         if let Some(hint) = &ask.default_hint {
-            text.push_str(&format!(" <{}>", hint_text(&self.units(), ask.wants, hint)));
+            text.push_str(&format!(
+                " <{}>",
+                hint_text(self.reading(), ask.wants, ask.turn, hint)
+            ));
         }
         Some(Prompt {
             command: runner.name().to_uppercase().into(),
@@ -282,8 +285,9 @@ impl AppState {
 
     /// A point placed on the canvas.
     pub fn answer_point(&mut self, at: Point) {
+        let ccs = self.session().document().ccs();
         let Some(ask) = self.waiting() else { return };
-        if let Some(reply) = reply_for_point(ask.wants, ask.base, at) {
+        if let Some(reply) = reply_for_point(ask, ccs, at) {
             if self.once.asking().is_none() {
                 self.docs[self.active].view.set_last_point(at);
             }
@@ -334,7 +338,7 @@ impl AppState {
             .or(ask.base)
             .or(view.last_point())
             .unwrap_or(Point::new(0.0, 0.0));
-        let Some(answer) = typed_reply(&ask, text, origin, self.cursor, &self.units()) else {
+        let Some(answer) = typed_reply(&ask, text, origin, self.cursor, self.reading()) else {
             return false;
         };
         let line = format!(
@@ -395,7 +399,7 @@ impl AppState {
                 origin,
                 self.docs[self.active].dynamic_input.cursor.or(self.cursor),
                 mode,
-                &self.units(),
+                self.reading(),
             )
             .unwrap_or(Err("Invalid input for the current prompt."))
         };
@@ -465,6 +469,7 @@ mod tests {
             sweep: false,
             no_snap: false,
             along: None,
+            turn: false,
             mtext: None,
             mtext_of: None,
             single_line: false,
@@ -540,7 +545,7 @@ mod tests {
         };
         assert!((r - FRAC_PI_2).abs() < 1e-12);
         assert_eq!(
-            reply_for_point(Wants::Angle, base, p(0.0, 5.0)),
+            reply_for_point(&a, opendraft_core::Ccs::WORLD, p(0.0, 5.0)),
             Some(Reply::Number(FRAC_PI_2))
         );
     }

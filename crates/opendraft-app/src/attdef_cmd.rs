@@ -143,9 +143,10 @@ pub fn define_attribute(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     }
     ed.defaults().text.change(|m| m.height = height);
+    let level = ed.read(|doc| doc.ccs().angle)?;
     let rotation = ed.get_angle(
         NumberOptions::new("Specify rotation angle of text")
-            .default(0.0)
+            .default(level)
             .base(at),
     )?;
     let lock_position = modes.lock_position;

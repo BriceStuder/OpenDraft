@@ -44,6 +44,8 @@ pub struct DwgHeader {
     pub paper_space: Option<DwgHandle>,
     /// `HANDSEED`: the next handle AutoCAD would assign.
     pub handle_seed: DwgHandle,
+    /// Model space's current UCS: `UCSORG`, `UCSXDIR` and `UCSYDIR`, in WCS.
+    pub model_ucs: [[f64; 3]; 3],
 }
 
 struct Streams<'a, 'b> {
@@ -99,19 +101,25 @@ impl Streams<'_, '_> {
     }
 
     /// The nine point and view settings that repeat for model and paper space.
-    fn space_settings(&mut self, paper: bool) -> Result<(), DwgError> {
+    /// Returns the space's UCS: its origin and X and Y directions.
+    fn space_settings(&mut self, paper: bool) -> Result<[[f64; 3]; 3], DwgError> {
         if paper {
             self.bds(1)?; // PSVPSCALE
         }
         self.bds(3 * 3)?; // INSBASE, EXTMIN, EXTMAX
         self.data.rd2()?; // LIMMIN
         self.data.rd2()?; // LIMMAX
-        self.bds(1 + 9)?; // ELEVATION, UCSORG, UCSXDIR, UCSYDIR
+        self.bds(1)?; // ELEVATION
+        let mut ucs = [[0.0; 3]; 3]; // UCSORG, UCSXDIR, UCSYDIR
+        for value in ucs.iter_mut().flatten() {
+            *value = self.data.bd()?;
+        }
         self.handles(1)?; // UCSNAME
         self.handles(1)?; // (P)UCSORTHOREF
         self.shorts(1)?; // (P)UCSORTHOVIEW
         self.handles(1)?; // (P)UCSBASE
-        self.bds(6 * 3) // the six orthographic origins
+        self.bds(6 * 3)?; // the six orthographic origins
+        Ok(ucs)
     }
 }
 
@@ -169,7 +177,7 @@ pub(crate) fn parse_header(
     s.handles(3)?; // TEXTSTYLE, CELTYPE, CMATERIAL
     s.handles(2)?; // DIMSTYLE, CMLSTYLE
     s.space_settings(true)?;
-    s.space_settings(false)?;
+    let model_ucs = s.space_settings(false)?;
     s.texts(2)?; // DIMPOST, DIMAPOST
     s.bds(9)?; // DIMSCALE .. DIMTM
     s.bds(2)?; // DIMFXL, DIMJOGANG
@@ -251,5 +259,6 @@ pub(crate) fn parse_header(
         model_space,
         paper_space,
         handle_seed,
+        model_ucs,
     })
 }

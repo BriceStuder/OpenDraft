@@ -190,6 +190,8 @@ fn rect_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
         return Ok(());
     };
     ed.say("Type = Rectangular  Associative = No");
+    // Columns and rows run along the coordinate system's axes.
+    let ccs = ed.read(|doc| doc.ccs())?;
     let (dx, dy) = source.spacing();
     let mut grid = Grid {
         columns: 4,
@@ -210,6 +212,13 @@ fn rect_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
             grid.column_spacing,
             grid.row_spacing,
         )
+        .map(|items| {
+            let along = |p: Placement| Placement {
+                offset: ccs.vector_to_world(p.offset),
+                ..p
+            };
+            items.into_iter().map(along).collect()
+        })
         .unwrap_or_else(|| vec![Placement::STAY]);
         let Some(option) = edit_prompt(ed, &keywords, ghost(&source, &items))? else {
             return make(ed, source, items);
@@ -321,7 +330,9 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
             }
             "Angle between" => {
                 let step = polar_step(items, fill);
-                let options = NumberOptions::new("Specify the angle between items").default(step);
+                let options = NumberOptions::new("Specify the angle between items")
+                    .default(step)
+                    .turn();
                 let step = ed.get_angle(options)?;
                 let span = step * (items.max(2) - 1) as f64;
                 if (step * items as f64 - TAU).abs() < 1e-9 {
@@ -333,8 +344,9 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
                 }
             }
             "Fill angle" => {
-                let options =
-                    NumberOptions::new("Specify the angle to fill (+=ccw, -=cw)").default(fill);
+                let options = NumberOptions::new("Specify the angle to fill (+=ccw, -=cw)")
+                    .default(fill)
+                    .turn();
                 let angle = ed.get_angle(options)?;
                 if angle != 0.0 && angle.abs() <= TAU + 1e-9 {
                     fill = angle;

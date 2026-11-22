@@ -188,11 +188,19 @@ impl SnapPoint {
 
     /// The tooltip: the kind's name, with "Deferred" before it when deferred.
     pub fn label(&self) -> String {
+        self.label_from(0.0)
+    }
+
+    /// [`label`](Self::label), with a path's angle counted from `zero` (the
+    /// X axis of the coordinate system in force).
+    pub fn label_from(&self, zero: f64) -> String {
         if let [Some(first), second] = self.guides {
             let part = |g: &Guide| {
                 let name = g.kind.map_or("Polar", SnapKind::label);
                 let (dx, dy) = (self.point.x - g.origin.x, self.point.y - g.origin.y);
-                let angle = dy.atan2(dx).to_degrees().rem_euclid(360.0);
+                let angle = (dy.atan2(dx) - zero).to_degrees().rem_euclid(360.0);
+                // A whole turn rounds to 0, not 360.
+                let angle = if angle >= 359.5 { 0.0 } else { angle };
                 format!("{name}: {:.4} < {angle:.0}\u{b0}", dx.hypot(dy))
             };
             return match second {
@@ -362,6 +370,8 @@ pub struct Probe<'a> {
     pub cursor: Point,
     pub tolerance: f64,
     pub grid_step: Option<f64>,
+    /// The coordinate system the grid lies in.
+    pub grid_frame: opendraft_core::Ccs,
     pub modes: &'a SnapModes,
     pub from: Option<Point>,
     /// With no `from`: the direction of the line the point places, which
@@ -486,10 +496,12 @@ pub fn snap_all<'a>(
         .grid_step
         .filter(|s| modes.grid && s.is_finite() && *s > 0.0)
     {
-        let point = Point::new(
-            (cursor.x / step).round() * step,
-            (cursor.y / step).round() * step,
-        );
+        let frame = probe.grid_frame;
+        let local = frame.from_world(cursor);
+        let point = frame.to_world(Point::new(
+            (local.x / step).round() * step,
+            (local.y / step).round() * step,
+        ));
         found.push(Ranked {
             snap: SnapPoint::new(point, SnapKind::Grid),
             dist: distance(point, cursor),
@@ -536,6 +548,7 @@ pub fn snap<'a>(
         cursor,
         tolerance,
         grid_step,
+        grid_frame: opendraft_core::Ccs::WORLD,
         modes,
         from: None,
         along: None,

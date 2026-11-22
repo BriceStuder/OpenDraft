@@ -187,6 +187,11 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("view.zoom_previous", ImmediateSafe, Ui),
     ("view.zoom", InteractiveInApp, Ui),
     ("view.zoom_objects", InteractiveInApp, Ui),
+    // The coordinate systems are the user's working frame and part of the
+    // drawing; outside callers work in world coordinates and leave them be.
+    ("view.ccs", Denied, Mutation),
+    ("view.ccs_world", Denied, Mutation),
+    ("view.ccs_previous", Denied, Mutation),
     ("view.grid", ImmediateSafe, Ui),
     ("view.dynamic_input", ImmediateSafe, Ui),
     ("view.snap", ImmediateSafe, Ui),

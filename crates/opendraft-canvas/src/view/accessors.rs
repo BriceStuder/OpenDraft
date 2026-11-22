@@ -85,6 +85,17 @@ impl View {
         self.selecting_objects
     }
 
+    /// The part of the drawing on screen at the last frame (inside the
+    /// viewport being worked through, in a layout); none before the first.
+    pub fn visible_area(&self) -> Option<opendraft_core::Bounds> {
+        let rect = self.snap_cycle.rect?;
+        let area = self.clip.map_or(rect, |c| c.intersect(rect));
+        Some(opendraft_core::Bounds::from_points(
+            self.camera.screen_to_world(area.left_bottom(), rect),
+            self.camera.screen_to_world(area.right_top(), rect),
+        ))
+    }
+
     pub fn last_point(&self) -> Option<Point> {
         self.last_point
     }

@@ -292,6 +292,10 @@ icons! {
     TOOL_SELECT = '\u{e1c2}';
     VIEW_ASSISTANT = '\u{e1ba}';
     VIEW_BASE_INVENTOR = '\u{e0c4}';
+    /// The CCS command (custom coordinate system).
+    VIEW_CCS = '\u{e2fd}';
+    VIEW_CCS_PREVIOUS = '\u{e1f4}';
+    VIEW_CCS_WORLD = '\u{e0eb}';
     VIEW_BASE_MODEL = '\u{e290}';
     VIEW_COMMAND_LINE = '\u{e379}';
     VIEW_GRID = '\u{e0ec}';

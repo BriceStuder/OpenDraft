@@ -40,14 +40,16 @@ pub fn draw_xline(ed: &mut Editor) -> Result<(), Cancelled> {
         .keyword("Bisecting", "B")
         .keyword("Offset", "O")
         .ghost(|_| Vec::new());
+    // Horizontal and vertical are along the coordinate system's axes.
+    let ccs = ed.read(|doc| doc.ccs())?;
     match ed.ask_point(options)? {
         Answer::Value(base) => through(ed, base, xline, NAME),
         Answer::Keyword(k) => match k.as_str() {
-            "Horizontal" => parallel(ed, Point::new(1.0, 0.0)),
-            "Vertical" => parallel(ed, Point::new(0.0, 1.0)),
+            "Horizontal" => parallel(ed, ccs.x_axis()),
+            "Vertical" => parallel(ed, ccs.y_axis()),
             "Angle" => {
-                let angle =
-                    ed.get_angle(NumberOptions::new("Enter angle of xline (0)").default(0.0))?;
+                let options = NumberOptions::new("Enter angle of xline (0)").default(ccs.angle);
+                let angle = ed.get_angle(options)?;
                 parallel(ed, infinite::from_angle(angle))
             }
             "Bisecting" => bisect(ed),

@@ -47,6 +47,9 @@ pub(super) enum DimKindDto {
         feature: PointDto,
         leader_end: PointDto,
         x_datum: bool,
+        /// The coordinate system it measures in (none: the world's).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        frame: Option<super::ccs::CcsDto>,
     },
     Angular {
         vertex: PointDto,
@@ -158,10 +161,12 @@ impl DimensionDto {
                 feature,
                 leader_end,
                 x_datum,
+                frame,
             } => DimKindDto::Ordinate {
                 feature: point(*feature),
                 leader_end: point(*leader_end),
                 x_datum: *x_datum,
+                frame: super::ccs::CcsDto::unless_world(*frame),
             },
             DimKind::Angular {
                 vertex,
@@ -246,10 +251,15 @@ impl DimensionDto {
                 feature,
                 leader_end,
                 x_datum,
+                frame,
             } => DimKind::Ordinate {
                 feature: pt(feature)?,
                 leader_end: pt(leader_end)?,
                 x_datum: *x_datum,
+                frame: match frame {
+                    Some(frame) => frame.read()?,
+                    None => opendraft_core::Ccs::WORLD,
+                },
             },
             DimKindDto::Angular {
                 vertex,

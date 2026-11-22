@@ -602,6 +602,88 @@ an angle is radians counter-clockwise from east. Units only decide the text.
   2D), architectural display of areas (areas stay decimal), and a unit-aware
   grid spacing and Settings suffix (both still say `mm`).
 
+## Custom coordinate system (built: the system, input, drawing aids and the CCS command)
+
+AutoCAD's user coordinate system (UCS) under our own name: the **custom
+coordinate system**, command `CCS` (alias `UCS`), View tab > Coordinates. It is
+an origin and a turn about Z (`opendraft_core::ccs::Ccs`; 2D only, no tilt
+about X or Y). **Objects are always stored in world coordinates**: a system
+only changes how points and angles are typed and shown, and which way is
+"horizontal".
+
+- **Where it lives.** The Model tab has one (`Document::model_ccs`) and each
+  layout viewport its own (`Viewport::ccs`), used while working through it;
+  changing one never changes another. A layout's sheet has none (the world).
+  `Document::ccs()` is the one in force: the document knows the viewport being
+  worked through (`set_active_viewport`, set with the active layout by
+  `Session::set_active_space` every frame). Systems saved by name
+  (`named_ccs`) are shared by every space. Each change is one undo step:
+  `SetCcs` (one space's system; it keeps the old one for Previous, ten per
+  space, in `ccs_previous`, which undo also takes back) and `SetNamedCcs`;
+  both report `Changes::ccs`. Saved in `.odraft` (`model_ccs`, `named_ccs`,
+  each viewport's `ccs`; left out when world; no version bump).
+- **DXF and DWG** keep a system as AutoCAD keeps a UCS: three points, an
+  origin and the X and Y directions. `Ccs::from_axes` accepts only a flat,
+  right-handed one; a 3D or mirrored UCS is read as World and the DXF reader
+  says how many. DXF (`dxf/ccs.rs`, `dxf/read/ucs.rs`), R12 and R2000: the
+  header's `$UCSNAME`, `$UCSORG`, `$UCSXDIR` and `$UCSYDIR` are the Model
+  tab's system, the UCS table holds the saved ones, and each VIEWPORT's
+  groups 110 to 112 its own (with 71, `UCSVP`, set when it is not World;
+  R2000 only, as R12 has no layouts). Checked against a file ezdxf wrote
+  (`tests/fixtures/make_ezdxf_ucs.py`), and ezdxf reads ours strictly with a
+  clean audit. DWG (R2010 and later): the header's model-space `UCSORG`,
+  `UCSXDIR` and `UCSYDIR` only.
+- **Reading and showing values** go through `coordinates::Reading` (the units
+  and the system in force; `AppState::reading()`). Typed coordinates are in the
+  system, and `*` after any `@` or `#` means world (`*10,20`, `@*5<0`). A
+  typed angle is a **direction** (counted from the system's X axis and
+  `ANGBASE`) unless the prompt says it is an **amount to turn by**
+  (`Options::turn`, `Prompt::turn`: ROTATE, grip rotate, included angles,
+  chamfer and array angles, ellipse angles, LENGTHEN), which ignores the base
+  angle and the system and measures a picked point from the system's X axis.
+  Prompt defaults, the status bar readout and the dynamic input fields show
+  values in the system; the dynamic input submits points as `#x,y` in the
+  system so they read back the same. A new place that shows a point uses
+  `Reading::show_point`, not `format_point`.
+- **Drawing aids follow its axes**: ortho (`ortho::axis_of_turned`,
+  `on_axis_turned`), grid snap (`Probe::grid_frame`), polar and object snap
+  tracking paths and their tooltips, the grid, the axes (drawn from the
+  system's origin), and the crosshair. A system other than the world shows an
+  icon in the lower-left corner of the canvas or viewport. With the world
+  system everything is exactly as before (the turned paths are only taken for
+  a non-zero angle).
+- **Commands that orient what they make** use the system: TEXT, -TEXT, MTEXT,
+  INSERT and ATTDEF default to its X axis; RECTANG is square to it (a polyline
+  when turned); XLINE Horizontal, Vertical and Angle; DIMLINEAR's automatic,
+  Horizontal and Vertical directions; ARRAYRECT's rows and columns;
+  DIMORDINATE, which measures from the system's origin along its axes. An
+  ordinate dimension keeps the system it was made in (`DimKind::Ordinate`'s
+  `frame`, World by default): its value and picture are worked out in it,
+  moving or turning the dimension leaves it where it is, `.odraft` keeps it
+  as an optional `frame`, and DXF as the definition point (group 10, the
+  origin) and the horizontal direction (group 51, the negative of the
+  system's turn; ezdxf writes the same sign). The automation API sends the
+  points in world coordinates and not the frame. HATCH and HATCHEDIT keep
+  the remembered pattern angle and origin in the system, as AutoCAD's
+  `HPANG` and `HPORIGIN` (the angle is an amount from its X axis, the
+  origin its coordinates), and a hatch gets them turned into world values
+  (`hatch_memory::Memory::hatch`). MLEADER builds the multileader level with
+  the system (`MLeader::build_turned`: left, right, the landing and the text
+  along its X axis), keeping the points given exactly.
+- **The command** (`ccs_cmd.rs`): two points (origin, then a point on X;
+  Enter keeps the direction), Object (`ccs_align::aligned_to`: a line or
+  segment from its nearer end along it, arcs and circles from the centre,
+  text, inserts and construction lines from their insertion point and
+  rotation, a point keeps the current turn; for polylines and rectangles the
+  segment nearest the pick, where AutoCAD takes the first), View (origin at
+  the bottom-left of the view, from `View::visible_area`), Rotate, Previous,
+  World, Named (Restore, Save, Delete, ?). Enter alone is World. The World and
+  Previous ribbon buttons act at once. Outside callers cannot run any of them
+  (`automation/policy.rs`); the automation API stays in world coordinates.
+- **Not built** (see `docs/parking_lot.md`, "Plan: custom coordinate system"):
+  DWG's UCS table and viewports, turning the view (PLAN), `UCSICON`
+  settings, a manager dialog.
+
 ## Layouts (built, phases 1-3)
 
 A layout is a sheet (millimetres) with viewports that show model space; the design follows AutoCAD's paper space but keeps this project's structures (no slotmap graph, handles or `nalgebra`).

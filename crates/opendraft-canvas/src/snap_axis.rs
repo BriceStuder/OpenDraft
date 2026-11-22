@@ -1,8 +1,9 @@
 //! Ortho applied to the pointer: after snapping, the point is held to the
-//! horizontal or vertical through the prompt's base point.
+//! horizontal or vertical through the prompt's base point (along the axes of
+//! the coordinate system in force).
 
-use opendraft_core::ortho::{axis_of, on_axis};
-use opendraft_core::{Document, Point};
+use opendraft_core::ortho::{axis_of_turned, on_axis_turned};
+use opendraft_core::{Ccs, Document, Point};
 
 use crate::hit::probe;
 use crate::snap::{snap_all, Probe, SnapId, SnapKind, SnapModes, SnapPoint};
@@ -43,6 +44,8 @@ pub(crate) struct Aim<'a> {
     pub track: Option<crate::snap::TrackInput>,
     /// Stand-in objects for what a command has drawn but not yet added.
     pub extra: std::sync::Arc<[opendraft_core::Object]>,
+    /// The coordinate system in force: ortho and the grid follow its axes.
+    pub ccs: Ccs,
 }
 
 impl Aim<'_> {
@@ -53,6 +56,7 @@ impl Aim<'_> {
             cursor: at,
             tolerance: self.radius,
             grid_step: Some(self.step),
+            grid_frame: self.ccs,
             modes: &self.modes,
             from: self.from,
             along: self.along,
@@ -84,14 +88,15 @@ impl Aim<'_> {
             .or_else(|| found.first())
             .copied();
         match self.base {
-            Some(base) => hold(self.ortho, base, at, snapped),
+            Some(base) => hold(self.ortho, base, at, snapped, self.ccs.angle),
             None => (snapped.map_or(at, |s| s.point), snapped),
         }
     }
 }
 
 /// Where the pointer at `cursor`, snapped to `found`, ends up when ortho
-/// holds it to the axis from `base` that the cursor is nearer to. An object
+/// holds it to the axis from `base` that the cursor is nearer to, the axes
+/// turned by `angle` (the coordinate system's). An object
 /// snap wins in the standard lock; in the strict lock its point is projected
 /// onto the axis, and the snap is still reported where it was found. A grid
 /// snap is always held to the axis, and reported there.
@@ -100,16 +105,18 @@ pub(crate) fn hold(
     base: Point,
     cursor: Point,
     found: Option<SnapPoint>,
+    angle: f64,
 ) -> (Point, Option<SnapPoint>) {
-    let axis = axis_of(base, cursor);
+    let axis = axis_of_turned(base, cursor, angle);
+    let on_axis = |p| on_axis_turned(base, p, axis, angle);
     match found {
         Some(s) if s.kind != SnapKind::Grid && !ortho.strict => (s.point, found),
-        Some(s) if s.kind != SnapKind::Grid => (on_axis(base, s.point, axis), found),
+        Some(s) if s.kind != SnapKind::Grid => (on_axis(s.point), found),
         Some(s) => {
-            let point = on_axis(base, s.point, axis);
+            let point = on_axis(s.point);
             (point, Some(SnapPoint { point, ..s }))
         }
-        None => (on_axis(base, cursor, axis), None),
+        None => (on_axis(cursor), None),
     }
 }
 
@@ -137,16 +144,16 @@ mod tests {
     #[test]
     fn standard_lets_an_object_snap_leave_the_axis() {
         let endpoint = at(p(50.0, 8.0), SnapKind::Endpoint);
-        let held = hold(STANDARD, p(0.0, 0.0), p(49.0, 7.0), endpoint);
+        let held = hold(STANDARD, p(0.0, 0.0), p(49.0, 7.0), endpoint, 0.0);
         assert_eq!(held, (p(50.0, 8.0), endpoint));
     }
 
     #[test]
     fn strict_projects_an_object_snap_onto_the_axis_and_keeps_its_marker() {
         let endpoint = at(p(50.0, 8.0), SnapKind::Endpoint);
-        let held = hold(STRICT, p(0.0, 0.0), p(49.0, 7.0), endpoint);
+        let held = hold(STRICT, p(0.0, 0.0), p(49.0, 7.0), endpoint, 0.0);
         assert_eq!(held, (p(50.0, 0.0), endpoint));
-        let upright = hold(STRICT, p(0.0, 0.0), p(3.0, 40.0), endpoint);
+        let upright = hold(STRICT, p(0.0, 0.0), p(3.0, 40.0), endpoint, 0.0);
         assert_eq!(upright.0, p(0.0, 8.0), "the cursor chooses the axis");
     }
 
@@ -155,7 +162,7 @@ mod tests {
         let grid = at(p(50.0, 10.0), SnapKind::Grid);
         let moved = at(p(50.0, 3.0), SnapKind::Grid);
         for ortho in [STANDARD, STRICT] {
-            let held = hold(ortho, p(0.0, 3.0), p(49.0, 9.0), grid);
+            let held = hold(ortho, p(0.0, 3.0), p(49.0, 9.0), grid, 0.0);
             assert_eq!(held, (p(50.0, 3.0), moved));
         }
     }
@@ -163,7 +170,7 @@ mod tests {
     #[test]
     fn with_no_snap_the_cursor_is_held_to_the_axis() {
         for ortho in [STANDARD, STRICT] {
-            let held = hold(ortho, p(0.0, 3.0), p(49.0, 9.0), None);
+            let held = hold(ortho, p(0.0, 3.0), p(49.0, 9.0), None, 0.0);
             assert_eq!(held, (p(49.0, 3.0), None));
         }
     }
@@ -184,7 +191,38 @@ mod tests {
             tracks: Vec::new(),
             track: None,
             extra: Default::default(),
+            ccs: Ccs::WORLD,
         }
+    }
+
+    #[test]
+    fn ortho_and_the_grid_follow_a_turned_system() {
+        let document = Document::default();
+        let mut aim = aimed(&document, None);
+        aim.ccs = Ccs::new(p(0.0, 0.0), std::f64::consts::FRAC_PI_2);
+        aim.base = Some(p(0.0, 0.0));
+        aim.ortho = Ortho {
+            enabled: true,
+            strict: false,
+        };
+        aim.modes.grid = false;
+        let (held, _) = aim.resolve(p(3.0, 40.0));
+        assert!(
+            held.x.abs() < 1e-9 && (held.y - 40.0).abs() < 1e-9,
+            "{held:?}"
+        );
+        let turned = Ccs::new(p(1.0, 0.0), std::f64::consts::FRAC_PI_4);
+        let probe_aim = Aim {
+            ccs: turned,
+            base: None,
+            ..aimed(&document, None)
+        };
+        let mut modes = probe_aim.modes;
+        modes.grid = true;
+        let probe_aim = Aim { modes, ..probe_aim };
+        let (snapped, _) = probe_aim.resolve(turned.to_world(p(9.0, 11.0)));
+        let local = turned.from_world(snapped);
+        assert!((local.x - 10.0).abs() < 1e-9 && (local.y - 10.0).abs() < 1e-9);
     }
 
     fn placed(document: &Document, over: Option<crate::SnapOverride>, at: Point) -> Option<Point> {

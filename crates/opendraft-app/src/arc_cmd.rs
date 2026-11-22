@@ -124,7 +124,7 @@ fn to_centre_angle_direction_radius(
         let arc = match ed.ask_point(options)? {
             Answer::Value(center) => from_center_start_end(center, start, end),
             Answer::Keyword(k) if k == "Angle" => {
-                let angle = ed.get_angle(NumberOptions::new("Specify included angle"))?;
+                let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
                 from_start_end_angle(start, end, angle)
             }
             Answer::Keyword(k) if k == "Direction" => {
@@ -165,7 +165,7 @@ pub(crate) fn to_end_from_centre(
         let arc = match ed.ask_point(options)? {
             Answer::Value(end) => from_center_start_end(center, start, end),
             Answer::Keyword(k) if k == "Angle" => {
-                let angle = ed.get_angle(NumberOptions::new("Specify included angle"))?;
+                let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
                 from_center_start_angle(center, start, angle)
             }
             Answer::Keyword(_) => {

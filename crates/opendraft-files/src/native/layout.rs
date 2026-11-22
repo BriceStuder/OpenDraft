@@ -126,6 +126,9 @@ struct ViewportDto {
     /// Layers frozen in this viewport only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     frozen: Vec<u64>,
+    /// The coordinate system used through this viewport (none: the world's).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ccs: Option<super::ccs::CcsDto>,
 }
 
 impl LayoutDto {
@@ -153,6 +156,7 @@ impl LayoutDto {
                     locked: v.locked,
                     on: v.on,
                     frozen: v.frozen.iter().map(|l| l.0).collect(),
+                    ccs: super::ccs::CcsDto::unless_world(v.ccs),
                 })
                 .collect(),
             paper_frozen: layout.paper_frozen.iter().map(|l| l.0).collect(),
@@ -196,6 +200,10 @@ pub fn into_layouts(dtos: Vec<LayoutDto>) -> Result<Vec<Layout>, FileError> {
                 locked: v.locked,
                 on: v.on,
                 frozen: sorted_layers(&v.frozen),
+                ccs: match v.ccs {
+                    Some(ccs) => ccs.read()?,
+                    None => opendraft_core::Ccs::WORLD,
+                },
             };
             if !viewport.is_valid() {
                 return invalid(format!("viewport {} has no usable size or scale", v.id));

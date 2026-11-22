@@ -121,7 +121,11 @@ pub(super) fn write_tables(
 
     table(out, h, "VIEW", 0);
     out.pair(0, "ENDTAB");
-    table(out, h, "UCS", 0);
+    let owner = table(out, h, "UCS", document.named_ccs().len());
+    for named in document.named_ccs() {
+        record(out, "UCS", owner, "AcDbUCSTableRecord", h.next());
+        crate::dxf::ccs::write_record(out, named, true);
+    }
     out.pair(0, "ENDTAB");
 
     let ours = model_freeze::any(document.layers());

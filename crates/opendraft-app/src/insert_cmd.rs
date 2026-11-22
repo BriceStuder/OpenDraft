@@ -97,7 +97,8 @@ pub fn insert_block(ed: &mut Editor) -> Result<(), Cancelled> {
     let from = block.unit;
     let units = ed.read(move |doc| InsertUnits::ratio(from, doc.units().insert))?;
     let mut scale = (1.0, 1.0);
-    let mut rotation = 0.0;
+    // Level with the coordinate system's X axis unless turned.
+    let mut rotation = ed.read(|doc| doc.ccs().angle)?;
     let at = loop {
         let (shown, s, r) = (block.clone(), (scale.0 * units, scale.1 * units), rotation);
         let options = PointOptions::new("Specify insertion point")

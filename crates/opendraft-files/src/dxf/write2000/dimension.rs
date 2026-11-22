@@ -113,8 +113,9 @@ pub(super) fn entity(
             if *lines { 2 } else { 5 },
             if *lines { *p2 } else { *arc_point },
         ),
-        DimKind::Ordinate { x_datum, .. } => {
-            (6 + if *x_datum { 64 } else { 0 }, Point::new(0.0, 0.0))
+        // The definition point is the origin of the system it measures in.
+        DimKind::Ordinate { x_datum, frame, .. } => {
+            (6 + if *x_datum { 64 } else { 0 }, frame.origin)
         }
         DimKind::ArcLength { .. } => return Err(super::super::write::unexploded()),
     };
@@ -147,6 +148,12 @@ pub(super) fn entity(
     }
     if let Some(angle) = d.text_angle {
         out.pair(53, finite(angle.rem_euclid(TAU).to_degrees())?);
+    }
+    // The horizontal direction: the negative of the system's turn.
+    if let DimKind::Ordinate { frame, .. } = &d.kind {
+        if frame.angle != 0.0 {
+            out.pair(51, finite((-frame.angle).rem_euclid(TAU).to_degrees())?);
+        }
     }
     match &d.kind {
         DimKind::Linear {

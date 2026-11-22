@@ -9,6 +9,8 @@ pub mod block;
 mod breaking;
 pub mod bulge;
 pub mod calc;
+pub mod ccs;
+pub mod ccs_align;
 pub mod closed_pair;
 mod corner;
 mod corner_infinite;
@@ -81,6 +83,7 @@ pub use block::{
     Affine, AttributeDefinition, AttributeDefinitionId, AttributeReference, BlockDef, BlockEntity,
     BlockId, Insert,
 };
+pub use ccs::{Ccs, CcsSpace, NamedCcs};
 pub use corner::{Chamfer, CornerError, Joined};
 pub use corner_infinite::{chamfer_lines, fillet};
 pub use dimension::{Arrow, DimKind, DimStyle, DimText, Dimension};

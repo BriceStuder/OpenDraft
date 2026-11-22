@@ -27,6 +27,8 @@ pub struct Changes {
     pub mleader_styles: bool,
     /// `PDMODE` or `PDSIZE` changed.
     pub point_style: bool,
+    /// A custom coordinate system, or the list saved by name, changed.
+    pub ccs: bool,
 }
 
 impl Changes {
@@ -121,6 +123,13 @@ impl Changes {
         }
     }
 
+    pub fn ccs() -> Self {
+        Self {
+            ccs: true,
+            ..Self::default()
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.added.is_empty()
             && self.removed.is_empty()
@@ -134,6 +143,7 @@ impl Changes {
             && !self.text_styles
             && !self.mleader_styles
             && !self.point_style
+            && !self.ccs
     }
 
     /// The combined report for changes made one after another. An object
@@ -154,6 +164,7 @@ impl Changes {
             all.text_styles |= part.text_styles;
             all.mleader_styles |= part.mleader_styles;
             all.point_style |= part.point_style;
+            all.ccs |= part.ccs;
         }
         let removed: HashSet<EntityId> = all.removed.iter().copied().collect();
         let cancelled: HashSet<EntityId> = all

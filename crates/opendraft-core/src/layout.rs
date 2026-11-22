@@ -69,6 +69,9 @@ pub struct Viewport {
     /// Layers hidden in this viewport only (VPLAYER), kept sorted. Other
     /// viewports and model space still show them.
     pub frozen: Vec<LayerId>,
+    /// The custom coordinate system used while working through this
+    /// viewport; the Model tab and other viewports have their own.
+    pub ccs: crate::ccs::Ccs,
 }
 
 impl Viewport {
@@ -91,6 +94,7 @@ impl Viewport {
             locked: false,
             on: true,
             frozen: Vec::new(),
+            ccs: crate::ccs::Ccs::WORLD,
         };
         if let Some(b) = model {
             vp.view_center = Point::new((b.min.x + b.max.x) / 2.0, (b.min.y + b.max.y) / 2.0);
@@ -388,6 +392,7 @@ mod tests {
             locked: false,
             on: true,
             frozen: Vec::new(),
+            ccs: crate::ccs::Ccs::WORLD,
         }
     }
 

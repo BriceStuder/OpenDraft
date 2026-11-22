@@ -363,9 +363,9 @@ impl View {
                 };
                 if is_active {
                     if grid.visible {
-                        self.paint_grid(&clipped, rect, style, grid);
+                        self.paint_grid(&clipped, rect, style, grid, vp.ccs);
                     }
-                    self.paint_axes(&clipped, rect, style);
+                    self.paint_axes(&clipped, rect, style, vp.ccs);
                     let args = (&clipped, rect, style, document);
                     let slot = Slot::Viewport(vp.id);
                     self.paint_space(slot, args, None, &vp.frozen, selection, hover);
@@ -455,6 +455,7 @@ mod tests {
             locked: false,
             on: true,
             frozen: Vec::new(),
+            ccs: opendraft_core::Ccs::WORLD,
         };
         let rect = Rect::from_min_size(Pos2::new(10.0, 20.0), egui::vec2(900.0, 600.0));
         let camera = view.viewport_camera(&vp);

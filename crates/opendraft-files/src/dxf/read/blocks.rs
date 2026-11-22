@@ -46,6 +46,7 @@ impl Importer {
             ("LAYER", "TABLES", "LAYER") => self.layer_record(record),
             ("LTYPE", "TABLES", "LTYPE") => self.linetype_record(record),
             ("BLOCK_RECORD", "TABLES", "BLOCK_RECORD") => self.blocks.table_record(record),
+            ("UCS", "TABLES", "UCS") => self.ucs_record(record),
             _ => {}
         }
     }

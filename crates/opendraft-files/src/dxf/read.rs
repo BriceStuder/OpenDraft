@@ -30,6 +30,7 @@ mod mleader;
 mod polyline;
 mod spline;
 mod text;
+mod ucs;
 
 /// One group: a code and its value.
 #[derive(Clone)]
@@ -160,6 +161,8 @@ struct Importer {
     text_styles: text::Styles,
     leaders: leader::Leaders,
     dim_styles: dimension::Styles,
+    /// Coordinate systems left out as 3D or mirrored.
+    tilted_ccs: usize,
 }
 
 impl Importer {
@@ -308,6 +311,7 @@ impl Importer {
             warnings.push(format!("Skipped {} damaged objects.", self.damaged));
         }
         warnings.extend(self.blocks.warnings());
+        warnings.extend(super::ccs::warning(self.tilted_ccs));
         warnings
     }
 }
@@ -336,7 +340,8 @@ pub fn read(bytes: &[u8]) -> Result<Loaded, FileError> {
                 }
                 if section == "HEADER" {
                     let groups = record.groups.iter().map(|g| (g.code, g.value.as_str()));
-                    super::header::apply(groups, &mut importer.document);
+                    let tilted = super::header::apply(groups, &mut importer.document);
+                    importer.tilted_ccs += usize::from(tilted);
                 }
             }
             "ENDSEC" => section.clear(),
@@ -344,7 +349,9 @@ pub fn read(bytes: &[u8]) -> Result<Loaded, FileError> {
             "ENDBLK" => block.clear(),
             "TABLE" => table = record.text(2).unwrap_or("").to_owned(),
             "ENDTAB" => table.clear(),
-            "LAYER" | "LTYPE" | "BLOCK_RECORD" => importer.table_record(record, &section, &table),
+            "LAYER" | "LTYPE" | "BLOCK_RECORD" | "UCS" => {
+                importer.table_record(record, &section, &table);
+            }
             _ if section != "ENTITIES"
                 && !(section == "BLOCKS" && spaces.is_sheet_block(&block)) => {}
             "VERTEX" | "SEQEND" => importer.shape(record, &mut open_polyline),

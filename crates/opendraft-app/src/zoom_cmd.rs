@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use opendraft_commands::{Answer, Cancelled, Editor, Options};
+use opendraft_commands::{Answer, Cancelled, Command, Editor, Options};
 use opendraft_core::{Bounds, Entity, Object, Point};
 
 use crate::state::AppState;
@@ -111,6 +111,18 @@ fn start_with(
         }
         Ok(())
     });
+}
+
+/// ZOOM and ZOOM Objects.
+pub fn commands() -> Vec<Command<AppState>> {
+    vec![
+        Command::new("view.zoom", "Zoom", AppState::start_zoom).checked(|s| s.is_running("ZOOM")),
+        Command::new(
+            "view.zoom_objects",
+            "Zoom Objects",
+            AppState::start_zoom_objects,
+        ),
+    ]
 }
 
 impl AppState {

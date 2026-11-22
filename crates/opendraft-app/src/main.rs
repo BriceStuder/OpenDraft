@@ -32,6 +32,9 @@ mod boundary_cmd;
 mod break_cmd;
 mod build_info;
 mod canvas_style;
+mod ccs_cmd;
+#[cfg(test)]
+mod ccs_orient_tests;
 mod circle;
 mod circle_arc_commands;
 mod clipboard;

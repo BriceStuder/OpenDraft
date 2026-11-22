@@ -68,11 +68,10 @@ pub(super) fn write_viewports(
         out.pair(90, flags);
         out.pair(1, "");
         out.pair(281, 0);
-        out.pair(71, 0);
+        // The viewport keeps its own coordinate system (UCSVP) when it has one.
+        out.pair(71, i32::from(!v.ccs.is_world()));
         out.pair(74, 0);
-        out.point3(110, 0.0, 0.0, 0.0);
-        out.point3(111, 1.0, 0.0, 0.0);
-        out.point3(112, 0.0, 1.0, 0.0);
+        crate::dxf::ccs::write_axes(out, 110, v.ccs);
         out.pair(79, 0);
         out.pair(146, 0.0);
         Ok(())
@@ -88,6 +87,7 @@ pub(super) fn write_viewports(
         on: true,
         // AutoCAD keeps the paper space's frozen layers here.
         frozen: layout.paper_frozen.clone(),
+        ccs: opendraft_core::Ccs::WORLD,
     };
     viewport(out, ids.overall[index], &sheet, 1, 1, 557_088)?;
     for (i, v) in layout.viewports.iter().enumerate() {
