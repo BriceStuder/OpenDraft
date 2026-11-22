@@ -28,10 +28,11 @@ impl OpenDraftApp {
             Some(_) => (rows.height(2), rows.height(0)),
             None => (dock::COMMAND_LINE_MIN_HEIGHT, dock::COLLAPSED_HEIGHT),
         };
-        let (space, paper) = (self.state.space(), self.state.settings.layout_paper);
+        let (space, settings) = (self.state.space(), &self.state.settings);
+        let (paper, colour) = (settings.layout_paper, settings.layout_paper_colour);
         let mut viewer = PanelViewer {
             theme: &self.theme,
-            style: canvas_style::canvas_style(&self.theme.colors, space, paper),
+            style: canvas_style::canvas_style(&self.theme.colors, space, paper, colour),
             grid: GridSettings {
                 visible: self.state.settings.show_grid,
                 spacing: self.state.settings.grid_spacing,
@@ -265,8 +266,9 @@ impl PanelViewer<'_> {
             self.layout_tabs(ui);
         }
         // After the layout tabs, which may have changed the space this frame.
-        let (space, paper) = (self.state.space(), self.state.settings.layout_paper);
-        self.style = canvas_style::canvas_style(&self.theme.colors, space, paper);
+        let (space, settings) = (self.state.space(), &self.state.settings);
+        let (paper, colour) = (settings.layout_paper, settings.layout_paper_colour);
+        self.style = canvas_style::canvas_style(&self.theme.colors, space, paper, colour);
         let crosshair = self.state.settings.crosshair();
         let editing = self.state.mtext_editing() && self.state.run_doc == self.state.active;
         let sizes = self.state.settings.pointer_sizes();
