@@ -83,7 +83,8 @@ pub(super) fn write_viewports(
         scale: 1.0,
         locked: false,
         on: true,
-        frozen: Vec::new(),
+        // AutoCAD keeps the paper space's frozen layers here.
+        frozen: layout.paper_frozen.clone(),
     };
     viewport(out, ids.overall[index], &sheet, 1, 1, 557_088)?;
     for (i, v) in layout.viewports.iter().enumerate() {

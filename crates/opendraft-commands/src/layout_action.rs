@@ -120,6 +120,7 @@ mod tests {
                 10.0,
                 None,
             )],
+            paper_frozen: Vec::new(),
         };
         let id: LayoutId = layout.id;
         let mut action = SetLayouts::new("New layout", vec![layout]);

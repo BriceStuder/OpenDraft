@@ -462,6 +462,7 @@ mod tests {
             height: 150.0,
             plot: opendraft_core::PlotSettings::for_layout(200.0, 150.0),
             viewports: Vec::new(),
+            paper_frozen: Vec::new(),
         };
         let detail_id = detail.id;
         doc.set_layouts(vec![plan, detail]);
@@ -860,6 +861,26 @@ mod tests {
                 at: Point::new(4.5, -1.0)
             }));
         assert_eq!(back.point_style(), original.point_style());
+    }
+
+    #[test]
+    fn layers_frozen_in_paper_space_come_back_per_layout() {
+        let mut original = drawing();
+        let walls = original.layers()[1].id;
+        let mut layouts = original.layouts().to_vec();
+        layouts[1].set_paper_frozen(&[walls], true);
+        original.set_layouts(layouts);
+        let back = crate::dxf::read::read(&write(&original).unwrap().bytes)
+            .unwrap()
+            .document;
+        let sheet = |name: &str| back.layouts().iter().find(|l| l.name == name).unwrap();
+        let names = |ids: &[opendraft_core::LayerId]| -> Vec<String> {
+            let name = |id: &opendraft_core::LayerId| back.layer(*id).unwrap().name.clone();
+            ids.iter().map(name).collect()
+        };
+        assert_eq!(names(&sheet("Detail").paper_frozen), ["Walls"]);
+        assert!(sheet("Plan").paper_frozen.is_empty());
+        assert_eq!(names(&sheet("Plan").viewports[0].frozen), ["Walls"]);
     }
 
     #[test]
