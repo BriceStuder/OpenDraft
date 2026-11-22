@@ -342,6 +342,7 @@ mod tests {
             height: 210.0,
             plot: opendraft_core::PlotSettings::for_layout(297.0, 210.0),
             viewports: Vec::new(),
+            paper_frozen: Vec::new(),
         }]);
         for name in ["sheet.pdf", "sheet.SVG"] {
             let path = dir.join(name);

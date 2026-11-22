@@ -1,10 +1,12 @@
 //! Where the VP Freeze switch acts: the viewport being worked on in a layout,
-//! or the Model tab. Freezing in the Model tab is an OpenDraft extension
-//! (AutoCAD has no such switch there): the layer is hidden in the Model tab,
-//! while layout viewports still show it and plot it.
+//! a layout's sheet (its paper space, as in AutoCAD), or the Model tab.
+//! Freezing in the Model tab is an OpenDraft extension (AutoCAD has no such
+//! switch there): the layer is hidden in the Model tab, while layout
+//! viewports still show it and plot it.
 
 use opendraft_canvas::Space;
-use opendraft_core::{Layer, LayerId, Viewport};
+use opendraft_commands::SetLayouts;
+use opendraft_core::{Document, Layer, LayerId, Layout, LayoutId, Viewport};
 
 use crate::state::AppState;
 
@@ -12,82 +14,138 @@ use crate::state::AppState;
 #[derive(Clone, Copy, Debug)]
 pub enum FreezeTarget<'a> {
     Viewport(&'a Viewport),
+    /// A layout's sheet, when no viewport is being worked on.
+    Paper(&'a Layout),
     Model,
 }
 
 impl FreezeTarget<'_> {
     /// The switch as `layer` shows it.
     pub fn switch(self, layer: &Layer) -> VpSwitch {
-        match self {
-            FreezeTarget::Viewport(v) => VpSwitch {
-                frozen: v.is_frozen(layer.id),
-                model: false,
-            },
-            FreezeTarget::Model => VpSwitch {
-                frozen: layer.frozen_in_model,
-                model: true,
-            },
-        }
+        let (frozen, place) = match self {
+            FreezeTarget::Viewport(v) => (v.is_frozen(layer.id), Place::Viewport),
+            FreezeTarget::Paper(l) => (l.is_paper_frozen(layer.id), Place::Paper),
+            FreezeTarget::Model => (layer.frozen_in_model, Place::Model),
+        };
+        VpSwitch { frozen, place }
     }
+}
+
+/// Where a switch acts, for its tooltip.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Place {
+    Viewport,
+    Paper,
+    Model,
 }
 
 /// One layer's VP Freeze switch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VpSwitch {
     pub frozen: bool,
-    /// In the Model tab rather than in a viewport.
-    pub model: bool,
+    pub place: Place,
 }
 
 impl VpSwitch {
     /// Its tooltip, in the Layers panel and the ribbon's layer list.
     pub fn tip(self) -> &'static str {
-        match (self.model, self.frozen) {
-            (false, true) => "Frozen in this viewport: click to thaw",
-            (false, false) => "Click to freeze in this viewport only",
-            (true, true) => "Frozen in the Model tab: click to thaw",
-            (true, false) => "Click to freeze in the Model tab only",
+        match (self.place, self.frozen) {
+            (Place::Viewport, true) => "Frozen in this viewport: click to thaw",
+            (Place::Viewport, false) => "Click to freeze in this viewport only",
+            (Place::Paper, true) => "Frozen in this layout's paper space: click to thaw",
+            (Place::Paper, false) => "Click to freeze in this layout's paper space only",
+            (Place::Model, true) => "Frozen in the Model tab: click to thaw",
+            (Place::Model, false) => "Click to freeze in the Model tab only",
+        }
+    }
+}
+
+/// The layout of `space` (`None`: model space) and the layers frozen there:
+/// the Model tab's, a sheet's paper space's, or a viewport's.
+pub fn active_space(document: &Document, space: Space) -> (Option<LayoutId>, Vec<LayerId>) {
+    match space {
+        Space::Model => (None, document.frozen_in_model()),
+        Space::Paper(l) => {
+            let frozen = document.layout(l).map(|l| l.paper_frozen.clone());
+            (Some(l), frozen.unwrap_or_default())
+        }
+        Space::Viewport(l, v) => {
+            let viewport = document.layout(l).and_then(|layout| layout.viewport(v));
+            (
+                None,
+                viewport.map(|vp| vp.frozen.clone()).unwrap_or_default(),
+            )
         }
     }
 }
 
 impl AppState {
     /// What the VP Freeze switch acts on: the Model tab, the viewport being
-    /// worked on in a layout, or nothing (a sheet with no viewport picked).
+    /// worked on in a layout, or else the layout's sheet.
     pub fn freeze_target(&self) -> Option<FreezeTarget<'_>> {
-        if self.space() == Space::Model {
-            return Some(FreezeTarget::Model);
+        match self.space() {
+            Space::Model => Some(FreezeTarget::Model),
+            Space::Paper(id) if self.target_viewport().is_none() => self
+                .session()
+                .document()
+                .layout(id)
+                .map(FreezeTarget::Paper),
+            _ => self.target_viewport_ref().map(FreezeTarget::Viewport),
         }
-        self.target_viewport_ref().map(FreezeTarget::Viewport)
     }
 
     /// Freeze (`freeze`) or thaw layers where the VP Freeze switch acts, one
     /// undo step.
     pub fn set_layers_in_view(&mut self, layers: &[LayerId], freeze: bool) {
-        if self.space() == Space::Model {
-            self.set_layers_in_model(layers, freeze);
-        } else {
-            self.set_layers_in_viewport(layers, freeze);
+        match self.space() {
+            Space::Model => self.set_layers_in_model(layers, freeze),
+            Space::Paper(id) if self.target_viewport().is_none() => {
+                self.set_layers_in_paper(id, layers, freeze);
+            }
+            _ => self.set_layers_in_viewport(layers, freeze),
         }
     }
 
-    /// Freeze or thaw layers in the Model tab. The current layer is left
-    /// thawed, as Freeze leaves it: what is drawn on it would vanish.
+    /// Freeze or thaw layers in the Model tab.
     fn set_layers_in_model(&mut self, layers: &[LayerId], freeze: bool) {
-        let current = self.session().document().current_layer();
-        if freeze && layers.contains(&current) {
-            self.message = "The current layer cannot be frozen".to_owned();
-        }
-        let layers = layers
-            .iter()
-            .copied()
-            .filter(|&id| !(freeze && id == current));
+        let layers = self.not_current(layers, freeze);
         let name = if freeze {
             "Freeze layer in Model tab"
         } else {
             "Thaw layer in Model tab"
         };
         self.edit_layers(name, layers, |l| l.frozen_in_model = freeze);
+    }
+
+    /// Freeze or thaw layers on a layout's sheet.
+    fn set_layers_in_paper(&mut self, id: LayoutId, layers: &[LayerId], freeze: bool) {
+        let layers = self.not_current(layers, freeze);
+        let mut layouts = self.session().document().layouts().to_vec();
+        let Some(layout) = layouts.iter_mut().find(|l| l.id == id) else {
+            return;
+        };
+        let before = layout.paper_frozen.clone();
+        layout.set_paper_frozen(&layers, freeze);
+        if layout.paper_frozen == before {
+            return;
+        }
+        let name = if freeze {
+            "Freeze layer in paper space"
+        } else {
+            "Thaw layer in paper space"
+        };
+        self.perform(SetLayouts::new(name, layouts));
+    }
+
+    /// `layers`, but not the current one when freezing: it stays thawed, as
+    /// Freeze leaves it, because what is drawn on it would vanish.
+    fn not_current(&mut self, layers: &[LayerId], freeze: bool) -> Vec<LayerId> {
+        let current = self.session().document().current_layer();
+        if freeze && layers.contains(&current) {
+            self.message = "The current layer cannot be frozen".to_owned();
+        }
+        let kept = layers.iter().copied();
+        kept.filter(|&id| !(freeze && id == current)).collect()
     }
 }
 
@@ -98,17 +156,26 @@ mod tests {
     use super::*;
     use crate::layers::LayerEdit;
 
+    fn line() -> Entity {
+        Entity::Line {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(10000.0, 5000.0),
+        }
+    }
+
     /// A line on a new layer, with layer 0 current again.
     fn drawing() -> (AppState, LayerId) {
         let mut state = AppState::new();
         let layer = state.new_layer();
-        state.set_current_layer(layer);
-        state.add_entity(Entity::Line {
-            start: Point::new(0.0, 0.0),
-            end: Point::new(10000.0, 5000.0),
-        });
-        state.set_current_layer(LayerId::DEFAULT);
+        add_on(&mut state, layer);
         (state, layer)
+    }
+
+    /// Add a line on `layer` in the space being edited.
+    fn add_on(state: &mut AppState, layer: LayerId) {
+        state.set_current_layer(layer);
+        state.add_entity(line());
+        state.set_current_layer(LayerId::DEFAULT);
     }
 
     fn freeze(state: &mut AppState, layers: &[LayerId], freeze: bool) {
@@ -125,6 +192,14 @@ mod tests {
         state.session().document().selectable_objects().count()
     }
 
+    fn enter(state: &mut AppState, space: Space) {
+        match space {
+            Space::Paper(id) => state.enter_layout(id),
+            _ => state.enter_model(),
+        }
+        state.docs[state.active].keep_space_valid();
+    }
+
     #[test]
     fn in_the_model_tab_the_switch_freezes_there_and_undoes() {
         let (mut state, id) = drawing();
@@ -134,7 +209,7 @@ mod tests {
             target.switch(&layer(&state, id)),
             VpSwitch {
                 frozen: false,
-                model: true
+                place: Place::Model
             }
         );
         state.select_all();
@@ -164,7 +239,6 @@ mod tests {
         let (mut state, id) = drawing();
         freeze(&mut state, &[id], true);
         state.new_layout();
-        assert!(state.freeze_target().is_none(), "no viewport picked yet");
         state.mspace();
         let target = state.freeze_target().unwrap();
         assert!(matches!(target, FreezeTarget::Viewport(_)));
@@ -182,11 +256,66 @@ mod tests {
     }
 
     #[test]
+    fn on_a_sheet_the_switch_freezes_that_layout_s_paper_space_only() {
+        let (mut state, id) = drawing();
+        state.new_layout();
+        let first = state.space();
+        add_on(&mut state, id);
+        state.new_layout();
+        let second = state.space();
+        add_on(&mut state, id);
+        enter(&mut state, first);
+        let target = state.freeze_target().unwrap();
+        assert!(matches!(target, FreezeTarget::Paper(_)));
+        assert_eq!(target.switch(&layer(&state, id)).place, Place::Paper);
+        assert_eq!(pickable(&state), 1);
+        freeze(&mut state, &[id], true);
+        assert_eq!(pickable(&state), 0, "hidden on this sheet");
+        assert!(
+            state
+                .freeze_target()
+                .unwrap()
+                .switch(&layer(&state, id))
+                .frozen
+        );
+        let layer_flags = layer(&state, id);
+        assert!(!layer_flags.frozen && !layer_flags.frozen_in_model);
+        enter(&mut state, second);
+        assert_eq!(pickable(&state), 1, "other layouts still show it");
+        enter(&mut state, Space::Model);
+        assert_eq!(pickable(&state), 1, "and so does the model");
+        enter(&mut state, first);
+        state.mspace();
+        state.docs[state.active].keep_space_valid();
+        assert_eq!(pickable(&state), 1, "and the layout's viewport");
+        state.undo();
+        state.pspace();
+        state.docs[state.active].keep_space_valid();
+        assert_eq!(pickable(&state), 1, "undone");
+    }
+
+    #[test]
     fn the_tooltips_say_where_the_switch_acts() {
-        let tip = |frozen, model| VpSwitch { frozen, model }.tip();
-        assert_eq!(tip(false, true), "Click to freeze in the Model tab only");
-        assert_eq!(tip(true, true), "Frozen in the Model tab: click to thaw");
-        assert_eq!(tip(false, false), "Click to freeze in this viewport only");
-        assert_eq!(tip(true, false), "Frozen in this viewport: click to thaw");
+        let tip = |frozen, place| VpSwitch { frozen, place }.tip();
+        assert_eq!(
+            tip(false, Place::Model),
+            "Click to freeze in the Model tab only"
+        );
+        assert_eq!(
+            tip(true, Place::Model),
+            "Frozen in the Model tab: click to thaw"
+        );
+        assert_eq!(
+            tip(false, Place::Viewport),
+            "Click to freeze in this viewport only"
+        );
+        assert_eq!(
+            tip(true, Place::Viewport),
+            "Frozen in this viewport: click to thaw"
+        );
+        assert_eq!(
+            tip(false, Place::Paper),
+            "Click to freeze in this layout's paper space only"
+        );
     }
 }

@@ -48,8 +48,9 @@ pub(super) struct Spaces {
     first: Option<LayoutId>,
     /// Layer names by the handle of their table record (for frozen layers).
     layer_names: HashMap<String, String>,
-    /// Frozen layer names to resolve once every layer is known.
-    frozen: Vec<(LayoutId, usize, Vec<String>)>,
+    /// Frozen layer names to resolve once every layer is known, by viewport
+    /// index (`None`: the sheet-wide viewport, so the layout's paper space).
+    frozen: Vec<(LayoutId, Option<usize>, Vec<String>)>,
     unsupported_views: usize,
     clipped: usize,
     unsupported_plot_settings: usize,
@@ -200,6 +201,7 @@ impl Spaces {
                 height,
                 plot,
                 viewports: Vec::new(),
+                paper_frozen: Vec::new(),
             });
         }
         spaces
@@ -234,9 +236,19 @@ impl Spaces {
     }
 
     /// Add a `VIEWPORT` entity to its layout. The sheet-wide viewport (id 1) is
-    /// not a window, and views that are not plan views cannot be shown.
+    /// not a window: only its frozen layers are kept, as the paper space's.
+    /// Views that are not plan views cannot be shown.
     pub(super) fn viewport(&mut self, record: &Record, layout: LayoutId, document: &mut Document) {
+        let frozen: Vec<String> = record
+            .groups
+            .iter()
+            .filter(|g| g.code == 331)
+            .filter_map(|g| self.layer_names.get(&g.value.to_uppercase()).cloned())
+            .collect();
         if record.int(69) == Some(1) {
+            if !frozen.is_empty() {
+                self.frozen.push((layout, None, frozen));
+            }
             return;
         }
         let number = |code, default| record.number(code).unwrap_or(default);
@@ -272,14 +284,9 @@ impl Spaces {
             on: record.int(68).unwrap_or(1) != 0,
             frozen: Vec::new(),
         };
-        let frozen: Vec<String> = record
-            .groups
-            .iter()
-            .filter(|g| g.code == 331)
-            .filter_map(|g| self.layer_names.get(&g.value.to_uppercase()).cloned())
-            .collect();
         if let Some(sheet) = self.layouts.iter_mut().find(|l| l.id == layout) {
-            self.frozen.push((layout, sheet.viewports.len(), frozen));
+            self.frozen
+                .push((layout, Some(sheet.viewports.len()), frozen));
             sheet.viewports.push(viewport);
         }
     }
@@ -289,13 +296,16 @@ impl Spaces {
     pub(super) fn finish(mut self, importer: &mut Importer) {
         for (layout, index, names) in std::mem::take(&mut self.frozen) {
             let layers: Vec<_> = names.iter().map(|n| importer.layer_named(n)).collect();
-            if let Some(vp) = self
-                .layouts
-                .iter_mut()
-                .find(|l| l.id == layout)
-                .and_then(|l| l.viewports.get_mut(index))
-            {
-                vp.set_frozen(&layers, true);
+            let Some(sheet) = self.layouts.iter_mut().find(|l| l.id == layout) else {
+                continue;
+            };
+            match index {
+                None => sheet.set_paper_frozen(&layers, true),
+                Some(i) => {
+                    if let Some(vp) = sheet.viewports.get_mut(i) {
+                        vp.set_frozen(&layers, true);
+                    }
+                }
             }
         }
         let document = &mut importer.document;
