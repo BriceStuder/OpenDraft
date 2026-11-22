@@ -191,6 +191,6 @@ impl OpenDraftApp {
             ctx.set_zoom_factor(new.zoom_factor());
         }
         self.state.templates_dir = Location::Templates.resolve(&new);
-        self.state.settings = new;
+        self.state.set_settings(new);
     }
 }

@@ -109,7 +109,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Layout colours beyond the paper: AutoCAD's Drawing Window Colors sets each part (crosshair, grid, snap marker and the rest) per context; OpenDraft chooses them to suit the paper, and only the paper is the user's to pick. Colours are drawn as they are, so pale ones such as yellow (colour 2) are hard to read on white paper, as in AutoCAD. A viewport that runs off the sheet draws its contents over the dark surround there, where black lines on light paper all but vanish (AutoCAD's surround is grey); the part off the sheet does not plot.
 - The Layout tab's other AutoCAD items: viewport Clip, Lock as a Lock/Unlock list, and the Create View, Modify View, Update and Styles and Standards panels.
 - Display and named View plot areas (no saved view state).
-- Plotting: `-PAGESETUP`, cancel and progress in the dialog, the last printer remembered, margins and media from the printer, a Page Setup Manager with named setups, collation, plot-style tables; proof on real printers and cutters (`docs/ROADMAP.md`, Phase 3).
+- Plotting: `-PAGESETUP`, cancel and progress in the dialog, the last printer remembered, a printer's own minimum margins (read from the system, to allow editing a printer's margins down to them; only PDF and SVG margins can be edited now) and media from the printer, a Page Setup Manager with named setups, collation, plot-style tables; proof on real printers and cutters (`docs/ROADMAP.md`, Phase 3).
 - Annotative scales, and `PSLTSCALE`/`MSLTSCALE`.
 - Check the R2000 export in AutoCAD (only ezdxf so far).
 

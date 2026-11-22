@@ -308,6 +308,17 @@ impl Layout {
         )
     }
 
+    /// Give a new layout its margins, its viewports staying where they are
+    /// on the paper: the origin moves to the new printable corner.
+    pub fn set_margins_keeping_paper(&mut self, margins: [f64; 4]) {
+        let before = self.printable_corner();
+        self.plot.margins_mm = margins;
+        let after = self.printable_corner();
+        for vp in &mut self.viewports {
+            vp.center = vp.center.translated(before.x - after.x, before.y - after.y);
+        }
+    }
+
     /// The top viewport that is on and holds the sheet point.
     pub fn viewport_at(&self, p: Point) -> Option<ViewportId> {
         self.viewports

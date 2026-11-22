@@ -9,6 +9,7 @@ use opendraft_core::{
     Viewport, ViewportId, PAPER_SIZES,
 };
 
+use crate::defaults::EditorDefaults;
 use crate::layouts::with_viewport;
 
 /// LAYOUT: Copy, Delete, New or Rename a layout, by name. Entering one is
@@ -24,11 +25,14 @@ pub fn layout_command(ed: &mut Editor, current: Option<LayoutId>) -> Result<(), 
     )?;
     if option == "New" {
         let name = ed.get_string(Options::<String>::new("Enter new layout name"))?;
+        let margin = ed.defaults().plot_margins.get();
         return edit_layouts(ed, "New layout", move |doc| {
             let name = checked_name(doc, &name, None)?;
             let (_, width, height) = PAPER_SIZES[0];
             let mut layouts = doc.layouts().to_vec();
-            layouts.push(doc.new_layout(name, width, height));
+            let mut layout = doc.new_layout(name, width, height);
+            layout.set_margins_keeping_paper([margin; 4]);
+            layouts.push(layout);
             Ok(Edit::layouts(layouts))
         });
     }
