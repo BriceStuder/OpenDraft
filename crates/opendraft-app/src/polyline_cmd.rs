@@ -250,6 +250,8 @@ fn keyword(
     mode: &mut Mode,
     (from, heading): (Point, Point),
 ) -> Result<Flow, Cancelled> {
+    // The option's prompts snap to what has been drawn so far too.
+    let drawn = chain.drawn();
     match keyword {
         "Arc" => mode.arcs = true,
         "Line" => mode.arcs = false,
@@ -265,10 +267,12 @@ fn keyword(
             chain.finish(curve, mode.widths);
             return Ok(Flow::Close);
         }
-        "Width" => mode.widths = ask_widths(ed, from, mode.widths, false)?,
-        "Halfwidth" => mode.widths = ask_widths(ed, from, mode.widths, true)?,
+        "Width" => mode.widths = ask_widths(ed, (from, &drawn), mode.widths, false)?,
+        "Halfwidth" => mode.widths = ask_widths(ed, (from, &drawn), mode.widths, true)?,
         "Length" => {
-            let options = NumberOptions::new("Specify length of line").base(from);
+            let options = NumberOptions::new("Specify length of line")
+                .base(from)
+                .snap_to(drawn);
             let length = ed.get_distance(options)?;
             if length > MIN_SIZE {
                 let to = Point::new(from.x + heading.x * length, from.y + heading.y * length);
@@ -277,7 +281,7 @@ fn keyword(
                 ed.say("Requires a non-zero value.");
             }
         }
-        arc_keyword => match arc_option(ed, arc_keyword, from, heading)? {
+        arc_keyword => match arc_option(ed, arc_keyword, (from, heading), &drawn)? {
             Some((to, curve)) if distance(from, to) > MIN_SIZE => {
                 chain.push(to, curve, mode.widths);
             }
@@ -289,9 +293,10 @@ fn keyword(
 
 /// Ask for the widths at the start and end of the next segments, or half of
 /// them. The start shows the current width; the end defaults to the start.
+/// The pointer snaps to `drawn`, the polyline so far, too.
 fn ask_widths(
     ed: &Editor,
-    from: Point,
+    (from, drawn): (Point, &[Entity]),
     current: (f64, f64),
     half: bool,
 ) -> Result<(f64, f64), Cancelled> {
@@ -300,12 +305,14 @@ fn ask_widths(
     let start = ed.get_distance(
         NumberOptions::new(format!("Specify starting {name}"))
             .default(current.0 / scale)
-            .base(from),
+            .base(from)
+            .snap_to(drawn.to_vec()),
     )?;
     let end = ed.get_distance(
         NumberOptions::new(format!("Specify ending {name}"))
             .default(start)
-            .base(from),
+            .base(from)
+            .snap_to(drawn.to_vec()),
     )?;
     Ok((start.max(0.0) * scale, end.max(0.0) * scale))
 }
@@ -562,6 +569,46 @@ mod tests {
         run(&mut state, &["5,0", "a", "r", "5", "0,5", ""]);
         let (_, bulges, ..) = polyline(&entities(&state)[0]);
         assert!((bulges[0].abs() - std::f64::consts::FRAC_PI_8.tan()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn every_prompt_of_the_options_snaps_to_the_segments_drawn_so_far() {
+        let drawn = [p(0.0, 0.0), p(10.0, 0.0), p(10.0, 5.0)];
+        // Each option, as far as each of its prompts.
+        let options: [&[&str]; 22] = [
+            &["a", "a"],
+            &["a", "a", "90"],
+            &["a", "a", "90", "ce"],
+            &["a", "a", "90", "r"],
+            &["a", "a", "90", "r", "3"],
+            &["a", "ce"],
+            &["a", "ce", "20,5"],
+            &["a", "ce", "20,5", "a"],
+            &["a", "ce", "20,5", "l"],
+            &["a", "d"],
+            &["a", "d", "0"],
+            &["a", "r"],
+            &["a", "r", "3"],
+            &["a", "r", "3", "a"],
+            &["a", "r", "3", "a", "90"],
+            &["a", "s"],
+            &["a", "s", "12,7"],
+            &["w"],
+            &["w", "1"],
+            &["h"],
+            &["h", "1"],
+            &["l"],
+        ];
+        for inputs in options {
+            let mut state = AppState::new();
+            run(&mut state, &["0,0", "10,0", "10,5"]);
+            run_more(&mut state, inputs);
+            let ask = state.waiting().expect("PLINE is waiting");
+            let message = ask.message.clone();
+            let geometry = ask.snap_geometry.clone();
+            assert_eq!(geometry.len(), 1, "{inputs:?}: {message}");
+            assert_eq!(polyline(&geometry[0]).0, drawn, "{inputs:?}: {message}");
+        }
     }
 
     #[test]
