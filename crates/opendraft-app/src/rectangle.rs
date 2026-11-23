@@ -69,23 +69,9 @@ fn set_option(ed: &Editor, option: &str) -> Result<(), Cancelled> {
                 .rect
                 .change(|m| (m.radius, m.first, m.second) = (radius, 0.0, 0.0));
         }
-        "Width" => {
+        _ => {
             let width = size(key!("Specify line width for rectangles"), m.width)?;
             defaults.rect.change(|m| m.width = width);
-        }
-        "Elevation" => {
-            let value = ed.get_number(
-                NumberOptions::new(key!("Specify the elevation for rectangles"))
-                    .default(m.elevation),
-            )?;
-            defaults.rect.change(|m| m.elevation = value);
-        }
-        _ => {
-            let value = ed.get_number(
-                NumberOptions::new(key!("Specify the thickness for rectangles"))
-                    .default(m.thickness),
-            )?;
-            defaults.rect.change(|m| m.thickness = value);
         }
     }
     Ok(())
@@ -143,17 +129,15 @@ fn rotation(ed: &Editor, first: Point, current: f64) -> Result<f64, Cancelled> {
 }
 
 /// RECTANGLE. The first corner prompt also sets what the next rectangles look
-/// like (Chamfer, Fillet, Width, and Elevation and Thickness, which are kept
-/// but not drawn in 2D). After it, Area and Dimensions give a size and the
+/// like (Chamfer, Fillet and Width; AutoCAD's Elevation and Thickness are 3D
+/// and are not offered). After it, Area and Dimensions give a size and the
 /// pointer chooses which of the four ways it lies from the first corner, and
 /// Rotation turns the whole rectangle about the first corner.
 pub fn draw_rectangle(ed: &mut Editor) -> Result<(), Cancelled> {
     let first = loop {
         let options = PointOptions::new(key!("Specify first corner point"))
             .keyword("Chamfer", "C")
-            .keyword("Elevation", "E")
             .keyword("Fillet", "F")
-            .keyword("Thickness", "T")
             .keyword("Width", "W");
         match ed.ask_point(options)? {
             Answer::Value(first) => break first,
@@ -244,10 +228,7 @@ mod tests {
     fn the_prompts_offer_the_options_of_each_stage() {
         let mut state = AppState::new();
         run(&mut state, &[]);
-        assert_eq!(
-            labels(&mut state),
-            ["Chamfer", "Elevation", "Fillet", "Thickness", "Width"]
-        );
+        assert_eq!(labels(&mut state), ["Chamfer", "Fillet", "Width"]);
         run_more(&mut state, &["0,0"]);
         assert_eq!(labels(&mut state), ["Area", "Dimensions", "Rotation"]);
     }
@@ -342,15 +323,6 @@ mod tests {
             matches!(entities(&state)[1], Entity::Polyline { .. }),
             "still wide"
         );
-    }
-
-    #[test]
-    fn elevation_and_thickness_are_kept_for_the_variables_but_draw_nothing() {
-        let mut state = AppState::new();
-        run(&mut state, &["e", "-2", "t", "3", "0,0", "4,2"]);
-        assert_eq!(entities(&state), [rect(p(0.0, 0.0), p(4.0, 2.0))]);
-        let kept = state.defaults().rect.get();
-        assert_eq!((kept.elevation, kept.thickness), (-2.0, 3.0));
     }
 
     #[test]
