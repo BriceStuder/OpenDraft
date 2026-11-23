@@ -2,13 +2,14 @@
 //! direction as an angle in degrees, which is the one value typing changes.
 
 use opendraft_core::{infinite, Entity, Point};
+use opendraft_ui::key;
 
 use super::{row, Field, Row, Unit};
 
 pub(super) const ROWS: &[Row] = &[
-    row(Field::X1, "Base X", Unit::Length, true),
-    row(Field::Y1, "Base Y", Unit::Length, true),
-    row(Field::Angle, "Angle", Unit::Angle, true),
+    row(Field::X1, key!("Base X"), Unit::Length, true),
+    row(Field::Y1, key!("Base Y"), Unit::Length, true),
+    row(Field::Angle, key!("Angle"), Unit::Angle, true),
 ];
 
 pub(super) fn value(origin: Point, direction: Point, field: Field) -> f64 {

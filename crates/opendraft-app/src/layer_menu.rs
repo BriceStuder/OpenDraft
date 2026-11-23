@@ -4,6 +4,7 @@
 use eframe::egui::{self, Align2, FontId, Sense, Ui};
 use opendraft_core::LayerId;
 use opendraft_ui::{menu, Theme};
+use rust_i18n::t;
 
 use crate::layer_selection::LayerSelection;
 use crate::layers::LayerEdit;
@@ -52,40 +53,40 @@ fn items(ui: &mut Ui, theme: &Theme, selection: &LayerSelection) -> Option<MenuP
             picked = Some(pick);
         }
     };
-    row(ui, "New Layer", true, MenuPick::Edit(LayerEdit::New));
+    row(ui, &t!("New Layer"), true, MenuPick::Edit(LayerEdit::New));
     row(
         ui,
-        "Set Current",
+        &t!("Set Current"),
         single.is_some(),
         MenuPick::Edit(LayerEdit::SetCurrent(single.unwrap_or(LayerId::DEFAULT))),
     );
     row(
         ui,
-        "Rename Layer",
+        &t!("Rename Layer"),
         single.is_some_and(|id| id != LayerId::DEFAULT),
         MenuPick::Rename(single.unwrap_or(LayerId::DEFAULT)),
     );
     let delete = if selection.ids().len() > 1 {
-        "Delete Layers"
+        t!("Delete Layers")
     } else {
-        "Delete Layer"
+        t!("Delete Layer")
     };
     row(
         ui,
-        delete,
+        &delete,
         any,
         MenuPick::Edit(LayerEdit::Delete(selection.ids().to_vec())),
     );
     separator(ui, theme);
-    row(ui, "Select All", true, MenuPick::SelectAll);
+    row(ui, &t!("Select All"), true, MenuPick::SelectAll);
     row(
         ui,
-        "Select All but Current",
+        &t!("Select All but Current"),
         true,
         MenuPick::SelectAllButCurrent,
     );
-    row(ui, "Invert Selection", true, MenuPick::Invert);
-    row(ui, "Clear All", any, MenuPick::ClearAll);
+    row(ui, &t!("Invert Selection"), true, MenuPick::Invert);
+    row(ui, &t!("Clear All"), any, MenuPick::ClearAll);
     picked
 }
 

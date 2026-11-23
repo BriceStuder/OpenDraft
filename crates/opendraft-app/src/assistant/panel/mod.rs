@@ -15,6 +15,7 @@ use std::sync::Arc;
 use eframe::egui;
 use opendraft_ui::icon_set::Icon;
 use opendraft_ui::{icons, Theme};
+use rust_i18n::t;
 
 use super::{Assistant, Entry};
 use crate::automation::AutomationCore;
@@ -61,9 +62,9 @@ fn header(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 let title = if assistant.history_open {
-                    "Chat history".to_owned()
+                    t!("Chat history").into_owned()
                 } else if assistant.chat().title.is_empty() {
-                    "New chat".to_owned()
+                    t!("New chat").into_owned()
                 } else {
                     assistant.chat().title.clone()
                 };
@@ -86,7 +87,7 @@ fn header(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
                                 .clickable()
                                 .color(weak),
                         )
-                        .on_hover_text("New chat")
+                        .on_hover_text(t!("New chat"))
                         .on_hover_cursor(egui::CursorIcon::PointingHand);
                     if new_chat.clicked() {
                         assistant.new_chat();
@@ -97,13 +98,13 @@ fn header(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
                                 .clickable()
                                 .color(weak),
                         )
-                        .on_hover_text("Copy this chat as text, with every tool call")
+                        .on_hover_text(t!("Copy this chat as text, with every tool call"))
                         .on_hover_cursor(egui::CursorIcon::PointingHand);
                     if copy.clicked() {
                         let text = assistant.transcript();
                         ui.ctx().copy_text(text);
                         assistant.chat_mut().entries.push(Entry::Notice(
-                            "Copied this chat to the clipboard.".to_owned(),
+                            t!("Copied this chat to the clipboard.").into_owned(),
                         ));
                     }
                     let history = ui
@@ -112,7 +113,7 @@ fn header(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
                                 .toggle(assistant.history_open)
                                 .color(weak),
                         )
-                        .on_hover_text("Chat history")
+                        .on_hover_text(t!("Chat history"))
                         .on_hover_cursor(egui::CursorIcon::PointingHand);
                     if history.clicked() {
                         assistant.history_open = !assistant.history_open;
@@ -134,9 +135,11 @@ fn history(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
                 .collect();
             if list.is_empty() {
                 ui.label(
-                    egui::RichText::new("No chats yet. They are kept until you close OpenDraft.")
-                        .size(theme.font_size_small)
-                        .color(theme.colors.text_weak),
+                    egui::RichText::new(t!(
+                        "No chats yet. They are kept until you close OpenDraft."
+                    ))
+                    .size(theme.font_size_small)
+                    .color(theme.colors.text_weak),
                 );
                 return;
             }

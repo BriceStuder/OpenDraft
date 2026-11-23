@@ -3,15 +3,16 @@
 
 use opendraft_core::pedit::PolyData;
 use opendraft_core::{bulge, Entity};
+use opendraft_ui::key;
 
 use super::{row, Field, Row, Unit};
 
 pub(super) const ROWS: &[Row] = &[
-    row(Field::Vertices, "Vertices", Unit::Count, false),
-    row(Field::Closed, "Closed", Unit::Flag, true),
-    row(Field::Width, "Global width", Unit::Length, true),
-    row(Field::Length, "Length", Unit::Length, false),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::Vertices, key!("Vertices"), Unit::Count, false),
+    row(Field::Closed, key!("Closed"), Unit::Flag, true),
+    row(Field::Width, key!("Global width"), Unit::Length, true),
+    row(Field::Length, key!("Length"), Unit::Length, false),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
 /// The width every segment has, if they all have the same (a hairline is 0).

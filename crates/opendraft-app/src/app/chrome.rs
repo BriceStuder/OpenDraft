@@ -6,10 +6,10 @@ use opendraft_core::units::format_length;
 use opendraft_ui::menu;
 use opendraft_ui::widgets;
 use opendraft_ui::{document_tabs, DocumentTabEvent};
+use rust_i18n::t;
 
 use super::update_notice::update_notice;
 use super::{OpenDraftApp, Source, QUICK_ACCESS};
-use crate::text::plural;
 
 const READOUT_WIDTH: f32 = 165.0;
 
@@ -92,28 +92,27 @@ impl OpenDraftApp {
     /// The application menu behind the badge button: the file commands and the
     /// recent drawings.
     fn app_menu(&self, ui: &egui::Ui, anchor: &egui::Response) -> Option<MenuChoice> {
-        const ITEMS: &[(&str, &str)] = &[
-            ("New", "file.new"),
-            ("Open...", "file.open"),
-            ("Save", "file.save"),
-            ("Save As...", "file.save_as"),
-            ("Save as Template...", "file.save_template"),
-            ("Export DXF...", "file.export_dxf"),
-            ("Page Setup...", "layout.page_setup"),
-            ("Plot...", "file.plot"),
-        ];
         let theme = &self.theme;
         let recent = self.state.recent.paths();
         menu::popup(ui, theme, egui::Id::new("app_menu"), anchor, 220.0, |ui| {
             let mut picked = None;
-            for (label, id) in ITEMS {
-                if menu::menu_row(ui, theme, label, false) {
+            for (label, id) in [
+                (t!("New"), "file.new"),
+                (t!("Open..."), "file.open"),
+                (t!("Save"), "file.save"),
+                (t!("Save As..."), "file.save_as"),
+                (t!("Save as Template..."), "file.save_template"),
+                (t!("Export DXF..."), "file.export_dxf"),
+                (t!("Page Setup..."), "layout.page_setup"),
+                (t!("Plot..."), "file.plot"),
+            ] {
+                if menu::menu_row(ui, theme, &label, false) {
                     picked = Some(MenuChoice::Command(id));
                 }
             }
             if !recent.is_empty() {
                 ui.separator();
-                ui.label(egui::RichText::new("Recent").color(theme.colors.text_weak));
+                ui.label(egui::RichText::new(t!("Recent")).color(theme.colors.text_weak));
                 for (i, path) in recent.iter().enumerate() {
                     let name = path.file_name().map_or_else(
                         || path.display().to_string(),
@@ -126,12 +125,12 @@ impl OpenDraftApp {
             }
             ui.separator();
             for (label, id) in [
-                ("Units", "format.units"),
-                ("Settings", "manage.settings"),
-                ("Crash log", "manage.crash_log"),
-                ("Exit", "file.exit"),
+                (t!("Units"), "format.units"),
+                (t!("Settings"), "manage.settings"),
+                (t!("Crash log"), "manage.crash_log"),
+                (t!("Exit"), "file.exit"),
             ] {
-                if menu::menu_row(ui, theme, label, false) {
+                if menu::menu_row(ui, theme, &label, false) {
                     picked = Some(MenuChoice::Command(id));
                 }
             }
@@ -238,7 +237,7 @@ impl OpenDraftApp {
                 ui.horizontal(|ui| {
                     self.status_message(ui);
                     if self.state.file_work_stalled()
-                        && widgets::secondary_button(ui, &self.theme, "Cancel").clicked()
+                        && widgets::secondary_button(ui, &self.theme, &t!("Cancel")).clicked()
                     {
                         self.state.cancel_file_work();
                     }
@@ -250,7 +249,7 @@ impl OpenDraftApp {
                         if !self.state.home {
                             let count = self.object_count(ui.ctx());
                             ui.label(
-                                egui::RichText::new(plural(count, "object"))
+                                egui::RichText::new(object_count_text(count))
                                     .color(self.theme.colors.text_weak),
                             );
                         }
@@ -265,12 +264,13 @@ impl OpenDraftApp {
     /// What the running command asks for, otherwise the last feedback.
     fn status_message(&self, ui: &mut egui::Ui) {
         let command_status = self.state.command_status();
+        let ready = t!("Ready");
         let message = if let Some(status) = &command_status {
-            status
+            status.as_str()
         } else if self.state.message.is_empty() {
-            "Ready"
+            ready.as_ref()
         } else {
-            &self.state.message
+            self.state.message.as_str()
         };
         // Leave room for the readout and toggles on the right; a long message
         // is cut short rather than running into them.
@@ -315,7 +315,7 @@ impl OpenDraftApp {
     pub(super) fn update_window_title(&mut self, ctx: &egui::Context) {
         let app = crate::profile::title();
         let title = if self.state.home {
-            format!("Home - {app}")
+            format!("{} - {app}", t!("Home"))
         } else {
             format!("{} - {app}", self.state.docs[self.state.active].tab_title())
         };
@@ -323,5 +323,14 @@ impl OpenDraftApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.window_title = title;
         }
+    }
+}
+
+/// "1 object", "12 objects" in the status bar.
+fn object_count_text(count: usize) -> String {
+    if count == 1 {
+        t!("1 object").into_owned()
+    } else {
+        t!("%{count} objects", count = count).into_owned()
     }
 }

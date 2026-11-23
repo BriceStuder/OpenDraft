@@ -5,40 +5,41 @@
 
 use opendraft_core::hatch::{HatchEntity, HatchFill, HatchPattern, HatchStyle, PatternType};
 use opendraft_core::Point;
+use opendraft_ui::key;
 
 use super::{row, Field, Row, Unit};
 
 const NAMED: &[Row] = &[
-    row(Field::FillKind, "Fill", Unit::Fill, false),
-    row(Field::HatchStyle, "Island style", Unit::Style, true),
-    row(Field::Angle, "Angle", Unit::Angle, true),
-    row(Field::Scale, "Scale", Unit::Factor, true),
-    row(Field::X1, "Origin X", Unit::Length, true),
-    row(Field::Y1, "Origin Y", Unit::Length, true),
-    row(Field::Loops, "Boundaries", Unit::Count, false),
-    row(Field::Associative, "Associative", Unit::Flag, false),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::FillKind, key!("Fill"), Unit::Fill, false),
+    row(Field::HatchStyle, key!("Island style"), Unit::Style, true),
+    row(Field::Angle, key!("Angle"), Unit::Angle, true),
+    row(Field::Scale, key!("Scale"), Unit::Factor, true),
+    row(Field::X1, key!("Origin X"), Unit::Length, true),
+    row(Field::Y1, key!("Origin Y"), Unit::Length, true),
+    row(Field::Loops, key!("Boundaries"), Unit::Count, false),
+    row(Field::Associative, key!("Associative"), Unit::Flag, false),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
 const USER: &[Row] = &[
-    row(Field::FillKind, "Fill", Unit::Fill, false),
-    row(Field::HatchStyle, "Island style", Unit::Style, true),
-    row(Field::Angle, "Angle", Unit::Angle, true),
-    row(Field::Spacing, "Spacing", Unit::Length, true),
-    row(Field::Double, "Double", Unit::Flag, true),
-    row(Field::X1, "Origin X", Unit::Length, true),
-    row(Field::Y1, "Origin Y", Unit::Length, true),
-    row(Field::Loops, "Boundaries", Unit::Count, false),
-    row(Field::Associative, "Associative", Unit::Flag, false),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::FillKind, key!("Fill"), Unit::Fill, false),
+    row(Field::HatchStyle, key!("Island style"), Unit::Style, true),
+    row(Field::Angle, key!("Angle"), Unit::Angle, true),
+    row(Field::Spacing, key!("Spacing"), Unit::Length, true),
+    row(Field::Double, key!("Double"), Unit::Flag, true),
+    row(Field::X1, key!("Origin X"), Unit::Length, true),
+    row(Field::Y1, key!("Origin Y"), Unit::Length, true),
+    row(Field::Loops, key!("Boundaries"), Unit::Count, false),
+    row(Field::Associative, key!("Associative"), Unit::Flag, false),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
 const FILLED: &[Row] = &[
-    row(Field::FillKind, "Fill", Unit::Fill, false),
-    row(Field::HatchStyle, "Island style", Unit::Style, true),
-    row(Field::Loops, "Boundaries", Unit::Count, false),
-    row(Field::Associative, "Associative", Unit::Flag, false),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::FillKind, key!("Fill"), Unit::Fill, false),
+    row(Field::HatchStyle, key!("Island style"), Unit::Style, true),
+    row(Field::Loops, key!("Boundaries"), Unit::Count, false),
+    row(Field::Associative, key!("Associative"), Unit::Flag, false),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
 pub(super) fn rows(h: &HatchEntity) -> &'static [Row] {

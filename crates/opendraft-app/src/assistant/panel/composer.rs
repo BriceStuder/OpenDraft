@@ -8,6 +8,7 @@ use std::sync::Arc;
 use eframe::egui;
 use opendraft_ui::icon_set::Icon;
 use opendraft_ui::{icons, Theme};
+use rust_i18n::t;
 
 use crate::assistant::{ApprovalLevel, Assistant, Drawings, Kind};
 use crate::automation::AutomationCore;
@@ -93,7 +94,7 @@ fn input(
         ui.add(
             egui::TextEdit::multiline(&mut assistant.draft)
                 .id(id)
-                .hint_text("Ask about this drawing...")
+                .hint_text(t!("Ask about this drawing..."))
                 .desired_rows(2)
                 .desired_width(f32::INFINITY)
                 .frame(false),
@@ -137,20 +138,22 @@ fn options(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
         level(ui, small, weak, assistant);
     }
     let drawings = match assistant.drawings {
-        Drawings::Current => "Current",
-        Drawings::All => "All open",
+        Drawings::Current => t!("Current"),
+        Drawings::All => t!("All open"),
     };
-    chip(ui, drawings, small, weak, |ui| {
+    chip(ui, &drawings, small, weak, |ui| {
         if ui
-            .selectable_label(assistant.drawings == Drawings::Current, "This drawing")
+            .selectable_label(assistant.drawings == Drawings::Current, t!("This drawing"))
             .clicked()
         {
             assistant.drawings = Drawings::Current;
             ui.close_menu();
         }
         if ui
-            .selectable_label(assistant.drawings == Drawings::All, "All open drawings")
-            .on_hover_text("Lets the assistant read and change every drawing you have open")
+            .selectable_label(assistant.drawings == Drawings::All, t!("All open drawings"))
+            .on_hover_text(t!(
+                "Lets the assistant read and change every drawing you have open"
+            ))
             .clicked()
         {
             assistant.drawings = Drawings::All;
@@ -172,8 +175,10 @@ fn burger(ui: &mut egui::Ui, size: f32, colour: egui::Color32, assistant: &mut A
         ui.menu_button(icon, |ui| {
             let mut review_only = assistant.kind == Kind::Review;
             if ui
-                .checkbox(&mut review_only, "Review only")
-                .on_hover_text("The assistant reads and reports, and cannot change the drawing")
+                .checkbox(&mut review_only, t!("Review only"))
+                .on_hover_text(t!(
+                    "The assistant reads and reports, and cannot change the drawing"
+                ))
                 .changed()
             {
                 assistant.kind = if review_only {
@@ -184,10 +189,10 @@ fn burger(ui: &mut egui::Ui, size: f32, colour: egui::Color32, assistant: &mut A
             }
             ui.separator();
             if ui
-                .button("Forget this key")
-                .on_hover_text(
-                    "Removes it from this session and from the computer's credential store",
-                )
+                .button(t!("Forget this key"))
+                .on_hover_text(t!(
+                    "Removes it from this session and from the computer's credential store"
+                ))
                 .clicked()
             {
                 assistant.forget_key();
@@ -195,30 +200,30 @@ fn burger(ui: &mut egui::Ui, size: f32, colour: egui::Color32, assistant: &mut A
             }
         })
         .response
-        .on_hover_text("Options");
+        .on_hover_text(t!("Options"));
     });
 }
 
 /// The approval level: how much the assistant asks before it changes things.
 fn level(ui: &mut egui::Ui, size: f32, colour: egui::Color32, assistant: &mut Assistant) {
     let label = match assistant.level {
-        ApprovalLevel::ReviewEach => "Each change",
-        ApprovalLevel::ApprovePlan => "Plan",
-        ApprovalLevel::AutoApprove { .. } => "Never ask",
+        ApprovalLevel::ReviewEach => t!("Each change"),
+        ApprovalLevel::ApprovePlan => t!("Plan"),
+        ApprovalLevel::AutoApprove { .. } => t!("Never ask"),
     };
-    chip(ui, label, size, colour, |ui| {
+    chip(ui, &label, size, colour, |ui| {
         let levels = [
             (
                 ApprovalLevel::ReviewEach,
-                "Each change: ask before each one",
+                t!("Each change: ask before each one"),
             ),
             (
                 ApprovalLevel::ApprovePlan,
-                "Plan: ask once, then carry it out",
+                t!("Plan: ask once, then carry it out"),
             ),
             (
                 ApprovalLevel::AutoApprove { limit: AUTO_LIMIT },
-                "Never ask: up to 20 changes, then stop",
+                t!("Never ask: up to 20 changes, then stop"),
             ),
         ];
         for (value, name) in levels {
@@ -281,9 +286,9 @@ fn round_button(ui: &mut egui::Ui, theme: &Theme, running: bool, dim: bool) -> b
     };
     ui.painter().circle_filled(rect.center(), 13.0, fill);
     let (icon, tip) = if running {
-        (icons::ASSISTANT_STOP, "Stop")
+        (icons::ASSISTANT_STOP, t!("Stop"))
     } else {
-        (icons::ASSISTANT_SEND, "Send (Enter)")
+        (icons::ASSISTANT_SEND, t!("Send (Enter)"))
     };
     let colour = if dim {
         c.text_disabled
@@ -308,13 +313,13 @@ fn key_card(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
     let small = theme.font_size_small;
     boxed(ui, theme, |ui| {
         ui.label(
-            egui::RichText::new("Add your Mistral key to start")
+            egui::RichText::new(t!("Add your Mistral key to start"))
                 .strong()
                 .color(theme.colors.text),
         );
         ui.label(
             egui::RichText::new(
-                "It is used until you close OpenDraft. Tick the box to keep it in this                  computer's credential store (never in a file of ours) so you are not asked again.",
+                t!("It is used until you close OpenDraft. Tick the box to keep it in this computer's credential store (never in a file of ours) so you are not asked again."),
             )
             .size(small)
             .color(theme.colors.text_weak),
@@ -323,16 +328,19 @@ fn key_card(ui: &mut egui::Ui, theme: &Theme, assistant: &mut Assistant) {
         let edit = ui.add(
             egui::TextEdit::singleline(&mut text)
                 .password(true)
-                .hint_text("Paste the key")
+                .hint_text(t!("Paste the key"))
                 .desired_width(f32::INFINITY),
         );
         let remember_id = id.with("remember");
         let mut remember: bool = ui.data_mut(|d| d.get_temp(remember_id).unwrap_or(true));
-        ui.checkbox(&mut remember, "Remember on this computer");
+        ui.checkbox(&mut remember, t!("Remember on this computer"));
         ui.data_mut(|d| d.insert_temp(remember_id, remember));
         let submitted = edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         let clicked = ui
-            .add_enabled(!text.trim().is_empty(), egui::Button::new("Use this key"))
+            .add_enabled(
+                !text.trim().is_empty(),
+                egui::Button::new(t!("Use this key")),
+            )
             .clicked();
         if (submitted || clicked) && !text.trim().is_empty() {
             assistant.set_key(&text, remember);

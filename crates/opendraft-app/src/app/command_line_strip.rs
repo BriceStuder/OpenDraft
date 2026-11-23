@@ -3,6 +3,7 @@
 //! under the drawing, the Model and layout tabs below it.
 
 use eframe::egui;
+use rust_i18n::t;
 
 use super::command_line::{LOG_CLEARANCE, MARGIN};
 use super::panels::PanelViewer;
@@ -145,11 +146,11 @@ impl PanelViewer<'_> {
                 egui::Sense::click_and_drag(),
             )
             .on_hover_cursor(egui::CursorIcon::Grab)
-            .on_hover_text("Drag to undock the command line");
+            .on_hover_text(t!("Drag to undock the command line"));
         let close = over
             .interact(close_rect, id.with("close"), egui::Sense::click())
             .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Close (Ctrl+9 shows it again)");
+            .on_hover_text(t!("Close (Ctrl+9 shows it again)"));
 
         let weak_or_text = |hovered| match hovered {
             true => colors.text,

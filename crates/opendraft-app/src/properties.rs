@@ -14,6 +14,7 @@ mod unit;
 pub use unit::{format, parse, Unit};
 
 use opendraft_core::{arc, Entity, Point};
+use opendraft_ui::key;
 
 /// One editable or derived value of an entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -101,72 +102,82 @@ const fn row(field: Field, label: &'static str, unit: Unit, editable: bool) -> R
 }
 
 const POINT: &[Row] = &[
-    row(Field::X1, "Position X", Unit::Length, true),
-    row(Field::Y1, "Position Y", Unit::Length, true),
+    row(Field::X1, key!("Position X"), Unit::Length, true),
+    row(Field::Y1, key!("Position Y"), Unit::Length, true),
 ];
 
 const LINE: &[Row] = &[
-    row(Field::X1, "Start X", Unit::Length, true),
-    row(Field::Y1, "Start Y", Unit::Length, true),
-    row(Field::X2, "End X", Unit::Length, true),
-    row(Field::Y2, "End Y", Unit::Length, true),
-    row(Field::Length, "Length", Unit::Length, true),
-    row(Field::Angle, "Angle", Unit::Angle, true),
+    row(Field::X1, key!("Start X"), Unit::Length, true),
+    row(Field::Y1, key!("Start Y"), Unit::Length, true),
+    row(Field::X2, key!("End X"), Unit::Length, true),
+    row(Field::Y2, key!("End Y"), Unit::Length, true),
+    row(Field::Length, key!("Length"), Unit::Length, true),
+    row(Field::Angle, key!("Angle"), Unit::Angle, true),
 ];
 
 const CIRCLE: &[Row] = &[
-    row(Field::X1, "Center X", Unit::Length, true),
-    row(Field::Y1, "Center Y", Unit::Length, true),
-    row(Field::Radius, "Radius", Unit::Length, true),
-    row(Field::Diameter, "Diameter", Unit::Length, true),
-    row(Field::Circumference, "Circumference", Unit::Length, false),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::X1, key!("Center X"), Unit::Length, true),
+    row(Field::Y1, key!("Center Y"), Unit::Length, true),
+    row(Field::Radius, key!("Radius"), Unit::Length, true),
+    row(Field::Diameter, key!("Diameter"), Unit::Length, true),
+    row(
+        Field::Circumference,
+        key!("Circumference"),
+        Unit::Length,
+        false,
+    ),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
 const ARC: &[Row] = &[
-    row(Field::X1, "Center X", Unit::Length, true),
-    row(Field::Y1, "Center Y", Unit::Length, true),
-    row(Field::Radius, "Radius", Unit::Length, true),
-    row(Field::StartAngle, "Start angle", Unit::Angle, true),
-    row(Field::EndAngle, "End angle", Unit::Angle, true),
-    row(Field::Length, "Length", Unit::Length, false),
+    row(Field::X1, key!("Center X"), Unit::Length, true),
+    row(Field::Y1, key!("Center Y"), Unit::Length, true),
+    row(Field::Radius, key!("Radius"), Unit::Length, true),
+    row(Field::StartAngle, key!("Start angle"), Unit::Angle, true),
+    row(Field::EndAngle, key!("End angle"), Unit::Angle, true),
+    row(Field::Length, key!("Length"), Unit::Length, false),
 ];
 
 const RECTANGLE: &[Row] = &[
-    row(Field::X1, "Corner 1 X", Unit::Length, true),
-    row(Field::Y1, "Corner 1 Y", Unit::Length, true),
-    row(Field::X2, "Corner 2 X", Unit::Length, true),
-    row(Field::Y2, "Corner 2 Y", Unit::Length, true),
-    row(Field::Width, "Width", Unit::Length, true),
-    row(Field::Height, "Height", Unit::Length, true),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::X1, key!("Corner 1 X"), Unit::Length, true),
+    row(Field::Y1, key!("Corner 1 Y"), Unit::Length, true),
+    row(Field::X2, key!("Corner 2 X"), Unit::Length, true),
+    row(Field::Y2, key!("Corner 2 Y"), Unit::Length, true),
+    row(Field::Width, key!("Width"), Unit::Length, true),
+    row(Field::Height, key!("Height"), Unit::Length, true),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
-const DIMENSION: &[Row] = &[row(Field::Measurement, "Measurement", Unit::Length, false)];
+const DIMENSION: &[Row] = &[row(
+    Field::Measurement,
+    key!("Measurement"),
+    Unit::Length,
+    false,
+)];
 
-const LEADER: &[Row] = &[row(Field::Vertices, "Vertices", Unit::Count, false)];
+const LEADER: &[Row] = &[row(Field::Vertices, key!("Vertices"), Unit::Count, false)];
 
 const MTEXT: &[Row] = &[
-    row(Field::X1, "Insertion X", Unit::Length, true),
-    row(Field::Y1, "Insertion Y", Unit::Length, true),
-    row(Field::Angle, "Rotation", Unit::Angle, true),
-    row(Field::Height, "Text height", Unit::Length, true),
-    row(Field::Width, "Width", Unit::Length, true),
+    row(Field::X1, key!("Insertion X"), Unit::Length, true),
+    row(Field::Y1, key!("Insertion Y"), Unit::Length, true),
+    row(Field::Angle, key!("Rotation"), Unit::Angle, true),
+    row(Field::Height, key!("Text height"), Unit::Length, true),
+    row(Field::Width, key!("Width"), Unit::Length, true),
 ];
 
 const ATTRIBUTE_DEFINITION: &[Row] = &[
-    row(Field::X1, "Position X", Unit::Length, true),
-    row(Field::Y1, "Position Y", Unit::Length, true),
-    row(Field::Angle, "Rotation", Unit::Angle, true),
-    row(Field::Height, "Text height", Unit::Length, true),
+    row(Field::X1, key!("Position X"), Unit::Length, true),
+    row(Field::Y1, key!("Position Y"), Unit::Length, true),
+    row(Field::Angle, key!("Rotation"), Unit::Angle, true),
+    row(Field::Height, key!("Text height"), Unit::Length, true),
 ];
 
 const INSERT: &[Row] = &[
-    row(Field::X1, "Position X", Unit::Length, true),
-    row(Field::Y1, "Position Y", Unit::Length, true),
-    row(Field::Angle, "Rotation", Unit::Angle, true),
-    row(Field::ScaleX, "Scale X", Unit::Factor, true),
-    row(Field::ScaleY, "Scale Y", Unit::Factor, true),
+    row(Field::X1, key!("Position X"), Unit::Length, true),
+    row(Field::Y1, key!("Position Y"), Unit::Length, true),
+    row(Field::Angle, key!("Rotation"), Unit::Angle, true),
+    row(Field::ScaleX, key!("Scale X"), Unit::Factor, true),
+    row(Field::ScaleY, key!("Scale Y"), Unit::Factor, true),
 ];
 
 /// The rows shown for an entity, in display order.

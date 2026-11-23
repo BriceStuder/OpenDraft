@@ -3,47 +3,53 @@
 //! SPLINEDIT's geometry, and the control frame is edited with grips.
 
 use opendraft_core::Spline;
+use opendraft_ui::key;
 
 use super::{row, Field, Row, Unit};
 
 const CONTROL: &[Row] = &[
-    row(Field::Degree, "Degree", Unit::Count, false),
-    row(Field::Closed, "Closed", Unit::Flag, false),
-    row(Field::Periodic, "Periodic", Unit::Flag, false),
-    row(Field::Rational, "Rational", Unit::Flag, false),
+    row(Field::Degree, key!("Degree"), Unit::Count, false),
+    row(Field::Closed, key!("Closed"), Unit::Flag, false),
+    row(Field::Periodic, key!("Periodic"), Unit::Flag, false),
+    row(Field::Rational, key!("Rational"), Unit::Flag, false),
     row(
         Field::ControlVertices,
-        "Control vertices",
+        key!("Control vertices"),
         Unit::Count,
         false,
     ),
-    row(Field::Knots, "Knots", Unit::Count, false),
-    row(Field::X1, "Start X", Unit::Length, false),
-    row(Field::Y1, "Start Y", Unit::Length, false),
-    row(Field::X2, "End X", Unit::Length, false),
-    row(Field::Y2, "End Y", Unit::Length, false),
-    row(Field::Length, "Length", Unit::Length, false),
+    row(Field::Knots, key!("Knots"), Unit::Count, false),
+    row(Field::X1, key!("Start X"), Unit::Length, false),
+    row(Field::Y1, key!("Start Y"), Unit::Length, false),
+    row(Field::X2, key!("End X"), Unit::Length, false),
+    row(Field::Y2, key!("End Y"), Unit::Length, false),
+    row(Field::Length, key!("Length"), Unit::Length, false),
 ];
 
 const FITTED: &[Row] = &[
-    row(Field::Degree, "Degree", Unit::Count, false),
-    row(Field::Closed, "Closed", Unit::Flag, false),
-    row(Field::Periodic, "Periodic", Unit::Flag, false),
-    row(Field::Rational, "Rational", Unit::Flag, false),
+    row(Field::Degree, key!("Degree"), Unit::Count, false),
+    row(Field::Closed, key!("Closed"), Unit::Flag, false),
+    row(Field::Periodic, key!("Periodic"), Unit::Flag, false),
+    row(Field::Rational, key!("Rational"), Unit::Flag, false),
     row(
         Field::ControlVertices,
-        "Control vertices",
+        key!("Control vertices"),
         Unit::Count,
         false,
     ),
-    row(Field::Knots, "Knots", Unit::Count, false),
-    row(Field::FitPoints, "Fit points", Unit::Count, false),
-    row(Field::FitTolerance, "Fit tolerance", Unit::Length, false),
-    row(Field::X1, "Start X", Unit::Length, false),
-    row(Field::Y1, "Start Y", Unit::Length, false),
-    row(Field::X2, "End X", Unit::Length, false),
-    row(Field::Y2, "End Y", Unit::Length, false),
-    row(Field::Length, "Length", Unit::Length, false),
+    row(Field::Knots, key!("Knots"), Unit::Count, false),
+    row(Field::FitPoints, key!("Fit points"), Unit::Count, false),
+    row(
+        Field::FitTolerance,
+        key!("Fit tolerance"),
+        Unit::Length,
+        false,
+    ),
+    row(Field::X1, key!("Start X"), Unit::Length, false),
+    row(Field::Y1, key!("Start Y"), Unit::Length, false),
+    row(Field::X2, key!("End X"), Unit::Length, false),
+    row(Field::Y2, key!("End Y"), Unit::Length, false),
+    row(Field::Length, key!("Length"), Unit::Length, false),
 ];
 
 pub(super) fn rows(s: &Spline) -> &'static [Row] {

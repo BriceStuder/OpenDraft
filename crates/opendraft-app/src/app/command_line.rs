@@ -3,6 +3,7 @@
 
 use eframe::egui;
 use opendraft_ui::{Colors, Theme};
+use rust_i18n::t;
 
 use crate::cmdline::Suggestion;
 
@@ -168,12 +169,12 @@ impl PanelViewer<'_> {
             let (icon, tip) = if expanded {
                 (
                     opendraft_ui::icons::COMMAND_LINE_COLLAPSE,
-                    "Collapse the command history",
+                    t!("Collapse the command history"),
                 )
             } else {
                 (
                     opendraft_ui::icons::COMMAND_LINE_EXPAND,
-                    "Show the command history",
+                    t!("Show the command history"),
                 )
             };
             let chevron = ui
