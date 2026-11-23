@@ -4,6 +4,7 @@
 //! drawing's view is changed on the UI thread, through the drawing's
 //! `zoom_to` slot, as soon as the answer is in.
 
+use opendraft_ui::key;
 use std::sync::{Arc, Mutex};
 
 use opendraft_commands::{Answer, Cancelled, Command, Editor, Options};
@@ -41,7 +42,7 @@ fn first_corner(prompt: &str) -> Options<Point> {
 /// dimensions and no snaps (a view is not a drawn object). There is no base
 /// point, as dynamic input would draw a length and an angle from it.
 fn opposite_corner(first: Point) -> Options<Point> {
-    Options::new("Specify opposite corner")
+    Options::new(key!("Specify opposite corner"))
         .no_snap()
         .ghost(move |at| {
             vec![Entity::Rectangle {
@@ -53,7 +54,7 @@ fn opposite_corner(first: Point) -> Options<Point> {
 
 /// Ask what to zoom to. Enter ends with nothing changed.
 fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
-    let mut prompt = first_corner("Specify first corner of window");
+    let mut prompt = first_corner(key!("Specify first corner of window"));
     loop {
         let first = match ed.ask_point(prompt)? {
             Answer::Value(at) => at,
@@ -62,7 +63,7 @@ fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
             Answer::Keyword(k) if k == "Objects" => return zoom_objects(ed),
             Answer::Keyword(_) => {
                 // Window: the corners are asked anyway.
-                prompt = first_corner("Specify first corner of window");
+                prompt = first_corner(key!("Specify first corner of window"));
                 continue;
             }
             Answer::Enter => return Ok(None),
@@ -75,7 +76,7 @@ fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
             return Ok(Some(ZoomTo::Window(first, second)));
         }
         ed.say("The window has no size.");
-        prompt = first_corner("Specify first corner of window");
+        prompt = first_corner(key!("Specify first corner of window"));
     }
 }
 
@@ -84,7 +85,7 @@ fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
 /// which run off to infinity) are left out, as ZE leaves them out.
 fn zoom_objects(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     let ids = match ed.pickset() {
-        [] => ed.get_selection("Select objects")?,
+        [] => ed.get_selection(key!("Select objects"))?,
         picked => picked.to_vec(),
     };
     let found = ed.read(move |doc| {

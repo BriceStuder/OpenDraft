@@ -9,6 +9,7 @@
 use opendraft_canvas::Region;
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked, Swept};
 use opendraft_core::{End, Entity, EntityId, Point};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::edges_sweep::{ask_fence, ask_window, change_swept, edges_for, put_back};
@@ -329,7 +330,7 @@ fn choose_edges(
 /// choice is remembered (`TRIMEXTENDMODE`). Returns whether it changed.
 fn switch_mode(ed: &Editor, quick: &mut bool) -> Result<bool, Cancelled> {
     let current = if *quick { "Quick" } else { "Standard" };
-    let options = Options::<String>::new("Enter a trim mode option")
+    let options = Options::<String>::new(key!("Enter a trim mode option"))
         .keyword("Quick", "Q")
         .keyword("Standard", "S")
         .default(current.to_owned());

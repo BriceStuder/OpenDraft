@@ -5,6 +5,7 @@
 //! each layout viewport have their own; a layout's sheet has none. Each
 //! change is one undo step (`opendraft_commands::SetCcs`).
 
+use opendraft_ui::key;
 use std::f64::consts::FRAC_PI_2;
 
 use opendraft_commands::{
@@ -58,7 +59,7 @@ fn ccs(ed: &mut Editor, view: Option<(Point, f64)>) -> Result<(), Cancelled> {
         return Ok(());
     };
     ed.say(format!("Current coordinate system: {name}"));
-    let options = PointOptions::new("Specify origin of CCS (Enter for World)")
+    let options = PointOptions::new(key!("Specify origin of CCS (Enter for World)"))
         .keyword("Object", "OB")
         .keyword("View", "V")
         .keyword("Rotate", "R")
@@ -79,7 +80,7 @@ fn ccs(ed: &mut Editor, view: Option<(Point, f64)>) -> Result<(), Cancelled> {
                 }
             },
             "Rotate" => {
-                let options = NumberOptions::new("Specify rotation angle about Z axis")
+                let options = NumberOptions::new(key!("Specify rotation angle about Z axis"))
                     .default(FRAC_PI_2)
                     .turn()
                     .base(current.origin);
@@ -95,7 +96,7 @@ fn ccs(ed: &mut Editor, view: Option<(Point, f64)>) -> Result<(), Cancelled> {
 
 /// Origin, then a point on the X axis (Enter keeps the current direction).
 fn by_points(ed: &Editor, space: CcsSpace, current: Ccs, origin: Point) -> Result<(), Cancelled> {
-    let options = PointOptions::new("Specify point on X-axis (Enter to accept)").base(origin);
+    let options = PointOptions::new(key!("Specify point on X-axis (Enter to accept)")).base(origin);
     let ccs = match ed.ask_point(options)? {
         Answer::Value(on_x) => match Ccs::through(origin, on_x) {
             Some(ccs) => ccs,
@@ -112,7 +113,7 @@ fn by_points(ed: &Editor, space: CcsSpace, current: Ccs, origin: Point) -> Resul
 /// Line the system up with a picked object.
 fn by_object(ed: &Editor, space: CcsSpace, current: Ccs) -> Result<(), Cancelled> {
     loop {
-        let picked = match ed.ask_object(Options::new("Select object to align CCS"))? {
+        let picked = match ed.ask_object(Options::new(key!("Select object to align CCS")))? {
             Answer::Value(picked) => picked,
             _ => return Ok(()),
         };
@@ -137,7 +138,7 @@ fn previous(ed: &Editor, space: CcsSpace) -> Result<(), Cancelled> {
 
 /// Restore, Save, Delete and list the systems saved by name.
 fn named(ed: &Editor, space: CcsSpace, current: Ccs) -> Result<(), Cancelled> {
-    let options = Options::<String>::new("Enter an option")
+    let options = Options::<String>::new(key!("Enter an option"))
         .keyword("Restore", "R")
         .keyword("Save", "S")
         .keyword("Delete", "D")
@@ -149,9 +150,9 @@ fn named(ed: &Editor, space: CcsSpace, current: Ccs) -> Result<(), Cancelled> {
         return list(ed);
     }
     let message = match choice.as_str() {
-        "Save" => "Enter name to save the current CCS as",
-        "Delete" => "Enter name of coordinate system to delete",
-        _ => "Enter name of coordinate system to restore",
+        "Save" => key!("Enter name to save the current CCS as"),
+        "Delete" => key!("Enter name of coordinate system to delete"),
+        _ => key!("Enter name of coordinate system to restore"),
     };
     let name = match ed.ask_string(Options::<String>::new(message))? {
         Answer::Value(name) => name.trim().to_owned(),

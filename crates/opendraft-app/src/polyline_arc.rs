@@ -7,6 +7,7 @@ use opendraft_core::arc_make::{
     from_start_end_angle, from_start_end_direction, from_start_end_radius,
 };
 use opendraft_core::{bulge, Entity, Point};
+use opendraft_ui::key;
 
 use crate::arc_cmd::{arc_through, centre_after, shown, to_end_from_centre};
 use crate::draw::{distance, line, MIN_SIZE};
@@ -87,8 +88,8 @@ pub(crate) fn arc_option(
 }
 
 fn by_angle(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
-    let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
-    let options = PointOptions::new("Specify endpoint of arc")
+    let angle = ed.get_angle(NumberOptions::new(key!("Specify included angle")).turn())?;
+    let options = PointOptions::new(key!("Specify endpoint of arc"))
         .base(from)
         .keyword("CEnter", "CE")
         .keyword("Radius", "R")
@@ -100,9 +101,12 @@ fn by_angle(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
             opendraft_core::arc_make::from_center_start_angle(center, from, angle)
         }
         Answer::Keyword(_) => {
-            let radius = positive(ed, NumberOptions::new("Specify radius of arc").base(from))?;
+            let radius = positive(
+                ed,
+                NumberOptions::new(key!("Specify radius of arc")).base(from),
+            )?;
             let direction = ed.get_angle(
-                NumberOptions::new("Specify direction of chord")
+                NumberOptions::new(key!("Specify direction of chord"))
                     .default(0.0)
                     .base(from),
             )?;
@@ -114,9 +118,12 @@ fn by_angle(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
 
 fn by_direction(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
     let direction = ed.get_angle(
-        NumberOptions::new("Specify the tangent direction for the start point of arc").base(from),
+        NumberOptions::new(key!(
+            "Specify the tangent direction for the start point of arc"
+        ))
+        .base(from),
     )?;
-    let options = PointOptions::new("Specify endpoint of arc")
+    let options = PointOptions::new(key!("Specify endpoint of arc"))
         .base(from)
         .ghost(move |at| preview(from, from_start_end_direction(from, at, direction), at));
     let end = ed.get_point(options)?;
@@ -124,17 +131,20 @@ fn by_direction(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
 }
 
 fn by_radius(ed: &Editor, from: Point, heading: Point) -> Result<Option<Entity>, Cancelled> {
-    let radius = positive(ed, NumberOptions::new("Specify radius of arc").base(from))?;
-    let options = PointOptions::new("Specify endpoint of arc")
+    let radius = positive(
+        ed,
+        NumberOptions::new(key!("Specify radius of arc")).base(from),
+    )?;
+    let options = PointOptions::new(key!("Specify endpoint of arc"))
         .base(from)
         .keyword("Angle", "A")
         .ghost(move |at| preview(from, radius_arc(from, at, heading, radius), at));
     Ok(match ed.ask_point(options)? {
         Answer::Value(end) => radius_arc(from, end, heading, radius),
         Answer::Keyword(_) => {
-            let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
+            let angle = ed.get_angle(NumberOptions::new(key!("Specify included angle")).turn())?;
             let direction = ed.get_angle(
-                NumberOptions::new("Specify direction of chord")
+                NumberOptions::new(key!("Specify direction of chord"))
                     .default(0.0)
                     .base(from),
             )?;
@@ -145,11 +155,11 @@ fn by_radius(ed: &Editor, from: Point, heading: Point) -> Result<Option<Entity>,
 }
 
 fn by_second_point(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
-    let options = PointOptions::new("Specify second point on arc")
+    let options = PointOptions::new(key!("Specify second point on arc"))
         .base(from)
         .ghost(move |at| vec![line(from, at)]);
     let second = ed.get_point(options)?;
-    let options = PointOptions::new("Specify end point of arc")
+    let options = PointOptions::new(key!("Specify end point of arc"))
         .base(second)
         .ghost(move |at| preview(from, arc_through(from, second, at), at));
     let end = ed.get_point(options)?;

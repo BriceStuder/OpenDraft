@@ -5,6 +5,7 @@ use opendraft_commands::{
     Answer, Cancelled, Editor, NumberOptions, NumberOrPoint, Options, PointOptions,
 };
 use opendraft_core::{Entity, Object, Point};
+use opendraft_ui::key;
 
 use crate::modify::{entities_of, objects_of};
 use crate::text::plural;
@@ -50,11 +51,11 @@ fn apply(
 /// picked from the base point, or (new length) given by two points.
 fn reference_factor(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f64, Cancelled> {
     let reference = loop {
-        let options = NumberOptions::new("Specify reference length").default(1.0);
+        let options = NumberOptions::new(key!("Specify reference length")).default(1.0);
         let length = match ed.ask_distance_or_point(options)? {
             Answer::Value(NumberOrPoint::Number(length)) => length,
             Answer::Value(NumberOrPoint::Point(first)) => {
-                let options = PointOptions::new("Specify second point").base(first);
+                let options = PointOptions::new(key!("Specify second point")).base(first);
                 distance(first, ed.get_point(options)?)
             }
             _ => return Err(Cancelled),
@@ -66,7 +67,7 @@ fn reference_factor(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f6
     };
     loop {
         let shown = originals.to_vec();
-        let options = NumberOptions::new("Specify new length")
+        let options = NumberOptions::new(key!("Specify new length"))
             .base(base)
             .keyword("Points", "P")
             .ghost(move |at| {
@@ -79,8 +80,9 @@ fn reference_factor(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f6
         let length = match ed.ask_distance(options)? {
             Answer::Value(length) => length,
             Answer::Keyword(_) => {
-                let first = ed.get_point("Specify first point")?;
-                let second = ed.get_point(PointOptions::new("Specify second point").base(first))?;
+                let first = ed.get_point(key!("Specify first point"))?;
+                let second =
+                    ed.get_point(PointOptions::new(key!("Specify second point")).base(first))?;
                 distance(first, second)
             }
             Answer::Enter => return Err(Cancelled),
@@ -96,18 +98,18 @@ fn reference_factor(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f6
 /// the distance from the base point to a picked point (relative to 1), or by
 /// a reference length and a new one. Copy keeps the originals.
 pub fn scale_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let objects = objects_of(ed, &ids)?;
     let originals = entities_of(ed, &ids)?;
     if let Some(why) = originals.iter().find_map(Entity::scale_refusal) {
         ed.say(why);
         return Ok(());
     }
-    let base = ed.get_point("Specify base point")?;
+    let base = ed.get_point(key!("Specify base point"))?;
     let mut copy = false;
     let factor = loop {
         let shown = originals.clone();
-        let options = Options::new("Specify scale factor")
+        let options = Options::new(key!("Specify scale factor"))
             .base(base)
             .keyword("Copy", "C")
             .keyword("Reference", "R")
@@ -143,17 +145,17 @@ pub fn scale_objects(ed: &mut Editor) -> Result<(), Cancelled> {
 /// angle defaults to 0; the new one is typed, picked from the base point or
 /// given by two points.
 fn reference_angle(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f64, Cancelled> {
-    let options = NumberOptions::new("Specify the reference angle").default(0.0);
+    let options = NumberOptions::new(key!("Specify the reference angle")).default(0.0);
     let reference = match ed.ask_angle_or_point(options)? {
         Answer::Value(NumberOrPoint::Number(angle)) => angle,
         Answer::Value(NumberOrPoint::Point(first)) => {
-            let options = PointOptions::new("Specify second point").base(first);
+            let options = PointOptions::new(key!("Specify second point")).base(first);
             direction(first, ed.get_point(options)?)
         }
         _ => return Err(Cancelled),
     };
     let shown = originals.to_vec();
-    let options = NumberOptions::new("Specify new angle")
+    let options = NumberOptions::new(key!("Specify new angle"))
         .base(base)
         .keyword("Points", "P")
         .ghost(move |at| {
@@ -163,8 +165,9 @@ fn reference_angle(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f64
     let new = match ed.ask_angle(options)? {
         Answer::Value(angle) => angle,
         Answer::Keyword(_) => {
-            let first = ed.get_point("Specify first point")?;
-            let second = ed.get_point(PointOptions::new("Specify second point").base(first))?;
+            let first = ed.get_point(key!("Specify first point"))?;
+            let second =
+                ed.get_point(PointOptions::new(key!("Specify second point")).base(first))?;
             direction(first, second)
         }
         Answer::Enter => return Err(Cancelled),
@@ -176,16 +179,16 @@ fn reference_angle(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f64
 /// from the base point to a picked point, or from a reference angle to a new
 /// one. Copy keeps the originals.
 pub fn rotate_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let objects = objects_of(ed, &ids)?;
     let originals = entities_of(ed, &ids)?;
-    let base = ed.get_point("Specify base point")?;
+    let base = ed.get_point(key!("Specify base point"))?;
     let mut copy = false;
     // A picked angle counts from the coordinate system's X axis.
     let zero = ed.read(|doc| doc.ccs().angle)?;
     let angle = loop {
         let shown = originals.clone();
-        let options = NumberOptions::new("Specify rotation angle")
+        let options = NumberOptions::new(key!("Specify rotation angle"))
             .turn()
             .base(base)
             .keyword("Copy", "C")

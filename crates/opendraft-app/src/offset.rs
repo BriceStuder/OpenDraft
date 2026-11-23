@@ -4,6 +4,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked, PointOptions};
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 /// Distances at or below this are refused.
 const MIN_DISTANCE: f64 = 1e-9;
@@ -32,7 +33,7 @@ fn copy_for(target: &Entity, gap: Gap, at: Point) -> Option<Entity> {
 pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut erase = false;
     let gap = loop {
-        let options = NumberOptions::new("Specify offset distance")
+        let options = NumberOptions::new(key!("Specify offset distance"))
             .keyword("Through", "T")
             .keyword("Erase", "E");
         match ed.ask_distance(options)? {
@@ -41,7 +42,7 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             Answer::Keyword(k) if k == "Through" => break Gap::Through,
             Answer::Keyword(_) => {
                 let answer = ed.get_keyword(
-                    Options::<String>::new("Erase source object after offsetting?")
+                    Options::<String>::new(key!("Erase source object after offsetting?"))
                         .keyword("Yes", "Y")
                         .keyword("No", "N")
                         .default("No".to_owned()),
@@ -52,9 +53,9 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
     };
     loop {
-        let Ok(Answer::Value(Picked { id, .. })) =
-            ed.ask_object(Options::<Picked>::new("Select object to offset or <exit>"))
-        else {
+        let Ok(Answer::Value(Picked { id, .. })) = ed.ask_object(Options::<Picked>::new(key!(
+            "Select object to offset or <exit>"
+        ))) else {
             return Ok(());
         };
         let Some(object) = ed.read(move |doc| doc.object(id).cloned())? else {
@@ -71,8 +72,8 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
         let shown = target.clone();
         let message = match gap {
-            Gap::Distance(_) => "Specify point on side to offset",
-            Gap::Through => "Specify through point",
+            Gap::Distance(_) => key!("Specify point on side to offset"),
+            Gap::Through => key!("Specify through point"),
         };
         let options = PointOptions::new(message)
             .ghost(move |at| copy_for(&shown, gap, at).into_iter().collect());

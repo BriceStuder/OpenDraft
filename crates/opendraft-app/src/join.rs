@@ -5,6 +5,7 @@
 
 use opendraft_commands::{Cancelled, Editor};
 use opendraft_core::{join, Entity, EntityId};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -15,7 +16,7 @@ const GAP: f64 = 1e-6;
 /// meets end to end becomes one object. The first of each group keeps its
 /// layer and place in the drawing order; the rest are removed. One undo step.
 pub fn join_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let chosen = ed.pickset_or_select("Select objects to join")?;
+    let chosen = ed.pickset_or_select(key!("Select objects to join"))?;
     let ids = chosen.clone();
     let found = ed.read(move |doc| -> Vec<(EntityId, Entity)> {
         ids.iter()

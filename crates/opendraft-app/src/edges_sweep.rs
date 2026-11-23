@@ -7,6 +7,7 @@
 use opendraft_canvas::{select_in, Region};
 use opendraft_commands::{Answer, Cancelled, Editor, GhostStyle, PointOptions, Transaction};
 use opendraft_core::{Attributes, Document, Entity, EntityId, Point};
+use opendraft_ui::key;
 
 use crate::edges::{plan, Mode};
 
@@ -184,7 +185,7 @@ pub(crate) fn change_swept(
 pub(crate) fn ask_window(ed: &Editor, first: Point) -> Result<Vec<Point>, Cancelled> {
     // Square to the screen, however the view is turned.
     let twist = ed.read(|doc| doc.view_twist())?;
-    let options = PointOptions::new("Specify opposite corner")
+    let options = PointOptions::new(key!("Specify opposite corner"))
         .ghost_style(GhostStyle::Crossing)
         .ghost(move |at| vec![outline(Region::view_corners(first, at, twist), true)]);
     let opposite = ed.get_point(options)?;
@@ -197,8 +198,8 @@ pub(crate) fn ask_fence(ed: &Editor) -> Result<Option<Vec<Point>>, Cancelled> {
     let mut points: Vec<Point> = Vec::new();
     loop {
         let message = match points.is_empty() {
-            true => "Specify first fence point",
-            false => "Specify next fence point (Enter to finish)",
+            true => key!("Specify first fence point"),
+            false => key!("Specify next fence point (Enter to finish)"),
         };
         let so_far = points.clone();
         let options = PointOptions::new(message)

@@ -15,6 +15,7 @@
 use opendraft_canvas::GripHit;
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
 use opendraft_core::{Attributes, Entity, EntityId, Point};
+use opendraft_ui::key;
 
 use crate::state::AppState;
 
@@ -187,18 +188,18 @@ fn ask(
             .collect()
     };
     let message = match (mode, copy) {
-        (Mode::Stretch, false) => "Specify stretch point",
-        (Mode::Stretch, true) => "Specify stretch point (copy)",
-        (Mode::Lengthen, false) => "Specify new end point",
-        (Mode::Lengthen, true) => "Specify new end point (copy)",
-        (Mode::Move, false) => "Specify move point",
-        (Mode::Move, true) => "Specify move point (copy)",
-        (Mode::Rotate, false) => "Specify rotation angle",
-        (Mode::Rotate, true) => "Specify rotation angle (copy)",
-        (Mode::Scale, false) => "Specify scale factor",
-        (Mode::Scale, true) => "Specify scale factor (copy)",
-        (Mode::Mirror, false) => "Specify second point of mirror line",
-        (Mode::Mirror, true) => "Specify second point of mirror line (copy)",
+        (Mode::Stretch, false) => key!("Specify stretch point"),
+        (Mode::Stretch, true) => key!("Specify stretch point (copy)"),
+        (Mode::Lengthen, false) => key!("Specify new end point"),
+        (Mode::Lengthen, true) => key!("Specify new end point (copy)"),
+        (Mode::Move, false) => key!("Specify move point"),
+        (Mode::Move, true) => key!("Specify move point (copy)"),
+        (Mode::Rotate, false) => key!("Specify rotation angle"),
+        (Mode::Rotate, true) => key!("Specify rotation angle (copy)"),
+        (Mode::Scale, false) => key!("Specify scale factor"),
+        (Mode::Scale, true) => key!("Specify scale factor (copy)"),
+        (Mode::Mirror, false) => key!("Specify second point of mirror line"),
+        (Mode::Mirror, true) => key!("Specify second point of mirror line (copy)"),
     };
     macro_rules! options {
         ($options:expr) => {{
@@ -291,7 +292,8 @@ fn edit_grips(ed: &mut Editor, hits: &[GripHit]) -> Result<(), Cancelled> {
             Reply::Keyword(k) => {
                 match k.as_str() {
                     "Base point" => {
-                        base = ed.get_point(PointOptions::new("Specify base point").base(base))?;
+                        base =
+                            ed.get_point(PointOptions::new(key!("Specify base point")).base(base))?;
                     }
                     "Copy" => copy = true,
                     "Lengthen" => mode = Mode::Lengthen,
