@@ -133,10 +133,37 @@ fn end_geom(entity: &Entity, last: bool) -> Option<Geom> {
     }
 }
 
-/// `key` as a track in `document`, if the object is still there and still
-/// the kind it was.
-pub fn resolve(document: &Document, key: Acquired) -> Option<Track> {
-    let entity = document.get(key.object()?)?;
+/// Where what is kept is looked for: the drawing, and the stand-ins for what
+/// the command has drawn but not yet added (the segments of a polyline in
+/// progress), which the pointer snaps to as if they were in the drawing.
+#[derive(Clone, Copy)]
+pub struct Drawing<'a> {
+    pub document: &'a Document,
+    pub extra: &'a [Object],
+}
+
+impl<'a> Drawing<'a> {
+    /// The object `id`, in the drawing or among the stand-ins.
+    pub fn get(self, id: EntityId) -> Option<&'a Entity> {
+        self.document
+            .get(id)
+            .or_else(|| self.extra.iter().find(|o| o.id == id).map(|o| &o.entity))
+    }
+}
+
+impl<'a> From<&'a Document> for Drawing<'a> {
+    fn from(document: &'a Document) -> Self {
+        Self {
+            document,
+            extra: &[],
+        }
+    }
+}
+
+/// `key` as a track in `drawing`, if the object is still there and still the
+/// kind it was.
+pub fn resolve<'a>(drawing: impl Into<Drawing<'a>>, key: Acquired) -> Option<Track> {
+    let entity = drawing.into().get(key.object()?)?;
     match key {
         Acquired::End { last, .. } => {
             let geom = end_geom(entity, last)?;
