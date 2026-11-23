@@ -30,7 +30,7 @@ pub use fixed::{candidates, geometric_center};
 pub use otrack::{directions, Guide, Origin, TrackInput, Tracking};
 
 pub use overrides::SnapOverride;
-pub use track::{resolve, targets, Acquired, Geom, Track};
+pub use track::{resolve, targets, Acquired, Drawing, Geom, Track};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SnapKind {
