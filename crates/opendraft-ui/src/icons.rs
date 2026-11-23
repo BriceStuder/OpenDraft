@@ -247,6 +247,7 @@ icons! {
     MODIFY_STRETCH = '\u{e441}';
     MODIFY_TRIM = '\u{e151}';
     NAV_GIZMO_HOME = '\u{e0f8}';
+    NAV_GIZMO_LEVEL = '\u{e14e}';
     OSNAP_APPARENT_INTERSECTION = '\u{e0ec}';
     OSNAP_CENTRE = '\u{e0ec}';
     OSNAP_END = '\u{e0ec}';
