@@ -147,16 +147,14 @@ jobs:
           deb_arch=$(dpkg --print-architecture)
           echo "MACHINE=$machine" >> "$GITHUB_ENV"
           echo "DEB_ARCH=$deb_arch" >> "$GITHUB_ENV"
-          # No AppImage on ARM: cargo-packager's AppRun only searches x86_64-linux-gnu
-          # for the bundled libraries, so it cannot find them on aarch64.
-          if [ "$machine" = x86_64 ]; then formats=deb,appimage; else formats=deb; fi
-          cargo packager --release -f "$formats"
+          cargo packager --release -f deb,appimage
           ls -la dist/packager
+          # On ARM the AppImage's AppRun does not search usr/lib/aarch64-linux-gnu, where
+          # the bundled libraries land; this moves them where it looks.
+          if [ "$machine" != x86_64 ]; then bash scripts/fix_appimage_libs.sh dist/packager/*.AppImage; fi
           cp dist/packager/*.deb "dist/OpenDraft-${VERSION}-linux-${deb_arch}.deb"
-          if [ "$machine" = x86_64 ]; then
-            cp dist/packager/*.AppImage "dist/OpenDraft-${VERSION}-linux-${machine}.AppImage"
-            chmod +x "dist/OpenDraft-${VERSION}-linux-${machine}.AppImage"
-          fi
+          cp dist/packager/*.AppImage "dist/OpenDraft-${VERSION}-linux-${machine}.AppImage"
+          chmod +x "dist/OpenDraft-${VERSION}-linux-${machine}.AppImage"
       - name: The .deb installs, works (the full smoke test) and removes cleanly on a bare Ubuntu 22.04
         if: runner.os == 'Linux' && !contains(needs.verify.outputs.version, '-')
         shell: bash
@@ -165,7 +163,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD:/repo:ro" ubuntu:22.04             bash /repo/scripts/test_deb.sh "/dist/OpenDraft-${VERSION}-linux-${DEB_ARCH}.deb"
       - name: The AppImage starts on a bare Ubuntu 22.04, bringing its own libraries
-        if: runner.os == 'Linux' && runner.arch == 'X64' && !contains(needs.verify.outputs.version, '-')
+        if: runner.os == 'Linux' && !contains(needs.verify.outputs.version, '-')
         shell: bash
         env:
           VERSION: ${{ needs.verify.outputs.version }}
