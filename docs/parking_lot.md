@@ -109,7 +109,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Layout colours beyond the paper: AutoCAD's Drawing Window Colors sets each part (crosshair, grid, snap marker and the rest) per context; OpenDraft chooses them to suit the paper, and only the paper (light or dark, and light paper's colour from six presets; no colour of one's own, which would need a picker limited to light colours) is the user's to pick. Colours are drawn as they are, so pale ones such as yellow (colour 2) are hard to read on light paper of any colour, as in AutoCAD; a screen-only option that darkens very pale line colours on light paper would fix that, at the cost of the sheet no longer previewing the print (issue #192). Model space's background colour is the palette's, not the user's to pick (suggested in #192). A viewport that runs off the sheet draws its contents over the dark surround there, where black lines on light paper all but vanish (AutoCAD's surround is grey); the part off the sheet does not plot.
 - The Layout tab's other AutoCAD items: viewport Clip, Lock as a Lock/Unlock list, and the Create View, Modify View, Update and Styles and Standards panels.
 - Display and named View plot areas (no saved view state).
-- Plotting: `-PAGESETUP`, cancel and progress in the dialog, the last printer remembered, margins and media from the printer, a Page Setup Manager with named setups, collation, plot-style tables; proof on real printers and cutters (`docs/ROADMAP.md`, Phase 3).
+- Plotting: `-PAGESETUP`, cancel and progress in the dialog, the last printer remembered, a printer's own minimum margins (read from the system, to allow editing a printer's margins down to them; only PDF and SVG margins can be edited now) and media from the printer, a Page Setup Manager with named setups, collation, plot-style tables; proof on real printers and cutters (`docs/ROADMAP.md`, Phase 3).
 - Annotative scales, and `PSLTSCALE`/`MSLTSCALE`.
 - Check the R2000 export in AutoCAD (only ezdxf so far).
 
@@ -138,6 +138,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Icons: reloading while the app runs, recolouring for a light theme; the Layout tab's six icons (`assets/icons/layout-*.svg`) are Lucide's outlines, not yet redrawn in the Home tab's style.
 - Purge: a confirmation window, previews beyond blocks.
 - Crash log: telling the user, when it happens, that a crash was recorded.
+- Translations (issue #138): only the setup is built (Settings > Display > Language, two French texts). Still to wrap in `t!`: the ribbon, menus and palettes, the prompts, prompt options and command names (both bilingual, `_LINE` always works), messages and dialogs; then the complete French file.
 
 ## Assistant and automation
 
@@ -168,8 +169,11 @@ Built and covered by tests, but not yet seen working where it matters. Take a li
 - **In AutoCAD** (open, `AUDIT`, edit, save): the Model-tab freeze's XDATA on LAYER records (it should survive a save), everything the DXF writer emits for dimensions, multileaders, legacy leaders and block attributes, ByBlock, and the R2000 layout export; the DWG reader's object counts against an AutoCAD listing; the ellipse angle convention and the spline prompts; MTEXT tracking at the end of a line; the rectangular array's default spacing; the multileader style's angle constraints and attachment codes.
 - **Custom coordinate systems in files:** an ordinate dimension made in a turned system has not been checked against one AutoCAD made (only the sign of group 51 against ezdxf); a DXF with a turned UCS has not been opened in AutoCAD (ezdxf reads ours cleanly), and no DWG with a turned UCS has been read: every local sample has the World UCS, so the decoded values are proven only to keep the header aligned. The paper space `$PUCS*` variables are not written (AutoCAD's defaults are World).
 - **By hand in the real app, the custom coordinate system:** tried 22-11-2026: Rotate, Object (on a line) and View in the Model tab; the turned grid, axes, icon and crosshair; grid snap to the turned grid; ortho holding a line along the turned X axis, with the dynamic input fields; LINE with typed relative points; the refusal on a layout's sheet; a viewport's own system (entered with MSPACE, turned 45 degrees while the Model tab's stayed at 30). Not yet tried: polar and object snap tracking, ROTATE and grip rotate, and the commands that orient what they make (TEXT, RECTANG, DIMLINEAR, DIMORDINATE, ARRAYRECT, HATCH, MLEADER), which are covered by tests only.
+- **By hand in the real app, view rotation:** tried 22-11-2026 on the Model tab: `ROTATEVIEW 30` (grid, axes icon and a rectangle turned the right way), `PLAN` (level, extents), Ctrl+middle-drag (about a quarter turn counter-clockwise), and picking a line in a turned view (its Properties and grips right). Not tried: Shift steps and Esc by hand, `ROTATEVIEW` Points, a viewport and a layout's sheet refusing, text, hatches and snap markers in a turned view, and a DXF with a turned viewport opened in AutoCAD.
+
 - **By hand in the real app** (tests drive the commands through `AppState` only): DIMEDIT and DIMTEDIT, TEXTEDIT and TEXT typed in place, DIST and AREA, Overkill and Purge, ByBlock, the attribute editor's double-click and the ATTDEF dialog, the warning before a large file opens, the window and lasso selection style, snapping to a polyline while drawing it, the Ortho pointer test, the Paragraph dialog (nobody has seen it), DIVIDE, MEASURE, grips, TRIM and BREAK on points and construction lines, and whether the Settings dialog's Files and Automation pages fit its height without scrolling.
 - **On real machines:** the 64-bit ARM Linux builds (.deb, tarball and AppImage) on a Raspberry Pi; so far they have only run in CI on an ARM runner (issue #164); Linux desktops beyond Mint (and on Mint: the Home page's templates and file actions, the assistant's key in the Secret Service, the crash log); the Windows exe on a machine with no Visual C++ Redistributable; the MSI's shortcut and file association opening with no console window; physical printers, and CUPS versions other than the one tried; the update check against the real GitHub.
+- **Language detection on Linux:** the Language setting's "System" choice (`sys_locale`, `language.rs`) has been tried on Windows only; not yet on a Linux desktop set to a real French locale (`fr_FR.UTF-8`), where the ribbon should come up in French.
 - **With a real model:** the assistant with Mistral on a real drawing, including its warning before it generates shapes (it needs your API key, and sends drawing data to the service).
 - **With real files:** DWG polylines (LWPOLYLINE, 2D POLYLINE, VERTEX), rotated or mirrored entities, entities with a Z, true colours on entities and extended data (none of the sample drawings has them); the large DWG object fix against the reporter's file.
 
@@ -204,7 +208,12 @@ Pull request 1 (the system) is built. Left out of it:
 - **DWG**: the UCS table (named systems, object type 0x3F) and viewports' own systems are not decoded; only the header's model-space UCS is (and DWG skips layouts anyway). DXF does all three.
 - Polyline and rectangle Object rule: ours takes the segment nearest the pick; AutoCAD takes a polyline's first segment. Kept on purpose; say so if users expect AutoCAD's.
 
-Pull request 2, view rotation: the camera turns (painting, picking, caches, layout viewport twist, plotting); a command to rotate the view and a gesture (not chosen yet); PLAN; View then lines up with a turned view (today it takes the corner of an unturned view).
+Pull request 2 (view rotation: the camera turns, Ctrl+middle-drag, `ROTATEVIEW`, `PLAN`, viewport twist in files) is built; see `docs/ARCHITECTURE.md`, "View rotation". Left out of it:
+
+- No ribbon item or icon for `ROTATEVIEW` and `PLAN` (ZOOM has none either); no `UCSICON`-style or status-bar control; the mouse pivot is always the canvas centre.
+- The Model tab's twist is not saved in `.odraft` or DXF (only viewports').
+- The MTEXT editor window and its ruler are laid out on the screen's axes, so editing text in a turned view is awkward; PDSIZE point shapes (cross, X) turn with the view.
+- The API/MCP view and the plot preview have no twist.
 
 Later: `UCSICON` settings (the icon cannot be switched off or moved to the origin), a manager dialog (`UCSMAN`), dragging the icon by its grips, the dimension arcs of the dynamic input drawn along a turned system's axes (the Cartesian legs are still screen-aligned), the systems through MCP, the legacy LEADER's text (it is level with the world).
 

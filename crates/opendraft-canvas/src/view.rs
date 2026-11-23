@@ -35,6 +35,7 @@ mod insert_pieces;
 mod layer_paint;
 mod layout;
 mod paint;
+mod paper;
 mod path_stroke;
 mod point_paint;
 mod previous;
@@ -49,12 +50,14 @@ mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
 pub(crate) mod text_raster;
+mod twist;
 pub use text_paint::paint_text;
 mod types;
 
 use layout::LayoutInput;
 pub use layout::Space;
 pub use select_gesture::SelectionStyle;
+use types::Request;
 pub use types::{
     CanvasOutput, CanvasStyle, Click, Crosshair, Ghost, GhostStyle, GridSettings, PointPrompt,
     PointerSizes, RegionSelect,
@@ -73,13 +76,6 @@ const BOX_MIN_PX: f32 = 4.0;
 /// Factor for the Zoom In / Zoom Out commands.
 const STEP_ZOOM: f64 = 1.5;
 
-enum Request {
-    Extents,
-    Zoom(f64),
-    /// ZOOM Window: two corners in the space being worked in.
-    Window(Point, Point),
-}
-
 /// Per-drawing view state.
 #[derive(Default)]
 pub struct View {
@@ -92,6 +88,8 @@ pub struct View {
     /// The coordinate system in force this frame (tooltip angles count from
     /// its X axis).
     ccs: opendraft_core::Ccs,
+    /// A Ctrl+middle-drag turning the view, while one is under way.
+    twist_drag: Option<twist::TwistDrag>,
     /// Wheel zoom speed as a multiple of the base rate; none means 1.
     zoom_speed: Option<f32>,
     constraint: Option<Arc<dyn Fn(Point) -> Point + Send + Sync>>,
@@ -141,6 +139,9 @@ pub struct View {
     sheet: Camera,
     /// Frame the whole sheet on the next frame.
     sheet_fit: bool,
+    /// Where the paper lies on the sheet, kept while the drawing is as it
+    /// was (see `paper.rs`).
+    paper: std::cell::RefCell<Option<paper::KeptPaper>>,
     /// The active viewport's window on screen: input outside it is ignored.
     clip: Option<Rect>,
     /// Whether the running middle-drag pans the viewport (decided where it
@@ -209,9 +210,17 @@ impl View {
                 Some(Request::Window(a, b)) => {
                     self.camera.show_window(Bounds::from_points(a, b), rect);
                 }
+                Some(Request::Twist(twist, fit)) => {
+                    self.camera.set_twist(twist);
+                    if fit {
+                        self.camera.fit(document.bounds(), rect);
+                    }
+                }
                 None => {}
             }
-            if response.dragged_by(PointerButton::Middle) {
+            if let Some(twist) = self.twist_by_drag(ui, &response, rect.center()) {
+                self.camera.set_twist(twist);
+            } else if response.dragged_by(PointerButton::Middle) {
                 self.camera.pan_by_pixels(response.drag_delta());
             } else {
                 self.pan_through_editor(ui, rect);

@@ -132,10 +132,13 @@ impl OpenDraftApp {
         if let Some(at) = snap_menu {
             self.state.snap_menu = Some((at.x, at.y));
         }
-        if let Some(at) = context_menu.filter(|_| !self.state.command_running()) {
+        // While a command runs, a right-click on the drawing is Enter at every
+        // prompt, "Select objects" included, as in AutoCAD; otherwise a menu.
+        let running = self.state.command_running();
+        if let Some(at) = context_menu.filter(|_| !running) {
             self.state.context_menu = Some((at.x, at.y));
         }
-        if prompt_enter {
+        if prompt_enter || (running && context_menu.is_some()) {
             let input = &self.state.docs[self.state.active].dynamic_input;
             if !input.draft.is_empty()
                 || !input.locks.is_empty()

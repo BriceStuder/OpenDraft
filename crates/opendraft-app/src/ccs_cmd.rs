@@ -13,7 +13,7 @@ use opendraft_commands::{
 use opendraft_core::ccs::name_refusal;
 use opendraft_core::ccs_align::aligned_to;
 use opendraft_core::units::{format_angle, format_point};
-use opendraft_core::{Bounds, Ccs, CcsSpace, Document, NamedCcs, Point};
+use opendraft_core::{Ccs, CcsSpace, Document, NamedCcs, Point};
 
 use crate::state::AppState;
 
@@ -48,9 +48,9 @@ fn set(ed: &Editor, space: CcsSpace, ccs: Ccs) -> Result<(), Cancelled> {
     })
 }
 
-/// The command. `view` is the part of the drawing on screen when it started
-/// (the View option's corner).
-fn ccs(ed: &mut Editor, view: Option<Bounds>) -> Result<(), Cancelled> {
+/// The command. `view` is the drawing point at the lower-left corner of the
+/// view when it started and how the view is turned (the View option).
+fn ccs(ed: &mut Editor, view: Option<(Point, f64)>) -> Result<(), Cancelled> {
     let (space, current, name) =
         ed.read(|doc| (doc.active_ccs_space(), doc.ccs(), current_name(doc)))?;
     let Some(space) = space else {
@@ -70,8 +70,9 @@ fn ccs(ed: &mut Editor, view: Option<Bounds>) -> Result<(), Cancelled> {
         Answer::Enter => set(ed, space, Ccs::WORLD),
         Answer::Keyword(k) => match k.as_str() {
             "Object" => by_object(ed, space, current),
+            // Level with the screen: the turn of the drawing on it, undone.
             "View" => match view {
-                Some(view) => set(ed, space, Ccs::new(view.min, 0.0)),
+                Some((corner, twist)) => set(ed, space, Ccs::new(corner, -twist)),
                 None => {
                     ed.say("The view is not known yet.");
                     Ok(())
@@ -253,8 +254,9 @@ pub fn commands() -> Vec<Command<AppState>> {
 impl AppState {
     /// Start CCS, remembering what is on screen for its View option.
     pub fn start_ccs(&mut self) {
-        let view = self.docs[self.active].view.visible_area();
-        self.start_command("CCS", move |ed| ccs(ed, view));
+        let view = &self.docs[self.active].view;
+        let at = view.view_corner().map(|corner| (corner, view.twist()));
+        self.start_command("CCS", move |ed| ccs(ed, at));
     }
 
     /// The World button: the world system, at once, in the space being edited.

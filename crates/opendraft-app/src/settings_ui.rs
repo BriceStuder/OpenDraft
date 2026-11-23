@@ -19,14 +19,18 @@ pub enum FolderRequest {
     Choose(Location),
 }
 
-pub const TABS: &[&str] = &[
-    "Display",
-    "Drafting",
-    "Files",
-    "Performance",
-    "Automation",
-    "Updates",
-];
+/// The page titles, in the interface language.
+pub fn tabs() -> [std::borrow::Cow<'static, str>; 6] {
+    use rust_i18n::t;
+    [
+        t!("Display"),
+        t!("Drafting"),
+        t!("Files"),
+        t!("Performance"),
+        t!("Automation"),
+        t!("Updates"),
+    ]
+}
 
 pub fn page(
     ui: &mut egui::Ui,
@@ -136,6 +140,8 @@ fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
             },
         );
     });
+    ui.add_space(6.0);
+    crate::language::settings_group(ui, theme, draft);
 }
 
 fn drafting(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
@@ -383,6 +389,22 @@ fn files(
         ui.label(
             egui::RichText::new(
                 "If the app closes unexpectedly, you are offered these copies at the next start.",
+            )
+            .size(theme.font_size_small)
+            .color(theme.colors.text_weak),
+        );
+    });
+    ui.add_space(6.0);
+    widgets::group_box(ui, theme, "Plot", |ui| {
+        ui.horizontal(|ui| {
+            widgets::field_label(ui, theme, "Default margins");
+            let margin = &mut draft.plot_margins_mm;
+            widgets::number_field_width(ui, theme, margin, "mm", 0.1, 80.0);
+            *margin = margin.clamp(0.0, 100.0);
+        });
+        ui.label(
+            egui::RichText::new(
+                "For PDF and SVG plots of a new drawing, and of a drawing whose printer is not                  on this computer.",
             )
             .size(theme.font_size_small)
             .color(theme.colors.text_weak),

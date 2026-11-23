@@ -71,9 +71,11 @@ fn layouts_and_viewports_come_in_with_their_sheets() {
     // One window: the sheet-wide viewport is not one and the side view is skipped.
     assert_eq!(layout1.viewports.len(), 1);
     let vp = &layout1.viewports[0];
-    // Paper coordinates start at the printable area, so everything on the
-    // sheet moves by the left (8) and bottom (6) margins.
-    assert_eq!(vp.center, Point::new(108.0, 86.0));
+    // As in AutoCAD, paper coordinates start at the printable area: they are
+    // kept as they are, and the paper's corner lies at minus the left (8)
+    // and bottom (6) margins.
+    assert_eq!(vp.center, Point::new(100.0, 80.0));
+    assert_eq!(layout1.sheet_bounds().min, Point::new(-8.0, -6.0));
     assert_eq!((vp.width, vp.height), (50.0, 40.0));
     assert!((vp.scale - 0.5).abs() < 1e-12, "40 mm showing 80 units");
     assert_eq!(vp.view_center, Point::new(10.0, 5.0));
@@ -88,14 +90,14 @@ fn layouts_and_viewports_come_in_with_their_sheets() {
     assert_eq!(
         on_sheet,
         [Entity::Line {
-            start: Point::new(18.0, 16.0),
-            end: Point::new(68.0, 16.0)
+            start: Point::new(10.0, 10.0),
+            end: Point::new(60.0, 10.0)
         }]
     );
 
     let off = &plan.viewports[0];
     assert!(!off.on && off.locked);
-    assert_eq!(off.center, Point::new(210.0, 148.5), "no margins, no shift");
+    assert_eq!(off.center, Point::new(210.0, 148.5));
     assert_eq!(doc.objects_of_layout(plan.id).len(), 1);
 
     assert_eq!(doc.model_objects().count(), 2);

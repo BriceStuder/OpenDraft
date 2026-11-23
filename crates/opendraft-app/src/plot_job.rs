@@ -33,6 +33,9 @@ pub struct PlotPreview {
     pub notes: Vec<String>,
     /// The sheet drawn, to draw part of it larger when the preview is zoomed.
     pub sheet: std::sync::Arc<opendraft_core::plot::PlotSheet>,
+    /// Where the plot puts the drawing: the offset from the printable corner
+    /// and paper mm per drawing unit, for the fields Center and Fit turn off.
+    pub placed: Option<(opendraft_core::Point, f64)>,
 }
 
 /// What the printers of the machine are, found off the UI thread.
@@ -46,7 +49,9 @@ pub use crate::plot_target::{initial_device, Target};
 
 impl PlotDialog {
     /// Once the printers are known, go back to the one used last time if it
-    /// is still there.
+    /// is still there. When the drawing's own printer is not on this
+    /// computer, the plot stays a PDF, and that printer's margins mean
+    /// nothing for it: the default margins replace them, in the draft.
     pub fn settle(&mut self) {
         let Printers::Ready(list) = &self.printers else {
             return;
@@ -54,6 +59,8 @@ impl PlotDialog {
         if let Some(wanted) = self.remembered.take() {
             if let Some(found) = list.iter().find(|p| p.id.0 == wanted) {
                 self.target = Target::Printer(found.id.clone());
+            } else if wanted == self.draft.plot.device_name {
+                self.draft.plot.margins_mm = [self.default_margins; 4];
             }
         }
     }
@@ -81,6 +88,9 @@ pub struct PlotDialog {
     pub dpi: u32,
     /// The printer used last time, taken once the printers are known.
     pub remembered: Option<String>,
+    /// The margins a PDF takes when the drawing's printer is not here
+    /// (the `plot_margins_mm` setting).
+    pub default_margins: f64,
     pub printers: Printers,
     /// Write the draft to the layout when Plot is pressed.
     pub save_changes: bool,
@@ -201,6 +211,7 @@ pub fn render_preview(document: &Document, draft: &PageDraft) -> Result<PlotPrev
         rgba,
         notes: sheet.notes.clone(),
         sheet: std::sync::Arc::new(sheet),
+        placed: opendraft_core::plot::placed(&copy, draft.space).ok(),
     })
 }
 
@@ -243,6 +254,7 @@ impl AppState {
             copies: 1,
             dpi: self.settings.plot_dpi,
             remembered,
+            default_margins: self.settings.plot_margins_mm,
             printers,
             draft,
             save_changes: true,
@@ -642,17 +654,18 @@ mod tests {
             .unwrap()
             .draft
             .plot
-            .margins_mm = [5.0; 4];
+            .margins_mm = [6.0; 4];
         state.plot_dialog_apply();
         state.plot_dialog_apply();
         assert_eq!(
             state.session().document().layouts()[0].plot.margins_mm,
-            [5.0; 4]
+            [6.0; 4]
         );
         state.undo();
         assert_eq!(
             state.session().document().layouts()[0].plot.margins_mm,
-            [0.0; 4]
+            [5.0; 4],
+            "the new layout's default margins"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -784,6 +797,34 @@ mod tests {
     }
 
     #[test]
+    fn a_pdf_in_place_of_a_printer_not_here_takes_the_default_margins() {
+        let (mut state, _, dir) = state();
+        with_fake(&mut state);
+        let mut layouts = state.session().document().layouts().to_vec();
+        layouts[0].plot.device_name = "Plotter at the office.pc3".into();
+        layouts[0].plot.margins_mm = [4.2, 5.8, 4.1, 3.8];
+        state.perform(opendraft_commands::SetLayouts::new("Page setup", layouts));
+        state.settings.plot_margins_mm = 7.0;
+        state.open_plot_dialog(false);
+        printers_of(&mut state);
+        let dialog = state.command_dialogs.plot.as_mut().unwrap();
+        dialog.settle();
+        assert_eq!(dialog.target, super::Target::Pdf);
+        assert_eq!(dialog.draft.plot.margins_mm, [7.0; 4]);
+
+        // A printer that is here keeps its own.
+        let mut layouts = state.session().document().layouts().to_vec();
+        layouts[0].plot.device_name = "Office".into();
+        state.perform(opendraft_commands::SetLayouts::new("Page setup", layouts));
+        state.open_plot_dialog(false);
+        printers_of(&mut state);
+        let dialog = state.command_dialogs.plot.as_mut().unwrap();
+        dialog.settle();
+        assert_eq!(dialog.draft.plot.margins_mm, [4.2, 5.8, 4.1, 3.8]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn the_device_to_start_on_is_the_layouts_then_the_last_used() {
         use super::{initial_device, Target};
         assert_eq!(
@@ -850,7 +891,7 @@ mod tests {
         );
         assert_eq!(state.session().document().layouts()[0].plot, layout_before);
         state.undo();
-        assert_eq!(state.session().document().model_plot().margins_mm, [0.0; 4]);
+        assert_eq!(state.session().document().model_plot().margins_mm, [5.0; 4]);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -129,6 +129,13 @@ struct ViewportDto {
     /// The coordinate system used through this viewport (none: the world's).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ccs: Option<super::ccs::CcsDto>,
+    /// How far the view turns model space, in radians counter-clockwise.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    twist: f64,
+}
+
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
 }
 
 impl LayoutDto {
@@ -157,6 +164,7 @@ impl LayoutDto {
                     on: v.on,
                     frozen: v.frozen.iter().map(|l| l.0).collect(),
                     ccs: super::ccs::CcsDto::unless_world(v.ccs),
+                    twist: v.twist,
                 })
                 .collect(),
             paper_frozen: layout.paper_frozen.iter().map(|l| l.0).collect(),
@@ -204,6 +212,7 @@ pub fn into_layouts(dtos: Vec<LayoutDto>) -> Result<Vec<Layout>, FileError> {
                     Some(ccs) => ccs.read()?,
                     None => opendraft_core::Ccs::WORLD,
                 },
+                twist: v.twist.rem_euclid(std::f64::consts::TAU),
             };
             if !viewport.is_valid() {
                 return invalid(format!("viewport {} has no usable size or scale", v.id));

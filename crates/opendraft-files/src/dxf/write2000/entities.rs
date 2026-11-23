@@ -15,10 +15,11 @@ pub(super) fn write_viewports(
     index: usize,
 ) -> Result<(), FileError> {
     let owner = ids.records[index];
-    // The page as it is read, where the sheet's objects lie; the file keeps
-    // them from the printable corner.
+    // The paper on the sheet: the page as it is read, its printable corner
+    // at the origin.
     let (w, hgt) = layout.page_size();
     let corner = layout.printable_corner();
+    let middle = opendraft_core::Point::new(w / 2.0 - corner.x, hgt / 2.0 - corner.y);
     let viewport = |out: &mut Out,
                     handle: u32,
                     v: &Viewport,
@@ -33,18 +34,16 @@ pub(super) fn write_viewports(
         out.pair(67, 1);
         out.pair(8, 0);
         out.pair(100, "AcDbViewport");
-        out.point3(
-            10,
-            finite(v.center.x - corner.x)?,
-            finite(v.center.y - corner.y)?,
-            0.0,
-        );
+        out.point3(10, finite(v.center.x)?, finite(v.center.y)?, 0.0);
         out.pair(40, finite(v.width)?);
         out.pair(41, finite(v.height)?);
         out.pair(68, status);
         out.pair(69, id);
-        out.pair(12, finite(v.view_center.x)?);
-        out.pair(22, finite(v.view_center.y)?);
+        // The view centre in the view's own axes, which the twist turns.
+        let (s, c) = v.twist.sin_cos();
+        let (x, y) = (v.view_center.x, v.view_center.y);
+        out.pair(12, finite(x * c - y * s)?);
+        out.pair(22, finite(x * s + y * c)?);
         out.pair(13, 0.0);
         out.pair(23, 0.0);
         out.pair(14, 10.0);
@@ -58,7 +57,7 @@ pub(super) fn write_viewports(
         out.pair(44, 0.0);
         out.pair(45, finite(v.height / v.scale)?);
         out.pair(50, 0.0);
-        out.pair(51, 0.0);
+        out.pair(51, finite(v.twist.to_degrees())?);
         out.pair(72, 100);
         for layer in &v.frozen {
             if let Some(handle) = ids.layers.get(layer) {
@@ -78,16 +77,17 @@ pub(super) fn write_viewports(
     };
     let sheet = Viewport {
         id: opendraft_core::ViewportId(0),
-        center: opendraft_core::Point::new(w / 2.0, hgt / 2.0),
+        center: middle,
         width: w * 1.1,
         height: hgt * 1.1,
-        view_center: opendraft_core::Point::new(w / 2.0, hgt / 2.0),
+        view_center: middle,
         scale: 1.0,
         locked: false,
         on: true,
         // AutoCAD keeps the paper space's frozen layers here.
         frozen: layout.paper_frozen.clone(),
         ccs: opendraft_core::Ccs::WORLD,
+        twist: 0.0,
     };
     viewport(out, ids.overall[index], &sheet, 1, 1, 557_088)?;
     for (i, v) in layout.viewports.iter().enumerate() {

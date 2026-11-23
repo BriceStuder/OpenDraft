@@ -279,10 +279,7 @@ pub fn write(document: &Document) -> Result<Encoded, FileError> {
                 .iter()
                 .filter(|o| o.layout == Some(layout.id))
             {
-                let corner = layout.printable_corner();
-                let mut printable = object.clone();
-                printable.entity = printable.entity.translated(-corner.x, -corner.y);
-                write_object(out, h, &ids, document, &printable, owner, true)?;
+                write_object(out, h, &ids, document, object, owner, true)?;
             }
             Ok(())
         };
@@ -561,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sheet_turned_a_quarter_is_kept_from_the_corner_of_its_page_as_read() {
+    fn a_sheet_keeps_autocads_coordinates_and_a_turned_paper_reads_landscape() {
         // AutoCAD's landscape A4: the paper feeds portrait, the plot is turned.
         let mut original = drawing();
         let mut layouts = original.layouts().to_vec();
@@ -573,8 +570,8 @@ mod tests {
         original.set_layouts(layouts);
         let encoded = write(&original).unwrap();
 
-        // Read across, the page's left margin is the paper's bottom one (5)
-        // and its bottom margin the paper's right one (6).
+        // As in AutoCAD, the sheet's origin is the printable corner: its
+        // objects are written as they are.
         let pairs = pairs(&encoded.bytes);
         let mut from = 0;
         let sheet_line = loop {
@@ -585,11 +582,17 @@ mod tests {
             from = at + 1;
         };
         let number = |code| value(sheet_line, code).unwrap().parse::<f64>().unwrap();
-        assert_eq!((number(10), number(20)), (0.0, -1.0));
+        assert_eq!((number(10), number(20)), (5.0, 5.0));
 
         let loaded = crate::dxf::read::read(&encoded.bytes).unwrap();
         let plan = &loaded.document.layouts()[0];
-        assert_eq!(plan.sheet_bounds().max, Point::new(297.0, 210.0));
+        // Read across, the page's left margin is the paper's bottom one (5)
+        // and its bottom margin the paper's right one (6).
+        let sheet = plan.sheet_bounds();
+        assert_eq!(
+            (sheet.min, sheet.max),
+            (Point::new(-5.0, -6.0), Point::new(292.0, 204.0))
+        );
         let line = loaded
             .document
             .objects_of_layout(plan.id)
@@ -628,6 +631,9 @@ mod tests {
         assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
         let mut expected = plot;
         expected.flags |= opendraft_core::plot_settings::flags::MODEL_TYPE;
+        // Centred, it is written with its centring, as AutoCAD writes it: the
+        // 40 × 25 mm window in the 412 × 287 mm printable area.
+        expected.origin_mm = Point::new(186.0, 131.0);
         assert_eq!(loaded.document.model_plot(), &expected);
         let sheet = &loaded.document.layouts()[0].plot;
         assert_eq!(

@@ -2,8 +2,7 @@
 
 use eframe::egui;
 use opendraft_core::{
-    paper_size, paper_size_name, plot_settings::flags, PlotArea, PlotRotation, PlotScale,
-    StandardScale, PAPER_SIZES,
+    paper_size, paper_size_name, plot_settings::flags, PlotArea, PlotRotation, PAPER_SIZES,
 };
 use opendraft_ui::widgets;
 
@@ -14,6 +13,17 @@ use crate::plot_controls::control_state;
 
 const CUSTOM: &str = "Custom";
 
+/// Where the plot puts the drawing: the offset from the printable corner of
+/// the page as it is read, and paper millimetres per drawing unit
+/// (`opendraft_core::plot::placed`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(in crate::app) struct Placed {
+    pub origin: opendraft_core::Point,
+    pub scale: f64,
+}
+
+mod margins;
+mod scale_offset;
 mod stored;
 
 pub(in crate::app) use stored::{shade_box, style_box};
@@ -34,6 +44,7 @@ pub(in crate::app) fn left_column(
     ui: &mut egui::Ui,
     theme: &opendraft_ui::Theme,
     draft: &mut PageDraft,
+    placed: Option<Placed>,
 ) {
     widgets::group_box(ui, theme, "Printer/plotter", |ui| {
         let shown = if draft.plot.device_name == "none_device" {
@@ -67,7 +78,8 @@ pub(in crate::app) fn left_column(
     ui.add_space(6.0);
     paper_box(ui, theme, draft);
     ui.add_space(6.0);
-    plot_box(ui, theme, draft, None);
+    let file = [DEVICE_PDF, DEVICE_SVG].contains(&draft.plot.device_name.as_str());
+    plot_box(ui, theme, draft, None, file, placed);
 }
 
 /// Page Setup's right column: what is stored but not applied yet, and the options.
@@ -230,11 +242,16 @@ fn orientation_row(ui: &mut egui::Ui, draft: &mut PageDraft) {
 /// What is plotted and how big: the area, the scale and the offset as one
 /// form, a caption and its controls on each row.
 /// With `pick`, a Window area gets a Pick button that sets it to true.
+/// For a `file` device (PDF, SVG) the margins can be changed; a printer's
+/// are only shown. `placed` is where the plot puts the drawing, shown in the
+/// offset and scale fields that Center and Fit turn off.
 pub(in crate::app) fn plot_box(
     ui: &mut egui::Ui,
     theme: &opendraft_ui::Theme,
     draft: &mut PageDraft,
     pick: Option<&mut bool>,
+    file: bool,
+    placed: Option<Placed>,
 ) {
     widgets::group_box(ui, theme, "Plot", |ui| {
         let controls = controls_of(draft);
@@ -266,14 +283,18 @@ pub(in crate::app) fn plot_box(
                     }
                 }
                 widgets::field_label(ui, theme, "Scale");
-                scale_row(ui, theme, draft, &controls);
+                scale_offset::scale_row(ui, theme, draft, &controls, placed);
                 ui.end_row();
                 widgets::field_label(ui, theme, "Offset");
-                offset_row(ui, theme, draft, &controls);
+                scale_offset::offset_row(ui, theme, draft, &controls, placed);
                 ui.end_row();
+                if file {
+                    margins::margins_row(ui, theme, draft);
+                    ui.end_row();
+                }
             });
         let (.., m) = draft.page_as_read();
-        if m.iter().any(|v| *v != 0.0) {
+        if !file && m.iter().any(|v| *v != 0.0) {
             ui.small(format!(
                 "Printable margins L {:.1}, B {:.1}, R {:.1}, T {:.1} mm",
                 m[0], m[1], m[2], m[3]
@@ -314,92 +335,17 @@ fn area_dropdown(
     });
 }
 
-/// Fit to paper, or plotted millimetres = drawing units.
-fn scale_row(
-    ui: &mut egui::Ui,
-    theme: &opendraft_ui::Theme,
-    draft: &mut PageDraft,
-    controls: &crate::plot_controls::PlotControlState,
-) {
-    ui.horizontal(|ui| {
-        let mut fit = matches!(
-            draft.plot.scale,
-            PlotScale::Standard {
-                kind: StandardScale::Fit,
-                ..
-            }
-        );
-        let changed = ui
-            .add_enabled_ui(controls.can_fit, |ui| {
-                ui.checkbox(&mut fit, "Fit").changed()
-            })
-            .inner;
-        if changed {
-            if fit {
-                if let PlotScale::Custom {
-                    paper_units,
-                    drawing_units,
-                } = draft.plot.scale
-                {
-                    draft.kept_scale = (paper_units, drawing_units);
-                }
-                draft.plot.scale = PlotScale::Standard {
-                    kind: StandardScale::Fit,
-                    value: 1.0,
-                };
-            } else {
-                draft.plot.scale = PlotScale::Custom {
-                    paper_units: draft.kept_scale.0,
-                    drawing_units: draft.kept_scale.1,
-                };
-            }
-            set_flag(draft, flags::USE_STANDARD_SCALE, fit);
-        }
-        ui.add_enabled_ui(controls.can_edit_scale, |ui| {
-            let (paper, drawing) = match &mut draft.plot.scale {
-                PlotScale::Custom {
-                    paper_units,
-                    drawing_units,
-                } => (paper_units, drawing_units),
-                _ => (&mut draft.kept_scale.0, &mut draft.kept_scale.1),
-            };
-            widgets::number_field_width(ui, theme, paper, "mm", 0.1, 62.0);
-            ui.label("=");
-            widgets::number_field_width(ui, theme, drawing, "units", 0.1, 74.0);
-        });
-    });
-}
-
-/// Centre the plot, or its offset from the printable corner.
-fn offset_row(
-    ui: &mut egui::Ui,
-    theme: &opendraft_ui::Theme,
-    draft: &mut PageDraft,
-    controls: &crate::plot_controls::PlotControlState,
-) {
-    ui.horizontal(|ui| {
-        ui.add_enabled_ui(controls.can_center, |ui| {
-            flag_checkbox(ui, draft, flags::PLOT_CENTERED, "Center");
-        })
-        .response
-        .on_disabled_hover_text("A layout plots from the corner of its printable area.");
-        ui.add_enabled_ui(controls.can_edit_offset, |ui| {
-            widgets::field_label(ui, theme, "X");
-            widgets::number_field_width(ui, theme, &mut draft.plot.origin_mm.x, "", 1.0, 54.0);
-            widgets::field_label(ui, theme, "Y");
-            widgets::number_field_width(ui, theme, &mut draft.plot.origin_mm.y, "mm", 1.0, 64.0);
-        });
-    });
-}
-
 /// Turn the page a quarter: swap the sheet's sides, or, when the plot is
-/// already turned on the sheet, undo that turn (keeping upside-down).
+/// already turned on the sheet, undo that turn (keeping upside-down). The
+/// margins stay with the edges of the page as it is read.
 fn turn_page(draft: &mut PageDraft) {
+    let (.., read) = draft.page_as_read();
     match draft.plot.rotation {
         PlotRotation::CounterClockwise90 => draft.plot.rotation = PlotRotation::Degrees0,
         PlotRotation::Clockwise90 => draft.plot.rotation = PlotRotation::Degrees180,
         _ => std::mem::swap(&mut draft.width, &mut draft.height),
     }
+    margins::set_as_read(draft, read);
 }
 
 pub(super) fn area_name(area: &PlotArea) -> &'static str {

@@ -24,6 +24,7 @@ fn panned() -> Camera {
     Camera {
         center: Point::new(430.0, 310.0),
         zoom: 1.0,
+        twist: 0.0,
     }
 }
 

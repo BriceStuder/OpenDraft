@@ -96,7 +96,10 @@ impl OpenDraftApp {
                 ui,
                 &self.theme,
                 &mut tab,
-                settings_ui::TABS,
+                &settings_ui::tabs()
+                    .iter()
+                    .map(AsRef::as_ref)
+                    .collect::<Vec<_>>(),
                 page_height,
                 |ui, i| {
                     egui::ScrollArea::vertical()
@@ -190,7 +193,10 @@ impl OpenDraftApp {
         if new.ui_scale_percent != self.state.settings.ui_scale_percent {
             ctx.set_zoom_factor(new.zoom_factor());
         }
+        if new.language != self.state.settings.language {
+            crate::language::apply(new.language.as_deref());
+        }
         self.state.templates_dir = Location::Templates.resolve(&new);
-        self.state.settings = new;
+        self.state.set_settings(new);
     }
 }

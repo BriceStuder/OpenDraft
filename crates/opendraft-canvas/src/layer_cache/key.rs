@@ -19,16 +19,17 @@ use crate::camera::Camera;
 /// "close".
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct View {
-    camera: [u64; 3],
+    camera: [u64; 4],
     clip: [u32; 4],
 }
 
 /// The camera of `view`.
 pub(crate) fn camera_of(view: View) -> Camera {
-    let [x, y, zoom] = view.camera;
+    let [x, y, zoom, twist] = view.camera;
     Camera {
         center: opendraft_core::Point::new(f64::from_bits(x), f64::from_bits(y)),
         zoom: f64::from_bits(zoom),
+        twist: f64::from_bits(twist),
     }
 }
 
@@ -97,6 +98,7 @@ impl LayerKey {
                     i.camera.center.x.to_bits(),
                     i.camera.center.y.to_bits(),
                     i.camera.zoom.to_bits(),
+                    i.camera.twist.to_bits(),
                 ],
                 clip: bits(i.clip),
             },

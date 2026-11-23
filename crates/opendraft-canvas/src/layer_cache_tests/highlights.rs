@@ -115,6 +115,7 @@ fn highlights_off_screen_or_before_the_first_visible_entity_are_harmless() {
         rig.view.camera = Camera {
             center: Point::new(400.0, 150.0),
             zoom: 5.0,
+            twist: 0.0,
         };
     }
     for _ in 0..3 {

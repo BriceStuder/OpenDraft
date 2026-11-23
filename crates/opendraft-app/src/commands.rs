@@ -5,7 +5,7 @@
 //! `Editor` and ask the user as they go; see `draw.rs`, `modify.rs` and
 //! `selection.rs`.
 
-use opendraft_commands::{Command, Registry, RemoveEntities};
+use opendraft_commands::{Command, Registry};
 
 use crate::array_cmd::{array_objects, array_polar, array_rect};
 use crate::array_path::array_path;
@@ -41,7 +41,6 @@ use crate::stretch::stretch_objects;
 
 use crate::dock::{LayoutRequest, PanelTab};
 use crate::state::AppState;
-use crate::text::plural;
 
 pub fn build_registry() -> Registry<AppState> {
     let mut registry = Registry::default();
@@ -61,6 +60,7 @@ pub fn build_registry() -> Registry<AppState> {
         crate::canvas_style::commands(),
         crate::ccs_cmd::commands(),
         crate::zoom_cmd::commands(),
+        crate::view_twist_cmd::commands(),
     ];
     for command in all().into_iter().chain(tables.into_iter().flatten()) {
         registry
@@ -245,16 +245,7 @@ fn all() -> Vec<Command<AppState>> {
             .when(AppState::in_block_editor)
             .checked(|s| s.is_running("BCLOSE")),
         editor_command!("modify.stretch", "Stretch", stretch_objects),
-        cmd("modify.erase", "Erase", |s| {
-            if s.erase_viewport() {
-                return;
-            }
-            let ids: Vec<_> = s.selection().iter().copied().collect();
-            s.message = format!("Erased {}", plural(ids.len(), "object"));
-            s.perform(RemoveEntities::new(ids));
-        })
-        .key("Delete")
-        .when(|s| !s.selection().is_empty() || s.viewport_picked()),
+        crate::erase::command(),
         cmd("layout.mspace", "MSPACE", |s| s.mspace()).when(|s| s.space().layout().is_some()),
         cmd("layout.pspace", "PSPACE", |s| s.pspace()).when(|s| s.space().layout().is_some()),
         cmd("layout.model", "Model", |s| s.enter_model()),
@@ -642,17 +633,13 @@ mod tests {
     }
 
     #[test]
-    fn erase_is_undoable_and_needs_a_selection() {
+    fn erase_is_undoable() {
         let registry = build_registry();
         let mut state = AppState::new();
         add(&mut state, sample(1.0));
-        assert!(
-            !registry.is_enabled("modify.erase", &state),
-            "nothing selected"
-        );
-
         registry.execute("edit.select_all", &mut state).unwrap();
         registry.execute("modify.erase", &mut state).unwrap();
+        state.settle_command();
         assert!(state.session().document().is_empty());
 
         registry.execute("edit.undo", &mut state).unwrap();
@@ -680,6 +667,7 @@ mod tests {
         let second = state.session().document().objects()[1].id;
         state.click_select(Some(second), false);
         registry.execute("modify.erase", &mut state).unwrap();
+        state.settle_command();
         assert_eq!(state.session().document().len(), 2);
         assert!(state.selection().is_empty());
 

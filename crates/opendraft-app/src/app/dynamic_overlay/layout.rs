@@ -18,6 +18,8 @@ pub(super) struct Inputs<'a> {
     pub prompt: &'a Prompt,
     pub settings: &'a DynamicInputSettings,
     pub units: &'a crate::coordinates::Reading,
+    /// How far the view turns the drawing on the screen.
+    pub twist: f64,
     pub canvas: Rect,
     /// The pointer, on screen.
     pub anchor: Pos2,
@@ -108,7 +110,7 @@ fn ghost_dimensions(
         [Field::Distance, Field::Angle] => dimensions::polar(
             base,
             end,
-            -((cx.units.units.base_angle + cx.units.ccs.angle) as f32),
+            -((cx.units.units.base_angle + cx.units.ccs.angle + cx.twist) as f32),
             if cx.units.units.clockwise { 1.0 } else { -1.0 },
         ),
         [Field::Distance] => dimensions::linear(base, end),
@@ -135,6 +137,7 @@ pub(super) fn plan(
         clearance,
         show_prompt,
         text_width,
+        ..
     } = *cx;
     let fields = shown_fields(ask, settings, input);
     let prompt_width = if show_prompt {

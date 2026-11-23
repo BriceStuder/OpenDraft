@@ -83,6 +83,9 @@ pub struct Settings {
     /// Open a PDF or SVG plot in the system's viewer once it is written
     /// (the Plot dialog's "Open in viewer when done").
     pub plot_view_when_done: bool,
+    /// The margin on every side of a PDF or SVG plot of a new drawing, or of
+    /// a drawing whose printer is not on this computer (the Files page).
+    pub plot_margins_mm: f64,
     /// The experimental MCP automation endpoint is on. Off by default.
     pub automation_enabled: bool,
     /// Folders automation may open and write files in. Nothing outside
@@ -97,6 +100,9 @@ pub struct Settings {
     pub update_checks: Option<bool>,
     /// The drawing cache and the frame-time readout (the Performance page).
     pub performance: crate::performance_settings::PerformanceSettings,
+    /// The interface language (a code of `language::LANGUAGES`); `None`
+    /// follows the system's.
+    pub language: Option<String>,
 }
 
 impl Default for Settings {
@@ -124,12 +130,14 @@ impl Default for Settings {
             plot_device: String::new(),
             plot_dpi: 300,
             plot_view_when_done: true,
+            plot_margins_mm: 5.0,
             automation_enabled: false,
             automation_roots: Vec::new(),
             templates_dir: None,
             recovery_dir: None,
             update_checks: None,
             performance: Default::default(),
+            language: None,
         }
     }
 }
@@ -230,6 +238,10 @@ impl Settings {
     pub fn sanitized(mut self) -> Self {
         self.dynamic_input = self.dynamic_input.sanitized();
         self.performance = self.performance.sanitized();
+        // A language this version does not offer follows the system.
+        self.language = self
+            .language
+            .filter(|code| crate::language::is_offered(code));
         let (min, max) = GRID_SPACING_RANGE;
         self.grid_spacing = if self.grid_spacing.is_finite() {
             self.grid_spacing.clamp(min, max)
@@ -385,6 +397,7 @@ mod tests {
             plot_device: "Office".into(),
             plot_dpi: 600,
             plot_view_when_done: false,
+            plot_margins_mm: 2.5,
             automation_enabled: true,
             automation_roots: vec!["/tmp/a".into(), "C:\\Plans".into()],
             templates_dir: Some("D:\\Templates".into()),
@@ -398,6 +411,7 @@ mod tests {
                 draw_as: opendraft_canvas::Render::Triangles,
                 show_frame_time: true,
             },
+            language: Some("fr".into()),
         };
         settings.save(&mut storage);
         assert_eq!(Settings::load(Some(&storage)), settings);

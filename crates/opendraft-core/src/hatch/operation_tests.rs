@@ -96,6 +96,7 @@ fn plotted(entity: Entity) -> crate::plot::PlotSheet {
         on: true,
         frozen: Vec::new(),
         ccs: crate::ccs::Ccs::WORLD,
+        twist: 0.0,
     };
     doc.set_layouts(vec![Layout {
         id,
@@ -172,6 +173,7 @@ fn a_pattern_too_dense_to_plot_is_an_error_not_a_hang() {
             on: true,
             frozen: Vec::new(),
             ccs: crate::ccs::Ccs::WORLD,
+            twist: 0.0,
         }],
         paper_frozen: Vec::new(),
     }]);

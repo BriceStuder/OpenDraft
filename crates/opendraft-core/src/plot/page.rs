@@ -7,7 +7,8 @@
 //! way it is read.
 
 use super::{plot_sheet, PlotError, PlotSheet, PlotSpace};
-use crate::{Document, PlotRotation, Point};
+use crate::plot_plan::validate_plot;
+use crate::{Bounds, Document, LayoutId, PlotRotation, Point};
 
 /// Whether the plot is turned a quarter on its paper.
 fn quarter(rotation: PlotRotation) -> bool {
@@ -76,6 +77,98 @@ pub fn page_as_read(
     } else {
         (width, height, margins)
     }
+}
+
+/// Where a layout's paper lies on its sheet, in sheet millimetres: the
+/// inverse of the placement the plot makes (area, scale, offset, centring),
+/// so the canvas can show the paper where the plot will put the drawing on
+/// it. Extents plots the layout's objects to find them; the other areas need
+/// nothing drawn.
+pub fn paper_on_sheet(document: &Document, layout: LayoutId) -> Result<Bounds, PlotError> {
+    let layout = document.layout(layout).ok_or(PlotError::NoLayout)?;
+    validate_plot(&layout.plot).map_err(PlotError::Invalid)?;
+    let (width, height) = layout.page_size();
+    let mut sheet = PlotSheet {
+        width,
+        height,
+        paths: Vec::new(),
+        fills: Vec::new(),
+        notes: Vec::new(),
+    };
+    if layout.plot.area == crate::PlotArea::Extents {
+        sheet = super::layout_sheet(document, layout)?;
+    }
+    let source = super::settings::source_bounds(&sheet, &layout.plot)?;
+    let (at, factor) = super::settings::placement(&layout.plot, &source);
+    let paper = super::settings::upright_paper(&layout.plot);
+    let on_sheet = |p: Point| {
+        Point::new(
+            source.min.x + (p.x - at.x) / factor,
+            source.min.y + (p.y - at.y) / factor,
+        )
+    };
+    Ok(Bounds::from_points(
+        on_sheet(paper.min),
+        on_sheet(paper.max),
+    ))
+}
+
+/// The offset a centred plot of `space` comes to, as AutoCAD keeps it (DXF
+/// codes 46 and 47): the room left on each axis, halved. AutoCAD gives it
+/// along the paper as it feeds, so a plot turned a quarter has X and Y
+/// swapped (an AutoCAD landscape A4 with a 277 × 190 frame keeps 5.81,
+/// 5.19: 5.81 is the centring up the page). AutoCAD shows and plots a
+/// drawing it opens with this offset until it works the centring out again
+/// (when its printer is changed), so a file must carry it. `None` when the
+/// plot is not centred, or is a layout area (never centred).
+pub fn centred_origin(document: &Document, space: PlotSpace) -> Result<Option<Point>, PlotError> {
+    let plot = match space {
+        PlotSpace::Model => document.model_plot(),
+        PlotSpace::Layout(id) => &document.layout(id).ok_or(PlotError::NoLayout)?.plot,
+    };
+    let centred = plot.flags & crate::plot_settings::flags::PLOT_CENTERED != 0;
+    if !centred || plot.area == crate::PlotArea::Layout {
+        return Ok(None);
+    }
+    let (origin, _) = placed(document, space)?;
+    Ok(Some(if quarter(plot.rotation) {
+        Point::new(origin.y, origin.x)
+    } else {
+        origin
+    }))
+}
+
+/// Where a plot of `space` puts the drawing: the offset from the printable
+/// corner of the page as it is read to the drawing's lower-left corner, and
+/// paper millimetres per drawing unit. What Center and Fit come to, for Plot
+/// and Page Setup to show. Extents plots the drawing to find it.
+pub fn placed(document: &Document, space: PlotSpace) -> Result<(Point, f64), PlotError> {
+    let (plot, layout) = match space {
+        PlotSpace::Model => (document.model_plot(), None),
+        PlotSpace::Layout(id) => {
+            let layout = document.layout(id).ok_or(PlotError::NoLayout)?;
+            (&layout.plot, Some(layout))
+        }
+    };
+    validate_plot(plot).map_err(PlotError::Invalid)?;
+    let (width, height) = layout.map_or((0.0, 0.0), crate::Layout::page_size);
+    let mut drawn = PlotSheet {
+        width,
+        height,
+        paths: Vec::new(),
+        fills: Vec::new(),
+        notes: Vec::new(),
+    };
+    if plot.area == crate::PlotArea::Extents {
+        drawn = match layout {
+            None => super::model_space::model_sheet(document)?,
+            Some(layout) => super::layout_sheet(document, layout)?,
+        };
+    } else if layout.is_none() && !matches!(plot.area, crate::PlotArea::Window { .. }) {
+        return Err(PlotError::UnsupportedArea);
+    }
+    let source = super::settings::source_bounds(&drawn, plot)?;
+    Ok(super::settings::placed_origin(plot, &source))
 }
 
 #[cfg(test)]
@@ -168,5 +261,134 @@ mod tests {
             touches_right |= near(p.x, w - right);
         }
         assert!(touches_left && touches_right, "fitted across the page");
+    }
+
+    /// A landscape A4 layout with no viewport, 5 mm margins and one line on
+    /// its sheet from (100, 100) to (200, 150).
+    fn sheet_with_a_line(area: crate::PlotArea) -> (Document, LayoutId) {
+        let mut doc = Document::default();
+        let mut layout = doc.new_layout("A4", 297.0, 210.0);
+        layout.viewports.clear();
+        layout.plot.margins_mm = [5.0; 4];
+        layout.plot.area = area;
+        layout.plot.flags |= crate::plot_settings::flags::PLOT_CENTERED;
+        let id = layout.id;
+        doc.set_layouts(vec![layout]);
+        doc.set_active_layout(Some(id));
+        doc.add(Entity::Line {
+            start: Point::new(100.0, 100.0),
+            end: Point::new(200.0, 150.0),
+        });
+        (doc, id)
+    }
+
+    fn near_point(a: Point, b: Point) -> bool {
+        (a.x - b.x).abs() < 1e-6 && (a.y - b.y).abs() < 1e-6
+    }
+
+    #[test]
+    fn a_layouts_origin_is_the_printable_corner_so_its_paper_starts_below_it() {
+        let (doc, id) = sheet_with_a_line(crate::PlotArea::Layout);
+        let sheet = plot_sheet(&doc, PlotSpace::Layout(id)).unwrap();
+        assert!(near_point(
+            sheet.paths[0].points[0],
+            Point::new(105.0, 105.0)
+        ));
+        let paper = paper_on_sheet(&doc, id).unwrap();
+        assert!(near_point(paper.min, Point::new(-5.0, -5.0)), "{paper:?}");
+        assert!(near_point(paper.max, Point::new(292.0, 205.0)), "{paper:?}");
+    }
+
+    #[test]
+    fn the_paper_lies_on_the_sheet_where_the_plot_puts_the_drawing_on_it() {
+        // Extents, centred: the line's 100 × 50 box goes in the middle of the
+        // printable area, which is the middle of the paper here.
+        let (mut doc, id) = sheet_with_a_line(crate::PlotArea::Extents);
+        let paper = paper_on_sheet(&doc, id).unwrap();
+        assert!(near_point(paper.min, Point::new(1.5, 20.0)), "{paper:?}");
+        assert!(near_point(paper.max, Point::new(298.5, 230.0)), "{paper:?}");
+        let sheet = plot_sheet(&doc, PlotSpace::Layout(id)).unwrap();
+        let start = sheet.paths[0].points[0];
+        assert!(near_point(start, Point::new(100.0 - 1.5, 100.0 - 20.0)));
+
+        // Not centred, offset (2, 3) from the printable corner.
+        let mut layouts = doc.layouts().to_vec();
+        layouts[0].plot.flags &= !crate::plot_settings::flags::PLOT_CENTERED;
+        layouts[0].plot.origin_mm = Point::new(2.0, 3.0);
+        doc.set_layouts(layouts);
+        let paper = paper_on_sheet(&doc, id).unwrap();
+        assert!(near_point(paper.min, Point::new(93.0, 92.0)), "{paper:?}");
+
+        // At 1:2 the paper covers twice as much of the sheet.
+        let mut layouts = doc.layouts().to_vec();
+        layouts[0].plot.scale = crate::PlotScale::Custom {
+            paper_units: 1.0,
+            drawing_units: 2.0,
+        };
+        doc.set_layouts(layouts);
+        let paper = paper_on_sheet(&doc, id).unwrap();
+        assert!(
+            (paper.max.x - paper.min.x - 594.0).abs() < 1e-6,
+            "{paper:?}"
+        );
+    }
+
+    #[test]
+    fn a_centred_plot_keeps_its_centring_as_autocad_does() {
+        // The 100 × 50 box in the 287 × 200 printable area of a landscape A4.
+        let (mut doc, id) = sheet_with_a_line(crate::PlotArea::Extents);
+        let origin = centred_origin(&doc, PlotSpace::Layout(id))
+            .unwrap()
+            .unwrap();
+        assert!(near_point(origin, Point::new(93.5, 75.0)), "{origin:?}");
+        // Turned a quarter on portrait paper, AutoCAD gives it along the
+        // paper: X and Y swap.
+        let mut layouts = doc.layouts().to_vec();
+        let layout = &mut layouts[0];
+        (layout.width, layout.height) = (210.0, 297.0);
+        (layout.plot.paper_width_mm, layout.plot.paper_height_mm) = (210.0, 297.0);
+        layout.plot.rotation = PlotRotation::CounterClockwise90;
+        doc.set_layouts(layouts);
+        let origin = centred_origin(&doc, PlotSpace::Layout(id))
+            .unwrap()
+            .unwrap();
+        assert!(near_point(origin, Point::new(75.0, 93.5)), "{origin:?}");
+        // Not centred, or a layout area: the offset set is the one kept.
+        let mut layouts = doc.layouts().to_vec();
+        layouts[0].plot.flags &= !crate::plot_settings::flags::PLOT_CENTERED;
+        doc.set_layouts(layouts);
+        assert_eq!(centred_origin(&doc, PlotSpace::Layout(id)), Ok(None));
+    }
+
+    #[test]
+    fn what_center_and_fit_come_to_is_known_for_the_dialogs() {
+        let (mut doc, id) = sheet_with_a_line(crate::PlotArea::Extents);
+        let (origin, scale) = placed(&doc, PlotSpace::Layout(id)).unwrap();
+        assert!(near_point(origin, Point::new(93.5, 75.0)), "{origin:?}");
+        assert!((scale - 1.0).abs() < 1e-9);
+        // Fitted: the 100 × 50 box grows 2.87 times to fill 287 mm across.
+        let mut layouts = doc.layouts().to_vec();
+        layouts[0].plot.scale = crate::PlotScale::Standard {
+            kind: crate::StandardScale::Fit,
+            value: 1.0,
+        };
+        doc.set_layouts(layouts);
+        let (origin, scale) = placed(&doc, PlotSpace::Layout(id)).unwrap();
+        assert!((scale - 2.87).abs() < 1e-9, "{scale}");
+        assert!(near_point(origin, Point::new(0.0, 28.25)), "{origin:?}");
+    }
+
+    #[test]
+    fn a_turned_paper_lies_on_the_sheet_the_way_it_is_read() {
+        let (mut doc, id) = sheet_with_a_line(crate::PlotArea::Extents);
+        let mut layouts = doc.layouts().to_vec();
+        let layout = &mut layouts[0];
+        (layout.width, layout.height) = (210.0, 297.0);
+        (layout.plot.paper_width_mm, layout.plot.paper_height_mm) = (210.0, 297.0);
+        layout.plot.rotation = PlotRotation::CounterClockwise90;
+        doc.set_layouts(layouts);
+        let paper = paper_on_sheet(&doc, id).unwrap();
+        assert!(near_point(paper.min, Point::new(1.5, 20.0)), "{paper:?}");
+        assert!(near_point(paper.max, Point::new(298.5, 230.0)), "{paper:?}");
     }
 }

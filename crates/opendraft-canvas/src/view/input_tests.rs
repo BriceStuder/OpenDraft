@@ -232,3 +232,98 @@ fn a_right_click_on_a_window_above_the_canvas_opens_no_canvas_menu() {
     let out = frame_under_window(&mut view, &ctx, right_click(beside));
     assert!(out.context_menu.is_some(), "the open canvas still has one");
 }
+
+/// A frame with `modifiers` held, as egui reads them from the raw input.
+fn frame_holding(
+    view: &mut View,
+    ctx: &Context,
+    modifiers: egui::Modifiers,
+    events: Vec<Event>,
+) -> CanvasOutput {
+    let mut result = None;
+    let _ = ctx.run(
+        RawInput {
+            screen_rect: Some(SCREEN),
+            modifiers,
+            events,
+            ..RawInput::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE)
+                .show(ctx, |ui| {
+                    result = Some(view.show(
+                        ui,
+                        &style(),
+                        &GridSettings {
+                            visible: false,
+                            spacing: 10.0,
+                        },
+                        &Document::default(),
+                        &BTreeSet::new(),
+                        &SnapModes::default(),
+                    ));
+                });
+        },
+    );
+    result.expect("the canvas was shown")
+}
+
+fn middle(at: egui::Pos2, pressed: bool, modifiers: egui::Modifiers) -> Event {
+    Event::PointerButton {
+        pos: at,
+        button: PointerButton::Middle,
+        pressed,
+        modifiers,
+    }
+}
+
+/// Drag the middle button from `from` to `to`, `modifiers` held; the view's
+/// twist afterwards.
+fn middle_drag(modifiers: egui::Modifiers, from: egui::Pos2, to: egui::Pos2) -> f64 {
+    let ctx = Context::default();
+    let mut view = View::default();
+    frame_holding(&mut view, &ctx, modifiers, vec![]);
+    frame_holding(&mut view, &ctx, modifiers, vec![]);
+    frame_holding(&mut view, &ctx, modifiers, vec![Event::PointerMoved(from)]);
+    frame_holding(
+        &mut view,
+        &ctx,
+        modifiers,
+        vec![middle(from, true, modifiers)],
+    );
+    frame_holding(&mut view, &ctx, modifiers, vec![Event::PointerMoved(to)]);
+    frame_holding(&mut view, &ctx, modifiers, vec![Event::PointerMoved(to)]);
+    frame_holding(
+        &mut view,
+        &ctx,
+        modifiers,
+        vec![middle(to, false, modifiers)],
+    );
+    frame_holding(&mut view, &ctx, modifiers, vec![]);
+    view.camera.twist
+}
+
+#[test]
+fn ctrl_middle_drag_turns_the_view_and_a_plain_one_only_pans() {
+    let (right, above) = (pos2(500.0, 200.0), pos2(300.0, 50.0));
+    let ctrl = egui::Modifiers::CTRL;
+    let turned = middle_drag(ctrl, right, above);
+    assert!(
+        (turned - std::f64::consts::FRAC_PI_2).abs() < 0.1,
+        "a quarter turn counter-clockwise, got {turned}"
+    );
+    assert_eq!(middle_drag(egui::Modifiers::NONE, right, above), 0.0);
+}
+
+#[test]
+fn shift_holds_a_ctrl_middle_drag_to_fifteen_degree_steps() {
+    let both = egui::Modifiers::CTRL | egui::Modifiers::SHIFT;
+    let turned = middle_drag(both, pos2(500.0, 200.0), pos2(480.0, 100.0));
+    let step = 15.0_f64.to_radians();
+    assert!(turned != 0.0, "it turned");
+    assert!(
+        ((turned / step).round() * step - turned).abs() < 1e-9,
+        "a whole number of steps, got {turned}"
+    );
+}

@@ -39,6 +39,9 @@ opendraft-files = { path = "crates/opendraft-files" }
 opendraft-dwg = { path = "crates/opendraft-dwg" }
 opendraft-api = { path = "crates/opendraft-api" }
 opendraft-agent = { path = "crates/opendraft-agent" }
+# Translations (issue #138). Each crate that translates calls `rust_i18n::i18n!`
+# on the shared `locales/` folder at its root.
+rust-i18n = "4"
 
 # Dependencies (egui especially) are slow unoptimised; our own crates keep fast
 # incremental debug builds.
