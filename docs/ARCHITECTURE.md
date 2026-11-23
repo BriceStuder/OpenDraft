@@ -718,6 +718,25 @@ only the camera turns.
 - **Saved.** A viewport's twist is `Viewport::twist` in `.odraft` and DXF
   group 51 (degrees), with the view centre in the viewport's own axes. The
   Model tab's twist is a view setting like its zoom: it is not saved.
+- **The navigation gizmo.** In the top right of the drawing (the View ribbon's Gizmo
+  toggle, `NAVGIZMO` and Settings > Display > Navigation turn it off;
+  `Settings::show_nav_gizmo`), shown in the Model tab and
+  in an unlocked viewport, never on a layout's sheet. A home button in the middle
+  (PLAN, World: twist 0 and the extents, `View::request_plan(0.0)`), a ring of eight
+  45 degree sectors, and an arrow outside the ring that marks where the drawing's up
+  lies on the screen (screen angle 90 degrees plus the twist), so it reads at the
+  top while the view is unturned and follows every other way of turning it. A
+  sector click turns the view so that up lies on that side (top is twist 0, right
+  is a quarter turn clockwise); the sector the view is exactly at is shaded.
+  Dragging the arrow turns the view freely about the pointer's angle round the
+  gizmo (Shift holds it to 15 degrees); the drag is `View::request_twist_live`, so
+  ZOOM Previous sees it as one step. Like the other turns it only moves the view, so
+  a running command carries on. The geometry (what a point is over, the sectors,
+  the arrow) is pure and tested in `opendraft-canvas/src/nav_gizmo.rs`; painting and
+  the pointer are in `opendraft-app/src/nav_gizmo.rs`, an egui `Area`, so the
+  canvas treats the pointer over it as covered (no cursor, hover or picking). Its
+  colours are theme roles only (neutral greys; the arrow is `text_weak`, `text` when
+  hovered or dragged), and the Performance frame readout moves left of it.
 - **Not built.** See `docs/parking_lot.md`, "Plan: custom coordinate system and
   view rotation".
 
@@ -1175,7 +1194,7 @@ What the app must keep true so the API is cheap to add later:
 ## Where things are
 
 - Panels: `opendraft-app/src/app/panels.rs`; command line UI: `app/command_line.rs` (and `app/command_line_strip.rs` for its grip when docked above or below the drawing); dock layout: `dock.rs` (panels, default layout, saving), `dock/places.rs` (where hidden panels return), `dock/targets.rs` and `dock/drag.rs` (dragging a panel: tab-bar drops are egui_dock's, body drops float, explicit targets dock);
-  Properties: `properties.rs` (model) and `properties_ui.rs` (view).
+  Properties: `properties.rs` (model) and `properties_ui.rs` (view). The geometry rows are the ones every shown entity has. A polyline that traces a rectangle (four straight sides at right angles, closed or with a fifth vertex back on the first, whichever command drew it and at any angle; `opendraft-core/src/rect_shape.rs`) is titled Rectangular polyline and also shows Width and Height (its first and second sides) and Angle (its first side), typed over with the first vertex, the vertex order and the turn kept; a `Rectangle` object shares Width and Height with it.
 - Visual constants and palettes: `opendraft-ui/src/theme.rs`. What comes next:
   `docs/ROADMAP.md` (priorities and next steps), `docs/parking_lot.md` (everything
   not built yet) and `2d_commands_reference.md` (the AutoCAD command list we

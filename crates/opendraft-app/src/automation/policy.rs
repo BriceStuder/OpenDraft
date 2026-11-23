@@ -196,6 +196,7 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("view.rotate", InteractiveInApp, Ui),
     ("view.plan", InteractiveInApp, Ui),
     ("view.grid", ImmediateSafe, Ui),
+    ("view.nav_gizmo", ImmediateSafe, Ui),
     ("view.dynamic_input", ImmediateSafe, Ui),
     ("view.snap", ImmediateSafe, Ui),
     ("view.ortho", ImmediateSafe, Ui),

@@ -46,6 +46,16 @@ impl View {
         }
     }
 
+    /// Like [`request_twist`](Self::request_twist), for a turn that goes on over
+    /// many frames (the navigation gizmo's arrow being dragged): it is not a
+    /// step of its own for ZOOM Previous, which takes the pauses between the
+    /// frames as the steps, as it does for Ctrl+middle-drag.
+    pub fn request_twist_live(&mut self, twist: f64) {
+        if twist.is_finite() {
+            self.request = Some(Request::Twist(twist, false));
+        }
+    }
+
     /// [`request_twist`](Self::request_twist), then show the extents (PLAN).
     pub fn request_plan(&mut self, twist: f64) {
         if twist.is_finite() {

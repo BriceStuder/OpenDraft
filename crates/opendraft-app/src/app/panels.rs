@@ -339,7 +339,10 @@ impl PanelViewer<'_> {
             }
         }
         self.state.frame_readout.finish(started);
-        if let (true, Some(canvas)) = (perf.show_frame_time, output.rect) {
+        let canvas = output
+            .rect
+            .map(|c| crate::nav_gizmo::show_in(ui.ctx(), self.state, c, self.theme));
+        if let (true, Some(canvas)) = (perf.show_frame_time, canvas) {
             let doc = &self.state.docs[self.state.active];
             let objects = doc.session.document().objects().len();
             let stats = doc.view.cache_stats();

@@ -7,10 +7,12 @@ mod hatch;
 mod infinite;
 mod mleader;
 mod polyline;
+mod shared;
 mod spline;
 mod text;
 mod unit;
 
+pub use shared::{common_rows, shared_value, title};
 pub use unit::{format, parse, Unit};
 
 use opendraft_core::{arc, Entity, Point};
@@ -36,6 +38,9 @@ pub enum Field {
     /// Number of vertices of a polyline.
     Vertices,
     Width,
+    /// A rectangle's width, along its first side for a polyline that traces
+    /// one (`Width` is a polyline's global width and a text's wrap width).
+    RectWidth,
     Height,
     Area,
     /// What a dimension measures, before its scale factor and rounding.
@@ -143,7 +148,7 @@ const RECTANGLE: &[Row] = &[
     row(Field::Y1, key!("Corner 1 Y"), Unit::Length, true),
     row(Field::X2, key!("Corner 2 X"), Unit::Length, true),
     row(Field::Y2, key!("Corner 2 Y"), Unit::Length, true),
-    row(Field::Width, key!("Width"), Unit::Length, true),
+    row(Field::RectWidth, key!("Width"), Unit::Length, true),
     row(Field::Height, key!("Height"), Unit::Length, true),
     row(Field::Area, key!("Area"), Unit::Area, false),
 ];
@@ -191,7 +196,7 @@ pub fn rows(entity: &Entity) -> &'static [Row] {
         Entity::Ellipse(e) => ellipse::rows(e),
         Entity::Spline(s) => spline::rows(s),
         Entity::Rectangle { .. } => RECTANGLE,
-        Entity::Polyline { .. } => polyline::ROWS,
+        Entity::Polyline { .. } => polyline::rows(entity),
         Entity::Dimension(_) => DIMENSION,
         Entity::MText(_) => MTEXT,
         Entity::Text(_) => ATTRIBUTE_DEFINITION,
@@ -201,26 +206,6 @@ pub fn rows(entity: &Entity) -> &'static [Row] {
         Entity::AttributeDefinition(_) => ATTRIBUTE_DEFINITION,
         Entity::Hatch(h) => hatch::rows(h),
     }
-}
-
-/// Rows that every given entity has (same field and label), in the first
-/// entity's order. Entities of different kinds currently share little, since
-/// layer, colour and so on do not exist yet.
-pub fn common_rows(entities: &[&Entity]) -> Vec<Row> {
-    let Some((first, rest)) = entities.split_first() else {
-        return Vec::new();
-    };
-    rows(first)
-        .iter()
-        .filter(|r| {
-            rest.iter().all(|e| {
-                rows(e)
-                    .iter()
-                    .any(|o| o.field == r.field && o.label == r.label)
-            })
-        })
-        .copied()
-        .collect()
 }
 
 /// Current value of `field`, in drawing units (degrees for angles).
@@ -321,7 +306,7 @@ pub fn value(entity: &Entity, field: Field) -> f64 {
                 Field::Y1 => min.y,
                 Field::X2 => max.x,
                 Field::Y2 => max.y,
-                Field::Width => w,
+                Field::RectWidth => w,
                 Field::Height => h,
                 Field::Area => w * h,
                 _ => f64::NAN,
@@ -395,7 +380,7 @@ pub fn with_value(entity: &Entity, field: Field, new: f64) -> Option<Entity> {
                 Field::Y1 => min.y = new,
                 Field::X2 => max.x = new,
                 Field::Y2 => max.y = new,
-                Field::Width if positive => max.x = min.x + sign(min.x, max.x) * new,
+                Field::RectWidth if positive => max.x = min.x + sign(min.x, max.x) * new,
                 Field::Height if positive => max.y = min.y + sign(min.y, max.y) * new,
                 _ => return None,
             }
@@ -437,20 +422,10 @@ pub fn with_value(entity: &Entity, field: Field, new: f64) -> Option<Entity> {
     Some(out)
 }
 
-/// A field's value across several entities: the shared value, or `None` when
-/// they differ.
-pub fn shared_value(entities: &[&Entity], field: Field) -> Option<f64> {
-    let first = value(entities.first()?, field);
-    entities
-        .iter()
-        .all(|e| (value(e, field) - first).abs() < 1e-9)
-        .then_some(first)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use opendraft_core::Units;
+    use opendraft_core::{EntityKind, Units};
 
     fn line(x1: f64, y1: f64, x2: f64, y2: f64) -> Entity {
         Entity::Line {
@@ -549,10 +524,39 @@ mod tests {
         assert!((value(&e, Field::Area) - 50.265482).abs() < 1e-5);
     }
 
+    fn polyline(points: &[(f64, f64)], closed: bool) -> Entity {
+        Entity::Polyline {
+            points: points.iter().map(|&(x, y)| Point::new(x, y)).collect(),
+            closed,
+            bulges: Vec::new(),
+            widths: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn polylines_are_called_rectangular_only_when_every_one_traces_a_rectangle() {
+        let square = polyline(&[(0.0, 0.0), (2.0, 0.0), (2.0, 1.0), (0.0, 1.0)], true);
+        let open = polyline(&[(0.0, 0.0), (2.0, 0.0), (2.0, 1.0)], false);
+        let other = line(0.0, 0.0, 1.0, 1.0);
+        let kind = EntityKind::Polyline;
+        assert_eq!(title(kind, &[&square]), "Rectangular polyline");
+        assert_eq!(title(kind, &[&square, &other]), "Rectangular polyline");
+        assert_eq!(title(kind, &[&square, &open]), "Polyline");
+        assert_eq!(title(EntityKind::Line, &[&other]), "Line");
+        let labels =
+            |es: &[&Entity]| -> Vec<&str> { common_rows(es).iter().map(|r| r.label).collect() };
+        assert!(!labels(&[&square, &open]).contains(&"Height"));
+        assert_eq!(
+            labels(&[&rect(0.0, 0.0, 2.0, 1.0), &square]),
+            ["Width", "Height", "Area"],
+            "a Rectangle and a rectangular polyline share their sizes"
+        );
+    }
+
     #[test]
     fn rectangle_size_ignores_corner_order() {
         let e = rect(10.0, 10.0, 4.0, 2.0);
-        assert_eq!(value(&e, Field::Width), 6.0);
+        assert_eq!(value(&e, Field::RectWidth), 6.0);
         assert_eq!(value(&e, Field::Height), 8.0);
     }
 
@@ -581,7 +585,7 @@ mod tests {
 
     #[test]
     fn rectangle_width_keeps_corner_and_direction() {
-        let e = with_value(&rect(10.0, 0.0, 4.0, 3.0), Field::Width, 2.0).unwrap();
+        let e = with_value(&rect(10.0, 0.0, 4.0, 3.0), Field::RectWidth, 2.0).unwrap();
         assert_eq!(value(&e, Field::X2), 8.0);
         assert_eq!(value(&e, Field::X1), 10.0);
     }
@@ -590,7 +594,7 @@ mod tests {
     fn sizes_must_be_positive_and_derived_fields_are_read_only() {
         assert!(with_value(&circle(1.0), Field::Radius, 0.0).is_none());
         assert!(with_value(&circle(1.0), Field::Radius, -3.0).is_none());
-        assert!(with_value(&rect(0.0, 0.0, 1.0, 1.0), Field::Width, 0.0).is_none());
+        assert!(with_value(&rect(0.0, 0.0, 1.0, 1.0), Field::RectWidth, 0.0).is_none());
         assert!(with_value(&circle(1.0), Field::Area, 5.0).is_none());
         assert!(with_value(&circle(1.0), Field::X1, f64::NAN).is_none());
     }

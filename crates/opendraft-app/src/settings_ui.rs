@@ -126,6 +126,10 @@ fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         });
     });
     ui.add_space(6.0);
+    widgets::group_box(ui, theme, "Navigation", |ui| {
+        ui.checkbox(&mut draft.show_nav_gizmo, "Show the navigation gizmo");
+    });
+    ui.add_space(6.0);
     selection(ui, theme, draft);
     ui.add_space(6.0);
     widgets::group_box(ui, theme, "Interface scale", |ui| {

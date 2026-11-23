@@ -335,6 +335,7 @@ fn all() -> Vec<Command<AppState>> {
         toggle_command!("view.grid", "Grid", show_grid)
             .key("F7")
             .transparent(),
+        toggle_command!("view.nav_gizmo", "Navigation Gizmo", show_nav_gizmo).transparent(),
         cmd("view.dynamic_input", "Dynamic Input", |s| {
             s.settings.dynamic_input.toggle();
             s.docs[s.active].dynamic_input.clear();

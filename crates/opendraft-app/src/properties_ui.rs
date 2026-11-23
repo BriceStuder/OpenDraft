@@ -87,12 +87,14 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
     let filter: Choice = stored.filter(|k| counts.contains_key(k) && counts.len() > 1);
     let mixed = counts.len() > 1;
 
+    let all: Vec<&Entity> = selected.iter().map(|o| &o.entity).collect();
+    let name = |k: EntityKind| tr(properties::title(k, &all));
     let title = |kind: Choice| match kind {
-        Some(k) => format!("{} ({})", tr(k.title()), counts[&k]),
+        Some(k) => format!("{} ({})", name(k), counts[&k]),
         None if mixed => t!("All (%{count})", count = selected.len()).into_owned(),
         None => match selected.len() {
-            1 => tr(selected[0].entity.kind().title()).into_owned(),
-            n => format!("{} ({n})", tr(selected[0].entity.kind().title())),
+            1 => name(selected[0].entity.kind()).into_owned(),
+            n => format!("{} ({n})", name(selected[0].entity.kind())),
         },
     };
     let options: Vec<(Choice, String)> = if mixed {
@@ -129,12 +131,9 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
         });
     }
 
-    // Geometry rows: the shared ones when kinds are mixed.
-    let rows = if mixed && filter.is_none() {
-        properties::common_rows(&entities)
-    } else {
-        properties::rows(entities[0]).to_vec()
-    };
+    // Geometry rows: the ones every shown entity has, so a rectangle's sides
+    // only when every polyline shown traces one.
+    let rows = properties::common_rows(&entities);
     if !rows.is_empty() {
         let geometry = section(ui, theme, &t!("Geometry"), |ui| {
             let mut edit = None;
