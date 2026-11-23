@@ -7,6 +7,7 @@
 
 use opendraft_canvas::{SnapKind, SnapOverride};
 use opendraft_core::{Entity, EntityId, Point};
+use opendraft_ui::key;
 
 /// The snaps a typed word names, by the full name (three letters or more of it
 /// are enough, as in AutoCAD).
@@ -237,14 +238,14 @@ impl OneShot {
     /// What is asked for now, if a chain is waiting.
     pub fn asking(&self) -> Option<&'static str> {
         if self.deferred.is_some() {
-            return Some("Specify the other point:");
+            return Some(key!("Specify the other point:"));
         }
         match self.chain? {
             Chain::From(None) => Some("Base point:"),
             Chain::From(Some(_)) => Some("<Offset>:"),
             Chain::Mid(None) => Some("First point of mid:"),
             Chain::Mid(Some(_)) => Some("Second point of mid:"),
-            Chain::Temp => Some("Specify temporary tracking point:"),
+            Chain::Temp => Some(key!("Specify temporary tracking point:")),
             Chain::Track(None) => Some("First tracking point:"),
             Chain::Track(Some(_)) => Some("Next point (Enter to end tracking):"),
         }

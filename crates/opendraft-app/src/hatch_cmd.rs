@@ -20,6 +20,7 @@ use opendraft_core::hatch::{
     HatchStyle,
 };
 use opendraft_core::{Entity, EntityId, Point};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::hatch_memory::{FillChoice, Memory};
@@ -28,7 +29,7 @@ use crate::text::plural;
 /// Ends closer than this count as meeting, as for JOIN.
 const GAP: f64 = 1e-6;
 
-const SELECT: &str = "Select objects";
+const SELECT: &str = key!("Select objects");
 
 /// What the current settings are, as a line for the command line.
 pub(crate) fn summary(m: &Memory) -> String {
@@ -83,7 +84,7 @@ pub(crate) fn with_keywords<T>(
 fn ask_pattern(ed: &Editor) -> Result<(), Cancelled> {
     loop {
         let typed = ed.get_string(
-            Options::<String>::new("Enter a pattern name, SOLID, USER, or ? to list")
+            Options::<String>::new(key!("Enter a pattern name, SOLID, USER, or ? to list"))
                 .default(ed.defaults().hatch.get().name()),
         )?;
         let text = typed.trim();
@@ -119,7 +120,7 @@ fn positive(ed: &Editor, message: &str, current: f64) -> Result<f64, Cancelled> 
 
 fn ask_style(ed: &Editor) -> Result<(), Cancelled> {
     let answer = ed.get_keyword(
-        Options::<String>::new("Enter island detection style")
+        Options::<String>::new(key!("Enter island detection style"))
             .keyword("Normal", "N")
             .keyword("Outer", "O")
             .keyword("Ignore", "I")
@@ -141,7 +142,7 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
         "Scale" => {
             let scale = positive(
                 ed,
-                "Specify a scale for the pattern",
+                key!("Specify a scale for the pattern"),
                 ed.defaults().hatch.get().scale,
             )?;
             ed.defaults().hatch.change(|m| m.scale = scale);
@@ -149,7 +150,7 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
         "Angle" => {
             // Counted from the coordinate system's X axis, as AutoCAD's HPANG.
             let angle = ed.get_angle(
-                NumberOptions::new("Specify an angle for the pattern")
+                NumberOptions::new(key!("Specify an angle for the pattern"))
                     .default(ed.defaults().hatch.get().angle)
                     .turn(),
             )?;
@@ -158,7 +159,7 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
         "Spacing" => {
             let spacing = positive(
                 ed,
-                "Specify the spacing between lines",
+                key!("Specify the spacing between lines"),
                 ed.defaults().hatch.get().spacing,
             )?;
             ed.defaults().hatch.change(|m| m.spacing = spacing);
@@ -199,7 +200,7 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
                 .change(|m| m.associative = answer == "Yes");
         }
         "Origin" => {
-            let origin = ed.get_point(PointOptions::new("Specify an origin point"))?;
+            let origin = ed.get_point(PointOptions::new(key!("Specify an origin point")))?;
             // Kept in the coordinate system, as AutoCAD's HPORIGIN.
             let origin = ed.read(move |doc| doc.ccs().from_world(origin))?;
             ed.defaults().hatch.change(|m| m.origin = origin);
@@ -311,7 +312,7 @@ pub fn hatch_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         let Some(current) = &found else {
             ed.say(summary(&ed.defaults().hatch.get()));
             let options = with_keywords(
-                PointOptions::new("Pick internal point"),
+                PointOptions::new(key!("Pick internal point")),
                 &ed.defaults().hatch.get().fill,
                 true,
             )
@@ -319,7 +320,7 @@ pub fn hatch_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             match ed.ask_point(options)? {
                 Answer::Value(at) => found = from_point(ed, at)?,
                 Answer::Keyword(k) if k == SELECT => {
-                    let ids = ed.get_selection("Select objects to hatch")?;
+                    let ids = ed.get_selection(key!("Select objects to hatch"))?;
                     found = from_objects(ed, ids)?;
                 }
                 Answer::Keyword(k) => adjust(ed, &k)?,

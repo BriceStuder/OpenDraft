@@ -3,21 +3,22 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options, PointOptions};
 use opendraft_core::{Entity, EntityId, Object, Point};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
 /// MOVE: shift objects by a base point and a second point, or by a typed
 /// displacement (the Displacement option, or Enter at the base point prompt).
 pub fn move_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let originals = entities_of(ed, &ids)?;
-    let base_options = PointOptions::new("Specify base point").keyword("Displacement", "DI");
+    let base_options = PointOptions::new(key!("Specify base point")).keyword("Displacement", "DI");
     let (dx, dy) = match ed.ask_point(base_options)? {
         Answer::Value(base) => {
             let ghost_of = originals;
-            let options = PointOptions::new(
-                "Specify second point of move or <use first point as displacement>",
-            )
+            let options = PointOptions::new(key!(
+                "Specify second point of move or <use first point as displacement>"
+            ))
             .dimensions(opendraft_commands::DynamicDimensions::Polar)
             .base(base)
             .ghost(move |at| {
@@ -34,7 +35,7 @@ pub fn move_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
         Answer::Keyword(_) | Answer::Enter => {
             let ghost_of = originals;
-            let options = PointOptions::new("Specify displacement")
+            let options = PointOptions::new(key!("Specify displacement"))
                 .default(Point::new(0.0, 0.0))
                 .ghost(move |at| ghost_of.iter().map(|e| e.translated(at.x, at.y)).collect());
             let displacement = ed.get_point(options)?;
@@ -69,12 +70,12 @@ pub(crate) fn entities_of(ed: &Editor, ids: &[EntityId]) -> Result<Vec<Entity>, 
 /// COPY: copy objects to as many places as the user picks, until Exit, Enter
 /// or Esc. Each copy is its own undo step.
 pub fn copy_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let objects = objects_of(ed, &ids)?;
-    let base = ed.get_point("Specify base point")?;
+    let base = ed.get_point(key!("Specify base point"))?;
     loop {
         let ghosts: Vec<Entity> = objects.iter().map(|o| o.entity.clone()).collect();
-        let options = PointOptions::new("Specify second point")
+        let options = PointOptions::new(key!("Specify second point"))
             .dimensions(opendraft_commands::DynamicDimensions::Polar)
             .base(base)
             .keyword("Exit", "E")
@@ -104,17 +105,17 @@ pub fn copy_objects(ed: &mut Editor) -> Result<(), Cancelled> {
 /// MIRROR: reflect objects in a line given by two points, keeping or erasing
 /// the originals.
 pub fn mirror_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let objects = objects_of(ed, &ids)?;
     if let Some(why) = objects.iter().find_map(|o| o.entity.mirror_refusal()) {
         ed.say(why);
         return Ok(());
     }
-    let first = ed.get_point("Specify first point of mirror line")?;
+    let first = ed.get_point(key!("Specify first point of mirror line"))?;
     let ghosts: Vec<Entity> = objects.iter().map(|o| o.entity.clone()).collect();
     let second: Point = loop {
         let ghosts = ghosts.clone();
-        let options = PointOptions::new("Specify second point of mirror line")
+        let options = PointOptions::new(key!("Specify second point of mirror line"))
             .dimensions(opendraft_commands::DynamicDimensions::Polar)
             .base(first)
             .ghost(move |at| {
@@ -130,7 +131,7 @@ pub fn mirror_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
     };
     let erase = ed.get_keyword(
-        Options::new("Erase source objects?")
+        Options::new(key!("Erase source objects?"))
             .keyword("Yes", "Y")
             .keyword("No", "N")
             .default("No".to_owned()),

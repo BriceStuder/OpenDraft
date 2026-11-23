@@ -4,6 +4,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
 use opendraft_core::donut::donut;
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::add;
@@ -30,10 +31,10 @@ pub fn draw_donut(ed: &mut Editor) -> Result<(), Cancelled> {
         let was = ed.defaults().donut.get();
         let (was_inside, was_outside) = (was.inside, was.outside);
         let inside = ed.get_distance(
-            NumberOptions::new("Specify inside diameter of donut").default(was_inside),
+            NumberOptions::new(key!("Specify inside diameter of donut")).default(was_inside),
         )?;
         let outside = ed.get_distance(
-            NumberOptions::new("Specify outside diameter of donut").default(was_outside),
+            NumberOptions::new(key!("Specify outside diameter of donut")).default(was_outside),
         )?;
         if donut(Point::default(), inside, outside).is_some() {
             ed.defaults()
@@ -44,11 +45,12 @@ pub fn draw_donut(ed: &mut Editor) -> Result<(), Cancelled> {
         ed.say("Requires a non-negative inside diameter and an outside diameter above zero.");
     };
     loop {
-        let options = PointOptions::new("Specify center of donut or <exit>").ghost(move |at| {
-            donut(at, inside, outside)
-                .into_iter()
-                .collect::<Vec<Entity>>()
-        });
+        let options =
+            PointOptions::new(key!("Specify center of donut or <exit>")).ghost(move |at| {
+                donut(at, inside, outside)
+                    .into_iter()
+                    .collect::<Vec<Entity>>()
+            });
         match ed.ask_point(options) {
             Ok(Answer::Value(at)) => {
                 if let Some(ring) = donut(at, inside, outside) {

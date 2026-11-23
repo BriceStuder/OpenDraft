@@ -3,6 +3,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, PointOptions};
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 /// Shapes smaller than this (drawing units) are treated as accidental clicks.
 pub(crate) const MIN_SIZE: f64 = 1e-6;
@@ -45,12 +46,12 @@ pub(crate) fn add(ed: &Editor, entity: Entity, name: &'static str) -> Result<(),
 /// Esc ends the chain and keeps what was drawn; Undo takes back the last
 /// segment; Close joins the end to the start.
 pub fn draw_line(ed: &mut Editor) -> Result<(), Cancelled> {
-    let mut first = ed.get_point("Specify first point")?;
+    let mut first = ed.get_point(key!("Specify first point"))?;
     // The chain's vertices; the segments are between neighbours.
     let mut vertices = vec![first];
     loop {
         let from = vertices.last().copied().unwrap_or(first);
-        let mut options = PointOptions::new("Specify next point")
+        let mut options = PointOptions::new(key!("Specify next point"))
             .dimensions(opendraft_commands::DynamicDimensions::Polar)
             .base(from)
             .keyword("Undo", "U")
@@ -69,7 +70,7 @@ pub fn draw_line(ed: &mut Editor) -> Result<(), Cancelled> {
             }
             Ok(Answer::Keyword(k)) if k == "Undo" => {
                 if vertices.len() == 1 {
-                    first = ed.get_point("Specify first point")?;
+                    first = ed.get_point(key!("Specify first point"))?;
                     vertices[0] = first;
                 } else {
                     ed.undo()?;

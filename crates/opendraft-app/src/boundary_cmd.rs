@@ -12,6 +12,7 @@ use opendraft_core::hatch::trace;
 use opendraft_core::infinite;
 use opendraft_core::loop_polyline::loop_polyline;
 use opendraft_core::{Bounds, Entity, Point};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -65,7 +66,8 @@ fn around(ed: &Editor, at: Point, islands: bool) -> Result<Vec<Entity>, Cancelle
 pub fn draw_boundary(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut islands = true;
     loop {
-        let options = PointOptions::new("Pick internal point").keyword("Island detection", "I");
+        let options =
+            PointOptions::new(key!("Pick internal point")).keyword("Island detection", "I");
         match ed.ask_point(options) {
             Ok(Answer::Value(at)) => {
                 let made = around(ed, at, islands)?;

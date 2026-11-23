@@ -271,7 +271,7 @@ impl AppState {
         }
         Prompt {
             command: Cow::Borrowed(""),
-            text: Cow::Borrowed("Type a command"),
+            text: rust_i18n::t!("Type a command"),
             options: Vec::new(),
         }
     }

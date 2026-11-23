@@ -6,6 +6,7 @@
 use opendraft_commands::{Cancelled, Editor, ModifyEntities, RemoveEntities};
 use opendraft_core::overkill::{overkill, prepare, Settings};
 use opendraft_core::EntityId;
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::text::plural;
@@ -15,7 +16,7 @@ use crate::text::plural;
 /// compare against ones on the same layer, colour, linetype, linetype scale
 /// and lineweight unless those are ignored.
 pub fn overkill_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let chosen = ed.pickset_or_select("Select objects")?;
+    let chosen = ed.pickset_or_select(key!("Select objects"))?;
     let settings = ed.ask_overkill(ed.defaults().overkill.get())?;
     ed.defaults().overkill.change(|m| *m = settings);
     run(ed, chosen, settings)

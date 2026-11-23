@@ -5,6 +5,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
 use opendraft_core::pedit::PolyData;
 use opendraft_core::{Entity, EntityId, Point};
+use opendraft_ui::key;
 
 use crate::pedit_cmd::{data_of, store};
 
@@ -42,7 +43,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
         let n = data.points.len();
         v = v.min(n - 1);
         let points = data.points.clone();
-        let options = PointOptions::new("Enter a vertex editing option (Enter for Next)")
+        let options = PointOptions::new(key!("Enter a vertex editing option (Enter for Next)"))
             .keyword("Next", "N")
             .keyword("Previous", "P")
             .keyword("Break", "B")
@@ -73,7 +74,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                     continue;
                 }
                 let options =
-                    PointOptions::new("Specify location for new vertex").base(data.points[v]);
+                    PointOptions::new(key!("Specify location for new vertex")).base(data.points[v]);
                 let at = ed.get_point(options)?;
                 match data.with_inserted(v, at) {
                     Some(inserted) => {
@@ -85,7 +86,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                 }
             }
             "Move" => {
-                let options = PointOptions::new("Specify new location for marked vertex")
+                let options = PointOptions::new(key!("Specify new location for marked vertex"))
                     .base(data.points[v]);
                 let at = ed.get_point(options)?;
                 store(ed, id, data.with_moved(v, at))?;
@@ -97,10 +98,11 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                     continue;
                 }
                 let (start, _) = opendraft_core::width::at(&data.widths, v);
-                let first =
-                    NumberOptions::new("Specify starting width for next segment").default(start);
+                let first = NumberOptions::new(key!("Specify starting width for next segment"))
+                    .default(start);
                 let w0 = ed.get_distance(first)?;
-                let last = NumberOptions::new("Specify ending width for next segment").default(w0);
+                let last =
+                    NumberOptions::new(key!("Specify ending width for next segment")).default(w0);
                 let w1 = ed.get_distance(last)?;
                 if w0 < 0.0 || w1 < 0.0 {
                     ed.say("Requires a value of zero or more.");
@@ -137,7 +139,7 @@ fn other_vertex(ed: &Editor, data: &PolyData, from: usize) -> Result<Option<usiz
     let mut w = from;
     loop {
         let points = data.points.clone();
-        let options = PointOptions::new("Enter an option (Enter for Next)")
+        let options = PointOptions::new(key!("Enter an option (Enter for Next)"))
             .keyword("Next", "N")
             .keyword("Previous", "P")
             .keyword("Go", "G")

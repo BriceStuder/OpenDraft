@@ -2,13 +2,14 @@
 //! selection when there is one, and otherwise asks for objects until Enter.
 
 use opendraft_commands::{Cancelled, Command, Editor};
+use opendraft_ui::key;
 
 use crate::state::AppState;
 use crate::text::plural;
 
 /// The ERASE command for the command table. A viewport picked on the sheet
 /// is erased at once; otherwise the selection, or the objects picked at
-/// "Select objects".
+/// key!("Select objects").
 pub fn command() -> Command<AppState> {
     Command::new("modify.erase", "Erase", |s: &mut AppState| {
         if !s.erase_viewport() {
@@ -31,7 +32,7 @@ pub fn may_fire(id: &str, s: &AppState) -> bool {
 }
 
 fn erase_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let count = ids.len();
     ed.transaction("Erase", move |tx| {
         tx.remove(ids);

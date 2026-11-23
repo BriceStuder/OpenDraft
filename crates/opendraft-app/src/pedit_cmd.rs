@@ -10,6 +10,7 @@ use opendraft_commands::{
 };
 use opendraft_core::pedit::{JoinType, PolyData};
 use opendraft_core::{Entity, EntityId};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::pedit_join::{ask_fuzz, join_group};
@@ -22,7 +23,7 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     loop {
         match chosen.len() {
             0 => {
-                let options = Options::<Picked>::new("Select polyline")
+                let options = Options::<Picked>::new(key!("Select polyline"))
                     .keyword("Multiple", "M")
                     .allow_empty();
                 match ed.ask_object(options)? {
@@ -32,7 +33,7 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                         }
                         refuse(ed, id)?;
                     }
-                    Answer::Keyword(_) => chosen = ed.get_selection("Select objects")?,
+                    Answer::Keyword(_) => chosen = ed.get_selection(key!("Select objects"))?,
                     Answer::Enter => return Ok(()),
                 }
             }
@@ -96,10 +97,12 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
             "Yes".to_owned()
         } else {
             ed.get_keyword(
-                Options::new("Object selected is not a polyline. Do you want to turn it into one?")
-                    .keyword("Yes", "Y")
-                    .keyword("No", "N")
-                    .default("Yes".to_owned()),
+                Options::new(key!(
+                    "Object selected is not a polyline. Do you want to turn it into one?"
+                ))
+                .keyword("Yes", "Y")
+                .keyword("No", "N")
+                .default("Yes".to_owned()),
             )?
         };
         if turn == "No" {
@@ -115,7 +118,7 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
             return Ok(());
         };
         let toggle = if data.closed { "Open" } else { "Close" };
-        let options = Options::<String>::new("Enter an option")
+        let options = Options::<String>::new(key!("Enter an option"))
             .keyword(toggle, &toggle[..1])
             .keyword("Join", "J")
             .keyword("Width", "W")
@@ -143,7 +146,7 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
                     continue;
                 }
                 let others =
-                    ed.ask_selection(Options::new("Select objects to join").allow_empty())?;
+                    ed.ask_selection(Options::new(key!("Select objects to join")).allow_empty())?;
                 if join_group(ed, vec![id], others, 0.0, JoinType::Add)? > 0 {
                     steps += 1;
                 }
@@ -177,7 +180,9 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
 
 /// The width to give every segment; `None` if it was refused.
 fn ask_width(ed: &Editor) -> Result<Option<f64>, Cancelled> {
-    let w = ed.get_distance(NumberOptions::new("Specify new width for all segments"))?;
+    let w = ed.get_distance(NumberOptions::new(key!(
+        "Specify new width for all segments"
+    )))?;
     if w < 0.0 {
         ed.say("Requires a value of zero or more.");
         return Ok(None);
@@ -197,7 +202,7 @@ fn set_generation(ed: &Editor, ids: &[EntityId]) -> Result<bool, Cancelled> {
     })?;
     let on = attrs.first().is_some_and(|(_, a)| a.continuous_generation);
     let answer = ed.get_keyword(
-        Options::new("Enter polyline linetype generation option")
+        Options::new(key!("Enter polyline linetype generation option"))
             .keyword("ON", "ON")
             .keyword("OFF", "OFF")
             .default(if on { "ON" } else { "OFF" }.to_owned()),
@@ -245,7 +250,7 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
     }
     if others > 0 && !ed.defaults().pedit.get().accept {
         let turn = ed.get_keyword(
-            Options::new("Convert lines, arcs and rectangles to polylines?")
+            Options::new(key!("Convert lines, arcs and rectangles to polylines?"))
                 .keyword("Yes", "Y")
                 .keyword("No", "N")
                 .default("Yes".to_owned()),
@@ -263,7 +268,7 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
     }
     let mut steps = 0usize;
     loop {
-        let options = Options::<String>::new("Enter an option")
+        let options = Options::<String>::new(key!("Enter an option"))
             .keyword("Close", "C")
             .keyword("Open", "O")
             .keyword("Join", "J")

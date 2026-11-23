@@ -11,6 +11,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked, PointOptions};
 use opendraft_core::{infinite, Entity, Point};
+use opendraft_ui::key;
 
 use crate::draw::{add, distance, MIN_SIZE};
 
@@ -33,7 +34,7 @@ fn toward(from: Point, to: Point) -> Option<Point> {
 
 /// XLINE.
 pub fn draw_xline(ed: &mut Editor) -> Result<(), Cancelled> {
-    let options = PointOptions::new("Specify a point")
+    let options = PointOptions::new(key!("Specify a point"))
         .keyword("Horizontal", "H")
         .keyword("Vertical", "V")
         .keyword("Angle", "A")
@@ -48,7 +49,8 @@ pub fn draw_xline(ed: &mut Editor) -> Result<(), Cancelled> {
             "Horizontal" => parallel(ed, ccs.x_axis()),
             "Vertical" => parallel(ed, ccs.y_axis()),
             "Angle" => {
-                let options = NumberOptions::new("Enter angle of xline (0)").default(ccs.angle);
+                let options =
+                    NumberOptions::new(key!("Enter angle of xline (0)")).default(ccs.angle);
                 let angle = ed.get_angle(options)?;
                 parallel(ed, infinite::from_angle(angle))
             }
@@ -61,7 +63,7 @@ pub fn draw_xline(ed: &mut Editor) -> Result<(), Cancelled> {
 
 /// RAY.
 pub fn draw_ray(ed: &mut Editor) -> Result<(), Cancelled> {
-    let start = ed.get_point("Specify start point")?;
+    let start = ed.get_point(key!("Specify start point"))?;
     through(ed, start, ray, "Ray")
 }
 
@@ -73,7 +75,7 @@ fn through(
     name: &'static str,
 ) -> Result<(), Cancelled> {
     loop {
-        let options = PointOptions::new("Specify through point")
+        let options = PointOptions::new(key!("Specify through point"))
             .base(base)
             .ghost(move |at| {
                 toward(base, at)
@@ -95,7 +97,7 @@ fn through(
 /// and Perpendicular find their point from the direction.
 fn parallel(ed: &Editor, direction: Point) -> Result<(), Cancelled> {
     loop {
-        let options = PointOptions::new("Specify through point")
+        let options = PointOptions::new(key!("Specify through point"))
             .along(direction)
             .ghost(move |at| vec![xline(at, direction)]);
         match ed.ask_point(options) {
@@ -109,9 +111,9 @@ fn parallel(ed: &Editor, direction: Point) -> Result<(), Cancelled> {
 /// end of the second side is asked again for more lines at the same angle
 /// start.
 fn bisect(ed: &Editor) -> Result<(), Cancelled> {
-    let vertex = ed.get_point("Specify angle vertex point")?;
+    let vertex = ed.get_point(key!("Specify angle vertex point"))?;
     let start = loop {
-        let at = ed.get_point(PointOptions::new("Specify angle start point").base(vertex))?;
+        let at = ed.get_point(PointOptions::new(key!("Specify angle start point")).base(vertex))?;
         if toward(vertex, at).is_some() {
             break at;
         }
@@ -119,7 +121,7 @@ fn bisect(ed: &Editor) -> Result<(), Cancelled> {
     };
     let first = toward(vertex, start).unwrap_or(Point::new(1.0, 0.0));
     loop {
-        let options = PointOptions::new("Specify angle end point")
+        let options = PointOptions::new(key!("Specify angle end point"))
             .base(vertex)
             .ghost(move |at| {
                 toward(vertex, at)
@@ -161,7 +163,7 @@ fn point_on(entity: &Entity) -> Option<Point> {
 /// Construction lines parallel to an object, at a distance or through a
 /// point, on the side picked.
 fn offset(ed: &Editor) -> Result<(), Cancelled> {
-    let options = NumberOptions::new("Specify offset distance").keyword("Through", "T");
+    let options = NumberOptions::new(key!("Specify offset distance")).keyword("Through", "T");
     let distance = match ed.ask_distance(options)? {
         Answer::Value(d) if d > MIN_SIZE => Some(d),
         Answer::Value(_) => {
@@ -171,9 +173,9 @@ fn offset(ed: &Editor) -> Result<(), Cancelled> {
         Answer::Keyword(_) | Answer::Enter => None,
     };
     loop {
-        let Ok(Answer::Value(Picked { id, .. })) =
-            ed.ask_object(Options::<Picked>::new("Select a line object or <exit>"))
-        else {
+        let Ok(Answer::Value(Picked { id, .. })) = ed.ask_object(Options::<Picked>::new(key!(
+            "Select a line object or <exit>"
+        ))) else {
             return Ok(());
         };
         let Some(entity) = ed.read(move |doc| doc.get(id).cloned())? else {
@@ -184,9 +186,9 @@ fn offset(ed: &Editor) -> Result<(), Cancelled> {
             continue;
         };
         let prompt = if distance.is_some() {
-            "Specify side to offset"
+            key!("Specify side to offset")
         } else {
-            "Specify through point"
+            key!("Specify through point")
         };
         let made = move |at: Point| -> Option<Entity> {
             // Which side `at` is on, and how far from the line.

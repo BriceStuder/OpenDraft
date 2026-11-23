@@ -11,6 +11,7 @@ use opendraft_commands::{
     Answer, Cancelled, Command, Editor, NumberOptions, Options, PointOptions,
 };
 use opendraft_core::Document;
+use opendraft_ui::key;
 
 use crate::state::AppState;
 use crate::zoom_cmd::{start_view_command, ZoomTo};
@@ -40,7 +41,7 @@ fn rotate_view(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     let Some(twist) = current(ed)? else {
         return Ok(None);
     };
-    let options = NumberOptions::new("Specify view rotation angle")
+    let options = NumberOptions::new(key!("Specify view rotation angle"))
         .default(twist)
         .turn()
         .keyword("Points", "P")
@@ -48,8 +49,8 @@ fn rotate_view(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     let twist = match ed.ask_angle(options)? {
         Answer::Value(angle) => angle,
         Answer::Keyword(k) if k == "Points" => {
-            let first = ed.get_point("Specify first point of a line to read level")?;
-            let options = PointOptions::new("Specify second point").base(first);
+            let first = ed.get_point(key!("Specify first point of a line to read level"))?;
+            let options = PointOptions::new(key!("Specify second point")).base(first);
             let second = ed.get_point(options)?;
             if (second.x - first.x).hypot(second.y - first.y) < 1e-12 {
                 ed.say("The points are the same.");
@@ -68,7 +69,7 @@ fn plan(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     if current(ed)?.is_none() {
         return Ok(None);
     }
-    let options = Options::<String>::new("Enter an option")
+    let options = Options::<String>::new(key!("Enter an option"))
         .keyword("Current", "C")
         .keyword("Named", "N")
         .keyword("World", "W")
@@ -76,11 +77,12 @@ fn plan(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     let angle = match ed.get_keyword(options)?.as_str() {
         "World" => 0.0,
         "Named" => {
-            let name =
-                match ed.ask_string(Options::<String>::new("Enter name of coordinate system"))? {
-                    Answer::Value(name) => name,
-                    _ => return Ok(None),
-                };
+            let name = match ed.ask_string(Options::<String>::new(key!(
+                "Enter name of coordinate system"
+            )))? {
+                Answer::Value(name) => name,
+                _ => return Ok(None),
+            };
             let named = ed.read(move |doc| doc.named_ccs_called(&name).map(|n| n.ccs.angle))?;
             let Some(angle) = named else {
                 ed.say("No coordinate system is saved under that name.");

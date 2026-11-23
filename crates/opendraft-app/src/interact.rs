@@ -14,6 +14,8 @@ use opendraft_commands::{
     Cancelled, Context, Editor, GhostStyle, Outcome, Prompt as Ask, Reply, Runner, Wants,
 };
 use opendraft_core::Point;
+use opendraft_ui::i18n::tr;
+use rust_i18n::t;
 
 use crate::cmdline::{CmdOption, Prompt};
 use crate::coordinates::CoordinateMode;
@@ -217,10 +219,14 @@ impl AppState {
                 options: Vec::new(),
             });
         };
-        let mut text = ask.message.clone();
+        // The command asks in English (outside callers read it so); it is
+        // shown in the language of the interface.
+        let mut text = tr(&ask.message).into_owned();
         // A keyword-only question reads "Erase source objects? <No> [Yes/No]".
-        if !ask.keywords.is_empty() && ask.wants != Wants::Keyword && !text.ends_with(" or") {
-            text.push_str(" or");
+        if !ask.keywords.is_empty() && ask.wants != Wants::Keyword && !ask.message.ends_with(" or")
+        {
+            text.push(' ');
+            text.push_str(&t!("or"));
         }
         if let Some(hint) = &ask.default_hint {
             text.push_str(&format!(
@@ -244,10 +250,10 @@ impl AppState {
 
     /// The instruction for the status bar while a command is waiting.
     pub fn command_status(&self) -> Option<String> {
-        let message = &self.waiting()?.message;
+        let message = tr(&self.waiting()?.message);
         Some(match self.once.status() {
             Some(once) => format!("{message} {once}"),
-            None => message.clone(),
+            None => message.into_owned(),
         })
     }
 

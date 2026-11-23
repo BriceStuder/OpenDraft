@@ -8,6 +8,7 @@ use opendraft_commands::{
 use opendraft_core::measure::{corners, separation, Measured};
 use opendraft_core::units::{format_angle, format_area, format_length};
 use opendraft_core::{Entity, Point, Units};
+use opendraft_ui::key;
 
 use crate::draw::line;
 
@@ -33,8 +34,8 @@ fn say_separation(ed: &Editor, units: &Units, a: Point, b: Point) {
 /// DIST: the distance and angle between two points. Multiple points adds up
 /// the length of a path of points.
 pub fn measure_distance(ed: &mut Editor) -> Result<(), Cancelled> {
-    let first = ed.get_point("Specify first point")?;
-    let options = PointOptions::new("Specify second point")
+    let first = ed.get_point(key!("Specify first point"))?;
+    let options = PointOptions::new(key!("Specify second point"))
         .keyword("Multiple points", "M")
         .dimensions(DynamicDimensions::Polar)
         .base(first)
@@ -59,7 +60,7 @@ fn measure_path(ed: &Editor, first: Point) -> Result<(), Cancelled> {
     let mut steps: Vec<f64> = Vec::new();
     loop {
         let from = points.last().copied().unwrap_or(first);
-        let mut options = PointOptions::new("Specify next point")
+        let mut options = PointOptions::new(key!("Specify next point"))
             .dimensions(DynamicDimensions::Polar)
             .base(from)
             .ghost(move |at| vec![line(from, at)]);
@@ -108,7 +109,7 @@ pub fn measure_area(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut mode = Mode::Single;
     let mut total = 0.0;
     loop {
-        let options = PointOptions::new("Specify first corner point").keyword("Object", "O");
+        let options = PointOptions::new(key!("Specify first corner point")).keyword("Object", "O");
         let options = match mode {
             Mode::Single => options
                 .keyword("Add area", "A")
@@ -151,7 +152,7 @@ fn corner_shape(ed: &Editor, units: &Units, first: Point) -> Result<Option<f64>,
     loop {
         let so_far = points.clone();
         let from = points.last().copied().unwrap_or(first);
-        let options = PointOptions::new("Specify next corner point or press ENTER for total")
+        let options = PointOptions::new(key!("Specify next corner point or press ENTER for total"))
             .base(from)
             .ghost(move |at| {
                 let mut all = so_far.clone();
@@ -184,7 +185,7 @@ fn corner_shape(ed: &Editor, units: &Units, first: Point) -> Result<Option<f64>,
 
 /// Ask for an object and say its area and perimeter (or length).
 fn object_shape(ed: &Editor, units: &Units) -> Result<Option<f64>, Cancelled> {
-    let picked = match ed.ask_object(Options::<Picked>::new("Select object"))? {
+    let picked = match ed.ask_object(Options::<Picked>::new(key!("Select object")))? {
         Answer::Value(picked) => picked,
         _ => return Ok(None),
     };

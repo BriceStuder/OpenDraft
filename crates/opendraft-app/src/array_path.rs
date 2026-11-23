@@ -4,6 +4,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked};
 use opendraft_core::array::{Path, Placement};
 use opendraft_core::{EntityId, Point};
+use opendraft_ui::key;
 
 use crate::array_cmd::{ask_count, edit_prompt, fits, ghost, make, read_source};
 
@@ -11,7 +12,7 @@ use crate::array_cmd::{ask_count, edit_prompt, fits, ghost, make, read_source};
 /// it (Measure) or spread over it (Divide) and turn with it, changed by the
 /// options until Enter.
 pub fn array_path(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     path_with(ed, ids)
 }
 
@@ -52,7 +53,7 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
                     "Measure"
                 };
                 let chosen = ed.get_keyword(
-                    Options::new("Enter path method")
+                    Options::new(key!("Enter path method"))
                         .keyword("Divide", "D")
                         .keyword("Measure", "M")
                         .default(current.to_owned()),
@@ -67,15 +68,16 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
                 }
             }
             "Items" if method == Method::Divide => {
-                let count = ask_count(ed, "Enter number of items along path", items)?;
+                let count = ask_count(ed, key!("Enter number of items along path"), items)?;
                 if fits(ed, &source, count) {
                     items = count;
                     spacing = path.spacing_dividing(items);
                 }
             }
             "Items" => {
-                let options = NumberOptions::new("Specify the distance between items along path")
-                    .default(spacing);
+                let options =
+                    NumberOptions::new(key!("Specify the distance between items along path"))
+                        .default(spacing);
                 let distance = ed.get_distance(options)?;
                 if distance <= 1e-9 {
                     ed.say("Requires a positive value.");
@@ -83,7 +85,7 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
                 }
                 let most = path.items_fitting(distance);
                 ed.say(format!("Maximum items = {most}"));
-                let options = NumberOptions::new("Specify number of items")
+                let options = NumberOptions::new(key!("Specify number of items"))
                     .default(most as f64)
                     .keyword("Fill entire path", "F");
                 let count = match ed.ask_number(options)? {
@@ -101,7 +103,7 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
             _ => {
                 let current = if align { "Yes" } else { "No" };
                 let answer = ed.get_keyword(
-                    Options::new("Align arrayed items to the path?")
+                    Options::new(key!("Align arrayed items to the path?"))
                         .keyword("Yes", "Y")
                         .keyword("No", "N")
                         .default(current.to_owned()),
@@ -116,7 +118,7 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
 /// being arrayed cannot be their own path.
 fn ask_path(ed: &Editor, arrayed: Vec<EntityId>) -> Result<Option<Path>, Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select path curve").allow_empty();
+        let options = Options::<Picked>::new(key!("Select path curve")).allow_empty();
         let Answer::Value(Picked { id, at, .. }) = ed.ask_object(options)? else {
             return Ok(None);
         };

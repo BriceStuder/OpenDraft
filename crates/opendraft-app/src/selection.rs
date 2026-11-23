@@ -4,6 +4,7 @@
 use opendraft_canvas::Region;
 use opendraft_commands::{Answer, Cancelled, Editor, GhostStyle, PointOptions};
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -20,15 +21,15 @@ enum Kind {
 impl Kind {
     fn first_prompt(self) -> &'static str {
         match self {
-            Kind::Fence => "Specify first fence point",
-            _ => "Specify first polygon point",
+            Kind::Fence => key!("Specify first fence point"),
+            _ => key!("Specify first polygon point"),
         }
     }
 
     fn next_prompt(self) -> &'static str {
         match self {
-            Kind::Fence => "Specify next fence point (Enter to finish)",
-            _ => "Specify next point (Enter to finish)",
+            Kind::Fence => key!("Specify next fence point (Enter to finish)"),
+            _ => key!("Specify next point (Enter to finish)"),
         }
     }
 

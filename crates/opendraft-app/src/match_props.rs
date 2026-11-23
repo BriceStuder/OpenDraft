@@ -6,6 +6,7 @@ use opendraft_commands::{
     Answer, Cancelled, Editor, ModifyAttributes, ModifyEntities, Options, Picked,
 };
 use opendraft_core::{Attributes, Document, Entity, EntityId, MText, Object};
+use opendraft_ui::key;
 
 use crate::layers::has_outline;
 
@@ -97,7 +98,7 @@ pub fn match_properties(ed: &mut Editor) -> Result<(), Cancelled> {
     let source = match ed.pickset() {
         [one] => *one,
         _ => {
-            let options = Options::<Picked>::new("Select source object")
+            let options = Options::<Picked>::new(key!("Select source object"))
                 .pick_locked()
                 .allow_empty();
             match ed.ask_object(options)? {
@@ -108,7 +109,7 @@ pub fn match_properties(ed: &mut Editor) -> Result<(), Cancelled> {
     };
     ed.say(format!("Current active settings: {SETTINGS}"));
     loop {
-        let options = Options::<Picked>::new("Select destination object(s)").allow_empty();
+        let options = Options::<Picked>::new(key!("Select destination object(s)")).allow_empty();
         let Answer::Value(Picked { id, .. }) = ed.ask_object(options)? else {
             return Ok(());
         };

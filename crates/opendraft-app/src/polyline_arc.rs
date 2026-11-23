@@ -9,6 +9,7 @@ use opendraft_core::arc_make::{
     from_start_end_angle, from_start_end_direction, from_start_end_radius,
 };
 use opendraft_core::{bulge, Entity, Point};
+use opendraft_ui::key;
 
 use crate::arc_cmd::{arc_through, centre_after, shown, to_end_from_centre};
 use crate::draw::{distance, line, MIN_SIZE};
@@ -96,13 +97,13 @@ fn number(message: &str, drawn: &[Entity]) -> NumberOptions {
 
 /// An end point prompt from `from` that snaps to `drawn` too.
 fn end_point(from: Point, drawn: &[Entity]) -> PointOptions {
-    PointOptions::new("Specify endpoint of arc")
+    PointOptions::new(key!("Specify endpoint of arc"))
         .base(from)
         .snap_to(drawn.to_vec())
 }
 
 fn by_angle(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<Option<Entity>, Cancelled> {
-    let angle = ed.get_angle(number("Specify included angle", drawn).turn())?;
+    let angle = ed.get_angle(number(key!("Specify included angle"), drawn).turn())?;
     let options = end_point(from, drawn)
         .keyword("CEnter", "CE")
         .keyword("Radius", "R")
@@ -114,7 +115,7 @@ fn by_angle(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<Option<Entity>
             opendraft_core::arc_make::from_center_start_angle(center, from, angle)
         }
         Answer::Keyword(_) => {
-            let radius = positive(ed, number("Specify radius of arc", drawn).base(from))?;
+            let radius = positive(ed, number(key!("Specify radius of arc"), drawn).base(from))?;
             let direction = chord_direction(ed, from, drawn)?;
             from_start_end_angle(from, chord_end(from, radius, angle, direction), angle)
         }
@@ -124,7 +125,7 @@ fn by_angle(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<Option<Entity>
 
 fn chord_direction(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<f64, Cancelled> {
     ed.get_angle(
-        number("Specify direction of chord", drawn)
+        number(key!("Specify direction of chord"), drawn)
             .default(0.0)
             .base(from),
     )
@@ -133,7 +134,7 @@ fn chord_direction(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<f64, Ca
 fn by_direction(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<Option<Entity>, Cancelled> {
     let direction = ed.get_angle(
         number(
-            "Specify the tangent direction for the start point of arc",
+            key!("Specify the tangent direction for the start point of arc"),
             drawn,
         )
         .base(from),
@@ -149,14 +150,14 @@ fn by_radius(
     (from, heading): (Point, Point),
     drawn: &[Entity],
 ) -> Result<Option<Entity>, Cancelled> {
-    let radius = positive(ed, number("Specify radius of arc", drawn).base(from))?;
+    let radius = positive(ed, number(key!("Specify radius of arc"), drawn).base(from))?;
     let options = end_point(from, drawn)
         .keyword("Angle", "A")
         .ghost(move |at| preview(from, radius_arc(from, at, heading, radius), at));
     Ok(match ed.ask_point(options)? {
         Answer::Value(end) => radius_arc(from, end, heading, radius),
         Answer::Keyword(_) => {
-            let angle = ed.get_angle(number("Specify included angle", drawn).turn())?;
+            let angle = ed.get_angle(number(key!("Specify included angle"), drawn).turn())?;
             let direction = chord_direction(ed, from, drawn)?;
             from_start_end_angle(from, chord_end(from, radius, angle, direction), angle)
         }
@@ -169,12 +170,12 @@ fn by_second_point(
     from: Point,
     drawn: &[Entity],
 ) -> Result<Option<Entity>, Cancelled> {
-    let options = PointOptions::new("Specify second point on arc")
+    let options = PointOptions::new(key!("Specify second point on arc"))
         .base(from)
         .snap_to(drawn.to_vec())
         .ghost(move |at| vec![line(from, at)]);
     let second = ed.get_point(options)?;
-    let options = PointOptions::new("Specify end point of arc")
+    let options = PointOptions::new(key!("Specify end point of arc"))
         .base(second)
         .snap_to(drawn.to_vec())
         .ghost(move |at| preview(from, arc_through(from, second, at), at));
