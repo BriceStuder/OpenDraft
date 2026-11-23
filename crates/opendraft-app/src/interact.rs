@@ -25,6 +25,8 @@ use crate::units_state::hint_text;
 
 /// How long to wait, right after an answer, for the command's next prompt.
 const NEXT_PROMPT_WAIT: Duration = Duration::from_millis(5);
+/// How long a cancelled command is waited for, per request, to end.
+const SETTLE: Duration = Duration::from_millis(100);
 
 impl AppState {
     /// Run `command` as the active command, replacing any running one. The
@@ -73,7 +75,11 @@ impl AppState {
         self.once.clear();
         self.snap_menu = None;
         if let Some(mut runner) = self.runner.take() {
-            runner.cancel();
+            // What it keeps on Esc (PLINE's polyline) goes into its drawing.
+            match self.docs.get_mut(self.run_doc) {
+                Some(doc) => runner.cancel_and_settle(&mut doc.session, SETTLE),
+                None => runner.cancel(),
+            }
             self.note_command_end(Outcome::Cancelled);
             let last = self.docs.len() - 1;
             self.docs[self.run_doc.min(last)].dynamic_input.clear();

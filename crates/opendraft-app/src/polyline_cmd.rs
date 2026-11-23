@@ -565,6 +565,33 @@ mod tests {
     }
 
     #[test]
+    fn esc_keeps_the_polyline_drawn_so_far_as_one_undo_step() {
+        let mut state = AppState::new();
+        run(&mut state, &["0,0", "10,0", "10,5"]);
+        state.cancel();
+        assert!(!state.command_running());
+        let drawn = [p(0.0, 0.0), p(10.0, 0.0), p(10.0, 5.0)];
+        assert_eq!(polyline(&entities(&state)[0]).0, drawn);
+        state.undo();
+        assert!(entities(&state).is_empty());
+        // A single point is no polyline.
+        run(&mut state, &["0,0"]);
+        state.cancel();
+        assert!(entities(&state).is_empty());
+    }
+
+    #[test]
+    fn another_command_keeps_the_polyline_drawn_so_far() {
+        let mut state = AppState::new();
+        run(&mut state, &["0,0", "10,0", "10,5"]);
+        state.start_command("Circle", crate::circle::draw_circle);
+        state.settle_command();
+        assert!(state.is_running("Circle"));
+        let drawn = [p(0.0, 0.0), p(10.0, 0.0), p(10.0, 5.0)];
+        assert_eq!(polyline(&entities(&state)[0]).0, drawn);
+    }
+
+    #[test]
     fn an_arc_option_that_makes_no_arc_says_so_and_asks_again() {
         let mut state = AppState::new();
         run(&mut state, &["0,0", "a", "r", "1", "10,0"]);
