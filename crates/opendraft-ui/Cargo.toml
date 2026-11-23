@@ -13,6 +13,7 @@ egui = "0.31"
 serde = { version = "1", features = ["derive"] }
 # Icon drawings (SVG) read at start-up; no text or system fonts needed.
 resvg = { version = "0.48", default-features = false }
+rust-i18n.workspace = true
 
 [dev-dependencies]
 eframe.workspace = true

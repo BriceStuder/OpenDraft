@@ -1,14 +1,15 @@
 //! Split buttons, as in AutoCAD: the face runs the item last picked from the
 //! list, and the arrow opens the list.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use egui::{pos2, vec2, Align2, FontId, Id, Rect, Response, Sense, Ui};
 
 use super::buttons::{paint_hover, paint_small, sense, text_width};
 use super::{
-    Ctx, Item, Split, ICON_LARGE, ICON_SMALL, LABEL_LINE_H, LABEL_SIZE, LARGE_GAP, LARGE_H,
-    LARGE_PAD, LARGE_W, SMALL_GAP, SMALL_PAD,
+    tr, two_lines, Ctx, Item, Split, ICON_LARGE, ICON_SMALL, LABEL_LINE_H, LABEL_SIZE, LARGE_GAP,
+    LARGE_H, LARGE_PAD, LARGE_W, SMALL_GAP, SMALL_PAD,
 };
 use crate::{icons, menu};
 
@@ -31,9 +32,10 @@ pub(super) fn face(split: &Split, picks: &Picks) -> Option<Item> {
     Some(*picked.unwrap_or(first))
 }
 
-/// The label shown: the split's own, or that of the item the face runs.
-pub(super) fn label(split: &Split, face: &Item) -> &'static str {
-    split.label.unwrap_or(face.label)
+/// The label shown, translated: the split's own, or that of the item the
+/// face runs.
+pub(super) fn label(split: &Split, face: &Item) -> Cow<'static, str> {
+    tr(split.label.unwrap_or(face.label))
 }
 
 /// A large split button: the icon runs the face item, the label below it
@@ -45,10 +47,9 @@ pub(super) fn large(
     picks: &mut Picks,
 ) -> Option<&'static str> {
     let face = face(split, picks)?;
-    let label = label(split, &face);
-    let (line1, line2) = label.split_once(' ').unwrap_or((label, ""));
-    let width =
-        text_width(ui, line1, LABEL_SIZE).max(text_width(ui, line2, LABEL_SIZE) + 12.0) + LARGE_PAD;
+    let (line1, line2) = two_lines(split.label.unwrap_or(face.label));
+    let width = text_width(ui, &line1, LABEL_SIZE).max(text_width(ui, &line2, LABEL_SIZE) + 12.0)
+        + LARGE_PAD;
     let width = width.max(LARGE_W);
     let (rect, _) = ui.allocate_exact_size(vec2(width, LARGE_H), Sense::hover());
     let label_y = rect.top() + LARGE_TOP + ICON_LARGE + LARGE_GAP;
@@ -92,7 +93,7 @@ pub(super) fn large(
     let arrow_at = if line2.is_empty() {
         pos2(rect.center().x, y + LABEL_LINE_H + 4.0)
     } else {
-        let line2_w = text_width(ui, line2, LABEL_SIZE);
+        let line2_w = text_width(ui, &line2, LABEL_SIZE);
         painter.text(
             pos2(rect.center().x - 6.0, y + LABEL_LINE_H),
             Align2::CENTER_TOP,
@@ -127,7 +128,7 @@ pub(super) fn small_width(ui: &Ui, split: &Split, picks: &Picks, icon_only: bool
             SMALL_PAD
                 + ICON_SMALL
                 + SMALL_GAP
-                + text_width(ui, label(split, &face), LABEL_SIZE)
+                + text_width(ui, &label(split, &face), LABEL_SIZE)
                 + 3.0
         }
         _ => ICON_SMALL + 8.0,
@@ -172,7 +173,7 @@ pub(super) fn small(
             color,
         );
     } else {
-        paint_small(ui, left, face.icon, label(split, &face), color);
+        paint_small(ui, left, face.icon, &label(split, &face), color);
     }
     paint_arrow(ui, cx, right.center());
     let face_clicked = face_response.on_hover_text(cx.tooltip(&face)).clicked();
@@ -217,7 +218,7 @@ fn run(
     let width = split
         .items
         .iter()
-        .map(|i| text_width(ui, i.label, cx.theme.font_size_body))
+        .map(|i| text_width(ui, &tr(i.label), cx.theme.font_size_body))
         .fold(0.0, f32::max)
         + 48.0;
     let picked = menu::popup_at(ui, cx.theme, list_id, arrow.clicked(), whole, width, |ui| {
@@ -263,7 +264,7 @@ fn list_row(ui: &mut Ui, cx: &Ctx, item: &Item, is_face: bool) -> bool {
     ui.painter().text(
         pos2(rect.left() + 32.0, rect.center().y),
         Align2::LEFT_CENTER,
-        item.label,
+        tr(item.label),
         FontId::proportional(cx.theme.font_size_body),
         color,
     );
@@ -290,7 +291,7 @@ mod tests {
         picks.insert("modify.trim", "modify.extend");
         let shown = face(&split, &picks);
         assert_eq!(shown.map(|i| i.command), Some("modify.extend"));
-        assert_eq!(shown.map(|i| label(&split, &i)), Some("Extend"));
+        assert_eq!(shown.map(|i| label(&split, &i)).as_deref(), Some("Extend"));
     }
 
     #[test]
@@ -301,7 +302,7 @@ mod tests {
         picks.insert("modify.trim", "gone");
         let shown = face(&split, &picks);
         assert_eq!(shown.map(|i| i.command), Some("modify.trim"));
-        assert_eq!(shown.map(|i| label(&split, &i)), Some("Edit"));
+        assert_eq!(shown.map(|i| label(&split, &i)).as_deref(), Some("Edit"));
         assert!(face(&Split::new(Vec::new()), &picks).is_none());
     }
 }
