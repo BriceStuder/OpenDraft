@@ -221,6 +221,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](modify-stretch.svg) | `modify-stretch.svg` | unfold-horizontal | Stretch |
 | ![](modify-trim.svg) | `modify-trim.svg` | scissors | Trim |
 | ![](nav-gizmo-home.svg) | `nav-gizmo-home.svg` | house | nav_gizmo.rs |
+| ![](nav-gizmo-level.svg) | `nav-gizmo-level.svg` | ruler | nav_gizmo.rs |
 | ![](osnap-apparent-intersection.svg) | `osnap-apparent-intersection.svg` | grid-3x3 | app/status_toggles.rs |
 | ![](osnap-centre.svg) | `osnap-centre.svg` | grid-3x3 | app/status_toggles.rs |
 | ![](osnap-end.svg) | `osnap-end.svg` | grid-3x3 | app/status_toggles.rs |
