@@ -10,7 +10,8 @@
 use opendraft_commands::{
     Answer, Cancelled, Command, Editor, NumberOptions, Options, PointOptions,
 };
-use opendraft_core::Document;
+use opendraft_core::ccs_align::aligned_to;
+use opendraft_core::{Document, Point};
 
 use crate::state::AppState;
 use crate::zoom_cmd::{start_view_command, ZoomTo};
@@ -35,6 +36,60 @@ fn current(ed: &Editor) -> Result<Option<f64>, Cancelled> {
     Ok(Some(twist))
 }
 
+/// The twist that lays the line from `first` to `second` level, pointing right
+/// (none when they are the same point).
+fn level_twist(first: Point, second: Point) -> Option<f64> {
+    if (second.x - first.x).hypot(second.y - first.y) < 1e-12 {
+        return None;
+    }
+    Some(-(second.y - first.y).atan2(second.x - first.x))
+}
+
+/// A picked object to read level, by the rules of CCS Object: a line or a
+/// polyline segment reads along itself from the end nearer the pick, a circle
+/// or arc along its radius to the pick (or the nearer end).
+fn object_twist(ed: &Editor) -> Result<Option<f64>, Cancelled> {
+    loop {
+        let picked = match ed.ask_object(Options::new("Select object to read level"))? {
+            Answer::Value(picked) => picked,
+            _ => return Ok(None),
+        };
+        let found =
+            ed.read(move |doc| doc.object(picked.id).map(|o| (o.entity.clone(), doc.ccs())))?;
+        match found.and_then(|(entity, ccs)| aligned_to(&entity, picked.at, ccs)) {
+            Some(ccs) => return Ok(Some(-ccs.angle)),
+            None => ed.say("That object has no direction to read level."),
+        }
+    }
+}
+
+/// Two points of a line to read level, or an object (the Object keyword at
+/// the first point): the twist that does it.
+fn points_twist(ed: &Editor) -> Result<Option<f64>, Cancelled> {
+    let options =
+        PointOptions::new("Specify first point of a line to read level").keyword("Object", "O");
+    let first = match ed.ask_point(options)? {
+        Answer::Value(first) => first,
+        Answer::Keyword(_) => return object_twist(ed),
+        Answer::Enter => return Ok(None),
+    };
+    let options = PointOptions::new("Specify second point").base(first);
+    let second = ed.get_point(options)?;
+    let twist = level_twist(first, second);
+    if twist.is_none() {
+        ed.say("The points are the same.");
+    }
+    Ok(twist)
+}
+
+/// The navigation gizmo's level button: ROTATEVIEW's Points option on its own.
+fn level_view(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
+    if current(ed)?.is_none() {
+        return Ok(None);
+    }
+    Ok(points_twist(ed)?.map(|twist| ZoomTo::Twist { twist, plan: false }))
+}
+
 /// ROTATEVIEW: how far to turn the drawing on the screen.
 fn rotate_view(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     let Some(twist) = current(ed)? else {
@@ -44,19 +99,18 @@ fn rotate_view(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
         .default(twist)
         .turn()
         .keyword("Points", "P")
+        .keyword("Object", "O")
         .keyword("Reset", "R");
     let twist = match ed.ask_angle(options)? {
         Answer::Value(angle) => angle,
-        Answer::Keyword(k) if k == "Points" => {
-            let first = ed.get_point("Specify first point of a line to read level")?;
-            let options = PointOptions::new("Specify second point").base(first);
-            let second = ed.get_point(options)?;
-            if (second.x - first.x).hypot(second.y - first.y) < 1e-12 {
-                ed.say("The points are the same.");
-                return Ok(None);
-            }
-            -(second.y - first.y).atan2(second.x - first.x)
-        }
+        Answer::Keyword(k) if k == "Object" => match object_twist(ed)? {
+            Some(twist) => twist,
+            None => return Ok(None),
+        },
+        Answer::Keyword(k) if k == "Points" => match points_twist(ed)? {
+            Some(twist) => twist,
+            None => return Ok(None),
+        },
         Answer::Keyword(_) => 0.0,
         Answer::Enter => return Ok(None),
     };
@@ -111,6 +165,14 @@ pub fn commands() -> Vec<Command<AppState>> {
     ]
 }
 
+impl AppState {
+    /// The gizmo's level button: ask for two points and turn the view so the
+    /// line between them reads level, pointing right.
+    pub fn start_level_view(&mut self) {
+        start_view_command(self, "ROTATEVIEW", level_view);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::f64::consts::FRAC_PI_6;
@@ -123,7 +185,11 @@ mod tests {
 
     fn asked(state: &mut AppState, name: &'static str, inputs: &[&str]) -> Option<ZoomTo> {
         // The app's own slot is drained by the pump, so keep a copy here.
-        let ask = if name == "PLAN" { plan } else { rotate_view };
+        let ask = match name {
+            "PLAN" => plan,
+            "LEVEL" => level_view,
+            _ => rotate_view,
+        };
         let seen = Arc::new(Mutex::new(None));
         let mine = Arc::clone(&seen);
         state.start_command(name, move |ed| {
@@ -171,6 +237,67 @@ mod tests {
         assert!((t + FRAC_PI_6).abs() < 1e-12 && plan);
         let (t, _) = twist_of(asked(&mut state, "PLAN", &["w"]));
         assert_eq!(t, 0.0);
+    }
+
+    #[test]
+    fn level_reads_a_line_level_pointing_right() {
+        let mut state = AppState::new();
+        let (t, plan) = twist_of(asked(&mut state, "LEVEL", &["0,0", "0,10"]));
+        assert!((t + std::f64::consts::FRAC_PI_2).abs() < 1e-12 && !plan);
+        // The other way round, the view is turned half a turn further.
+        let (back, _) = twist_of(asked(&mut state, "LEVEL", &["0,10", "0,0"]));
+        assert!((back - std::f64::consts::FRAC_PI_2).abs() < 1e-12);
+        assert!(level_twist(Point::new(1.0, 1.0), Point::new(1.0, 1.0)).is_none());
+    }
+
+    /// A line from 0,0 to 0,10 in the drawing.
+    fn with_a_vertical_line() -> (AppState, opendraft_core::EntityId) {
+        let mut state = AppState::new();
+        state.start_command("Line", crate::draw::draw_line);
+        state.settle_command();
+        for input in ["0,0", "0,10", ""] {
+            state.cmd_submit(input);
+            state.settle_command();
+        }
+        let id = state.session().document().objects()[0].id;
+        (state, id)
+    }
+
+    #[test]
+    fn rotateview_and_level_can_take_an_object() {
+        for name in ["ROTATEVIEW", "LEVEL"] {
+            let (mut state, id) = with_a_vertical_line();
+            let ask = if name == "LEVEL" {
+                level_view
+            } else {
+                rotate_view
+            };
+            let seen = Arc::new(Mutex::new(None));
+            let mine = Arc::clone(&seen);
+            state.start_command(name, move |ed| {
+                *mine.lock().unwrap() = ask(ed)?;
+                Ok(())
+            });
+            state.settle_command();
+            state.cmd_submit("o");
+            state.settle_command();
+            // Picked near its start, the line reads from there to its far end.
+            state.answer_object(Point::new(0.0, 1.0), Some(id), false);
+            state.settle_command();
+            let (t, plan) = twist_of(seen.lock().unwrap().take());
+            assert!(
+                (t + std::f64::consts::FRAC_PI_2).abs() < 1e-12 && !plan,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn level_does_nothing_on_the_same_point_or_a_layouts_sheet() {
+        let mut state = AppState::new();
+        assert!(asked(&mut state, "LEVEL", &["3,3", "3,3"]).is_none());
+        state.new_layout();
+        assert!(asked(&mut state, "LEVEL", &[]).is_none());
     }
 
     #[test]

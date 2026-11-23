@@ -736,7 +736,14 @@ only the camera turns.
   the pointer are in `opendraft-app/src/nav_gizmo.rs`, an egui `Area`, so the
   canvas treats the pointer over it as covered (no cursor, hover or picking). Its
   colours are theme roles only (neutral greys; the arrow is `text_weak`, `text` when
-  hovered or dragged), and the Performance frame readout moves left of it.
+  hovered or dragged), and the Performance frame readout moves left of it. A
+  small spirit-level button below the ring levels the view on two picked points:
+  it starts ROTATEVIEW's Points prompts on their own (`level_view` in
+  `view_twist_cmd.rs`, object snap as usual; the first point to the second reads
+  level pointing right, Esc cancels; its Object keyword takes a picked line or
+  segment instead, by the rules of CCS Object, and `ROTATEVIEW` has the same
+  Object option). It needs the point prompts, so it is dimmed
+  and does nothing while another command runs.
 - **Not built.** See `docs/parking_lot.md`, "Plan: custom coordinate system and
   view rotation".
 

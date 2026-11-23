@@ -26,6 +26,9 @@ const HOME: f32 = 17.0;
 const ARROW_GAP: f32 = 3.0;
 const ARROW_LENGTH: f32 = 7.0;
 const ARROW_HALF_WIDTH: f32 = 5.5;
+/// The level button below the ring: its radius and the space between.
+const LEVEL_RADIUS: f32 = 10.0;
+const LEVEL_GAP: f32 = 4.0;
 /// Slack round the arrow where a press still takes it, as a distance in points
 /// along the circle it travels on.
 const ARROW_REACH: f32 = 9.0;
@@ -40,6 +43,8 @@ pub enum Part {
     Sector(usize),
     /// The arrow outside the ring.
     Arrow,
+    /// The button below the ring: level the view on two picked points.
+    Level,
 }
 
 /// Where the gizmo is on the screen.
@@ -109,6 +114,9 @@ impl Gizmo {
             let sector = (angle_round(self.centre, p) / FRAC_PI_4).round() as i64;
             return Some(Part::Sector(sector.rem_euclid(SECTORS as i64) as usize));
         }
+        if (p - self.level_centre()).length() <= LEVEL_RADIUS {
+            return Some(Part::Level);
+        }
         // The arrow: near the point it stands at, a little beyond the ring.
         let tip = self.at(arrow_angle(twist), RING_OUTER + ARROW_GAP + ARROW_LENGTH);
         let near_ring =
@@ -151,6 +159,24 @@ impl Gizmo {
         ]
     }
 
+    /// The middle of the level button, below the ring.
+    pub fn level_centre(&self) -> Pos2 {
+        pos2(
+            self.centre.x,
+            self.centre.y + RADIUS + LEVEL_GAP + LEVEL_RADIUS,
+        )
+    }
+
+    /// The radius of the level button.
+    pub fn level_radius(&self) -> f32 {
+        LEVEL_RADIUS
+    }
+
+    /// The size of the whole gizmo, level button included.
+    pub fn size() -> egui::Vec2 {
+        egui::vec2(2.0 * RADIUS, 2.0 * RADIUS + LEVEL_GAP + 2.0 * LEVEL_RADIUS)
+    }
+
     /// The radius of the home button.
     pub fn home_radius(&self) -> f32 {
         HOME
@@ -178,6 +204,19 @@ mod tests {
         // Up and to the right on the screen is the sector between right and top.
         assert_eq!(g.part_at(pos2(122.0, 78.0), 0.0), Some(Part::Sector(1)));
         assert_eq!(g.part_at(pos2(100.0, 40.0), 0.0), None);
+    }
+
+    #[test]
+    fn the_level_button_is_below_the_ring_and_inside_the_gizmo() {
+        let g = gizmo();
+        let at = g.level_centre();
+        assert_eq!(g.part_at(at, 0.0), Some(Part::Level));
+        assert_eq!(g.part_at(pos2(at.x + LEVEL_RADIUS + 3.0, at.y), 0.0), None);
+        assert!(at.y + LEVEL_RADIUS <= g.centre.y + Gizmo::size().y - RADIUS + 0.01);
+        assert!(
+            at.y - LEVEL_RADIUS > g.centre.y + RADIUS,
+            "clear of the arrow's circle"
+        );
     }
 
     #[test]
