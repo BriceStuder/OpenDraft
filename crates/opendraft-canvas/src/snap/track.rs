@@ -41,10 +41,12 @@ impl Acquired {
 /// The path an acquired object gives.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Geom {
-    /// Past `from`, along the unit vector `dir`.
+    /// The line through `from` along the unit vector `dir`: on past the end
+    /// and back over the object, so a point can be taken back from the end.
     Ray { from: Point, dir: Point },
     /// Round the circle from angle `from`, counter-clockwise or not, for
-    /// `room` radians at most (what the arc itself does not cover).
+    /// `room` radians at most past the end (what the arc itself does not
+    /// cover), and back over the arc the other way.
     Arc {
         center: Point,
         radius: f64,
@@ -229,10 +231,11 @@ impl Track {
                 radius,
                 from,
                 ccw,
-                ..
+                room,
             } => {
                 let a = arc::angle_of(center, to);
                 let delta = if ccw { a - from } else { from - a }.rem_euclid(TAU);
+                let (ccw, delta) = short_way(ccw, delta, room);
                 let n = steps(delta, 20.0);
                 (0..=n)
                     .map(|i| {
@@ -242,10 +245,14 @@ impl Track {
                     .collect()
             }
             Geom::Ellipse {
-                ellipse, from, ccw, ..
+                ellipse,
+                from,
+                ccw,
+                room,
             } => {
                 let t = ellipse.parameter_of(to);
                 let delta = if ccw { t - from } else { from - t }.rem_euclid(TAU);
+                let (ccw, delta) = short_way(ccw, delta, room);
                 let n = steps(delta, 20.0);
                 (0..=n)
                     .map(|i| {
@@ -255,6 +262,16 @@ impl Track {
                     .collect()
             }
         }
+    }
+}
+
+/// The way round from the end to a point `delta` along the path: on past
+/// the end within `room`, else back over the curve itself.
+fn short_way(ccw: bool, delta: f64, room: f64) -> (bool, f64) {
+    if delta > room {
+        (!ccw, TAU - delta)
+    } else {
+        (ccw, delta)
     }
 }
 
@@ -310,41 +327,24 @@ fn on_path(track: &Track, cursor: Point, tolerance: f64, base: Option<Point>) ->
     let (point, start) = match track.geom {
         Geom::Ray { from, dir } => {
             let t = (cursor.x - from.x) * dir.x + (cursor.y - from.y) * dir.y;
-            if t <= 0.0 {
-                return None;
-            }
             (Point::new(from.x + dir.x * t, from.y + dir.y * t), from)
         }
         Geom::Arc {
             center,
             radius,
             from,
-            ccw,
-            room,
+            ..
         } => {
-            let a = arc::angle_of(center, cursor);
-            let delta = if ccw { a - from } else { from - a }.rem_euclid(TAU);
-            if delta > room || radius < 1e-9 {
+            if radius < 1e-9 {
                 return None;
             }
+            let a = arc::angle_of(center, cursor);
             (
                 arc::point_at(center, radius, a),
                 arc::point_at(center, radius, from),
             )
         }
-        Geom::Ellipse {
-            ellipse,
-            from,
-            ccw,
-            room,
-        } => {
-            let (point, t) = ellipse.nearest(cursor);
-            let delta = if ccw { t - from } else { from - t }.rem_euclid(TAU);
-            if delta > room {
-                return None;
-            }
-            (point, ellipse.point_at(from))
-        }
+        Geom::Ellipse { ellipse, from, .. } => (ellipse.nearest(cursor).0, ellipse.point_at(from)),
         Geom::Along { dir } => {
             let base = base?;
             let s = (cursor.x - base.x) * dir.x + (cursor.y - base.y) * dir.y;
@@ -428,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    fn a_line_extends_past_either_end_and_only_past_it() {
+    fn a_line_extends_both_ways_from_either_end() {
         let d = doc(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
         let id = EntityId(0);
         let last = track(
@@ -454,7 +454,11 @@ mod tests {
         let guide = found[0].snap.guides[0].expect("a straight path");
         assert_eq!((guide.origin, guide.dir), (p(10.0, 0.0), p(1.0, 0.0)));
         assert_eq!(found[0].snap.label(), "Extension: 5.0000 < 0\u{b0}");
-        assert!(at(&last, 5.0, 0.4).is_empty(), "over the line itself");
+        // Back from the end over the line itself, and on past its start.
+        let back = at(&last, 5.0, 0.4);
+        assert_eq!(back[0].snap.point, p(5.0, 0.0));
+        assert_eq!(back[0].snap.label(), "Extension: 5.0000 < 180\u{b0}");
+        assert_eq!(at(&last, -7.0, -0.3)[0].snap.point, p(-7.0, 0.0));
         assert!(at(&last, 15.0, 3.0).is_empty(), "too far from the path");
         assert!(
             at(&last, 10.5, 0.2).is_empty(),
@@ -496,8 +500,13 @@ mod tests {
         assert_eq!(back[0].snap.point, p(-6.0, 0.0));
         // ...and on past the end, along the last.
         assert_eq!(at(true, 10.3, 16.0)[0].snap.point, p(10.0, 16.0));
-        assert!(at(true, 10.3, 5.0).is_empty(), "over the last segment");
-        assert!(at(false, 16.0, 0.3).is_empty(), "not past the corner");
+        // Back over the end segments too, and on along their lines.
+        assert_eq!(at(true, 10.3, 5.0)[0].snap.point, p(10.0, 5.0));
+        assert_eq!(at(false, 16.0, 0.3)[0].snap.point, p(16.0, 0.0));
+        assert!(
+            at(false, 10.3, 5.0).is_empty(),
+            "not along the last segment"
+        );
         assert_eq!(track(&d, end(true)).mark, p(10.0, 10.0));
     }
 
@@ -514,8 +523,10 @@ mod tests {
         let found = candidates(&[last], p(5.2, 5.3), 1.0, None, &modes());
         let q = found[0].snap.point;
         assert!(((q.x - 5.0).hypot(q.y) - 5.0).abs() < 1e-9, "{q:?}");
+        // Back over the arc itself too.
         let over = candidates(&[last], p(5.2, -5.3), 1.0, None, &modes());
-        assert!(over.is_empty(), "that is the arc itself");
+        let q = over[0].snap.point;
+        assert!(((q.x - 5.0).hypot(q.y) - 5.0).abs() < 1e-9, "{q:?}");
     }
 
     #[test]
@@ -534,7 +545,8 @@ mod tests {
     #[test]
     fn an_arc_continues_round_its_circle_not_along_its_tangent() {
         // A quarter arc from east to north: past the north end it carries on
-        // toward the west, and past the east end toward the south.
+        // toward the west, and past the east end toward the south; from
+        // either end it also runs back over the arc.
         let d = doc(&[Entity::Arc {
             center: p(0.0, 0.0),
             radius: 10.0,
@@ -561,11 +573,11 @@ mod tests {
         assert_eq!(west.len(), 1);
         let q = west[0].snap.point;
         assert!((q.x.hypot(q.y) - 10.0).abs() < 1e-9, "on the circle: {q:?}");
-        assert!(here(&last, 7.0, 7.3).is_empty(), "that is the arc itself");
+        assert!(!here(&last, 7.0, 7.3).is_empty(), "back over the arc");
         assert!(!here(&first, 7.3, -7.0).is_empty());
-        // Either end carries on round the rest of the circle, never over the arc.
         assert!(!here(&first, -7.0, 7.3).is_empty());
-        assert!(here(&first, 7.0, 7.3).is_empty(), "that is the arc itself");
+        assert!(!here(&first, 7.0, 7.3).is_empty(), "back over the arc");
+        assert!(here(&last, 7.0, 3.0).is_empty(), "off the circle");
     }
 
     #[test]
@@ -584,7 +596,11 @@ mod tests {
         assert_eq!(found.len(), 1, "{found:?}");
         let q = found[0].snap.point;
         assert!((q.x * q.x / 100.0 + q.y * q.y / 25.0 - 1.0).abs() < 1e-6);
-        assert!(candidates(&[last], p(9.9, 0.4), 1.0, None, &modes()).is_empty());
+        // And back over the elliptical arc itself.
+        let back = candidates(&[last], p(7.2, 3.6), 1.0, None, &modes());
+        let q = back[0].snap.point;
+        assert!((q.x * q.x / 100.0 + q.y * q.y / 25.0 - 1.0).abs() < 1e-6);
+        assert!(candidates(&[last], p(7.2, 1.0), 1.0, None, &modes()).is_empty());
     }
 
     #[test]
@@ -746,6 +762,10 @@ mod tests {
         let last = path[path.len() - 1];
         assert!((last.x + 10.0).abs() < 1e-9 && last.y.abs() < 1e-9);
         assert!(path.iter().all(|q| (q.x.hypot(q.y) - 10.0).abs() < 1e-9));
+        // Back over the arc, the short way: east of the end, never west.
+        let r = 50.0_f64.sqrt();
+        let back = arc.path_to(p(r, r), None);
+        assert!(back.iter().all(|q| q.x > -1e-9), "{back:?}");
         let along = track(
             &d,
             Acquired::Along {
