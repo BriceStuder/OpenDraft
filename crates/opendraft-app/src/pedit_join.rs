@@ -4,6 +4,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options};
 use opendraft_core::pedit::{JoinType, PolyData, MAX_JOIN_CANDIDATES};
 use opendraft_core::{Attributes, Entity, EntityId, LayoutId};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::text::plural;
@@ -138,7 +139,7 @@ pub(crate) fn join_group(
 /// Multiple's Join prompt: the fuzz distance, or the Jointype to change.
 pub(crate) fn ask_fuzz(ed: &Editor) -> Result<(f64, JoinType), Cancelled> {
     loop {
-        let options = NumberOptions::new("Enter fuzz distance")
+        let options = NumberOptions::new(key!("Enter fuzz distance"))
             .keyword("Jointype", "J")
             .default(0.0);
         match ed.ask_distance(options)? {
@@ -153,7 +154,7 @@ pub(crate) fn ask_fuzz(ed: &Editor) -> Result<(f64, JoinType), Cancelled> {
                     JoinType::Both => "Both",
                 };
                 let answer = ed.get_keyword(
-                    Options::new("Enter join type")
+                    Options::new(key!("Enter join type"))
                         .keyword("Extend", "E")
                         .keyword("Add", "A")
                         .keyword("Both", "B")

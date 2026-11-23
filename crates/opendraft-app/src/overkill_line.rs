@@ -4,6 +4,7 @@
 
 use opendraft_commands::{Cancelled, Editor, Options};
 use opendraft_core::overkill::{Ignore, Settings};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::overkill_cmd::run;
@@ -59,7 +60,7 @@ fn ask_yes_no(ed: &Editor, message: &str, current: bool) -> Result<bool, Cancell
 /// `All` ignores every one.
 fn ask_ignore(ed: &Editor, ignore: &mut Ignore) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<String>::new("Enter property to ignore, Enter when done")
+        let options = Options::<String>::new(key!("Enter property to ignore, Enter when done"))
             .keyword("None", "N")
             .keyword("All", "A")
             .keyword("Color", "C")
@@ -90,7 +91,7 @@ fn ask_ignore(ed: &Editor, ignore: &mut Ignore) -> Result<(), Cancelled> {
 
 /// -OVERKILL.
 pub fn overkill_prompt(ed: &mut Editor) -> Result<(), Cancelled> {
-    let chosen = ed.pickset_or_select("Select objects")?;
+    let chosen = ed.pickset_or_select(key!("Select objects"))?;
     let mut settings = ed.defaults().overkill.get();
     loop {
         let line = describe(ed, &settings)?;
@@ -100,14 +101,15 @@ pub fn overkill_prompt(ed: &mut Editor) -> Result<(), Cancelled> {
         )
         .keyword("Ignore", "I")
         .keyword("Tolerance", "T")
-        .keyword("Optimize polylines", "O")
-        .keyword("Combine partial overlap", "C")
+        .keyword(key!("Optimize polylines"), "O")
+        .keyword(key!("Combine partial overlap"), "C")
         .keyword("combine End to end", "E")
         .keyword("Associativity", "A");
         match ed.ask_keyword(options)?.as_deref() {
             Some("Ignore") => ask_ignore(ed, &mut settings.ignore)?,
             Some("Tolerance") => {
-                let ask = Options::<f64>::new("Specify tolerance").default(settings.tolerance);
+                let ask =
+                    Options::<f64>::new(key!("Specify tolerance")).default(settings.tolerance);
                 let value = ed.get_distance(ask)?;
                 if value.is_finite() && value >= 0.0 {
                     settings.tolerance = value;
@@ -115,21 +117,22 @@ pub fn overkill_prompt(ed: &mut Editor) -> Result<(), Cancelled> {
                     ed.say("The tolerance must be zero or more.");
                 }
             }
-            Some("Optimize polylines") => {
+            Some(key!("Optimize polylines")) => {
                 settings.optimize_polylines =
-                    ask_yes_no(ed, "Optimize polylines", settings.optimize_polylines)?;
+                    ask_yes_no(ed, key!("Optimize polylines"), settings.optimize_polylines)?;
             }
-            Some("Combine partial overlap") => {
+            Some(key!("Combine partial overlap")) => {
                 settings.overlapping =
-                    ask_yes_no(ed, "Combine partial overlap", settings.overlapping)?;
+                    ask_yes_no(ed, key!("Combine partial overlap"), settings.overlapping)?;
             }
             Some("combine End to end") => {
-                settings.end_to_end = ask_yes_no(ed, "Combine end to end", settings.end_to_end)?;
+                settings.end_to_end =
+                    ask_yes_no(ed, key!("Combine end to end"), settings.end_to_end)?;
             }
             Some("Associativity") => {
                 settings.maintain_associative = ask_yes_no(
                     ed,
-                    "Maintain associative objects",
+                    key!("Maintain associative objects"),
                     settings.maintain_associative,
                 )?;
             }

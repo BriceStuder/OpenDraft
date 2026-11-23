@@ -7,6 +7,7 @@ use opendraft_commands::{
 };
 use opendraft_core::polygon::{about_point, about_radius, on_edge, Fit, MAX_SIDES, MIN_SIDES};
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::add;
@@ -51,7 +52,7 @@ fn ghost(points: Option<Vec<Point>>) -> Vec<Entity> {
 /// undo step.
 pub fn draw_polygon(ed: &mut Editor) -> Result<(), Cancelled> {
     let sides = ask_sides(ed)?;
-    let options = PointOptions::new("Specify center of polygon").keyword("Edge", "E");
+    let options = PointOptions::new(key!("Specify center of polygon")).keyword("Edge", "E");
     let points = match ed.ask_point(options)? {
         Answer::Value(center) => about_center(ed, center, sides)?,
         Answer::Keyword(_) => by_edge(ed, sides)?,
@@ -62,7 +63,7 @@ pub fn draw_polygon(ed: &mut Editor) -> Result<(), Cancelled> {
 
 fn ask_sides(ed: &Editor) -> Result<usize, Cancelled> {
     loop {
-        let options = NumberOptions::new("Enter number of sides")
+        let options = NumberOptions::new(key!("Enter number of sides"))
             .default(ed.defaults().polygon.get().sides as f64);
         let typed = ed.get_number(options)?;
         let whole = typed.round();
@@ -83,7 +84,7 @@ fn about_center(ed: &Editor, center: Point, sides: usize) -> Result<Vec<Point>, 
         Fit::Circumscribed => CIRCUMSCRIBED,
     };
     let chosen = ed.get_keyword(
-        Options::new("Enter an option")
+        Options::new(key!("Enter an option"))
             .keyword(INSCRIBED, "I")
             .keyword(CIRCUMSCRIBED, "C")
             .default(default.to_owned()),
@@ -95,7 +96,7 @@ fn about_center(ed: &Editor, center: Point, sides: usize) -> Result<Vec<Point>, 
     };
     ed.defaults().polygon.change(|m| m.fit = fit);
     loop {
-        let options = NumberOptions::new("Specify radius of circle")
+        let options = NumberOptions::new(key!("Specify radius of circle"))
             .base(center)
             .ghost(move |at| ghost(about_point(center, at, sides, fit)));
         let made = match ed.ask_distance_or_point(options)? {
@@ -113,9 +114,9 @@ fn about_center(ed: &Editor, center: Point, sides: usize) -> Result<Vec<Point>, 
 }
 
 fn by_edge(ed: &Editor, sides: usize) -> Result<Vec<Point>, Cancelled> {
-    let first = ed.get_point("Specify first endpoint of edge")?;
+    let first = ed.get_point(key!("Specify first endpoint of edge"))?;
     loop {
-        let options = PointOptions::new("Specify second endpoint of edge")
+        let options = PointOptions::new(key!("Specify second endpoint of edge"))
             .base(first)
             .ghost(move |at| ghost(on_edge(first, at, sides)));
         let second = ed.get_point(options)?;

@@ -4,6 +4,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, PointOptions};
 use opendraft_core::rect::{outline, Corners};
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::{add, MIN_SIZE};
@@ -49,32 +50,40 @@ fn set_option(ed: &Editor, option: &str) -> Result<(), Cancelled> {
     };
     match option {
         "Chamfer" => {
-            let first = size("Specify first chamfer distance for rectangles", m.first)?;
-            let second = size("Specify second chamfer distance for rectangles", first)?;
+            let first = size(
+                key!("Specify first chamfer distance for rectangles"),
+                m.first,
+            )?;
+            let second = size(
+                key!("Specify second chamfer distance for rectangles"),
+                first,
+            )?;
             // Bevels and rounding exclude each other.
             defaults
                 .rect
                 .change(|m| (m.first, m.second, m.radius) = (first, second, 0.0));
         }
         "Fillet" => {
-            let radius = size("Specify fillet radius for rectangles", m.radius)?;
+            let radius = size(key!("Specify fillet radius for rectangles"), m.radius)?;
             defaults
                 .rect
                 .change(|m| (m.radius, m.first, m.second) = (radius, 0.0, 0.0));
         }
         "Width" => {
-            let width = size("Specify line width for rectangles", m.width)?;
+            let width = size(key!("Specify line width for rectangles"), m.width)?;
             defaults.rect.change(|m| m.width = width);
         }
         "Elevation" => {
             let value = ed.get_number(
-                NumberOptions::new("Specify the elevation for rectangles").default(m.elevation),
+                NumberOptions::new(key!("Specify the elevation for rectangles"))
+                    .default(m.elevation),
             )?;
             defaults.rect.change(|m| m.elevation = value);
         }
         _ => {
             let value = ed.get_number(
-                NumberOptions::new("Specify the thickness for rectangles").default(m.thickness),
+                NumberOptions::new(key!("Specify the thickness for rectangles"))
+                    .default(m.thickness),
             )?;
             defaults.rect.change(|m| m.thickness = value);
         }
@@ -95,38 +104,38 @@ fn positive(ed: &Editor, message: &str) -> Result<f64, Cancelled> {
 /// Area: the area, then the length or the width, give the other side.
 fn size_from_area(ed: &Editor) -> Result<Size, Cancelled> {
     let area = loop {
-        let area = ed.get_number("Enter area of rectangle in current units")?;
+        let area = ed.get_number(key!("Enter area of rectangle in current units"))?;
         if area > MIN_SIZE {
             break area;
         }
         ed.say("Requires a positive value.");
     };
     let by = ed.get_keyword(
-        Options::new("Calculate rectangle dimensions based on")
+        Options::new(key!("Calculate rectangle dimensions based on"))
             .keyword("Length", "L")
             .keyword("Width", "W")
             .default("Length".to_owned()),
     )?;
     Ok(if by == "Length" {
-        let length = positive(ed, "Enter rectangle length")?;
+        let length = positive(ed, key!("Enter rectangle length"))?;
         (length, area / length)
     } else {
-        let width = positive(ed, "Enter rectangle width")?;
+        let width = positive(ed, key!("Enter rectangle width"))?;
         (area / width, width)
     })
 }
 
 /// Rotation: an angle, typed or picked from the first corner, or two points.
 fn rotation(ed: &Editor, first: Point, current: f64) -> Result<f64, Cancelled> {
-    let options = NumberOptions::new("Specify rotation angle")
+    let options = NumberOptions::new(key!("Specify rotation angle"))
         .default(current)
         .base(first)
-        .keyword("Pick points", "P");
+        .keyword(key!("Pick points"), "P");
     Ok(match ed.ask_angle(options)? {
         Answer::Value(angle) => angle,
         Answer::Keyword(_) => {
-            let a = ed.get_point("Specify first point")?;
-            let b = ed.get_point(PointOptions::new("Specify second point").base(a))?;
+            let a = ed.get_point(key!("Specify first point"))?;
+            let b = ed.get_point(PointOptions::new(key!("Specify second point")).base(a))?;
             (b.y - a.y).atan2(b.x - a.x)
         }
         Answer::Enter => return Err(Cancelled),
@@ -140,7 +149,7 @@ fn rotation(ed: &Editor, first: Point, current: f64) -> Result<f64, Cancelled> {
 /// Rotation turns the whole rectangle about the first corner.
 pub fn draw_rectangle(ed: &mut Editor) -> Result<(), Cancelled> {
     let first = loop {
-        let options = PointOptions::new("Specify first corner point")
+        let options = PointOptions::new(key!("Specify first corner point"))
             .keyword("Chamfer", "C")
             .keyword("Elevation", "E")
             .keyword("Fillet", "F")
@@ -158,7 +167,7 @@ pub fn draw_rectangle(ed: &mut Editor) -> Result<(), Cancelled> {
     let level = ed.read(|doc| doc.ccs().angle)?;
     let (mut angle, mut size): (f64, Option<Size>) = (level, None);
     let (dx, dy) = loop {
-        let options = PointOptions::new("Specify other corner point")
+        let options = PointOptions::new(key!("Specify other corner point"))
             .keyword("Area", "A")
             .keyword("Dimensions", "D")
             .keyword("Rotation", "R")
@@ -176,8 +185,8 @@ pub fn draw_rectangle(ed: &mut Editor) -> Result<(), Cancelled> {
             }
             Answer::Keyword(k) if k == "Area" => size = Some(size_from_area(ed)?),
             Answer::Keyword(k) if k == "Dimensions" => {
-                let length = positive(ed, "Specify length for rectangles")?;
-                let width = positive(ed, "Specify width for rectangles")?;
+                let length = positive(ed, key!("Specify length for rectangles"))?;
+                let width = positive(ed, key!("Specify width for rectangles"))?;
                 size = Some((length, width));
             }
             Answer::Keyword(_) => angle = rotation(ed, first, angle)?,

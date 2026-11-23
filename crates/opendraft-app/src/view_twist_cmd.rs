@@ -12,6 +12,7 @@ use opendraft_commands::{
 };
 use opendraft_core::ccs_align::aligned_to;
 use opendraft_core::{Document, Point};
+use opendraft_ui::key;
 
 use crate::state::AppState;
 use crate::zoom_cmd::{start_view_command, ZoomTo};
@@ -50,7 +51,7 @@ fn level_twist(first: Point, second: Point) -> Option<f64> {
 /// or arc along its radius to the pick (or the nearer end).
 fn object_twist(ed: &Editor) -> Result<Option<f64>, Cancelled> {
     loop {
-        let picked = match ed.ask_object(Options::new("Select object to read level"))? {
+        let picked = match ed.ask_object(Options::new(key!("Select object to read level")))? {
             Answer::Value(picked) => picked,
             _ => return Ok(None),
         };
@@ -66,14 +67,14 @@ fn object_twist(ed: &Editor) -> Result<Option<f64>, Cancelled> {
 /// Two points of a line to read level, or an object (the Object keyword at
 /// the first point): the twist that does it.
 fn points_twist(ed: &Editor) -> Result<Option<f64>, Cancelled> {
-    let options =
-        PointOptions::new("Specify first point of a line to read level").keyword("Object", "O");
+    let options = PointOptions::new(key!("Specify first point of a line to read level"))
+        .keyword("Object", "O");
     let first = match ed.ask_point(options)? {
         Answer::Value(first) => first,
         Answer::Keyword(_) => return object_twist(ed),
         Answer::Enter => return Ok(None),
     };
-    let options = PointOptions::new("Specify second point").base(first);
+    let options = PointOptions::new(key!("Specify second point")).base(first);
     let second = ed.get_point(options)?;
     let twist = level_twist(first, second);
     if twist.is_none() {
@@ -95,7 +96,7 @@ fn rotate_view(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     let Some(twist) = current(ed)? else {
         return Ok(None);
     };
-    let options = NumberOptions::new("Specify view rotation angle")
+    let options = NumberOptions::new(key!("Specify view rotation angle"))
         .default(twist)
         .turn()
         .keyword("Points", "P")
@@ -122,7 +123,7 @@ fn plan(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     if current(ed)?.is_none() {
         return Ok(None);
     }
-    let options = Options::<String>::new("Enter an option")
+    let options = Options::<String>::new(key!("Enter an option"))
         .keyword("Current", "C")
         .keyword("Named", "N")
         .keyword("World", "W")
@@ -130,11 +131,12 @@ fn plan(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     let angle = match ed.get_keyword(options)?.as_str() {
         "World" => 0.0,
         "Named" => {
-            let name =
-                match ed.ask_string(Options::<String>::new("Enter name of coordinate system"))? {
-                    Answer::Value(name) => name,
-                    _ => return Ok(None),
-                };
+            let name = match ed.ask_string(Options::<String>::new(key!(
+                "Enter name of coordinate system"
+            )))? {
+                Answer::Value(name) => name,
+                _ => return Ok(None),
+            };
             let named = ed.read(move |doc| doc.named_ccs_called(&name).map(|n| n.ccs.angle))?;
             let Some(angle) = named else {
                 ed.say("No coordinate system is saved under that name.");

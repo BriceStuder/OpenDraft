@@ -4,6 +4,7 @@
 use opendraft_canvas::Region;
 use opendraft_commands::{Answer, Cancelled, Editor, GhostStyle, PointOptions};
 use opendraft_core::{Entity, EntityId, Point};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -12,14 +13,14 @@ use crate::text::plural;
 fn ask_region(ed: &Editor) -> Result<Vec<Point>, Cancelled> {
     // Square to the screen, however the view is turned.
     let twist = ed.read(|doc| doc.view_twist())?;
-    let first_options =
-        PointOptions::new("Specify first corner of crossing window").keyword("CPolygon", "CP");
+    let first_options = PointOptions::new(key!("Specify first corner of crossing window"))
+        .keyword("CPolygon", "CP");
     let first = match ed.ask_point(first_options)? {
         Answer::Value(at) => at,
         Answer::Keyword(_) => return ask_polygon(ed),
         Answer::Enter => return Err(Cancelled),
     };
-    let options = PointOptions::new("Specify opposite corner")
+    let options = PointOptions::new(key!("Specify opposite corner"))
         .ghost_style(GhostStyle::Crossing)
         .ghost(move |at| {
             vec![Entity::Polyline {
@@ -37,9 +38,9 @@ fn ask_polygon(ed: &Editor) -> Result<Vec<Point>, Cancelled> {
     let mut points: Vec<Point> = Vec::new();
     loop {
         let message = if points.is_empty() {
-            "Specify first polygon point"
+            key!("Specify first polygon point")
         } else {
-            "Specify next point (Enter to finish)"
+            key!("Specify next point (Enter to finish)")
         };
         let so_far = points.clone();
         let options = PointOptions::new(message)
@@ -93,9 +94,9 @@ pub fn stretch_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         ed.say("Nothing to stretch: no object has a point inside the window.");
         return Ok(());
     }
-    let base = ed.get_point("Specify base point")?;
+    let base = ed.get_point(key!("Specify base point"))?;
     let (shown, inside) = (found.clone(), region.clone());
-    let options = PointOptions::new("Specify second point")
+    let options = PointOptions::new(key!("Specify second point"))
         .base(base)
         .ghost(move |at| {
             shown

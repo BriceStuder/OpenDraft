@@ -4,6 +4,7 @@
 //! plain copy, as AutoCAD's with Associative = No. The geometry is
 //! `opendraft_core::array`.
 
+use opendraft_ui::key;
 use std::f64::consts::TAU;
 use std::sync::Arc;
 
@@ -154,9 +155,9 @@ pub(crate) fn ask_count(ed: &Editor, message: &str, current: usize) -> Result<us
 
 /// ARRAY: select objects, then the kind of array.
 pub fn array_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let kind = ed.get_keyword(
-        Options::new("Enter array type")
+        Options::new(key!("Enter array type"))
             .keyword("Rectangular", "R")
             .keyword("PAth", "PA")
             .keyword("POlar", "PO")
@@ -172,7 +173,7 @@ pub fn array_objects(ed: &mut Editor) -> Result<(), Cancelled> {
 /// ARRAYRECT: select objects; 4 columns and 3 rows to begin with, changed
 /// by the options until Enter.
 pub fn array_rect(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     rect_with(ed, ids)
 }
 
@@ -244,9 +245,9 @@ fn change_grid(ed: &Editor, grid: Grid, option: &str) -> Result<Grid, Cancelled>
                 let count = total.unwrap_or(2).max(2);
                 let span = current * (count - 1) as f64;
                 let what = if message.contains("column") {
-                    "Specify the distance between first and last column"
+                    key!("Specify the distance between first and last column")
                 } else {
-                    "Specify the distance between first and last row"
+                    key!("Specify the distance between first and last row")
                 };
                 let total = ed.get_distance(NumberOptions::new(what).default(span))?;
                 Ok(total / (count - 1) as f64)
@@ -256,38 +257,44 @@ fn change_grid(ed: &Editor, grid: Grid, option: &str) -> Result<Grid, Cancelled>
     };
     match option {
         "COUnt" => {
-            g.columns = ask_count(ed, "Enter number of columns", g.columns)?;
-            g.rows = ask_count(ed, "Enter number of rows", g.rows)?;
+            g.columns = ask_count(ed, key!("Enter number of columns"), g.columns)?;
+            g.rows = ask_count(ed, key!("Enter number of rows"), g.rows)?;
         }
         "Spacing" => {
-            let options = NumberOptions::new("Specify the distance between columns")
+            let options = NumberOptions::new(key!("Specify the distance between columns"))
                 .default(g.column_spacing)
                 .keyword("Unit cell", "U");
             match ed.ask_distance(options)? {
                 Answer::Keyword(_) => {
-                    let a = ed.get_point("Specify first corner")?;
-                    let b = ed.get_corner(a, "Specify other corner")?;
+                    let a = ed.get_point(key!("Specify first corner"))?;
+                    let b = ed.get_corner(a, key!("Specify other corner"))?;
                     (g.column_spacing, g.row_spacing) = (b.x - a.x, b.y - a.y);
                 }
                 Answer::Value(d) => {
                     g.column_spacing = d;
-                    g.row_spacing =
-                        distance("Specify the distance between rows", g.row_spacing, None)?;
+                    g.row_spacing = distance(
+                        key!("Specify the distance between rows"),
+                        g.row_spacing,
+                        None,
+                    )?;
                 }
                 Answer::Enter => {
-                    g.row_spacing =
-                        distance("Specify the distance between rows", g.row_spacing, None)?;
+                    g.row_spacing = distance(
+                        key!("Specify the distance between rows"),
+                        g.row_spacing,
+                        None,
+                    )?;
                 }
             }
         }
         "COLumns" => {
-            g.columns = ask_count(ed, "Enter number of columns", g.columns)?;
-            let message = "Specify the distance between columns";
+            g.columns = ask_count(ed, key!("Enter number of columns"), g.columns)?;
+            let message = key!("Specify the distance between columns");
             g.column_spacing = distance(message, g.column_spacing, Some(g.columns))?;
         }
         _ => {
-            g.rows = ask_count(ed, "Enter the number of rows", g.rows)?;
-            let message = "Specify the distance between rows";
+            g.rows = ask_count(ed, key!("Enter the number of rows"), g.rows)?;
+            let message = key!("Specify the distance between rows");
             g.row_spacing = distance(message, g.row_spacing, Some(g.rows))?;
         }
     }
@@ -297,7 +304,7 @@ fn change_grid(ed: &Editor, grid: Grid, option: &str) -> Result<Grid, Cancelled>
 /// ARRAYPOLAR: select objects and the centre; 6 items round a whole turn,
 /// turned as they go, to begin with, changed by the options until Enter.
 pub fn array_polar(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     polar_with(ed, ids)
 }
 
@@ -306,7 +313,7 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
         return Ok(());
     };
     ed.say("Type = Polar  Associative = No");
-    let center = ed.get_point("Specify center point of array")?;
+    let center = ed.get_point(key!("Specify center point of array"))?;
     let base = source.center();
     let (mut items, mut fill, mut rotate) = (6, TAU, true);
     let keywords = [
@@ -323,14 +330,14 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
         };
         match option.as_str() {
             "Items" => {
-                let count = ask_count(ed, "Enter number of items in array", items)?;
+                let count = ask_count(ed, key!("Enter number of items in array"), items)?;
                 if fits(ed, &source, count) {
                     items = count;
                 }
             }
             "Angle between" => {
                 let step = polar_step(items, fill);
-                let options = NumberOptions::new("Specify the angle between items")
+                let options = NumberOptions::new(key!("Specify the angle between items"))
                     .default(step)
                     .turn();
                 let step = ed.get_angle(options)?;
@@ -344,7 +351,7 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
                 }
             }
             "Fill angle" => {
-                let options = NumberOptions::new("Specify the angle to fill (+=ccw, -=cw)")
+                let options = NumberOptions::new(key!("Specify the angle to fill (+=ccw, -=cw)"))
                     .default(fill)
                     .turn();
                 let angle = ed.get_angle(options)?;
@@ -357,7 +364,7 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
             _ => {
                 let current = if rotate { "Yes" } else { "No" };
                 let answer = ed.get_keyword(
-                    Options::new("Rotate arrayed items?")
+                    Options::new(key!("Rotate arrayed items?"))
                         .keyword("Yes", "Y")
                         .keyword("No", "N")
                         .default(current.to_owned()),

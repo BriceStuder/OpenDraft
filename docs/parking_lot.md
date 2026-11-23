@@ -33,7 +33,7 @@ Keep it current: when something here is built, delete its line in the same chang
 
 ## Selection, snapping and input
 
-- Object snap and tracking: the leftovers listed under "Not built" in `docs/ARCHITECTURE.md`'s object snap section (pausing to take back a tracking point, `POLARMODE` bit 1, Extension past the ends of polylines and splines, `OSOPTIONS`, `OSNAPZ`).
+- Object snap and tracking: the leftovers listed under "Not built" in `docs/ARCHITECTURE.md`'s object snap section (pausing to take back a tracking point, `POLARMODE` bit 1, Extension past the ends of splines, `OSOPTIONS`, `OSNAPZ`).
 - `ORTHOMODE` saved in the drawing (it is a user setting today).
 - Snapping to the shape being drawn: ELLIPSE's first axis and a CV spline's control frame are not passed.
 - Window and lasso selection style: the command line does not say "Specify opposite corner", the lasso does not show its kind by the pointer, no option to start a lasso only from empty space, no highlight of what the box or lasso would take.
@@ -141,7 +141,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Icons: reloading while the app runs, recolouring for a light theme; the Layout tab's six icons (`assets/icons/layout-*.svg`) are Lucide's outlines, not yet redrawn in the Home tab's style.
 - Purge: a confirmation window, previews beyond blocks.
 - Crash log: telling the user, when it happens, that a crash was recorded.
-- Translations (issue #138): the setup (Settings > Display > Language), the ribbon, the menus, the palettes and the status bar are built, with French. Still to wrap in `t!`: the prompts, prompt options and command names (both bilingual, `_LINE` always works), messages and dialogs; then the complete French file.
+- Translations (issue #138): the setup (Settings > Display > Language), the ribbon, the menus, the palettes, the status bar and the prompts of the drawing and editing commands are built, with French. Still to wrap: the other prompts (dimensions, text, leaders, blocks and attributes, fields, layers, layouts, plot, purge, system variables), prompts built with `format!` or composed (TRIM's mode), prompt options and command names (both bilingual, `_LINE` always works), messages and dialogs; then the complete French file.
 
 ## Assistant and automation
 

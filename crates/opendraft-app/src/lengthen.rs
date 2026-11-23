@@ -5,6 +5,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked, PointOptions};
 use opendraft_core::units::{format_angle, format_length};
 use opendraft_core::{End, Entity};
+use opendraft_ui::key;
 
 /// What to do to the end of each object that is picked.
 #[derive(Clone, Copy)]
@@ -49,7 +50,7 @@ fn refusal(target: &Entity) -> Option<&'static str> {
 /// should move. Each change is one undo step; Enter ends.
 pub fn lengthen_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select an object")
+        let options = Options::<Picked>::new(key!("Select an object"))
             .keyword("DElta", "DE")
             .keyword("Percent", "P")
             .keyword("Total", "T")
@@ -96,18 +97,18 @@ fn report(ed: &mut Editor, id: opendraft_core::EntityId) -> Result<(), Cancelled
 /// Ask for the amount the chosen keyword needs; `None` to go back.
 fn ask_mode(ed: &mut Editor, keyword: &str) -> Result<Option<Mode>, Cancelled> {
     Ok(match keyword {
-        "DElta" => match ask_amount(ed, "Enter delta length", true)? {
+        "DElta" => match ask_amount(ed, key!("Enter delta length"), true)? {
             Amount::Length(d) => Some(Mode::Delta(d)),
             Amount::Angle(a) => Some(Mode::DeltaAngle(a)),
             Amount::Back => None,
         },
-        "Total" => match ask_amount(ed, "Specify total length", false)? {
+        "Total" => match ask_amount(ed, key!("Specify total length"), false)? {
             Amount::Length(t) => Some(Mode::Total(t)),
             Amount::Angle(t) => Some(Mode::TotalAngle(t)),
             Amount::Back => None,
         },
         "Percent" => {
-            let options = NumberOptions::new("Enter percentage length").default(100.0);
+            let options = NumberOptions::new(key!("Enter percentage length")).default(100.0);
             match ed.ask_number(options)? {
                 Answer::Value(p) if p > 0.0 => Some(Mode::Percent(p)),
                 Answer::Value(_) => {
@@ -156,7 +157,7 @@ fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Ca
 /// Pick objects one after another and change each by `mode`.
 fn change_objects(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select an object to change")
+        let options = Options::<Picked>::new(key!("Select an object to change"))
             .keyword("Undo", "U")
             .allow_empty();
         let Picked { id, at, .. } = match ed.ask_object(options)? {
@@ -180,7 +181,7 @@ fn change_objects(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
         let changed = match mode {
             Mode::Dynamic => {
                 let shown = target.clone();
-                let options = PointOptions::new("Specify new end point")
+                let options = PointOptions::new(key!("Specify new end point"))
                     .ghost(move |p| shown.lengthened_to(end, p).into_iter().collect());
                 let Answer::Value(p) = ed.ask_point(options)? else {
                     continue;
