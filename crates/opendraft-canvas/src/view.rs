@@ -57,6 +57,7 @@ mod types;
 use layout::LayoutInput;
 pub use layout::Space;
 pub use select_gesture::SelectionStyle;
+use types::Request;
 pub use types::{
     CanvasOutput, CanvasStyle, Click, Crosshair, Ghost, GhostStyle, GridSettings, PointPrompt,
     PointerSizes, RegionSelect,
@@ -74,16 +75,6 @@ const HIGHLIGHT_WIDTH: f32 = 6.0;
 const BOX_MIN_PX: f32 = 4.0;
 /// Factor for the Zoom In / Zoom Out commands.
 const STEP_ZOOM: f64 = 1.5;
-
-enum Request {
-    Extents,
-    Zoom(f64),
-    /// ZOOM Window: two corners in the space being worked in.
-    Window(Point, Point),
-    /// Turn the drawing on the screen to this twist, then (when `true`)
-    /// show the extents (PLAN).
-    Twist(f64, bool),
-}
 
 /// Per-drawing view state.
 #[derive(Default)]
