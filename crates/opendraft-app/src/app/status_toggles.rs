@@ -2,8 +2,11 @@
 //! AutoCAD's order, with the object snap menu behind a right-click.
 
 use eframe::egui;
+use opendraft_ui::i18n::tr;
 use opendraft_ui::icon_set::{self, Icon};
 use opendraft_ui::icons;
+use opendraft_ui::key;
+use rust_i18n::t;
 
 use super::OpenDraftApp;
 
@@ -22,73 +25,89 @@ const MODE_TOGGLES: &[(char, &str, &str, Menu)] = &[
     (
         icons::STATUS_GRID_DISPLAY,
         "view.grid",
-        "Grid display (F7)",
+        key!("Grid display (F7)"),
         Menu::None,
     ),
     (
         icons::STATUS_GRID_SNAP,
         "view.snap_grid",
-        "Snap to grid",
+        key!("Snap to grid"),
         Menu::None,
     ),
     (
         icons::STATUS_ORTHO,
         "view.ortho",
-        "Ortho mode (F8)",
+        key!("Ortho mode (F8)"),
         Menu::None,
     ),
     (
         icons::STATUS_POLAR,
         "view.polar",
-        "Polar tracking (F10)",
+        key!("Polar tracking (F10)"),
         Menu::None,
     ),
     (
         icons::STATUS_OSNAP,
         "view.snap",
-        "Object snap (F3); right-click for the modes",
+        key!("Object snap (F3); right-click for the modes"),
         Menu::ObjectSnap,
     ),
     (
         icons::STATUS_OTRACK,
         "view.otrack",
-        "Object snap tracking (F11)",
+        key!("Object snap tracking (F11)"),
         Menu::None,
     ),
 ];
 
 /// The running object snaps in the object snap menu, in AutoCAD's order.
 const SNAP_MENU: &[(char, &str, &str)] = &[
-    (icons::OSNAP_END, "Endpoint", "view.snap_endpoint"),
-    (icons::OSNAP_MID, "Midpoint", "view.snap_midpoint"),
-    (icons::OSNAP_CENTRE, "Center", "view.snap_center"),
+    (icons::OSNAP_END, key!("Endpoint"), "view.snap_endpoint"),
+    (icons::OSNAP_MID, key!("Midpoint"), "view.snap_midpoint"),
+    (icons::OSNAP_CENTRE, key!("Center"), "view.snap_center"),
     (
         icons::OSNAP_GEO_CENTRE,
-        "Geometric Center",
+        key!("Geometric Center"),
         "view.snap_geometric_center",
     ),
-    (icons::OSNAP_NODE, "Node", "view.snap_node"),
-    (icons::OSNAP_QUADRANT, "Quadrant", "view.snap_quadrant"),
+    (icons::OSNAP_NODE, key!("Node"), "view.snap_node"),
+    (
+        icons::OSNAP_QUADRANT,
+        key!("Quadrant"),
+        "view.snap_quadrant",
+    ),
     (
         icons::OSNAP_INTERSECTION,
-        "Intersection",
+        key!("Intersection"),
         "view.snap_intersection",
     ),
-    (icons::OSNAP_EXTENSION, "Extension", "view.snap_extension"),
-    (icons::OSNAP_INSERTION, "Insertion", "view.snap_insertion"),
+    (
+        icons::OSNAP_EXTENSION,
+        key!("Extension"),
+        "view.snap_extension",
+    ),
+    (
+        icons::OSNAP_INSERTION,
+        key!("Insertion"),
+        "view.snap_insertion",
+    ),
     (
         icons::OSNAP_PERPENDICULAR,
-        "Perpendicular",
+        key!("Perpendicular"),
         "view.snap_perpendicular",
     ),
-    (icons::OSNAP_TANGENT, "Tangent", "view.snap_tangent"),
-    (icons::OSNAP_NEAREST, "Nearest", "view.snap_nearest"),
+    (icons::OSNAP_TANGENT, key!("Tangent"), "view.snap_tangent"),
+    (icons::OSNAP_NEAREST, key!("Nearest"), "view.snap_nearest"),
     (
         icons::OSNAP_APPARENT_INTERSECTION,
-        "Apparent Intersection",
+        key!("Apparent Intersection"),
         "view.snap_apparent_intersection",
     ),
-    (icons::OSNAP_PARALLEL, "Parallel", "view.snap_parallel"),
+    (
+        icons::OSNAP_PARALLEL,
+        key!("Parallel"),
+        "view.snap_parallel",
+    ),
 ];
 
 /// One menu row: a tick when on, the snap's icon and its name. Returns
@@ -165,7 +184,7 @@ impl OpenDraftApp {
                         .color(color)
                         .padding(4.0),
                 )
-                .on_hover_text(tip)
+                .on_hover_text(tr(tip))
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
             if on || response.hovered() {
                 let fill = if on { colors.pressed } else { colors.hover };
@@ -212,13 +231,13 @@ impl OpenDraftApp {
                             ui.spacing_mut().item_spacing.y = 0.0;
                             for &(icon, label, mode) in SNAP_MENU {
                                 let on = self.registry.is_checked(mode, &self.state);
-                                if snap_row(ui, &self.theme, icon, label, on) {
+                                if snap_row(ui, &self.theme, icon, &tr(label), on) {
                                     *clicked = Some(mode);
                                     done = true;
                                 }
                             }
                             ui.separator();
-                            if ui.button("Object Snap Settings...").clicked() {
+                            if ui.button(t!("Object Snap Settings...")).clicked() {
                                 self.settings_tab = 1;
                                 self.state.show_settings = true;
                                 done = true;
@@ -249,7 +268,7 @@ impl OpenDraftApp {
                     .color(color)
                     .padding(4.0),
             )
-            .on_hover_text("Status bar settings")
+            .on_hover_text(t!("Status bar settings"))
             .on_hover_cursor(egui::CursorIcon::PointingHand);
         let dynamic = self.registry.is_checked("view.dynamic_input", &self.state);
         let pick = opendraft_ui::menu::popup(
@@ -260,14 +279,14 @@ impl OpenDraftApp {
             200.0,
             |ui| {
                 let label = if dynamic {
-                    "Dynamic Input (F12): on"
+                    t!("Dynamic Input (F12): on")
                 } else {
-                    "Dynamic Input (F12): off"
+                    t!("Dynamic Input (F12): off")
                 };
-                if opendraft_ui::menu::menu_row(ui, &self.theme, label, false) {
+                if opendraft_ui::menu::menu_row(ui, &self.theme, &label, false) {
                     return Some("view.dynamic_input");
                 }
-                opendraft_ui::menu::menu_row(ui, &self.theme, "Drafting Settings...", false)
+                opendraft_ui::menu::menu_row(ui, &self.theme, &t!("Drafting Settings..."), false)
                     .then_some("")
             },
         );

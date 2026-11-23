@@ -5,7 +5,10 @@
 
 use eframe::egui::Ui;
 use opendraft_core::{Document, Entity, Object, TextStyleId};
+use opendraft_ui::i18n::tr;
+use opendraft_ui::key;
 use opendraft_ui::Theme;
+use rust_i18n::t;
 
 use crate::attr_rows::{cell_combo, shared, VARIES};
 use crate::properties_ui::row_frame;
@@ -30,8 +33,8 @@ impl Kind {
     /// The section's title.
     pub fn title(self) -> &'static str {
         match self {
-            Kind::Dimension => "Misc",
-            Kind::Text => "Text",
+            Kind::Dimension => key!("Misc"),
+            Kind::Text => key!("Text"),
         }
     }
 }
@@ -61,7 +64,7 @@ pub fn row(
 ) -> Option<StyleEdit> {
     match kind {
         Kind::Dimension => {
-            let (_, cell) = row_frame(ui, theme, "Dim style");
+            let (_, cell) = row_frame(ui, theme, &t!("Dim style"));
             let names: Vec<String> = document
                 .dim_styles()
                 .iter()
@@ -72,13 +75,14 @@ pub fn row(
                 _ => None,
             }));
             let current = name.and_then(|n| names.iter().position(|s| s.to_ascii_lowercase() == n));
-            let text = current.map_or(VARIES, |i| names[i].as_str());
+            let varies = tr(VARIES);
+            let text = current.map_or(&*varies, |i| names[i].as_str());
             let id = ui.id().with("style_dimension");
             let picked = cell_combo(ui, theme, id, cell, text, &names, current)?;
             Some(StyleEdit::Dimension(names[picked].clone()))
         }
         Kind::Text => {
-            let (_, cell) = row_frame(ui, theme, "Style");
+            let (_, cell) = row_frame(ui, theme, &t!("Style"));
             let styles = document.text_styles();
             let names: Vec<String> = styles.iter().map(|s| s.name.clone()).collect();
             let id_of = shared(objects.iter().filter_map(|o| match &o.entity {
@@ -86,7 +90,8 @@ pub fn row(
                 _ => None,
             }));
             let current = id_of.and_then(|id| styles.iter().position(|s| s.id == id));
-            let text = current.map_or(VARIES, |i| names[i].as_str());
+            let varies = tr(VARIES);
+            let text = current.map_or(&*varies, |i| names[i].as_str());
             let id = ui.id().with("style_text");
             let picked = cell_combo(ui, theme, id, cell, text, &names, current)?;
             Some(StyleEdit::Text(styles[picked].id))

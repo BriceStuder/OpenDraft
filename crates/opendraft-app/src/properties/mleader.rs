@@ -9,32 +9,63 @@
 use opendraft_core::dimension::Arrow;
 use opendraft_core::mleader::{MLeader, MLeaderContent, MLeaderLineType};
 use opendraft_core::Point;
+use opendraft_ui::key;
 
 use super::{row, Field, Row, Unit};
 
 const WITH_TEXT: &[Row] = &[
-    row(Field::LeaderType, "Leader type", Unit::LeaderType, true),
-    row(Field::Arrowhead, "Arrowhead", Unit::Arrowhead, true),
-    row(Field::ArrowSize, "Arrowhead size", Unit::Length, true),
-    row(Field::Lines, "Leader lines", Unit::Count, false),
-    row(Field::Vertices, "Vertices", Unit::Count, false),
-    row(Field::Dogleg, "Use landing", Unit::Flag, true),
-    row(Field::DoglegLength, "Landing distance", Unit::Length, true),
-    row(Field::LandingGap, "Landing gap", Unit::Length, true),
-    row(Field::ContentKind, "Content type", Unit::Content, false),
-    row(Field::Height, "Text height", Unit::Length, true),
-    row(Field::Frame, "Text frame", Unit::Flag, true),
+    row(
+        Field::LeaderType,
+        key!("Leader type"),
+        Unit::LeaderType,
+        true,
+    ),
+    row(Field::Arrowhead, key!("Arrowhead"), Unit::Arrowhead, true),
+    row(Field::ArrowSize, key!("Arrowhead size"), Unit::Length, true),
+    row(Field::Lines, key!("Leader lines"), Unit::Count, false),
+    row(Field::Vertices, key!("Vertices"), Unit::Count, false),
+    row(Field::Dogleg, key!("Use landing"), Unit::Flag, true),
+    row(
+        Field::DoglegLength,
+        key!("Landing distance"),
+        Unit::Length,
+        true,
+    ),
+    row(Field::LandingGap, key!("Landing gap"), Unit::Length, true),
+    row(
+        Field::ContentKind,
+        key!("Content type"),
+        Unit::Content,
+        false,
+    ),
+    row(Field::Height, key!("Text height"), Unit::Length, true),
+    row(Field::Frame, key!("Text frame"), Unit::Flag, true),
 ];
 
 const NO_CONTENT: &[Row] = &[
-    row(Field::LeaderType, "Leader type", Unit::LeaderType, true),
-    row(Field::Arrowhead, "Arrowhead", Unit::Arrowhead, true),
-    row(Field::ArrowSize, "Arrowhead size", Unit::Length, true),
-    row(Field::Lines, "Leader lines", Unit::Count, false),
-    row(Field::Vertices, "Vertices", Unit::Count, false),
-    row(Field::Dogleg, "Use landing", Unit::Flag, true),
-    row(Field::DoglegLength, "Landing distance", Unit::Length, true),
-    row(Field::ContentKind, "Content type", Unit::Content, false),
+    row(
+        Field::LeaderType,
+        key!("Leader type"),
+        Unit::LeaderType,
+        true,
+    ),
+    row(Field::Arrowhead, key!("Arrowhead"), Unit::Arrowhead, true),
+    row(Field::ArrowSize, key!("Arrowhead size"), Unit::Length, true),
+    row(Field::Lines, key!("Leader lines"), Unit::Count, false),
+    row(Field::Vertices, key!("Vertices"), Unit::Count, false),
+    row(Field::Dogleg, key!("Use landing"), Unit::Flag, true),
+    row(
+        Field::DoglegLength,
+        key!("Landing distance"),
+        Unit::Length,
+        true,
+    ),
+    row(
+        Field::ContentKind,
+        key!("Content type"),
+        Unit::Content,
+        false,
+    ),
 ];
 
 pub(super) fn rows(m: &MLeader) -> &'static [Row] {

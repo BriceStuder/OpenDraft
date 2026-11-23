@@ -4,7 +4,9 @@
 
 use eframe::egui::{self, Align2, FontId, Rect, Sense, Stroke, Ui};
 use opendraft_core::{Document, Entity, EntityKind, Object, Units};
+use opendraft_ui::i18n::tr;
 use opendraft_ui::{icons, menu, Theme};
+use rust_i18n::t;
 
 use crate::attr_rows;
 use crate::attribute_rows;
@@ -70,7 +72,7 @@ type Choice = Option<EntityKind>;
 
 fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -> Option<Edit> {
     if selected.is_empty() {
-        type_bar(ui, theme, "No selection", &[], None);
+        type_bar(ui, theme, &t!("No selection"), &[], None);
         return None;
     }
     let mut counts = std::collections::BTreeMap::new();
@@ -86,11 +88,11 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
     let mixed = counts.len() > 1;
 
     let title = |kind: Choice| match kind {
-        Some(k) => format!("{} ({})", k.title(), counts[&k]),
-        None if mixed => format!("All ({})", selected.len()),
+        Some(k) => format!("{} ({})", tr(k.title()), counts[&k]),
+        None if mixed => t!("All (%{count})", count = selected.len()).into_owned(),
         None => match selected.len() {
-            1 => selected[0].entity.kind().title().to_owned(),
-            n => format!("{} ({n})", selected[0].entity.kind().title()),
+            1 => tr(selected[0].entity.kind().title()).into_owned(),
+            n => format!("{} ({n})", tr(selected[0].entity.kind().title())),
         },
     };
     let options: Vec<(Choice, String)> = if mixed {
@@ -118,7 +120,7 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
     let entities: Vec<&Entity> = shown.iter().map(|o| &o.entity).collect();
 
     let mut edit = None;
-    if let Some(attr) = section(ui, theme, "General", |ui| {
+    if let Some(attr) = section(ui, theme, &t!("General"), |ui| {
         attr_rows::rows(ui, theme, document, &shown)
     }) {
         edit = Some(Edit::Attr {
@@ -134,7 +136,7 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
         properties::rows(entities[0]).to_vec()
     };
     if !rows.is_empty() {
-        let geometry = section(ui, theme, "Geometry", |ui| {
+        let geometry = section(ui, theme, &t!("Geometry"), |ui| {
             let mut edit = None;
             for row in &rows {
                 if let Some(value) = value_row(ui, theme, document.units(), &entities, row) {
@@ -163,7 +165,7 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
     if inserts.len() == shown.len() {
         let rows = attribute_rows::rows(&inserts);
         if !rows.is_empty() {
-            let changed = section(ui, theme, "Attributes", |ui| {
+            let changed = section(ui, theme, &t!("Attributes"), |ui| {
                 attribute_rows::show(ui, theme, &rows)
             });
             if let Some((tag, value)) = changed {
@@ -177,7 +179,7 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
     }
     // The style of dimensions or of text, when that is all that is shown.
     if let Some(kind) = style_rows::kind(&shown) {
-        let styled = section(ui, theme, kind.title(), |ui| {
+        let styled = section(ui, theme, &tr(kind.title()), |ui| {
             style_rows::row(ui, theme, document, &shown, kind)
         });
         if let Some(styled) = styled {
@@ -294,21 +296,23 @@ fn value_row(
     let shown = shared
         .map(|v| properties::format(units, row.unit, v))
         .unwrap_or_default();
-    let (label_cell, cell) = row_frame(ui, theme, row.label);
+    let label = tr(row.label);
+    let (label_cell, cell) = row_frame(ui, theme, &label);
     ui.interact(
         label_cell,
         ui.id().with(("label", row.field)),
         Sense::hover(),
     )
     .on_hover_text(match row.unit.suffix(units) {
-        suffix if suffix.is_empty() => row.label.to_owned(),
-        suffix => format!("{} ({suffix})", row.label),
+        suffix if suffix.is_empty() => label.into_owned(),
+        suffix => format!("{label} ({suffix})"),
     });
     if !row.editable {
+        let varies = tr(attr_rows::VARIES);
         let text = if shared.is_some() {
             shown.as_str()
         } else {
-            "Varies"
+            &varies
         };
         ui.painter().text(
             cell.left_center() + egui::vec2(8.0, 0.0),
@@ -359,7 +363,9 @@ pub(crate) fn text_cell(
         egui::TextEdit::singleline(&mut text)
             .id(id)
             .frame(false)
-            .hint_text(egui::RichText::new("Varies").color(theme.colors.text_weak))
+            .hint_text(
+                egui::RichText::new(tr(crate::attr_rows::VARIES)).color(theme.colors.text_weak),
+            )
             .margin(egui::Margin::symmetric(6, 3))
             .vertical_align(egui::Align::Center)
             .desired_width(cell.width()),

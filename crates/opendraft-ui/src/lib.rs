@@ -4,6 +4,7 @@
 rust_i18n::i18n!("../../locales");
 
 mod doc_tabs;
+pub mod i18n;
 pub mod icon_set;
 pub mod icons;
 pub mod menu;

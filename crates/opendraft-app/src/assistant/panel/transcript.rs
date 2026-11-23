@@ -5,12 +5,12 @@
 use eframe::egui;
 use opendraft_agent::{Answer, PlanOutcome};
 use opendraft_ui::Theme;
+use rust_i18n::t;
 
 use super::markdown;
 use crate::assistant::describe;
 use crate::assistant::{ApprovalLevel, Ask, Assistant, Decision, Entry, Progress, Reply};
 use crate::state::AppState;
-use crate::text::plural;
 
 pub fn show(
     ui: &mut egui::Ui,
@@ -138,16 +138,13 @@ fn entry_ui(ui: &mut egui::Ui, theme: &Theme, entry: &Entry) -> bool {
             None => {
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new(format!(
-                            "Made {}.",
-                            plural(*changes as usize, "change")
-                        ))
-                        .size(small)
-                        .color(c.text_weak),
+                        egui::RichText::new(made_text(*changes as usize))
+                            .size(small)
+                            .color(c.text_weak),
                     );
                     if ui
-                        .small_button("Undo")
-                        .on_hover_text("Take back what this task changed")
+                        .small_button(t!("Undo"))
+                        .on_hover_text(t!("Take back what this task changed"))
                         .clicked()
                     {
                         undo = true;
@@ -172,7 +169,7 @@ fn card(ui: &mut egui::Ui, theme: &Theme, ask: &Ask, names: &[(String, String)])
             match ask {
                 Ask::Change(request) => {
                     ui.label(
-                        egui::RichText::new("The assistant wants to change the drawing")
+                        egui::RichText::new(t!("The assistant wants to change the drawing"))
                             .color(c.text_weak),
                     );
                     ui.label(
@@ -188,12 +185,12 @@ fn card(ui: &mut egui::Ui, theme: &Theme, ask: &Ask, names: &[(String, String)])
                         .filter(|_| names.len() > 1)
                     {
                         ui.label(
-                            egui::RichText::new(format!("In {}", title.1))
+                            egui::RichText::new(t!("In %{drawing}", drawing = title.1))
                                 .size(theme.font_size_small)
                                 .color(c.text_weak),
                         );
                     }
-                    egui::CollapsingHeader::new("Show exactly what will be sent")
+                    egui::CollapsingHeader::new(t!("Show exactly what will be sent"))
                         .id_salt("assistant_change")
                         .show(ui, |ui| {
                             let text = serde_json::to_string_pretty(&request.arguments)
@@ -206,16 +203,20 @@ fn card(ui: &mut egui::Ui, theme: &Theme, ask: &Ask, names: &[(String, String)])
                             );
                         });
                     ui.horizontal(|ui| {
-                        if ui.button("Allow once").clicked() {
+                        if ui.button(t!("Allow once")).clicked() {
                             reply = Some(Reply::Change(Decision::Approved));
                         }
-                        if ui.button("Decline").clicked() {
+                        if ui.button(t!("Decline")).clicked() {
                             reply = Some(Reply::Change(Decision::Declined));
                         }
                     });
                 }
                 Ask::Plan(plan, level) => {
-                    ui.label(egui::RichText::new("Proposed plan").strong().color(c.text));
+                    ui.label(
+                        egui::RichText::new(t!("Proposed plan"))
+                            .strong()
+                            .color(c.text),
+                    );
                     ui.label(egui::RichText::new(&plan.summary).color(c.text));
                     for (n, step) in plan.steps.iter().enumerate() {
                         ui.label(
@@ -225,12 +226,14 @@ fn card(ui: &mut egui::Ui, theme: &Theme, ask: &Ask, names: &[(String, String)])
                         );
                     }
                     let allows = match level {
-                        ApprovalLevel::ApprovePlan => format!(
-                            "Approving lets it make up to {} change(s).",
-                            plan.steps.len()
-                        ),
+                        ApprovalLevel::ApprovePlan => t!(
+                            "Approving lets it make up to %{count} change(s).",
+                            count = plan.steps.len()
+                        )
+                        .into_owned(),
                         ApprovalLevel::ReviewEach => {
-                            "Approving only lets it go on; each change is still asked.".to_owned()
+                            t!("Approving only lets it go on; each change is still asked.")
+                                .into_owned()
                         }
                         ApprovalLevel::AutoApprove { .. } => String::new(),
                     };
@@ -243,10 +246,10 @@ fn card(ui: &mut egui::Ui, theme: &Theme, ask: &Ask, names: &[(String, String)])
                         );
                     }
                     ui.horizontal(|ui| {
-                        if ui.button("Approve").clicked() {
+                        if ui.button(t!("Approve")).clicked() {
                             reply = Some(Reply::Plan(PlanOutcome::Approved));
                         }
-                        if ui.button("Reject").clicked() {
+                        if ui.button(t!("Reject")).clicked() {
                             reply = Some(Reply::Plan(PlanOutcome::Rejected(None)));
                         }
                     });
@@ -262,7 +265,7 @@ fn card(ui: &mut egui::Ui, theme: &Theme, ask: &Ask, names: &[(String, String)])
                     let mut text: String = ui.data_mut(|d| d.get_temp(id).unwrap_or_default());
                     let edit = ui.add(
                         egui::TextEdit::singleline(&mut text)
-                            .hint_text("Or type an answer")
+                            .hint_text(t!("Or type an answer"))
                             .desired_width(f32::INFINITY),
                     );
                     let submitted =
@@ -276,4 +279,13 @@ fn card(ui: &mut egui::Ui, theme: &Theme, ask: &Ask, names: &[(String, String)])
             }
         });
     reply
+}
+
+/// "Made 1 change.", "Made 3 changes." under a finished task.
+fn made_text(changes: usize) -> String {
+    if changes == 1 {
+        t!("Made 1 change.").into_owned()
+    } else {
+        t!("Made %{count} changes.", count = changes).into_owned()
+    }
 }

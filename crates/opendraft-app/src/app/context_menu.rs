@@ -2,8 +2,11 @@
 //! running: repeat, recent commands, the usual edits on what is selected,
 //! and a few tools. Rows that have nothing behind them yet are greyed.
 
+use std::borrow::Cow;
+
 use eframe::egui;
 use opendraft_ui::icons;
+use rust_i18n::t;
 
 use super::OpenDraftApp;
 
@@ -56,21 +59,21 @@ impl Row {
         Self::new(None, "", Kind::Rule)
     }
 
-    fn run(icon: Option<char>, label: &str, id: &'static str) -> Self {
+    fn run(icon: Option<char>, label: impl Into<String>, id: &'static str) -> Self {
         Self::new(icon, label, Kind::Item(Action::Run(id)))
     }
 
-    fn soon(icon: Option<char>, label: &str) -> Self {
+    fn soon(icon: Option<char>, label: impl Into<String>) -> Self {
         Self::new(icon, label, Kind::Soon)
     }
 
-    fn sub(label: &str, rows: Vec<Row>) -> Self {
+    fn sub(label: impl Into<String>, rows: Vec<Row>) -> Self {
         Self::new(None, label, Kind::Sub(rows))
     }
 }
 
-fn soon_all(labels: &[&str]) -> Vec<Row> {
-    labels.iter().map(|l| Row::soon(None, l)).collect()
+fn soon_all(labels: &[Cow<'static, str>]) -> Vec<Row> {
+    labels.iter().map(|l| Row::soon(None, l.clone())).collect()
 }
 
 impl OpenDraftApp {
@@ -82,12 +85,12 @@ impl OpenDraftApp {
         let repeat = match self.state.cmdline.last_command.and_then(label_of) {
             Some(label) => Row::new(
                 Some(icons::CONTEXT_REPEAT),
-                format!("Repeat {}", label.to_uppercase()),
+                t!("Repeat %{command}", command = label.to_uppercase()),
                 Kind::Item(Action::Run(
                     self.state.cmdline.last_command.unwrap_or_default(),
                 )),
             ),
-            None => Row::soon(Some(icons::CONTEXT_REPEAT), "Repeat"),
+            None => Row::soon(Some(icons::CONTEXT_REPEAT), t!("Repeat")),
         };
         let recent: Vec<Row> = self
             .state
@@ -97,23 +100,27 @@ impl OpenDraftApp {
             .filter_map(|id| Some(Row::run(None, label_of(id)?, id)))
             .collect();
         let recent = if recent.is_empty() {
-            vec![Row::soon(None, "(none)")]
+            vec![Row::soon(None, t!("(none)"))]
         } else {
             recent
         };
         let mut rows = vec![
             repeat,
-            Row::sub("Recent Input", recent),
+            Row::sub(t!("Recent Input"), recent),
             Row::rule(),
             Row::sub(
-                "Clipboard",
+                t!("Clipboard"),
                 vec![
-                    Row::run(None, "Cut", "edit.cut"),
-                    Row::run(None, "Copy", "edit.copy_clip"),
-                    Row::run(None, "Copy with Base Point", "edit.copy_base"),
-                    Row::run(None, "Paste", "edit.paste"),
-                    Row::run(None, "Paste as Block", "edit.paste_block"),
-                    Row::run(None, "Paste to Original Coordinates", "edit.paste_original"),
+                    Row::run(None, t!("Cut"), "edit.cut"),
+                    Row::run(None, t!("Copy"), "edit.copy_clip"),
+                    Row::run(None, t!("Copy with Base Point"), "edit.copy_base"),
+                    Row::run(None, t!("Paste"), "edit.paste"),
+                    Row::run(None, t!("Paste as Block"), "edit.paste_block"),
+                    Row::run(
+                        None,
+                        t!("Paste to Original Coordinates"),
+                        "edit.paste_original",
+                    ),
                 ],
             ),
         ];
@@ -121,63 +128,79 @@ impl OpenDraftApp {
             rows.extend([
                 Row::rule(),
                 Row::sub(
-                    "Isolate",
-                    soon_all(&["Isolate Objects", "Hide Objects", "End Object Isolation"]),
-                ),
-                Row::rule(),
-                Row::run(Some(icons::CONTEXT_MODIFY_ERASE), "Erase", "modify.erase"),
-                Row::run(Some(icons::MODIFY_MOVE), "Move", "modify.move"),
-                Row::run(Some(icons::MODIFY_COPY), "Copy Selection", "modify.copy"),
-                Row::run(Some(icons::MODIFY_SCALE), "Scale", "modify.scale"),
-                Row::run(Some(icons::MODIFY_ROTATE), "Rotate", "modify.rotate"),
-                Row::sub(
-                    "Draw Order",
+                    t!("Isolate"),
                     soon_all(&[
-                        "Bring to Front",
-                        "Send to Back",
-                        "Bring Above Objects",
-                        "Send Under Objects",
+                        t!("Isolate Objects"),
+                        t!("Hide Objects"),
+                        t!("End Object Isolation"),
                     ]),
                 ),
-                Row::sub("Group", soon_all(&["Group", "Ungroup"])),
+                Row::rule(),
+                Row::run(
+                    Some(icons::CONTEXT_MODIFY_ERASE),
+                    t!("Erase"),
+                    "modify.erase",
+                ),
+                Row::run(Some(icons::MODIFY_MOVE), t!("Move"), "modify.move"),
+                Row::run(
+                    Some(icons::MODIFY_COPY),
+                    t!("Copy Selection"),
+                    "modify.copy",
+                ),
+                Row::run(Some(icons::MODIFY_SCALE), t!("Scale"), "modify.scale"),
+                Row::run(Some(icons::MODIFY_ROTATE), t!("Rotate"), "modify.rotate"),
+                Row::sub(
+                    t!("Draw Order"),
+                    soon_all(&[
+                        t!("Bring to Front"),
+                        t!("Send to Back"),
+                        t!("Bring Above Objects"),
+                        t!("Send Under Objects"),
+                    ]),
+                ),
+                Row::sub(t!("Group"), soon_all(&[t!("Group"), t!("Ungroup")])),
                 Row::rule(),
                 Row::new(
                     Some(icons::CONTEXT_SELECT_SIMILAR),
-                    "Select Similar",
+                    t!("Select Similar"),
                     Kind::Item(Action::SelectSimilar),
                 ),
                 Row::new(
                     Some(icons::CONTEXT_DESELECT_ALL),
-                    "Deselect All",
+                    t!("Deselect All"),
                     Kind::Item(Action::DeselectAll),
                 ),
             ]);
         } else {
             rows.extend([
                 Row::rule(),
-                Row::run(Some(icons::EDIT_UNDO), "Undo", "edit.undo"),
-                Row::run(Some(icons::EDIT_REDO), "Redo", "edit.redo"),
+                Row::run(Some(icons::EDIT_UNDO), t!("Undo"), "edit.undo"),
+                Row::run(Some(icons::EDIT_REDO), t!("Redo"), "edit.redo"),
                 Row::rule(),
                 Row::run(
                     Some(icons::CONTEXT_EDIT_SELECT_ALL),
-                    "Select All",
+                    t!("Select All"),
                     "edit.select_all",
                 ),
                 Row::run(
                     Some(icons::CONTEXT_VIEW_ZOOM_EXTENTS),
-                    "Zoom Extents",
+                    t!("Zoom Extents"),
                     "view.zoom_extents",
                 ),
             ]);
         }
         rows.extend([
             Row::rule(),
-            Row::run(Some(icons::SELECT_POWER), "Power Select...", "select.power"),
-            Row::soon(Some(icons::CONTEXT_QUICKCALC), "QuickCalc"),
-            Row::soon(Some(icons::CONTEXT_FIND), "Find..."),
+            Row::run(
+                Some(icons::SELECT_POWER),
+                t!("Power Select..."),
+                "select.power",
+            ),
+            Row::soon(Some(icons::CONTEXT_QUICKCALC), t!("QuickCalc")),
+            Row::soon(Some(icons::CONTEXT_FIND), t!("Find...")),
             Row::run(
                 Some(icons::CONTEXT_VIEW_PANEL_PROPERTIES),
-                "Properties",
+                t!("Properties"),
                 "view.panel_properties",
             ),
         ]);

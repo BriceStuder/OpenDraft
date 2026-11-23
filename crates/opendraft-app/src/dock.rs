@@ -4,7 +4,7 @@
 use eframe::egui;
 use egui_dock::{DockState, NodeIndex};
 use opendraft_commands::Command;
-use opendraft_ui::Theme;
+use opendraft_ui::{key, Theme};
 use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
@@ -32,13 +32,14 @@ pub enum PanelTab {
 }
 
 impl PanelTab {
+    /// The tab's title in English; drawn translated.
     pub fn title(self) -> &'static str {
         match self {
-            PanelTab::Canvas => "Drawing",
-            PanelTab::Properties => "Properties",
-            PanelTab::Layers => "Layers",
-            PanelTab::CommandLine => "Command Line",
-            PanelTab::Assistant => "Assistant",
+            PanelTab::Canvas => key!("Drawing"),
+            PanelTab::Properties => key!("Properties"),
+            PanelTab::Layers => key!("Layers"),
+            PanelTab::CommandLine => key!("Command Line"),
+            PanelTab::Assistant => key!("Assistant"),
         }
     }
 

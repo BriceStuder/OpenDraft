@@ -48,6 +48,7 @@ fn french_translates_and_a_missing_text_stays_english() {
 fn every_translated_text_is_still_in_the_code() {
     let mut used = texts_in_code();
     used.extend(ribbon_texts().into_iter().map(str::to_owned));
+    used.extend(core_labels().into_iter().map(str::to_owned));
     let backend = crate::_rust_i18n_backend();
     let mut stale = Vec::new();
     for locale in backend.available_locales() {
@@ -59,7 +60,7 @@ fn every_translated_text_is_still_in_the_code() {
     }
     assert!(
         stale.is_empty(),
-        "not in any t!(\"…\") of the code: {stale:#?}"
+        "not in any t!(\"…\") or key!(\"…\") of the code: {stale:#?}"
     );
 }
 
@@ -82,13 +83,38 @@ fn translations_keep_their_placeholders() {
 fn the_code_scanner_reads_escapes() {
     let mut found = BTreeSet::new();
     literals_after_t(
-        r#"t!("A \"b\"\n") + t!( "c" , x = 1) + not!("d")"#,
+        r#"t!("A \"b\"\n") + t!( "c" , x = 1) + not!("d") + key!("e") + monkey!("f")"#,
         &mut found,
     );
     assert_eq!(
         found,
-        BTreeSet::from(["A \"b\"\n".to_owned(), "c".to_owned()])
+        BTreeSet::from(["A \"b\"\n".to_owned(), "c".to_owned(), "e".to_owned()])
     );
+}
+
+/// Labels from `opendraft-core`, which has no translations: the app
+/// translates them where it draws them (Properties).
+fn core_labels() -> BTreeSet<&'static str> {
+    let mut labels: BTreeSet<&'static str> = opendraft_core::EntityKind::ALL
+        .iter()
+        .map(|k| k.title())
+        .collect();
+    labels.extend(
+        (0..3).filter_map(|code| {
+            opendraft_core::hatch::HatchStyle::from_code(code).map(|s| s.label())
+        }),
+    );
+    labels.extend(
+        opendraft_core::mleader::MLeaderLineType::ALL
+            .iter()
+            .map(|t| t.label()),
+    );
+    labels.extend(
+        opendraft_core::dimension::Arrow::ALL
+            .iter()
+            .map(|a| a.label()),
+    );
+    labels
 }
 
 fn placeholders(text: &str) -> BTreeSet<&str> {
@@ -157,7 +183,8 @@ fn add_ribbon(ribbon: &Ribbon, texts: &mut BTreeSet<&'static str>) {
     }
 }
 
-/// The first argument of every `t!("…")` in the program's sources.
+/// The first argument of every `t!("…")` and `key!("…")` in the program's
+/// sources.
 fn texts_in_code() -> BTreeSet<String> {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let mut found = BTreeSet::new();
@@ -175,16 +202,19 @@ fn texts_in_code() -> BTreeSet<String> {
     found
 }
 
-/// Adds the string literal that opens each `t!(` call of `source`.
+/// Adds the string literal that opens each `t!(` and `key!(` call of
+/// `source` (`key!` marks a text translated where it is drawn).
 fn literals_after_t(source: &str, found: &mut BTreeSet<String>) {
-    for (at, _) in source.match_indices("t!(") {
-        let before = source[..at].chars().next_back();
-        if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
-            continue; // `not!(`, `print!(`…
-        }
-        let rest = source[at + 3..].trim_start();
-        if let Some(text) = rest.strip_prefix('"').and_then(unescape) {
-            found.insert(text);
+    for call in ["t!(", "key!("] {
+        for (at, _) in source.match_indices(call) {
+            let before = source[..at].chars().next_back();
+            if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
+                continue; // `not!(`, `print!(`, `monkey!(`…
+            }
+            let rest = source[at + call.len()..].trim_start();
+            if let Some(text) = rest.strip_prefix('"').and_then(unescape) {
+                found.insert(text);
+            }
         }
     }
 }
