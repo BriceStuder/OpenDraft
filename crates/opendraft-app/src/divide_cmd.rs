@@ -5,6 +5,7 @@
 //! MEASURE starts at the end of the object nearest the point it was picked
 //! at; a closed object starts where it starts.
 
+use opendraft_ui::key;
 use std::sync::Arc;
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked};
@@ -44,7 +45,7 @@ fn ask_block(ed: &Editor) -> Result<Option<Placed>, Cancelled> {
         return Ok(None);
     };
     let align = ed.get_keyword(
-        Options::<String>::new("Align block with object?")
+        Options::<String>::new(key!("Align block with object?"))
             .keyword("Yes", "Y")
             .keyword("No", "N")
             .default("Yes".to_owned()),
@@ -81,12 +82,13 @@ fn place(ed: &Editor, marks: Vec<Mark>, what: Placed, name: &'static str) -> Res
 /// DIVIDE: the number of segments, or Block to place a block instead of
 /// points, then the marks between the parts.
 pub fn divide_object(ed: &mut Editor) -> Result<(), Cancelled> {
-    let Some((path, _)) = pick_path(ed, "Select object to divide", "divide")? else {
+    let Some((path, _)) = pick_path(ed, key!("Select object to divide"), "divide")? else {
         return Ok(());
     };
     let mut what = Placed::Points;
     loop {
-        let options = NumberOptions::new("Enter the number of segments").keyword("Block", "B");
+        let options =
+            NumberOptions::new(key!("Enter the number of segments")).keyword("Block", "B");
         match ed.ask_number(options)? {
             Answer::Keyword(_) => match ask_block(ed)? {
                 Some(block) => what = block,
@@ -118,13 +120,13 @@ fn from_nearest(path: Path, at: Point) -> Path {
 /// MEASURE: the length of a segment, or Block to place a block instead of
 /// points, then the marks from the end nearest the pick.
 pub fn measure_object(ed: &mut Editor) -> Result<(), Cancelled> {
-    let Some((path, picked)) = pick_path(ed, "Select object to measure", "measure")? else {
+    let Some((path, picked)) = pick_path(ed, key!("Select object to measure"), "measure")? else {
         return Ok(());
     };
     let path = from_nearest(path, picked.at);
     let mut what = Placed::Points;
     loop {
-        let options = NumberOptions::new("Specify length of segment").keyword("Block", "B");
+        let options = NumberOptions::new(key!("Specify length of segment")).keyword("Block", "B");
         match ed.ask_distance(options)? {
             Answer::Keyword(_) => match ask_block(ed)? {
                 Some(block) => what = block,

@@ -8,6 +8,7 @@ use opendraft_core::arc_make::{
     from_start_end_direction, from_start_end_radius,
 };
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 use crate::draw::{add, distance, line, MIN_SIZE};
 
@@ -37,7 +38,7 @@ fn or_say(ed: &Editor, arc: Option<Entity>) -> Option<Entity> {
 /// ARC. Start point first, then a second point on the arc, or its centre or
 /// end; or the centre first.
 pub fn draw_arc(ed: &mut Editor) -> Result<(), Cancelled> {
-    let options = PointOptions::new("Specify start point of arc").keyword("Center", "C");
+    let options = PointOptions::new(key!("Specify start point of arc")).keyword("Center", "C");
     let entity = match ed.ask_point(options)? {
         Answer::Value(start) => from_start(ed, start)?,
         Answer::Keyword(_) => from_centre(ed)?,
@@ -49,21 +50,21 @@ pub fn draw_arc(ed: &mut Editor) -> Result<(), Cancelled> {
 /// ARC, Start, Center, End: the start point, the centre, then the end (or an
 /// included angle or chord length).
 pub fn draw_arc_sce(ed: &mut Editor) -> Result<(), Cancelled> {
-    let start = ed.get_point("Specify start point of arc")?;
+    let start = ed.get_point(key!("Specify start point of arc"))?;
     let center = centre_after(ed, start)?;
     let entity = to_end_from_centre(ed, center, start)?;
     add(ed, entity, "Arc")
 }
 
 fn from_start(ed: &Editor, start: Point) -> Result<Entity, Cancelled> {
-    let options = PointOptions::new("Specify second point of arc")
+    let options = PointOptions::new(key!("Specify second point of arc"))
         .base(start)
         .keyword("Center", "C")
         .keyword("End", "E")
         .ghost(move |at| vec![line(start, at)]);
     match ed.ask_point(options)? {
         Answer::Value(second) => loop {
-            let options = PointOptions::new("Specify end point of arc")
+            let options = PointOptions::new(key!("Specify end point of arc"))
                 .base(second)
                 .ghost(move |at| shown(arc_through(start, second, at), start, at));
             let end = ed.get_point(options)?;
@@ -78,7 +79,7 @@ fn from_start(ed: &Editor, start: Point) -> Result<Entity, Cancelled> {
         }
         Answer::Keyword(_) => {
             let end = loop {
-                let options = PointOptions::new("Specify end point of arc")
+                let options = PointOptions::new(key!("Specify end point of arc"))
                     .base(start)
                     .ghost(move |at| vec![line(start, at)]);
                 let end = ed.get_point(options)?;
@@ -96,7 +97,7 @@ fn from_start(ed: &Editor, start: Point) -> Result<Entity, Cancelled> {
 /// A centre point that is not on `start`.
 pub(crate) fn centre_after(ed: &Editor, start: Point) -> Result<Point, Cancelled> {
     loop {
-        let options = PointOptions::new("Specify center point of arc")
+        let options = PointOptions::new(key!("Specify center point of arc"))
             .base(start)
             .ghost(move |at| vec![line(at, start)]);
         let center = ed.get_point(options)?;
@@ -115,7 +116,7 @@ fn to_centre_angle_direction_radius(
     end: Point,
 ) -> Result<Entity, Cancelled> {
     loop {
-        let options = PointOptions::new("Specify center point of arc")
+        let options = PointOptions::new(key!("Specify center point of arc"))
             .base(end)
             .keyword("Angle", "A")
             .keyword("Direction", "D")
@@ -124,21 +125,23 @@ fn to_centre_angle_direction_radius(
         let arc = match ed.ask_point(options)? {
             Answer::Value(center) => from_center_start_end(center, start, end),
             Answer::Keyword(k) if k == "Angle" => {
-                let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
+                let angle =
+                    ed.get_angle(NumberOptions::new(key!("Specify included angle")).turn())?;
                 from_start_end_angle(start, end, angle)
             }
             Answer::Keyword(k) if k == "Direction" => {
-                let options =
-                    NumberOptions::new("Specify tangent direction for the start point of arc")
-                        .base(start)
-                        .ghost(move |at| {
-                            let toward = angle_of(start, at);
-                            shown(from_start_end_direction(start, end, toward), start, end)
-                        });
+                let options = NumberOptions::new(key!(
+                    "Specify tangent direction for the start point of arc"
+                ))
+                .base(start)
+                .ghost(move |at| {
+                    let toward = angle_of(start, at);
+                    shown(from_start_end_direction(start, end, toward), start, end)
+                });
                 from_start_end_direction(start, end, ed.get_angle(options)?)
             }
             Answer::Keyword(_) => {
-                let options = NumberOptions::new("Specify radius of arc").base(start);
+                let options = NumberOptions::new(key!("Specify radius of arc")).base(start);
                 from_start_end_radius(start, end, ed.get_distance(options)?)
             }
             Answer::Enter => return Err(Cancelled),
@@ -157,7 +160,7 @@ pub(crate) fn to_end_from_centre(
     start: Point,
 ) -> Result<Entity, Cancelled> {
     loop {
-        let options = PointOptions::new("Specify end point of arc")
+        let options = PointOptions::new(key!("Specify end point of arc"))
             .base(center)
             .keyword("Angle", "A")
             .keyword("chord Length", "L")
@@ -165,11 +168,12 @@ pub(crate) fn to_end_from_centre(
         let arc = match ed.ask_point(options)? {
             Answer::Value(end) => from_center_start_end(center, start, end),
             Answer::Keyword(k) if k == "Angle" => {
-                let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
+                let angle =
+                    ed.get_angle(NumberOptions::new(key!("Specify included angle")).turn())?;
                 from_center_start_angle(center, start, angle)
             }
             Answer::Keyword(_) => {
-                let options = NumberOptions::new("Specify length of chord").base(start);
+                let options = NumberOptions::new(key!("Specify length of chord")).base(start);
                 from_center_start_chord(center, start, ed.get_distance(options)?)
             }
             Answer::Enter => return Err(Cancelled),
@@ -181,9 +185,9 @@ pub(crate) fn to_end_from_centre(
 }
 
 fn from_centre(ed: &Editor) -> Result<Entity, Cancelled> {
-    let center = ed.get_point("Specify center point of arc")?;
+    let center = ed.get_point(key!("Specify center point of arc"))?;
     let start = loop {
-        let options = PointOptions::new("Specify start point of arc")
+        let options = PointOptions::new(key!("Specify start point of arc"))
             .base(center)
             .ghost(move |at| vec![line(center, at)]);
         let start = ed.get_point(options)?;

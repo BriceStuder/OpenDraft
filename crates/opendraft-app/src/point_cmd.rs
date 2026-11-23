@@ -5,11 +5,12 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, PointOptions};
 use opendraft_core::{Entity, PointStyle};
+use opendraft_ui::key;
 
 use crate::draw::add;
 
 fn ask(ed: &Editor) -> Result<Answer<opendraft_core::Point>, Cancelled> {
-    ed.ask_point(PointOptions::new("Specify a point").ghost(|at| vec![Entity::Point { at }]))
+    ed.ask_point(PointOptions::new(key!("Specify a point")).ghost(|at| vec![Entity::Point { at }]))
 }
 
 /// The reminder AutoCAD prints when POINT starts.

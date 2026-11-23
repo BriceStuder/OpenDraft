@@ -3,6 +3,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
 use opendraft_core::{bulge, width, Entity, Point};
+use opendraft_ui::key;
 
 use crate::draw::{add, distance, MIN_SIZE};
 use crate::polyline_arc::arc_option;
@@ -143,7 +144,7 @@ enum Flow {
 /// back the last segment and Close joins the end to the start. Fewer than two
 /// points draws nothing.
 pub fn draw_polyline(ed: &mut Editor) -> Result<(), Cancelled> {
-    let first = ed.get_point("Specify start point")?;
+    let first = ed.get_point(key!("Specify start point"))?;
     let mut chain = Chain::new(first);
     let mut mode = Mode {
         arcs: false,
@@ -211,9 +212,9 @@ fn step(ed: &Editor, chain: &mut Chain, mode: &mut Mode) -> Result<Flow, Cancell
     let heading = chain.heading();
     let (shown, arcs, widths) = (chain.clone(), mode.arcs, mode.widths);
     let options = PointOptions::new(if arcs {
-        "Specify endpoint of arc"
+        key!("Specify endpoint of arc")
     } else {
-        "Specify next point"
+        key!("Specify next point")
     })
     .base(from)
     .snap_to(chain.drawn())
@@ -268,7 +269,7 @@ fn keyword(
         "Width" => mode.widths = ask_widths(ed, from, mode.widths, false)?,
         "Halfwidth" => mode.widths = ask_widths(ed, from, mode.widths, true)?,
         "Length" => {
-            let options = NumberOptions::new("Specify length of line").base(from);
+            let options = NumberOptions::new(key!("Specify length of line")).base(from);
             let length = ed.get_distance(options)?;
             if length > MIN_SIZE {
                 let to = Point::new(from.x + heading.x * length, from.y + heading.y * length);

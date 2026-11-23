@@ -6,6 +6,7 @@ use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions}
 use opendraft_core::{
     arc, circle_tangent_to_three, tangent_circle, touchable_by_tangent_circle, Entity, Point,
 };
+use opendraft_ui::key;
 
 use crate::draw::{add, distance, line, MIN_SIZE};
 
@@ -31,7 +32,7 @@ fn circle_through(a: Point, b: Point, c: Point) -> Entity {
 /// three points on the circle, the two ends of a diameter, or two tangent
 /// objects and a radius.
 pub fn draw_circle(ed: &mut Editor) -> Result<(), Cancelled> {
-    let options = PointOptions::new("Specify center point for circle")
+    let options = PointOptions::new(key!("Specify center point for circle"))
         .keyword("3P", "3P")
         .keyword("2P", "2P")
         .keyword(TTR, "T");
@@ -43,14 +44,14 @@ pub fn draw_circle(ed: &mut Editor) -> Result<(), Cancelled> {
         Answer::Enter => return Err(Cancelled),
     };
     let radius = loop {
-        let options = NumberOptions::new("Specify radius of circle")
+        let options = NumberOptions::new(key!("Specify radius of circle"))
             .base(center)
             .keyword("Diameter", "D")
             .ghost(move |at| vec![circle(center, distance(center, at))]);
         let radius = match ed.ask_distance(options)? {
             Answer::Value(radius) => radius,
             Answer::Keyword(_) => {
-                let options = NumberOptions::new("Specify diameter of circle")
+                let options = NumberOptions::new(key!("Specify diameter of circle"))
                     .base(center)
                     .ghost(move |at| vec![circle(center, distance(center, at) / 2.0)]);
                 ed.get_distance(options)? / 2.0
@@ -67,9 +68,9 @@ pub fn draw_circle(ed: &mut Editor) -> Result<(), Cancelled> {
 
 /// CIRCLE, Center and Diameter: the centre, then the diameter.
 pub fn draw_circle_diameter(ed: &mut Editor) -> Result<(), Cancelled> {
-    let center = ed.get_point("Specify center point for circle")?;
+    let center = ed.get_point(key!("Specify center point for circle"))?;
     let radius = loop {
-        let options = NumberOptions::new("Specify diameter of circle")
+        let options = NumberOptions::new(key!("Specify diameter of circle"))
             .base(center)
             .ghost(move |at| vec![circle(center, distance(center, at) / 2.0)]);
         let radius = ed.get_distance(options)? / 2.0;
@@ -129,13 +130,13 @@ fn pick_touchable(ed: &Editor, which: &str) -> Result<(Entity, Point), Cancelled
 }
 
 fn three_points(ed: &Editor) -> Result<(), Cancelled> {
-    let first = ed.get_point("Specify first point")?;
-    let options = PointOptions::new("Specify second point")
+    let first = ed.get_point(key!("Specify first point"))?;
+    let options = PointOptions::new(key!("Specify second point"))
         .base(first)
         .ghost(move |at| vec![line(first, at)]);
     let second = ed.get_point(options)?;
     let entity = loop {
-        let options = PointOptions::new("Specify third point")
+        let options = PointOptions::new(key!("Specify third point"))
             .base(second)
             .ghost(move |at| vec![circle_through(first, second, at)]);
         let third = ed.get_point(options)?;
@@ -149,9 +150,9 @@ fn three_points(ed: &Editor) -> Result<(), Cancelled> {
 }
 
 fn two_points(ed: &Editor) -> Result<(), Cancelled> {
-    let first = ed.get_point("Specify first end point of diameter")?;
+    let first = ed.get_point(key!("Specify first end point of diameter"))?;
     let entity = loop {
-        let options = PointOptions::new("Specify second end point of diameter")
+        let options = PointOptions::new(key!("Specify second end point of diameter"))
             .base(first)
             .ghost(move |at| vec![circle(midpoint(first, at), distance(first, at) / 2.0)]);
         let second = ed.get_point(options)?;
@@ -178,10 +179,10 @@ fn pick_object(ed: &Editor, message: &str) -> Result<(Entity, Point), Cancelled>
 }
 
 fn tangent_tangent_radius(ed: &Editor) -> Result<(), Cancelled> {
-    let (first, at_first) = pick_object(ed, "Specify point on object for first tangent")?;
-    let (second, at_second) = pick_object(ed, "Specify point on object for second tangent")?;
+    let (first, at_first) = pick_object(ed, key!("Specify point on object for first tangent"))?;
+    let (second, at_second) = pick_object(ed, key!("Specify point on object for second tangent"))?;
     let radius = loop {
-        let radius = ed.get_distance(NumberOptions::new("Specify radius of circle"))?;
+        let radius = ed.get_distance(NumberOptions::new(key!("Specify radius of circle")))?;
         if radius > MIN_SIZE {
             break radius;
         }

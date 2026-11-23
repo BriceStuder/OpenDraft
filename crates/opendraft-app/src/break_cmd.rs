@@ -3,6 +3,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked, PointOptions};
 use opendraft_core::Point;
+use opendraft_ui::key;
 
 /// BREAK: click the object (the click is the first break point), then give
 /// the second break point. First point re-asks for the first one. Giving the
@@ -11,7 +12,7 @@ use opendraft_core::Point;
 pub fn break_object(ed: &mut Editor) -> Result<(), Cancelled> {
     // Like AutoCAD, Break takes one object by clicking it, selected or not.
     let Answer::Value(Picked { id, at, .. }) =
-        ed.ask_object(Options::<Picked>::new("Select object").allow_empty())?
+        ed.ask_object(Options::<Picked>::new(key!("Select object")).allow_empty())?
     else {
         return Ok(());
     };
@@ -24,14 +25,14 @@ pub fn break_object(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     }
     let mut first = at;
-    let mut options =
-        break_options(&target, first, "Specify second break point").keyword("First point", "F");
+    let mut options = break_options(&target, first, key!("Specify second break point"))
+        .keyword("First point", "F");
     let second = loop {
         match ed.ask_point(options)? {
             Answer::Value(p) => break p,
             Answer::Keyword(_) => {
-                first = ed.get_point(PointOptions::new("Specify first break point"))?;
-                options = break_options(&target, first, "Specify second break point");
+                first = ed.get_point(PointOptions::new(key!("Specify first break point")))?;
+                options = break_options(&target, first, key!("Specify second break point"));
             }
             Answer::Enter => return Err(Cancelled),
         }

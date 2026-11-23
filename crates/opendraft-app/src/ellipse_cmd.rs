@@ -10,6 +10,7 @@
 //! diameter is the first axis, as AutoCAD does. Isocircle needs isometric
 //! drafting, which does not exist yet.
 
+use opendraft_ui::key;
 use std::f64::consts::{PI, TAU};
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, NumberOrPoint, PointOptions};
@@ -65,9 +66,10 @@ pub fn draw_ellipse(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut arc = false;
     let axes = loop {
         let options = if arc {
-            PointOptions::new("Specify axis endpoint of elliptical arc").keyword("Center", "C")
+            PointOptions::new(key!("Specify axis endpoint of elliptical arc"))
+                .keyword("Center", "C")
         } else {
-            PointOptions::new("Specify axis endpoint of ellipse")
+            PointOptions::new(key!("Specify axis endpoint of ellipse"))
                 .keyword("Arc", "A")
                 .keyword("Center", "C")
         };
@@ -96,7 +98,7 @@ pub fn draw_ellipse(ed: &mut Editor) -> Result<(), Cancelled> {
 /// The first axis from its two ends, then the other axis.
 fn by_axis_ends(ed: &Editor, start: Point) -> Result<Axes, Cancelled> {
     let end = loop {
-        let options = PointOptions::new("Specify other endpoint of axis")
+        let options = PointOptions::new(key!("Specify other endpoint of axis"))
             .base(start)
             .ghost(move |at| vec![line(start, at)]);
         let end = ed.get_point(options)?;
@@ -112,9 +114,9 @@ fn by_axis_ends(ed: &Editor, start: Point) -> Result<Axes, Cancelled> {
 
 /// The centre and one axis endpoint, then the other axis.
 fn by_center(ed: &Editor) -> Result<Axes, Cancelled> {
-    let center = ed.get_point("Specify center of ellipse")?;
+    let center = ed.get_point(key!("Specify center of ellipse"))?;
     let end = loop {
-        let options = PointOptions::new("Specify endpoint of axis")
+        let options = PointOptions::new(key!("Specify endpoint of axis"))
             .base(center)
             .ghost(move |at| vec![line(center, at)]);
         let end = ed.get_point(options)?;
@@ -133,7 +135,7 @@ fn by_center(ed: &Editor) -> Result<Axes, Cancelled> {
 fn other_axis(ed: &Editor, center: Point, first: Point, axis: Entity) -> Result<Axes, Cancelled> {
     loop {
         let shown = axis.clone();
-        let options = NumberOptions::new("Specify distance to other axis")
+        let options = NumberOptions::new(key!("Specify distance to other axis"))
             .base(center)
             .keyword("Rotation", "R")
             .ghost(move |at| {
@@ -174,7 +176,7 @@ fn tilt_of(center: Point, first: Point, at: Point) -> f64 {
 fn rotation(ed: &Editor, center: Point, first: Point) -> Result<Axes, Cancelled> {
     let length = first.x.hypot(first.y);
     loop {
-        let options = NumberOptions::new("Specify rotation around major axis")
+        let options = NumberOptions::new(key!("Specify rotation around major axis"))
             .turn()
             .base(center)
             .ghost(move |at| {
@@ -245,8 +247,8 @@ fn arc_ends(ed: &Editor, axes: Axes, whole: Ellipse) -> Result<Ellipse, Cancelle
     let mut mode = Mode::Angle;
     let start = loop {
         let (message, other) = match mode {
-            Mode::Angle => ("Specify start angle", ("Parameter", "P")),
-            Mode::Parameter => ("Specify start parameter", ("Angle", "A")),
+            Mode::Angle => (key!("Specify start angle"), ("Parameter", "P")),
+            Mode::Parameter => (key!("Specify start parameter"), ("Angle", "A")),
         };
         let options = NumberOptions::new(message)
             .turn()
@@ -262,8 +264,8 @@ fn arc_ends(ed: &Editor, axes: Axes, whole: Ellipse) -> Result<Ellipse, Cancelle
     };
     loop {
         let (message, other) = match mode {
-            Mode::Angle => ("Specify end angle", ("Parameter", "P")),
-            Mode::Parameter => ("Specify end parameter", ("Angle", "A")),
+            Mode::Angle => (key!("Specify end angle"), ("Parameter", "P")),
+            Mode::Parameter => (key!("Specify end parameter"), ("Angle", "A")),
         };
         let options = NumberOptions::new(message)
             .turn()
@@ -278,7 +280,7 @@ fn arc_ends(ed: &Editor, axes: Axes, whole: Ellipse) -> Result<Ellipse, Cancelle
                 continue;
             }
             Answer::Keyword(k) if k == INCLUDED => {
-                let options = NumberOptions::new("Specify included angle for arc")
+                let options = NumberOptions::new(key!("Specify included angle for arc"))
                     .default(PI)
                     .turn();
                 included(&whole, start, ed.get_angle(options)?)

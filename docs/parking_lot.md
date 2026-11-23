@@ -139,7 +139,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Icons: reloading while the app runs, recolouring for a light theme; the Layout tab's six icons (`assets/icons/layout-*.svg`) are Lucide's outlines, not yet redrawn in the Home tab's style.
 - Purge: a confirmation window, previews beyond blocks.
 - Crash log: telling the user, when it happens, that a crash was recorded.
-- Translations (issue #138): the setup (Settings > Display > Language), the ribbon, the menus, the palettes and the status bar are built, with French. Still to wrap in `t!`: the prompts, prompt options and command names (both bilingual, `_LINE` always works), messages and dialogs; then the complete French file.
+- Translations (issue #138): the setup (Settings > Display > Language), the ribbon, the menus, the palettes, the status bar and the prompts of the drawing and editing commands are built, with French. Still to wrap: the other prompts (dimensions, text, leaders, blocks and attributes, fields, layers, layouts, plot, purge, system variables), prompts built with `format!` or composed (TRIM's mode), prompt options and command names (both bilingual, `_LINE` always works), messages and dialogs; then the complete French file.
 
 ## Assistant and automation
 

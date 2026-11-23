@@ -11,6 +11,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked, PointOptions};
 use opendraft_core::hatch::{HatchEntity, HatchFill, HatchLimits, PatternType};
 use opendraft_core::{Ccs, Entity, EntityId};
+use opendraft_ui::key;
 
 use crate::defaults::{CommandDefaults, EditorDefaults};
 use crate::hatch_cmd::{adjust, check_tolerance, summary, with_keywords};
@@ -89,7 +90,7 @@ fn choose(ed: &Editor) -> Result<(EntityId, HatchEntity), Cancelled> {
     }
     loop {
         let Picked { id, .. } =
-            match ed.ask_object(Options::<Picked>::new("Select hatch object"))? {
+            match ed.ask_object(Options::<Picked>::new(key!("Select hatch object")))? {
                 Answer::Value(p) => p,
                 Answer::Enter | Answer::Keyword(_) => return Err(Cancelled),
             };
@@ -132,7 +133,7 @@ pub fn hatch_edit(ed: &mut Editor) -> Result<(), Cancelled> {
         ed.say(summary(&ed.defaults().hatch.get()));
         let shown = new.clone();
         let options = with_keywords(
-            PointOptions::new("Press Enter or click to apply the change")
+            PointOptions::new(key!("Press Enter or click to apply the change"))
                 .ghost(move |_| vec![Entity::Hatch(Box::new(shown.clone()))]),
             &settings.fill,
             false,

@@ -4,6 +4,7 @@
 
 use opendraft_commands::{Cancelled, Editor};
 use opendraft_core::{Attributes, Document, Entity, EntityId, Object};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -14,7 +15,7 @@ use crate::text::plural;
 /// AutoCAD, except that a ByBlock colour, linetype or lineweight takes the
 /// reference's. Other objects are left alone. One undo step.
 pub fn explode_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    let chosen = ed.pickset_or_select("Select objects to explode")?;
+    let chosen = ed.pickset_or_select(key!("Select objects to explode"))?;
     let found = ed.read(move |doc| {
         chosen
             .iter()

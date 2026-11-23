@@ -11,6 +11,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, PointOptions};
 use opendraft_core::{Entity, KnotParameterization, Point, Spline};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::{add, distance, MIN_SIZE};
@@ -33,7 +34,7 @@ pub fn draw_spline(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut degree = ed.defaults().spline.get().degree;
     let first = loop {
         let m = ed.defaults().spline.get();
-        let options = PointOptions::new("Specify first point").keyword("Method", "M");
+        let options = PointOptions::new(key!("Specify first point")).keyword("Method", "M");
         let options = match m.method {
             Method::Fit => {
                 ed.say(format!(
@@ -68,7 +69,7 @@ fn ask_method(ed: &Editor) -> Result<(), Cancelled> {
         Method::Cv => "CV",
     };
     let answer = ed.get_keyword(
-        Options::<String>::new("Enter spline creation method")
+        Options::<String>::new(key!("Enter spline creation method"))
             .keyword("Fit", "F")
             .keyword("CV", "C")
             .default(current.to_owned()),
@@ -85,7 +86,7 @@ fn ask_method(ed: &Editor) -> Result<(), Cancelled> {
 
 fn ask_knots(ed: &Editor) -> Result<(), Cancelled> {
     let answer = ed.get_keyword(
-        Options::<String>::new("Enter knot parameterization")
+        Options::<String>::new(key!("Enter knot parameterization"))
             .keyword("Chord", "C")
             .keyword("Square root", "S")
             .keyword("Uniform", "U")
@@ -105,7 +106,8 @@ fn ask_knots(ed: &Editor) -> Result<(), Cancelled> {
 fn ask_degree(ed: &Editor, current: u8) -> Result<u8, Cancelled> {
     let most = opendraft_core::spline::MAX_COMMAND_DEGREE;
     loop {
-        let options = NumberOptions::new("Enter degree of spline").default(f64::from(current));
+        let options =
+            NumberOptions::new(key!("Enter degree of spline")).default(f64::from(current));
         let typed = ed.get_number(options)?;
         if typed.fract() == 0.0 && (1.0..=f64::from(most)).contains(&typed) {
             let degree = typed as u8;
@@ -121,7 +123,7 @@ fn ask_degree(ed: &Editor, current: u8) -> Result<u8, Cancelled> {
 /// Only a fit tolerance of 0 (through the points) is built.
 fn ask_tolerance(ed: &Editor) -> Result<(), Cancelled> {
     loop {
-        let options = NumberOptions::new("Specify fit tolerance").default(0.0);
+        let options = NumberOptions::new(key!("Specify fit tolerance")).default(0.0);
         if ed.get_distance(options)? == 0.0 {
             return Ok(());
         }
@@ -180,7 +182,7 @@ fn by_fit_points(ed: &Editor, first: Point, knots: KnotParameterization) -> Resu
     loop {
         let n = points.len();
         let shown = points.clone();
-        let mut options = PointOptions::new("Enter next point")
+        let mut options = PointOptions::new(key!("Enter next point"))
             .base(points[n - 1])
             .snap_to(fit_ghost(points.clone(), knots))
             .ghost(move |at| fit_ghost(with_point(&shown, at), knots))
@@ -227,7 +229,7 @@ fn by_control_vertices(ed: &Editor, first: Point, degree: u8) -> Result<(), Canc
     loop {
         let n = points.len();
         let shown = points.clone();
-        let mut options = PointOptions::new("Enter next point")
+        let mut options = PointOptions::new(key!("Enter next point"))
             .base(points[n - 1])
             .snap_to(
                 (cv_spline(points.clone(), degree))

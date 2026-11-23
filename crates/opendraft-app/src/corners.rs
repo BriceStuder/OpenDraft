@@ -6,6 +6,7 @@ use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked};
 use opendraft_core::{
     chamfer_lines, fillet, round_polyline, Chamfer, Entity, EntityId, Joined, Round,
 };
+use opendraft_ui::key;
 
 use crate::corner_memory::Memory;
 use crate::defaults::EditorDefaults;
@@ -94,16 +95,17 @@ fn join_corners(ed: &mut Editor, kind: Kind) -> Result<(), Cancelled> {
 fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelled> {
     match keyword {
         "Radius" => {
-            let r =
-                ed.get_distance(Options::<f64>::new("Specify fillet radius").default(m.radius))?;
+            let r = ed.get_distance(
+                Options::<f64>::new(key!("Specify fillet radius")).default(m.radius),
+            )?;
             ed.defaults().corner.change(|m| m.radius = r.max(0.0));
         }
         "Distance" => {
             let first = ed.get_distance(
-                Options::<f64>::new("Specify first chamfer distance").default(m.first),
+                Options::<f64>::new(key!("Specify first chamfer distance")).default(m.first),
             )?;
             let second = ed.get_distance(
-                Options::<f64>::new("Specify second chamfer distance").default(first),
+                Options::<f64>::new(key!("Specify second chamfer distance")).default(first),
             )?;
             ed.defaults().corner.change(|m| {
                 m.first = first.max(0.0);
@@ -113,10 +115,11 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
         }
         "Angle" => {
             let length = ed.get_distance(
-                Options::<f64>::new("Specify chamfer length on the first line").default(m.length),
+                Options::<f64>::new(key!("Specify chamfer length on the first line"))
+                    .default(m.length),
             )?;
             let angle = ed.get_angle(
-                Options::<f64>::new("Specify chamfer angle from the first line")
+                Options::<f64>::new(key!("Specify chamfer angle from the first line"))
                     .default(m.angle.to_radians())
                     .turn(),
             )?;
@@ -145,7 +148,7 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
 /// when the user ended the command).
 fn join_second(ed: &Editor, kind: Kind, first: Picked) -> Result<bool, Cancelled> {
     loop {
-        let second = match ed.ask_object(Options::<Picked>::new("Select second object")) {
+        let second = match ed.ask_object(Options::<Picked>::new(key!("Select second object"))) {
             Err(Cancelled) | Ok(Answer::Enter) | Ok(Answer::Keyword(_)) => return Ok(false),
             Ok(Answer::Value(second)) => second,
         };
@@ -314,7 +317,7 @@ fn apply(
 /// The Polyline option: pick one polyline and round every corner that fits.
 /// Returns whether something was done.
 fn round_whole_polyline(ed: &Editor, kind: Kind) -> Result<bool, Cancelled> {
-    let picked = match ed.ask_object(Options::<Picked>::new("Select polyline")) {
+    let picked = match ed.ask_object(Options::<Picked>::new(key!("Select polyline"))) {
         Ok(Answer::Value(picked)) => picked,
         Err(Cancelled) | Ok(_) => return Ok(false),
     };
