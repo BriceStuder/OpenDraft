@@ -244,7 +244,7 @@ fn utilities() -> Panel {
                 ],
             )),
             Column::Rows(vec![
-                vec![icon("select.power", "Quick Select", icons::SELECT_POWER)],
+                vec![icon("select.power", "Power Select", icons::SELECT_POWER)],
                 vec![icon(
                     "edit.select_all",
                     "Select All",
