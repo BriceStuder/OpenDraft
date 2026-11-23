@@ -73,7 +73,8 @@ pub(super) fn show(ui: &mut Ui, theme: &Theme, selected: &mut usize, tabs: &[Tab
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
                 for (i, tab) in tabs.iter().enumerate() {
-                    let width = text_width(ui, tab.title, theme.font_size_tab) + 24.0;
+                    let title = super::tr(tab.title);
+                    let width = text_width(ui, &title, theme.font_size_tab) + 24.0;
                     let (rect, response) =
                         ui.allocate_exact_size(vec2(width, TAB_H), Sense::click());
                     let look = TabLook::of(c, *selected == i, response.hovered(), tab.contextual);
@@ -88,7 +89,7 @@ pub(super) fn show(ui: &mut Ui, theme: &Theme, selected: &mut usize, tabs: &[Tab
                     painter.text(
                         rect.center(),
                         Align2::CENTER_CENTER,
-                        tab.title,
+                        title,
                         FontId::proportional(theme.font_size_tab),
                         look.label,
                     );

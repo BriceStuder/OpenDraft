@@ -3,8 +3,8 @@
 use egui::{pos2, vec2, Align2, Color32, FontId, Rect, Sense, Stroke, Ui, Vec2};
 
 use super::{
-    Ctx, Item, ICON_LARGE, ICON_SMALL, LABEL_LINE_H, LABEL_SIZE, LARGE_GAP, LARGE_H, LARGE_PAD,
-    LARGE_W, SMALL_END, SMALL_GAP, SMALL_PAD, SMALL_ROW_H,
+    tr, two_lines, Ctx, Item, ICON_LARGE, ICON_SMALL, LABEL_LINE_H, LABEL_SIZE, LARGE_GAP, LARGE_H,
+    LARGE_PAD, LARGE_W, SMALL_END, SMALL_GAP, SMALL_PAD, SMALL_ROW_H,
 };
 use crate::Theme;
 
@@ -45,7 +45,7 @@ pub(super) fn stack(ui: &mut Ui, cx: &Ctx, items: &[Item]) -> Option<&'static st
     ui.spacing_mut().item_spacing.y = 0.0;
     let width = items
         .iter()
-        .map(|i| labelled_width(ui, i.label))
+        .map(|i| labelled_width(ui, &tr(i.label)))
         .fold(0.0, f32::max);
     for item in items {
         if small_button(ui, cx, item, width) {
@@ -58,9 +58,9 @@ pub(super) fn stack(ui: &mut Ui, cx: &Ctx, items: &[Item]) -> Option<&'static st
 pub(super) fn large_button(ui: &mut Ui, cx: &Ctx, item: &Item) -> Option<&'static str> {
     let c = &cx.theme.colors;
     let enabled = cx.source.is_enabled(item.command);
-    let (line1, line2) = item.label.split_once(' ').unwrap_or((item.label, ""));
+    let (line1, line2) = two_lines(item.label);
     let width =
-        text_width(ui, line1, LABEL_SIZE).max(text_width(ui, line2, LABEL_SIZE)) + LARGE_PAD;
+        text_width(ui, &line1, LABEL_SIZE).max(text_width(ui, &line2, LABEL_SIZE)) + LARGE_PAD;
     let width = width.max(LARGE_W);
     let (rect, response) = ui.allocate_exact_size(vec2(width, LARGE_H), sense(enabled));
     if enabled {
@@ -125,7 +125,7 @@ pub(super) fn small_button(ui: &mut Ui, cx: &Ctx, item: &Item, width: f32) -> bo
         );
     }
     let color = if enabled { c.text } else { c.text_disabled };
-    paint_small(ui, rect, item.icon, item.label, color);
+    paint_small(ui, rect, item.icon, &tr(item.label), color);
     let clicked = response.on_hover_text(cx.tooltip(item)).clicked();
     enabled && clicked
 }

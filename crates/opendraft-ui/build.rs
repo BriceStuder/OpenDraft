@@ -5,6 +5,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 fn main() {
+    // The translations are read when the crate is compiled.
+    println!("cargo:rerun-if-changed=../../locales");
     let dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default())
         .join("../../assets/icons");
     println!("cargo:rerun-if-changed={}", dir.display());

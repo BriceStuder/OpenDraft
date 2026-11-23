@@ -5,6 +5,8 @@
 //! current layer, and the other lists show and set the colour, linetype and
 //! lineweight new objects are drawn with (ByLayer unless set).
 
+use std::borrow::Cow;
+
 use eframe::egui::{self, Align2, Color32, FontId, Painter, Pos2, Rect, Sense, Stroke, Ui};
 use opendraft_core::{Document, Layer, Object};
 use opendraft_ui::{icons, menu, Theme};
@@ -235,13 +237,13 @@ fn menu_row(
             Toggle::Viewport => {
                 let frozen = vp_frozen.is_some_and(|s| s.frozen);
                 (
-                    vp_frozen.map_or("", VpSwitch::tip),
+                    vp_frozen.map_or(Cow::Borrowed(""), VpSwitch::tip),
                     LayerEdit::SetInViewport(vec![layer.id], !frozen),
                 )
             }
             Toggle::Flag(flag) => (switch_tip(layer, flag), LayerEdit::Toggle(layer.id, flag)),
         };
-        if response.on_hover_text(tip).clicked() {
+        if response.on_hover_text(tip.as_ref()).clicked() {
             toggled = Some(edit);
         }
     }
@@ -329,14 +331,14 @@ fn corner_marks(square: Rect, pixel: f32, arm: f32) -> [[Pos2; 3]; 4] {
     ]
 }
 
-fn switch_tip(layer: &Layer, flag: LayerFlag) -> &'static str {
+fn switch_tip(layer: &Layer, flag: LayerFlag) -> Cow<'static, str> {
     match flag {
-        LayerFlag::On if layer.on => "On: click to turn off",
-        LayerFlag::On => "Off: click to turn on",
-        LayerFlag::Frozen if layer.frozen => "Frozen: click to thaw",
-        LayerFlag::Frozen => "Thawed: click to freeze",
-        LayerFlag::Locked if layer.locked => "Locked: click to unlock",
-        LayerFlag::Locked => "Unlocked: click to lock",
+        LayerFlag::On if layer.on => rust_i18n::t!("On: click to turn off"),
+        LayerFlag::On => rust_i18n::t!("Off: click to turn on"),
+        LayerFlag::Frozen if layer.frozen => rust_i18n::t!("Frozen: click to thaw"),
+        LayerFlag::Frozen => rust_i18n::t!("Thawed: click to freeze"),
+        LayerFlag::Locked if layer.locked => rust_i18n::t!("Locked: click to unlock"),
+        LayerFlag::Locked => rust_i18n::t!("Unlocked: click to lock"),
     }
 }
 

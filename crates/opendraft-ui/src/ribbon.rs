@@ -22,6 +22,7 @@
 //! Not implemented yet: responsive collapse, galleries, pinning an expanded
 //! panel open.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use egui::{pos2, vec2, Align2, FontId, Frame, Margin, Rect, Sense, Stroke, Ui};
@@ -57,6 +58,30 @@ pub(super) const LABEL_SIZE: f32 = 11.5;
 const PANEL_TITLE_H: f32 = 15.0;
 /// Side of an icon-only button in a panel flyout.
 pub(super) const FLY_BTN: f32 = 26.0;
+
+/// `text` (a tab, panel or button label written in English) in the language
+/// of the interface. The ribbon's data stays in English, which the app
+/// matches on (tab titles, split picks); only what is drawn is translated, so
+/// sizes follow the translated text. The English text is the key (#138).
+pub(super) fn tr(text: &'static str) -> Cow<'static, str> {
+    let shown = rust_i18n::t!(text);
+    if shown.contains('\n') {
+        Cow::Owned(shown.replace('\n', " "))
+    } else {
+        shown
+    }
+}
+
+/// A large button's label, translated, in two lines: where the translation
+/// breaks it (a `\n`, for a long text), else at the first space.
+pub(super) fn two_lines(text: &'static str) -> (String, String) {
+    let shown = rust_i18n::t!(text);
+    let (line1, line2) = shown
+        .split_once('\n')
+        .or_else(|| shown.split_once(' '))
+        .unwrap_or((&shown, ""));
+    (line1.to_owned(), line2.to_owned())
+}
 
 /// A clickable ribbon button.
 #[derive(Clone, Copy, Debug)]
@@ -194,9 +219,10 @@ struct Ctx<'a> {
 
 impl Ctx<'_> {
     pub(super) fn tooltip(&self, item: &Item) -> String {
+        let label = tr(item.label);
         match self.source.shortcut_text(item.command) {
-            Some(shortcut) => format!("{} ({shortcut})", item.label),
-            None => item.label.to_owned(),
+            Some(shortcut) => format!("{label} ({shortcut})"),
+            None => label.into_owned(),
         }
     }
 }
@@ -264,14 +290,15 @@ fn title_bar(ui: &mut Ui, cx: &Ctx, panel: &Panel, rect: Rect, open: bool) -> bo
         paint_hover(ui, cx.theme, &response, rect, open);
     }
     let arrow_w = if expandable { 14.0 } else { 0.0 };
-    let title_w = text_width(ui, panel.title, LABEL_SIZE - 1.0);
+    let title = tr(panel.title);
+    let title_w = text_width(ui, &title, LABEL_SIZE - 1.0);
     let left = rect.center().x - (title_w + arrow_w) / 2.0;
     let color = cx.theme.colors.text_weak;
     let painter = ui.painter();
     painter.text(
         pos2(left, rect.center().y),
         Align2::LEFT_CENTER,
-        panel.title,
+        title,
         FontId::proportional(LABEL_SIZE - 1.0),
         color,
     );
@@ -331,7 +358,7 @@ fn panel_ui(
 
             // Panel title, centered under the buttons.
             let arrow_w = if panel.extra.is_empty() { 0.0 } else { 14.0 };
-            let title_w = text_width(ui, panel.title, LABEL_SIZE - 1.0);
+            let title_w = text_width(ui, &tr(panel.title), LABEL_SIZE - 1.0);
             let width = row.response.rect.width().max(title_w + arrow_w + 10.0);
             let (rect, _) = ui.allocate_exact_size(vec2(width, PANEL_TITLE_H), Sense::hover());
             title_rect = rect;

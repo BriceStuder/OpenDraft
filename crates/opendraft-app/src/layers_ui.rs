@@ -323,7 +323,7 @@ fn row(
     }
     if let Some(vp) = vp {
         let glyph = crate::ribbon_slots::vp_glyph(vp.frozen, c.text_weak);
-        if switch(ui, cols.vp_freeze, "vp_freeze", glyph, vp.tip()) {
+        if switch(ui, cols.vp_freeze, "vp_freeze", glyph, &vp.tip()) {
             result.edit = Some(LayerEdit::SetInViewport(targets.clone(), !vp.frozen));
         }
     }
