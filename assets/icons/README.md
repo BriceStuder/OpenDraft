@@ -245,7 +245,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](ribbon-split-arrow.svg) | `ribbon-split-arrow.svg` | chevron-down | app/home_page/start.rs, ribbon/split.rs |
 | ![](select-crossing-polygon.svg) | `select-crossing-polygon.svg` | lasso | Crossing Polygon |
 | ![](select-fence.svg) | `select-fence.svg` | route | Fence |
-| ![](select-power.svg) | `select-power.svg` | wand-sparkles | Quick Select, app/context_menu.rs |
+| ![](select-power.svg) | `select-power.svg` | wand-sparkles | Power Select, app/context_menu.rs |
 | ![](select-window-polygon.svg) | `select-window-polygon.svg` | lasso-select | Window Polygon |
 | ![](text-align-center.svg) | `text-align-center.svg` | align-center | mtext_editor/toolbar.rs |
 | ![](status-grid-display.svg) | `status-grid-display.svg` | grid-3x3 | app/status_toggles.rs |
