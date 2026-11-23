@@ -209,7 +209,7 @@ fn objects(
                 *pressed = Some(BlockDialogButton::SelectObjects);
             }
             ui.add_enabled(false, egui::Button::new("\u{26A1}"))
-                .on_disabled_hover_text("Quick select is not offered here yet; use POWERSELECT.");
+                .on_disabled_hover_text("Power Select is not offered here yet; use POWERSELECT.");
         });
         ui.radio_value(&mut draft.action, ObjectsAction::Retain, "Retain");
         ui.radio_value(
