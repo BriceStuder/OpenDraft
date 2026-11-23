@@ -246,6 +246,7 @@ icons! {
     MODIFY_SCALE = '\u{e115}';
     MODIFY_STRETCH = '\u{e441}';
     MODIFY_TRIM = '\u{e151}';
+    NAV_GIZMO_HOME = '\u{e0f8}';
     OSNAP_APPARENT_INTERSECTION = '\u{e0ec}';
     OSNAP_CENTRE = '\u{e0ec}';
     OSNAP_END = '\u{e0ec}';
@@ -304,6 +305,7 @@ icons! {
     VIEW_PAN = '\u{e1d6}';
     VIEW_PANEL_PROPERTIES = '\u{e37a}';
     VIEW_RESET_LAYOUT = '\u{e2a0}';
+    VIEW_NAV_GIZMO = '\u{e09f}';
     VIEW_SNAP = '\u{e2b4}';
     VIEW_ZOOM_EXTENTS = '\u{e115}';
     VIEW_ZOOM_IN = '\u{e1b5}';

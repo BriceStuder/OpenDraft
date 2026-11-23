@@ -11,6 +11,7 @@ mod indexed_tests;
 pub mod layer_cache;
 #[cfg(test)]
 mod layer_cache_tests;
+pub mod nav_gizmo;
 #[cfg(test)]
 mod picture_tests;
 pub mod preview;
