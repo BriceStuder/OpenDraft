@@ -33,7 +33,7 @@ Keep it current: when something here is built, delete its line in the same chang
 
 ## Selection, snapping and input
 
-- Object snap and tracking: the leftovers listed under "Not built" in `docs/ARCHITECTURE.md`'s object snap section (pausing to take back a tracking point, `POLARMODE` bit 1, Extension past the ends of polylines and splines, `OSOPTIONS`, `OSNAPZ`).
+- Object snap and tracking: the leftovers listed under "Not built" in `docs/ARCHITECTURE.md`'s object snap section (pausing to take back a tracking point, `POLARMODE` bit 1, Extension past the ends of splines, `OSOPTIONS`, `OSNAPZ`).
 - `ORTHOMODE` saved in the drawing (it is a user setting today).
 - Snapping to the shape being drawn: ELLIPSE's first axis and a CV spline's control frame are not passed.
 - Window and lasso selection style: the command line does not say "Specify opposite corner", the lasso does not show its kind by the pointer, no option to start a lasso only from empty space, no highlight of what the box or lasso would take.
