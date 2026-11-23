@@ -41,7 +41,8 @@ impl Acquired {
 /// The path an acquired object gives.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Geom {
-    /// Past `from`, along the unit vector `dir`.
+    /// The line through `from` along the unit vector `dir`: on past the end
+    /// and back over the object, so a point can be taken back from the end.
     Ray { from: Point, dir: Point },
     /// Round the circle from angle `from`, counter-clockwise or not, for
     /// `room` radians at most (what the arc itself does not cover).
@@ -310,9 +311,6 @@ fn on_path(track: &Track, cursor: Point, tolerance: f64, base: Option<Point>) ->
     let (point, start) = match track.geom {
         Geom::Ray { from, dir } => {
             let t = (cursor.x - from.x) * dir.x + (cursor.y - from.y) * dir.y;
-            if t <= 0.0 {
-                return None;
-            }
             (Point::new(from.x + dir.x * t, from.y + dir.y * t), from)
         }
         Geom::Arc {
@@ -428,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    fn a_line_extends_past_either_end_and_only_past_it() {
+    fn a_line_extends_both_ways_from_either_end() {
         let d = doc(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
         let id = EntityId(0);
         let last = track(
@@ -454,7 +452,11 @@ mod tests {
         let guide = found[0].snap.guides[0].expect("a straight path");
         assert_eq!((guide.origin, guide.dir), (p(10.0, 0.0), p(1.0, 0.0)));
         assert_eq!(found[0].snap.label(), "Extension: 5.0000 < 0\u{b0}");
-        assert!(at(&last, 5.0, 0.4).is_empty(), "over the line itself");
+        // Back from the end over the line itself, and on past its start.
+        let back = at(&last, 5.0, 0.4);
+        assert_eq!(back[0].snap.point, p(5.0, 0.0));
+        assert_eq!(back[0].snap.label(), "Extension: 5.0000 < 180\u{b0}");
+        assert_eq!(at(&last, -7.0, -0.3)[0].snap.point, p(-7.0, 0.0));
         assert!(at(&last, 15.0, 3.0).is_empty(), "too far from the path");
         assert!(
             at(&last, 10.5, 0.2).is_empty(),
@@ -496,8 +498,13 @@ mod tests {
         assert_eq!(back[0].snap.point, p(-6.0, 0.0));
         // ...and on past the end, along the last.
         assert_eq!(at(true, 10.3, 16.0)[0].snap.point, p(10.0, 16.0));
-        assert!(at(true, 10.3, 5.0).is_empty(), "over the last segment");
-        assert!(at(false, 16.0, 0.3).is_empty(), "not past the corner");
+        // Back over the end segments too, and on along their lines.
+        assert_eq!(at(true, 10.3, 5.0)[0].snap.point, p(10.0, 5.0));
+        assert_eq!(at(false, 16.0, 0.3)[0].snap.point, p(16.0, 0.0));
+        assert!(
+            at(false, 10.3, 5.0).is_empty(),
+            "not along the last segment"
+        );
         assert_eq!(track(&d, end(true)).mark, p(10.0, 10.0));
     }
 
