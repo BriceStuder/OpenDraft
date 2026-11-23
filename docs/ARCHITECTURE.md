@@ -375,7 +375,10 @@ answer. Anything touching the drawing (`ed.read`, `ed.transaction`) is sent to
 the UI thread and run there between frames, so the drawing is never shared and
 a transaction is atomic as far as the UI goes. `Runner::poll` does that work
 each frame; Esc drops the reply channel, which makes the command's wait fail
-with `Cancelled`. The work a command hands to the UI thread
+with `Cancelled`. The app then pumps it a moment longer (`Runner::cancel_and_settle`,
+up to 100 ms per request) so it can do what it does when cancelled: PLINE's
+polyline drawn so far is kept on Esc and when another command takes over; a
+command still busy after that ends on its own. The work a command hands to the UI thread
 (`ed.read`, `ed.transaction`) runs under `catch_unwind`, so a panic in it
 ends that command as `Crashed` instead of the application. (A panic inside a
 transaction can leave its edits half applied; the debug validation reports
