@@ -98,3 +98,31 @@ fn a_point_of_a_polyline_in_progress_is_kept_and_tracked_from() {
     }
     assert!(view.snap_acquire.origins().is_empty());
 }
+
+#[test]
+fn a_polyline_in_progress_extends_back_past_its_start() {
+    let ctx = Context::default();
+    let mut view = View::default();
+    // A first segment on the slant, so no horizontal or vertical tracking
+    // path from the start runs along its extension.
+    view.set_point_prompt(Some(PointPrompt {
+        base: Some(p(250.0, 150.0)),
+        rubber_band: true,
+        snap_geometry: vec![Entity::Polyline {
+            points: vec![p(50.0, 50.0), p(250.0, 150.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: Vec::new(),
+        }]
+        .into(),
+        ..Default::default()
+    }));
+    for time in [0.0, 0.2, 0.4, 0.5] {
+        frame(&mut view, &ctx, time, p(50.5, 50.5));
+    }
+    let out = frame(&mut view, &ctx, 0.6, p(30.3, 39.6));
+    let q = out.preview_cursor.expect("a point");
+    // On the line through the segment, back past the start.
+    let across = (q.x - 50.0) * 1.0 - (q.y - 50.0) * 2.0;
+    assert!(across.abs() < 1e-9 && q.x < 49.0, "{q:?}");
+}

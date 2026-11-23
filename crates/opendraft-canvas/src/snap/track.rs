@@ -1,6 +1,6 @@
 //! Snaps that follow a path through something the pointer has paused over:
-//! Extension (the continuation of a line, arc or elliptical arc past one of
-//! its ends) and Parallel (the direction of a straight segment, through the
+//! Extension (the continuation of a line, arc, elliptical arc or open
+//! polyline past one of its ends) and Parallel (the direction of a straight segment, through the
 //! command's last point). The pause "acquires" the object; the acquired
 //! objects live in the view, and this is the pure part: what can be
 //! acquired where, the path an acquired object gives, and the snap points on
@@ -19,8 +19,8 @@ fn distance(a: Point, b: Point) -> f64 {
 /// What the pointer has paused over, and so keeps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Acquired {
-    /// An end of a line, arc or elliptical arc: the start, or the end
-    /// (`last`).
+    /// An end of a line, arc, elliptical arc or open polyline: the start, or
+    /// the end (`last`).
     End { object: EntityId, last: bool },
     /// A straight segment, the `curve`th of the object's outline.
     Along { object: EntityId, curve: u16 },
@@ -93,13 +93,46 @@ fn ends(entity: &Entity) -> Vec<(bool, Point)> {
         Entity::Ellipse(e) if !e.is_full() => {
             vec![(false, e.start_point()), (true, e.end_point())]
         }
+        Entity::Polyline { points, .. } => match (points.first(), points.last()) {
+            (Some(start), Some(end)) if polyline_end(entity, false).is_some() => {
+                vec![(false, *start), (true, *end)]
+            }
+            _ => Vec::new(),
+        },
         _ => Vec::new(),
     }
+}
+
+/// The line or arc an open polyline starts with, or ends with (`last`), and
+/// which end of it is the polyline's: its start, or its end (`true`).
+fn polyline_end(polyline: &Entity, last: bool) -> Option<(Entity, bool)> {
+    let Entity::Polyline {
+        points,
+        closed: false,
+        ..
+    } = polyline
+    else {
+        return None;
+    };
+    let pieces = polyline.explode()?;
+    let (piece, at) = if last {
+        (pieces.last()?, points.last()?)
+    } else {
+        (pieces.first()?, points.first()?)
+    };
+    let (own, _) = ends(piece)
+        .into_iter()
+        .min_by(|a, b| distance(a.1, *at).total_cmp(&distance(b.1, *at)))?;
+    Some((piece.clone(), own))
 }
 
 /// The path past one end of `entity`.
 fn end_geom(entity: &Entity, last: bool) -> Option<Geom> {
     match entity {
+        Entity::Polyline { .. } => {
+            let (piece, own) = polyline_end(entity, last)?;
+            end_geom(&piece, own)
+        }
         Entity::Line { start, end } => {
             let (from, other) = if last { (*end, *start) } else { (*start, *end) };
             Some(Geom::Ray {
@@ -428,6 +461,74 @@ mod tests {
             "the end's own snap is there"
         );
         assert_eq!(at(&first, -7.0, -0.3)[0].snap.point, p(-7.0, 0.0));
+    }
+
+    fn polyline(points: &[Point], bulges: &[f64], closed: bool) -> Entity {
+        Entity::Polyline {
+            points: points.to_vec(),
+            closed,
+            bulges: bulges.to_vec(),
+            widths: Vec::new(),
+        }
+    }
+
+    fn end(last: bool) -> Acquired {
+        Acquired::End {
+            object: EntityId(0),
+            last,
+        }
+    }
+
+    #[test]
+    fn an_open_polyline_extends_past_its_first_and_last_segments() {
+        let d = doc(&[polyline(
+            &[p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0)],
+            &[],
+            false,
+        )]);
+        let at = |last: bool, x: f64, y: f64| {
+            candidates(&[track(&d, end(last))], p(x, y), 1.0, None, &modes())
+        };
+        // Back past the start, along the first segment...
+        let back = at(false, -6.0, 0.4);
+        assert_eq!(back.len(), 1);
+        assert_eq!(back[0].snap.kind, SnapKind::Extension);
+        assert_eq!(back[0].snap.point, p(-6.0, 0.0));
+        // ...and on past the end, along the last.
+        assert_eq!(at(true, 10.3, 16.0)[0].snap.point, p(10.0, 16.0));
+        assert!(at(true, 10.3, 5.0).is_empty(), "over the last segment");
+        assert!(at(false, 16.0, 0.3).is_empty(), "not past the corner");
+        assert_eq!(track(&d, end(true)).mark, p(10.0, 10.0));
+    }
+
+    #[test]
+    fn an_arc_segment_at_an_end_continues_round_its_circle() {
+        // From (0, 0) a half circle about (5, 0) through (5, -5) to (10, 0).
+        let d = doc(&[polyline(&[p(0.0, 0.0), p(10.0, 0.0)], &[1.0, 0.0], false)]);
+        let last = track(&d, end(true));
+        let Geom::Arc { center, radius, .. } = last.geom else {
+            panic!("round the circle: {:?}", last.geom);
+        };
+        assert!((center.x - 5.0).abs() < 1e-9 && center.y.abs() < 1e-9);
+        assert!((radius - 5.0).abs() < 1e-9);
+        let found = candidates(&[last], p(5.2, 5.3), 1.0, None, &modes());
+        let q = found[0].snap.point;
+        assert!(((q.x - 5.0).hypot(q.y) - 5.0).abs() < 1e-9, "{q:?}");
+        let over = candidates(&[last], p(5.2, -5.3), 1.0, None, &modes());
+        assert!(over.is_empty(), "that is the arc itself");
+    }
+
+    #[test]
+    fn a_closed_polyline_has_no_ends_to_extend() {
+        let square = [p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0), p(0.0, 10.0)];
+        let d = doc(&[polyline(&square, &[], true)]);
+        assert!(resolve(&d, end(true)).is_none());
+        let objects = d.objects();
+        let modes = SnapModes {
+            parallel: false,
+            ..modes()
+        };
+        assert!(targets(objects.iter(), p(0.2, 0.1), 1.0, &modes).is_empty());
     }
 
     #[test]
