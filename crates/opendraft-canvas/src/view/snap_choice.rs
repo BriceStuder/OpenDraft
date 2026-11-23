@@ -7,8 +7,8 @@ use opendraft_core::{Document, Point};
 use super::{GridSettings, View};
 use crate::hit::probe;
 use crate::snap::{
-    cycled, directions, targets, Acquired, Origin, SnapId, SnapKind, SnapModes, SnapOverride,
-    SnapPoint, TrackInput, Tracking,
+    cycled, directions, targets, Acquired, Drawing, Origin, SnapId, SnapKind, SnapModes,
+    SnapOverride, SnapPoint, TrackInput, Tracking,
 };
 use crate::snap_axis::Aim;
 
@@ -125,17 +125,24 @@ impl View {
             extension: aim.modes.extension || aim.modes.extended_intersection,
             ..aim.modes
         };
+        // What the command has drawn but not yet added is kept as if it were
+        // in the drawing, as the pointer snaps to it.
+        let extra = aim.extra.clone();
+        let drawing = Drawing {
+            document,
+            extra: &extra,
+        };
         let mut resting = asking
             .map(|c| {
                 let near = document.visible_here_in_rect(probe(c, aim.radius));
-                targets(near, c, aim.radius, &wanted)
+                targets(near.into_iter().chain(extra.iter()), c, aim.radius, &wanted)
             })
             .unwrap_or_default();
         // Paths from what is kept, and the polar paths from the last point.
         // With running snaps off, kept points are suspended, not shown stale.
         let tracking = self.snap_cycle.tracking.clone();
         let keeping = tracking.otrack && aim.modes.enabled;
-        aim.tracks = self.snap_acquire.paths(document, parallel).to_vec();
+        aim.tracks = self.snap_acquire.paths(drawing, parallel).to_vec();
         let rect = self.snap_cycle.rect.unwrap_or(ui.clip_rect());
         let corner = |p: egui::Pos2| self.camera.screen_to_world(p, rect);
         let view = opendraft_core::Bounds::from_points(corner(rect.min), corner(rect.max));

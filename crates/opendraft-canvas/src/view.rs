@@ -50,6 +50,8 @@ mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
 pub(crate) mod text_raster;
+#[cfg(test)]
+mod track_drawn_tests;
 mod twist;
 pub use text_paint::paint_text;
 mod types;

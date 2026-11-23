@@ -1,5 +1,5 @@
-//! Snapping to the segments of the polyline being drawn, through the whole
-//! frame path (prompt, canvas, click), as the app runs it.
+//! Snapping and tracking to the segments of the polyline being drawn,
+//! through the whole frame path (prompt, canvas, click), as the app runs it.
 
 use super::*;
 use opendraft_core::Entity;
@@ -97,4 +97,35 @@ fn the_start_and_inner_vertices_are_snapped_to() {
         assert_eq!(points.len(), 4, "{points:?}");
         assert_eq!(points[3], vertex, "vertex {target}");
     }
+}
+
+#[test]
+fn the_start_point_is_kept_and_tracked_from() {
+    let (mut app, ctx) = (app(), egui::Context::default());
+    let (a, b, c) = (
+        Pos2::new(300.0, 300.0),
+        Pos2::new(500.0, 300.0),
+        Pos2::new(500.0, 450.0),
+    );
+    let canvas = started(&mut app, &ctx, [a, b, c]);
+    let start = placed(&app)[0];
+    let at = app.state.docs[0].view.camera.world_to_screen(start, canvas);
+    // Resting on the start point keeps it...
+    let near = at + Vec2::new(-3.0, 2.0);
+    for t in [1.0, 1.2, 1.4, 1.5, 1.6] {
+        frame(&mut app, &ctx, vec![Event::PointerMoved(near)], t);
+    }
+    // ...and a click a little off the line straight below it lands on it.
+    let below = at + Vec2::new(4.0, 80.0);
+    frame(&mut app, &ctx, vec![Event::PointerMoved(below)], 1.7);
+    press(&mut app, &ctx, below, 1.8);
+    app.state.settle_command();
+    frame(&mut app, &ctx, Vec::new(), 1.9);
+    let points = placed(&app);
+    assert_eq!(points.len(), 4, "{points:?}");
+    let q = points[3];
+    assert!(
+        (q.x - start.x).abs() < 1e-6 && q.y < start.y - 1.0,
+        "placed {q:?}, start {start:?}"
+    );
 }

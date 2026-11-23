@@ -1,5 +1,7 @@
 //! The arc options of PLINE: each one finishes an arc segment from the
-//! polyline's last point, as the end point and bulge the chain stores.
+//! polyline's last point, as the end point and bulge the chain stores. At
+//! every prompt the pointer snaps to the segments drawn so far, as it does
+//! at PLINE's own.
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
 use opendraft_core::arc::midpoint;
@@ -66,91 +68,115 @@ fn chord_end(from: Point, radius: f64, angle: f64, direction: f64) -> Point {
 }
 
 /// Finish the arc segment for one of the arc-mode keywords, or `None` when
-/// the answers make no arc (the caller says so and asks again).
+/// the answers make no arc (the caller says so and asks again). `drawn` is
+/// the polyline so far, for the pointer to snap to.
 pub(crate) fn arc_option(
     ed: &Editor,
     keyword: &str,
-    from: Point,
-    heading: Point,
+    (from, heading): (Point, Point),
+    drawn: &[Entity],
 ) -> Result<Option<Segment>, Cancelled> {
     let arc = match keyword {
-        "Angle" => by_angle(ed, from)?,
+        "Angle" => by_angle(ed, from, drawn)?,
         "CEnter" => {
-            let center = centre_after(ed, from)?;
-            Some(to_end_from_centre(ed, center, from)?)
+            let center = centre_after(ed, from, drawn)?;
+            Some(to_end_from_centre(ed, center, from, drawn)?)
         }
-        "Direction" => by_direction(ed, from)?,
-        "Radius" => by_radius(ed, from, heading)?,
-        _ => by_second_point(ed, from)?,
+        "Direction" => by_direction(ed, from, drawn)?,
+        "Radius" => by_radius(ed, (from, heading), drawn)?,
+        _ => by_second_point(ed, from, drawn)?,
     };
     Ok(arc.and_then(|arc| segment_of(from, &arc)))
 }
 
-fn by_angle(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
-    let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
-    let options = PointOptions::new("Specify endpoint of arc")
+/// A number prompt that snaps to `drawn` too.
+fn number(message: &str, drawn: &[Entity]) -> NumberOptions {
+    NumberOptions::new(message).snap_to(drawn.to_vec())
+}
+
+/// An end point prompt from `from` that snaps to `drawn` too.
+fn end_point(from: Point, drawn: &[Entity]) -> PointOptions {
+    PointOptions::new("Specify endpoint of arc")
         .base(from)
+        .snap_to(drawn.to_vec())
+}
+
+fn by_angle(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<Option<Entity>, Cancelled> {
+    let angle = ed.get_angle(number("Specify included angle", drawn).turn())?;
+    let options = end_point(from, drawn)
         .keyword("CEnter", "CE")
         .keyword("Radius", "R")
         .ghost(move |at| preview(from, from_start_end_angle(from, at, angle), at));
     Ok(match ed.ask_point(options)? {
         Answer::Value(end) => from_start_end_angle(from, end, angle),
         Answer::Keyword(k) if k == "CEnter" => {
-            let center = centre_after(ed, from)?;
+            let center = centre_after(ed, from, drawn)?;
             opendraft_core::arc_make::from_center_start_angle(center, from, angle)
         }
         Answer::Keyword(_) => {
-            let radius = positive(ed, NumberOptions::new("Specify radius of arc").base(from))?;
-            let direction = ed.get_angle(
-                NumberOptions::new("Specify direction of chord")
-                    .default(0.0)
-                    .base(from),
-            )?;
+            let radius = positive(ed, number("Specify radius of arc", drawn).base(from))?;
+            let direction = chord_direction(ed, from, drawn)?;
             from_start_end_angle(from, chord_end(from, radius, angle, direction), angle)
         }
         Answer::Enter => return Err(Cancelled),
     })
 }
 
-fn by_direction(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
+fn chord_direction(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<f64, Cancelled> {
+    ed.get_angle(
+        number("Specify direction of chord", drawn)
+            .default(0.0)
+            .base(from),
+    )
+}
+
+fn by_direction(ed: &Editor, from: Point, drawn: &[Entity]) -> Result<Option<Entity>, Cancelled> {
     let direction = ed.get_angle(
-        NumberOptions::new("Specify the tangent direction for the start point of arc").base(from),
+        number(
+            "Specify the tangent direction for the start point of arc",
+            drawn,
+        )
+        .base(from),
     )?;
-    let options = PointOptions::new("Specify endpoint of arc")
-        .base(from)
+    let options = end_point(from, drawn)
         .ghost(move |at| preview(from, from_start_end_direction(from, at, direction), at));
     let end = ed.get_point(options)?;
     Ok(from_start_end_direction(from, end, direction))
 }
 
-fn by_radius(ed: &Editor, from: Point, heading: Point) -> Result<Option<Entity>, Cancelled> {
-    let radius = positive(ed, NumberOptions::new("Specify radius of arc").base(from))?;
-    let options = PointOptions::new("Specify endpoint of arc")
-        .base(from)
+fn by_radius(
+    ed: &Editor,
+    (from, heading): (Point, Point),
+    drawn: &[Entity],
+) -> Result<Option<Entity>, Cancelled> {
+    let radius = positive(ed, number("Specify radius of arc", drawn).base(from))?;
+    let options = end_point(from, drawn)
         .keyword("Angle", "A")
         .ghost(move |at| preview(from, radius_arc(from, at, heading, radius), at));
     Ok(match ed.ask_point(options)? {
         Answer::Value(end) => radius_arc(from, end, heading, radius),
         Answer::Keyword(_) => {
-            let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
-            let direction = ed.get_angle(
-                NumberOptions::new("Specify direction of chord")
-                    .default(0.0)
-                    .base(from),
-            )?;
+            let angle = ed.get_angle(number("Specify included angle", drawn).turn())?;
+            let direction = chord_direction(ed, from, drawn)?;
             from_start_end_angle(from, chord_end(from, radius, angle, direction), angle)
         }
         Answer::Enter => return Err(Cancelled),
     })
 }
 
-fn by_second_point(ed: &Editor, from: Point) -> Result<Option<Entity>, Cancelled> {
+fn by_second_point(
+    ed: &Editor,
+    from: Point,
+    drawn: &[Entity],
+) -> Result<Option<Entity>, Cancelled> {
     let options = PointOptions::new("Specify second point on arc")
         .base(from)
+        .snap_to(drawn.to_vec())
         .ghost(move |at| vec![line(from, at)]);
     let second = ed.get_point(options)?;
     let options = PointOptions::new("Specify end point of arc")
         .base(second)
+        .snap_to(drawn.to_vec())
         .ghost(move |at| preview(from, arc_through(from, second, at), at));
     let end = ed.get_point(options)?;
     Ok(arc_through(from, second, end))

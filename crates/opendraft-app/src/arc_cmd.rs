@@ -50,8 +50,8 @@ pub fn draw_arc(ed: &mut Editor) -> Result<(), Cancelled> {
 /// included angle or chord length).
 pub fn draw_arc_sce(ed: &mut Editor) -> Result<(), Cancelled> {
     let start = ed.get_point("Specify start point of arc")?;
-    let center = centre_after(ed, start)?;
-    let entity = to_end_from_centre(ed, center, start)?;
+    let center = centre_after(ed, start, &[])?;
+    let entity = to_end_from_centre(ed, center, start, &[])?;
     add(ed, entity, "Arc")
 }
 
@@ -73,8 +73,8 @@ fn from_start(ed: &Editor, start: Point) -> Result<Entity, Cancelled> {
             }
         },
         Answer::Keyword(k) if k == "Center" => {
-            let center = centre_after(ed, start)?;
-            to_end_from_centre(ed, center, start)
+            let center = centre_after(ed, start, &[])?;
+            to_end_from_centre(ed, center, start, &[])
         }
         Answer::Keyword(_) => {
             let end = loop {
@@ -93,11 +93,17 @@ fn from_start(ed: &Editor, start: Point) -> Result<Entity, Cancelled> {
     }
 }
 
-/// A centre point that is not on `start`.
-pub(crate) fn centre_after(ed: &Editor, start: Point) -> Result<Point, Cancelled> {
+/// A centre point that is not on `start`. The pointer snaps to `drawn` too:
+/// what the command has drawn but not yet added (PLINE's segments).
+pub(crate) fn centre_after(
+    ed: &Editor,
+    start: Point,
+    drawn: &[Entity],
+) -> Result<Point, Cancelled> {
     loop {
         let options = PointOptions::new("Specify center point of arc")
             .base(start)
+            .snap_to(drawn.to_vec())
             .ghost(move |at| vec![line(at, start)]);
         let center = ed.get_point(options)?;
         if distance(center, start) > MIN_SIZE {
@@ -150,26 +156,33 @@ fn to_centre_angle_direction_radius(
 }
 
 /// Centre and start known: the end point, an included angle or a chord
-/// length finishes the arc.
+/// length finishes the arc. The pointer snaps to `drawn` too (see
+/// [`centre_after`]).
 pub(crate) fn to_end_from_centre(
     ed: &Editor,
     center: Point,
     start: Point,
+    drawn: &[Entity],
 ) -> Result<Entity, Cancelled> {
     loop {
         let options = PointOptions::new("Specify end point of arc")
             .base(center)
             .keyword("Angle", "A")
             .keyword("chord Length", "L")
+            .snap_to(drawn.to_vec())
             .ghost(move |at| shown(from_center_start_end(center, start, at), center, at));
         let arc = match ed.ask_point(options)? {
             Answer::Value(end) => from_center_start_end(center, start, end),
             Answer::Keyword(k) if k == "Angle" => {
-                let angle = ed.get_angle(NumberOptions::new("Specify included angle").turn())?;
-                from_center_start_angle(center, start, angle)
+                let options = NumberOptions::new("Specify included angle")
+                    .turn()
+                    .snap_to(drawn.to_vec());
+                from_center_start_angle(center, start, ed.get_angle(options)?)
             }
             Answer::Keyword(_) => {
-                let options = NumberOptions::new("Specify length of chord").base(start);
+                let options = NumberOptions::new("Specify length of chord")
+                    .base(start)
+                    .snap_to(drawn.to_vec());
                 from_center_start_chord(center, start, ed.get_distance(options)?)
             }
             Answer::Enter => return Err(Cancelled),
@@ -192,7 +205,7 @@ fn from_centre(ed: &Editor) -> Result<Entity, Cancelled> {
         }
         ed.say("Requires a non-zero value.");
     };
-    to_end_from_centre(ed, center, start)
+    to_end_from_centre(ed, center, start, &[])
 }
 
 #[cfg(test)]
