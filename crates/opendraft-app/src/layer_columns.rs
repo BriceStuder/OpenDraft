@@ -3,6 +3,7 @@
 
 use eframe::egui::{self, Align2, FontId, Rect, Sense, Stroke, Ui};
 use opendraft_ui::{icons, Theme};
+use rust_i18n::t;
 
 pub const ROW_HEIGHT: f32 = 22.0;
 pub const NAME_MIN: f32 = 90.0;
@@ -90,7 +91,7 @@ pub fn header(ui: &mut Ui, theme: &Theme, shape: Layout) {
             c.text_weak,
         );
     };
-    text(cols.name, "Name");
+    text(cols.name, &t!("Name"));
     // The same bulb, sun and padlock as the ribbon's layer list.
     glyph(cols.on, icons::LAYER_LIST_ON);
     glyph(cols.freeze, icons::LAYER_LIST_THAWED);
@@ -98,16 +99,16 @@ pub fn header(ui: &mut Ui, theme: &Theme, shape: Layout) {
         ui.painter().text(
             cols.vp_freeze.center(),
             Align2::CENTER_CENTER,
-            "VP",
+            t!("VP"),
             FontId::proportional(theme.font_size_small),
             c.text_weak,
         );
     }
     glyph(cols.lock, icons::LAYER_LIST_UNLOCKED);
-    text(cols.color, "Color");
+    text(cols.color, &t!("Color"));
     if wide {
-        text(cols.linetype, "Linetype");
-        text(cols.weight, "Weight");
+        text(cols.linetype, &t!("Linetype"));
+        text(cols.weight, &t!("Weight"));
     }
     ui.painter().hline(
         rect.x_range(),

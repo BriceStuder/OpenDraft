@@ -64,12 +64,7 @@ pub(super) const FLY_BTN: f32 = 26.0;
 /// matches on (tab titles, split picks); only what is drawn is translated, so
 /// sizes follow the translated text. The English text is the key (#138).
 pub(super) fn tr(text: &'static str) -> Cow<'static, str> {
-    let shown = rust_i18n::t!(text);
-    if shown.contains('\n') {
-        Cow::Owned(shown.replace('\n', " "))
-    } else {
-        shown
-    }
+    crate::i18n::tr(text)
 }
 
 /// A large button's label, translated, in two lines: where the translation

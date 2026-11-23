@@ -224,7 +224,7 @@ impl egui_dock::TabViewer for PanelViewer<'_> {
     type Tab = PanelTab;
 
     fn title(&mut self, tab: &mut PanelTab) -> egui::WidgetText {
-        tab.title().into()
+        opendraft_ui::i18n::tr(tab.title()).into()
     }
 
     fn closeable(&mut self, tab: &mut PanelTab) -> bool {

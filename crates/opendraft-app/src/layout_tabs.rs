@@ -5,6 +5,7 @@ use eframe::egui::{self, Rect, Response, Sense, Ui};
 use opendraft_canvas::Space;
 use opendraft_core::{Document, LayoutId};
 use opendraft_ui::Theme;
+use rust_i18n::t;
 
 /// Height of a tab, smaller than other controls to keep the bar thin.
 pub const TAB_HEIGHT: f32 = 20.0;
@@ -72,7 +73,7 @@ pub fn show(ui: &mut Ui, theme: &Theme, document: &Document, space: Space) -> Op
     let mut action = None;
     ui.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing.x = TAB_GAP;
-        if tab(ui, theme, "Model", space == Space::Model).clicked() {
+        if tab(ui, theme, &t!("Model"), space == Space::Model).clicked() {
             action = Some(TabAction::Model);
         }
         for layout in document.layouts() {
@@ -82,10 +83,10 @@ pub fn show(ui: &mut Ui, theme: &Theme, document: &Document, space: Space) -> Op
             }
             response.context_menu(|ui| {
                 for (label, act) in [
-                    ("New layout", TabAction::New),
-                    ("Page Setup...", TabAction::PageSetup(layout.id)),
-                    ("Copy", TabAction::Copy(layout.id)),
-                    ("Delete", TabAction::Delete(layout.id)),
+                    (t!("New layout"), TabAction::New),
+                    (t!("Page Setup..."), TabAction::PageSetup(layout.id)),
+                    (t!("Copy"), TabAction::Copy(layout.id)),
+                    (t!("Delete"), TabAction::Delete(layout.id)),
                 ] {
                     if ui.button(label).clicked() {
                         action = Some(act);
@@ -101,7 +102,7 @@ pub fn show(ui: &mut Ui, theme: &Theme, document: &Document, space: Space) -> Op
                     .toggle(false)
                     .color(theme.colors.text_weak),
             )
-            .on_hover_text("New layout")
+            .on_hover_text(t!("New layout"))
             .on_hover_cursor(egui::CursorIcon::PointingHand);
         if new.clicked() {
             action = Some(TabAction::New);

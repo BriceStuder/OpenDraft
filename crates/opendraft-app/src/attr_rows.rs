@@ -4,7 +4,10 @@
 
 use eframe::egui::{self, Ui};
 use opendraft_core::{Attr, Color, Document, LinetypeId, Lineweight, Object};
+use opendraft_ui::i18n::tr;
+use opendraft_ui::key;
 use opendraft_ui::{menu, Theme};
+use rust_i18n::t;
 
 use crate::colour_ui::{self, Pick};
 use crate::layers::{has_outline, AttrEdit};
@@ -13,9 +16,9 @@ use crate::linetype_ui;
 use crate::properties_ui::{row_frame, text_cell};
 
 /// Shown when the selected objects follow their layer.
-const BY_LAYER: &str = "ByLayer";
-const BY_BLOCK: &str = "ByBlock";
-pub(crate) const VARIES: &str = "Varies";
+const BY_LAYER: &str = key!("ByLayer");
+const BY_BLOCK: &str = key!("ByBlock");
+pub(crate) const VARIES: &str = key!("Varies");
 
 /// The value every item agrees on, or `None` when they differ (or there are
 /// none).
@@ -62,12 +65,13 @@ fn layer_row(
     document: &Document,
     objects: &[&Object],
 ) -> Option<AttrEdit> {
-    let (_, cell) = row_frame(ui, theme, "Layer");
+    let (_, cell) = row_frame(ui, theme, &t!("Layer"));
     let current = shared(objects.iter().map(|o| o.attrs.layer));
     let layers = document.layers_by_name();
     let names: Vec<String> = layers.iter().map(|l| l.name.clone()).collect();
     let selected = current.and_then(|id| layers.iter().position(|l| l.id == id));
-    let text = selected.map_or(VARIES, |i| names[i].as_str());
+    let varies = tr(VARIES);
+    let text = selected.map_or(&*varies, |i| names[i].as_str());
     let id = ui.id().with("attr_layer");
     let picked = cell_combo(ui, theme, id, cell, text, &names, selected)?;
     Some(AttrEdit::Layer(layers.get(picked)?.id))
@@ -79,7 +83,7 @@ fn color_row(
     document: &Document,
     objects: &[&Object],
 ) -> Option<AttrEdit> {
-    let (_, cell) = row_frame(ui, theme, "Colour");
+    let (_, cell) = row_frame(ui, theme, &t!("Colour"));
     let id = ui.id().with("attr_color");
     color_field(ui, theme, id, cell.shrink(2.0), document, objects)
 }
@@ -130,7 +134,7 @@ fn linetype_row(
     document: &Document,
     objects: &[&Object],
 ) -> Option<AttrEdit> {
-    let (_, cell) = row_frame(ui, theme, "Linetype");
+    let (_, cell) = row_frame(ui, theme, &t!("Linetype"));
     let id = ui.id().with("attr_linetype");
     linetype_field(ui, theme, id, cell.shrink(2.0), document, objects)
 }
@@ -159,7 +163,7 @@ pub(crate) fn linetype_value_field(
 ) -> Option<AttrEdit> {
     let choices = linetype_ui::choices(document);
     // ByLayer and ByBlock first, then the table's linetypes, each with a picture.
-    let entries: Vec<String> = [BY_LAYER.to_owned(), BY_BLOCK.to_owned()]
+    let entries: Vec<String> = [tr(BY_LAYER).into_owned(), tr(BY_BLOCK).into_owned()]
         .into_iter()
         .chain(choices.iter().map(|r| r.name.clone()))
         .collect();
@@ -168,11 +172,12 @@ pub(crate) fn linetype_value_field(
         Attr::ByBlock => Some(1),
         Attr::Set(id) => linetype_ui::position(&choices, *id).map(|i| i + 2),
     });
+    let varies = tr(VARIES);
     let text = match (&attr, current) {
         // A reference the table cannot answer (a valid drawing has none).
         (Some(Attr::Set(_)), None) => "?",
         (_, Some(i)) => entries[i].as_str(),
-        _ => VARIES,
+        _ => &varies,
     };
     let sample = |painter: &egui::Painter, area: egui::Rect, i: usize, color: egui::Color32| {
         if let Some(record) = i.checked_sub(2).and_then(|i| choices.get(i)) {
@@ -198,7 +203,7 @@ pub(crate) fn linetype_value_field(
 }
 
 fn lineweight_row(ui: &mut Ui, theme: &Theme, objects: &[&Object]) -> Option<AttrEdit> {
-    let (_, cell) = row_frame(ui, theme, "Lineweight");
+    let (_, cell) = row_frame(ui, theme, &t!("Lineweight"));
     let id = ui.id().with("attr_lineweight");
     lineweight_field(ui, theme, id, cell.shrink(2.0), objects)
 }
@@ -223,7 +228,7 @@ pub(crate) fn lineweight_value_field(
     area: egui::Rect,
     attr: Option<Attr<Lineweight>>,
 ) -> Option<AttrEdit> {
-    let entries: Vec<String> = [BY_LAYER.to_owned(), BY_BLOCK.to_owned()]
+    let entries: Vec<String> = [tr(BY_LAYER).into_owned(), tr(BY_BLOCK).into_owned()]
         .into_iter()
         .chain(Lineweight::STANDARD.iter().map(|w| weight_label(*w)))
         .collect();
@@ -235,7 +240,8 @@ pub(crate) fn lineweight_value_field(
             .position(|s| s == w)
             .map(|i| i + 2),
     });
-    let text = current.map_or(VARIES, |i| entries[i].as_str());
+    let varies = tr(VARIES);
+    let text = current.map_or(&*varies, |i| entries[i].as_str());
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(area));
     let picked = menu::combo(&mut child, theme, id, area.size(), text, &entries, current)?;
     Some(AttrEdit::Lineweight(match picked {
@@ -247,7 +253,7 @@ pub(crate) fn lineweight_value_field(
 
 /// The objects' own linetype scale, typed in. Not the drawing's `LTSCALE`.
 fn scale_row(ui: &mut Ui, theme: &Theme, objects: &[&Object]) -> Option<AttrEdit> {
-    let (_, cell) = row_frame(ui, theme, "Linetype scale");
+    let (_, cell) = row_frame(ui, theme, &t!("Linetype scale"));
     let scale =
         shared(objects.iter().map(|o| o.attrs.linetype_scale.to_bits())).map(f64::from_bits);
     let shown = scale.map_or(String::new(), |s| format!("{s:.4}"));
@@ -263,10 +269,11 @@ fn generation_row(ui: &mut Ui, theme: &Theme, objects: &[&Object]) -> Option<Att
     if outlined.is_empty() {
         return None;
     }
-    let (_, cell) = row_frame(ui, theme, "Linetype generation");
+    let (_, cell) = row_frame(ui, theme, &t!("Linetype generation"));
     let current = shared(outlined.iter().map(|o| o.attrs.continuous_generation)).map(usize::from);
-    let entries = ["Disabled".to_owned(), "Enabled".to_owned()];
-    let text = current.map_or(VARIES, |i| entries[i].as_str());
+    let entries = [t!("Disabled").into_owned(), t!("Enabled").into_owned()];
+    let varies = tr(VARIES);
+    let text = current.map_or(&*varies, |i| entries[i].as_str());
     let id = ui.id().with("attr_linetype_generation");
     let picked = cell_combo(ui, theme, id, cell, text, &entries, current)?;
     Some(AttrEdit::LinetypeGeneration(picked == 1))

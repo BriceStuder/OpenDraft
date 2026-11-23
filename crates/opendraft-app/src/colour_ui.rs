@@ -10,7 +10,9 @@ use eframe::egui::{
     self, Align2, Color32, FontId, Id, Painter, Rect, Response, Sense, Shape, Stroke, Ui,
 };
 use opendraft_core::Color;
+use opendraft_ui::i18n::tr;
 use opendraft_ui::{menu, Theme};
+use rust_i18n::t;
 
 pub use names::name;
 
@@ -80,8 +82,8 @@ pub fn swatch_button(
     palette_popup(ui, theme, id, &response, Some(Pick::Color(color)), by_layer)
 }
 
-/// A drop-down field showing an optional swatch and a label ("Red", "ByLayer",
-/// "Varies"). Opens the palette.
+/// A drop-down field showing an optional swatch and a label in English, drawn
+/// translated ("Red", "ByLayer", "Varies"). Opens the palette.
 pub fn field(
     ui: &mut Ui,
     theme: &Theme,
@@ -105,7 +107,7 @@ pub fn field(
     ui.painter().text(
         egui::pos2(text_x, rect.center().y),
         Align2::LEFT_CENTER,
-        label,
+        tr(label),
         FontId::proportional(theme.font_size_body),
         theme.colors.text,
     );
@@ -156,10 +158,10 @@ fn palette_popup(
 /// used lately, and "Select Colors...".
 fn short_list(ui: &mut Ui, theme: &Theme, by_layer: bool) -> Option<Choice> {
     let mut picked = None;
-    if by_layer && menu::menu_row(ui, theme, "ByLayer", false) {
+    if by_layer && menu::menu_row(ui, theme, &t!("ByLayer"), false) {
         picked = Some(Choice::Pick(Pick::ByLayer));
     }
-    if by_layer && menu::menu_row(ui, theme, "ByBlock", false) {
+    if by_layer && menu::menu_row(ui, theme, &t!("ByBlock"), false) {
         picked = Some(Choice::Pick(Pick::ByBlock));
     }
     let standard = (1..=7).map(names::from_index);
@@ -176,7 +178,7 @@ fn short_list(ui: &mut Ui, theme: &Theme, by_layer: bool) -> Option<Choice> {
         }
     }
     separator(ui, theme);
-    if menu::menu_row(ui, theme, "Select Colors...", false) {
+    if menu::menu_row(ui, theme, &t!("Select Colors..."), false) {
         picked = Some(Choice::MoreColours);
     }
     picked
@@ -197,7 +199,7 @@ fn colour_row(ui: &mut Ui, theme: &Theme, color: Color) -> bool {
     ui.painter().text(
         egui::pos2(rect.left() + 28.0, rect.center().y),
         Align2::LEFT_CENTER,
-        name(color),
+        tr(&name(color)),
         FontId::proportional(theme.font_size_body),
         theme.colors.text,
     );

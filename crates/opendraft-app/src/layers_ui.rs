@@ -5,6 +5,7 @@
 use eframe::egui::{self, Align2, Rect, Sense, Stroke, Ui};
 use opendraft_core::{Document, Layer, LayerId, Lineweight};
 use opendraft_ui::{icons, menu, widgets, Theme};
+use rust_i18n::t;
 
 use crate::colour_ui::{self, Pick};
 use crate::layer_cells::{cell_text, fit_text, layers_in_use};
@@ -34,23 +35,23 @@ pub fn show(
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
         ui.add_space(6.0);
-        if widgets::secondary_button(ui, theme, "New")
-            .on_hover_text("Create a layer")
+        if widgets::secondary_button(ui, theme, &t!("New"))
+            .on_hover_text(t!("Create a layer"))
             .clicked()
         {
             edit = Some(LayerEdit::New);
         }
         ui.add_enabled_ui(!selection.ids().is_empty(), |ui| {
-            if widgets::secondary_button(ui, theme, "Delete")
-                .on_hover_text("Delete the selected layers")
+            if widgets::secondary_button(ui, theme, &t!("Delete"))
+                .on_hover_text(t!("Delete the selected layers"))
                 .clicked()
             {
                 edit = Some(LayerEdit::Delete(selection.ids().to_vec()));
             }
         });
         ui.add_enabled_ui(selection.single().is_some(), |ui| {
-            if widgets::secondary_button(ui, theme, "Set Current")
-                .on_hover_text("Draw new objects on the selected layer")
+            if widgets::secondary_button(ui, theme, &t!("Set Current"))
+                .on_hover_text(t!("Draw new objects on the selected layer"))
                 .clicked()
             {
                 edit = selection.single().map(LayerEdit::SetCurrent);
@@ -224,7 +225,7 @@ fn row(
             c.accent_text,
         );
     }
-    if status.on_hover_text("Current layer").clicked() {
+    if status.on_hover_text(t!("Current layer")).clicked() {
         result.edit = Some(LayerEdit::SetCurrent(layer.id));
     }
 
@@ -298,11 +299,11 @@ fn row(
         response.on_hover_text(tip).clicked()
     };
     let on_tip = if layer.on {
-        "On: click to turn off"
+        t!("On: click to turn off")
     } else {
-        "Off: click to turn on"
+        t!("Off: click to turn on")
     };
-    if switch(ui, cols.on, "on", on_glyph, on_tip) {
+    if switch(ui, cols.on, "on", on_glyph, &on_tip) {
         result.edit = Some(LayerEdit::SetFlag(
             targets.clone(),
             LayerFlag::On,
@@ -310,11 +311,11 @@ fn row(
         ));
     }
     let freeze_tip = if layer.frozen {
-        "Frozen: click to thaw"
+        t!("Frozen: click to thaw")
     } else {
-        "Thawed: click to freeze"
+        t!("Thawed: click to freeze")
     };
-    if switch(ui, cols.freeze, "freeze", thaw_glyph, freeze_tip) {
+    if switch(ui, cols.freeze, "freeze", thaw_glyph, &freeze_tip) {
         result.edit = Some(LayerEdit::SetFlag(
             targets.clone(),
             LayerFlag::Frozen,
@@ -328,11 +329,11 @@ fn row(
         }
     }
     let lock_tip = if layer.locked {
-        "Locked: click to unlock"
+        t!("Locked: click to unlock")
     } else {
-        "Unlocked: click to lock"
+        t!("Unlocked: click to lock")
     };
-    if switch(ui, cols.lock, "lock", lock_glyph, lock_tip) {
+    if switch(ui, cols.lock, "lock", lock_glyph, &lock_tip) {
         result.edit = Some(LayerEdit::SetFlag(
             targets.clone(),
             LayerFlag::Locked,

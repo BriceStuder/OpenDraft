@@ -4,17 +4,18 @@
 
 use opendraft_core::aci::{aci_rgb, nearest_aci};
 use opendraft_core::Color;
+use opendraft_ui::key;
 
 use super::Pick;
 
 /// The index colours AutoCAD calls by a name (7 is the foreground).
 const NAMED: [(u8, &str); 6] = [
-    (1, "Red"),
-    (2, "Yellow"),
-    (3, "Green"),
-    (4, "Cyan"),
-    (5, "Blue"),
-    (6, "Magenta"),
+    (1, key!("Red")),
+    (2, key!("Yellow")),
+    (3, key!("Green")),
+    (4, key!("Cyan")),
+    (5, key!("Blue")),
+    (6, key!("Magenta")),
 ];
 
 /// The index colour `i` (1..=255); 7 is the foreground.
@@ -42,7 +43,7 @@ pub fn index_of(color: Color) -> Option<u8> {
 /// Human name: "Foreground", "Red", "34" or "255,128,0".
 pub fn name(color: Color) -> String {
     match (index_of(color), color) {
-        (Some(7), _) => "Foreground".to_owned(),
+        (Some(7), _) => key!("Foreground").to_owned(),
         (Some(i), _) => match NAMED.iter().find(|(n, _)| *n == i) {
             Some((_, name)) => (*name).to_owned(),
             None => i.to_string(),

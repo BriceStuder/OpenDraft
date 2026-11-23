@@ -2,34 +2,37 @@
 //! prompt: one-shot object snaps for the next point only.
 
 use eframe::egui;
+use opendraft_ui::i18n::tr;
+use opendraft_ui::key;
+use rust_i18n::t;
 
 use super::OpenDraftApp;
 use crate::snap_once::parse;
 
 /// Menu rows: a label and the word a user would type, or `None` for a rule.
 const ROWS: &[Option<(&str, &str)>] = &[
-    Some(("Temporary Track Point", "tt")),
-    Some(("Tracking", "tk")),
-    Some(("From", "fro")),
-    Some(("Mid Between 2 Points", "m2p")),
+    Some((key!("Temporary Track Point"), "tt")),
+    Some((key!("Tracking"), "tk")),
+    Some((key!("From"), "fro")),
+    Some((key!("Mid Between 2 Points"), "m2p")),
     None,
-    Some(("Endpoint", "end")),
-    Some(("Midpoint", "mid")),
-    Some(("Intersection", "int")),
-    Some(("Apparent Intersection", "app")),
-    Some(("Extended Intersection", "extint")),
-    Some(("Geometric Center", "gcen")),
-    Some(("Center", "cen")),
-    Some(("Quadrant", "qua")),
-    Some(("Tangent", "tan")),
-    Some(("Perpendicular", "per")),
-    Some(("Extension", "ext")),
-    Some(("Parallel", "par")),
-    Some(("Node", "nod")),
-    Some(("Insertion", "ins")),
-    Some(("Nearest", "nea")),
+    Some((key!("Endpoint"), "end")),
+    Some((key!("Midpoint"), "mid")),
+    Some((key!("Intersection"), "int")),
+    Some((key!("Apparent Intersection"), "app")),
+    Some((key!("Extended Intersection"), "extint")),
+    Some((key!("Geometric Center"), "gcen")),
+    Some((key!("Center"), "cen")),
+    Some((key!("Quadrant"), "qua")),
+    Some((key!("Tangent"), "tan")),
+    Some((key!("Perpendicular"), "per")),
+    Some((key!("Extension"), "ext")),
+    Some((key!("Parallel"), "par")),
+    Some((key!("Node"), "nod")),
+    Some((key!("Insertion"), "ins")),
+    Some((key!("Nearest"), "nea")),
     None,
-    Some(("None", "non")),
+    Some((key!("None"), "non")),
 ];
 
 impl OpenDraftApp {
@@ -61,7 +64,7 @@ impl OpenDraftApp {
                                     ui.separator();
                                 }
                                 Some((label, typed)) => {
-                                    if ui.selectable_label(false, *label).clicked() {
+                                    if ui.selectable_label(false, tr(label)).clicked() {
                                         word = Some(*typed);
                                     }
                                 }
@@ -71,7 +74,7 @@ impl OpenDraftApp {
                     ui.separator();
                     settings = ui
                         .with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
-                            ui.selectable_label(false, "Snap Settings...").clicked()
+                            ui.selectable_label(false, t!("Snap Settings...")).clicked()
                         })
                         .inner;
                 });

@@ -2,6 +2,7 @@
 //! A parameter is not an angle (see `opendraft_core::ellipse`), so both are shown
 //! and labelled for what they are; angles and parameters are degrees here.
 
+use opendraft_ui::key;
 use std::f64::consts::TAU;
 
 use opendraft_core::{arc, Ellipse, Point};
@@ -9,29 +10,54 @@ use opendraft_core::{arc, Ellipse, Point};
 use super::{row, Field, Row, Unit};
 
 const FULL: &[Row] = &[
-    row(Field::X1, "Center X", Unit::Length, true),
-    row(Field::Y1, "Center Y", Unit::Length, true),
-    row(Field::MajorRadius, "Major radius", Unit::Length, true),
-    row(Field::MinorRadius, "Minor radius", Unit::Length, true),
-    row(Field::Angle, "Rotation", Unit::Angle, true),
-    row(Field::RadiusRatio, "Radius ratio", Unit::Factor, false),
-    row(Field::Circumference, "Circumference", Unit::Length, false),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::X1, key!("Center X"), Unit::Length, true),
+    row(Field::Y1, key!("Center Y"), Unit::Length, true),
+    row(Field::MajorRadius, key!("Major radius"), Unit::Length, true),
+    row(Field::MinorRadius, key!("Minor radius"), Unit::Length, true),
+    row(Field::Angle, key!("Rotation"), Unit::Angle, true),
+    row(
+        Field::RadiusRatio,
+        key!("Radius ratio"),
+        Unit::Factor,
+        false,
+    ),
+    row(
+        Field::Circumference,
+        key!("Circumference"),
+        Unit::Length,
+        false,
+    ),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
 const ARC: &[Row] = &[
-    row(Field::X1, "Center X", Unit::Length, true),
-    row(Field::Y1, "Center Y", Unit::Length, true),
-    row(Field::MajorRadius, "Major radius", Unit::Length, true),
-    row(Field::MinorRadius, "Minor radius", Unit::Length, true),
-    row(Field::Angle, "Rotation", Unit::Angle, true),
-    row(Field::RadiusRatio, "Radius ratio", Unit::Factor, false),
-    row(Field::StartAngle, "Start angle", Unit::Angle, true),
-    row(Field::EndAngle, "End angle", Unit::Angle, true),
-    row(Field::StartParameter, "Start parameter", Unit::Angle, true),
-    row(Field::EndParameter, "End parameter", Unit::Angle, true),
-    row(Field::Length, "Length", Unit::Length, false),
-    row(Field::Area, "Area", Unit::Area, false),
+    row(Field::X1, key!("Center X"), Unit::Length, true),
+    row(Field::Y1, key!("Center Y"), Unit::Length, true),
+    row(Field::MajorRadius, key!("Major radius"), Unit::Length, true),
+    row(Field::MinorRadius, key!("Minor radius"), Unit::Length, true),
+    row(Field::Angle, key!("Rotation"), Unit::Angle, true),
+    row(
+        Field::RadiusRatio,
+        key!("Radius ratio"),
+        Unit::Factor,
+        false,
+    ),
+    row(Field::StartAngle, key!("Start angle"), Unit::Angle, true),
+    row(Field::EndAngle, key!("End angle"), Unit::Angle, true),
+    row(
+        Field::StartParameter,
+        key!("Start parameter"),
+        Unit::Angle,
+        true,
+    ),
+    row(
+        Field::EndParameter,
+        key!("End parameter"),
+        Unit::Angle,
+        true,
+    ),
+    row(Field::Length, key!("Length"), Unit::Length, false),
+    row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
 pub(super) fn rows(e: &Ellipse) -> &'static [Row] {
