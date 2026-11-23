@@ -2897,6 +2897,7 @@ dependencies = [
  "eframe",
  "egui",
  "resvg",
+ "rust-i18n",
  "serde",
 ]
 

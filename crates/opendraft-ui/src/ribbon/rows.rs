@@ -5,14 +5,14 @@ use egui::{vec2, Rect, Sense, Ui};
 
 use super::buttons::{icon_button, labelled_width, small_button};
 use super::split::{self, Picks};
-use super::{Cell, Ctx, ICON_SMALL, SMALL_ROW_H};
+use super::{tr, Cell, Ctx, ICON_SMALL, SMALL_ROW_H};
 
 /// Width of an icon-only button in a row.
 const ICON_W: f32 = 22.0;
 
 fn natural_width(ui: &Ui, cell: &Cell, picks: &Picks) -> f32 {
     match cell {
-        Cell::Button(item) => labelled_width(ui, item.label),
+        Cell::Button(item) => labelled_width(ui, &tr(item.label)),
         Cell::Icon(_) => ICON_W,
         Cell::Split(s) => split::small_width(ui, s, picks, false),
         Cell::IconSplit(s) => split::small_width(ui, s, picks, true),

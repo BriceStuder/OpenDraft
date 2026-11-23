@@ -1,7 +1,10 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use opendraft_ui::ribbon::{Cell, Column, Item, Ribbon, Split};
+
 use super::*;
+use crate::ribbon_def::{ribbon_for, RibbonContext};
 
 #[test]
 fn a_system_tag_gives_its_language_when_offered() {
@@ -43,7 +46,8 @@ fn french_translates_and_a_missing_text_stays_english() {
 /// which this lists so it can be updated or deleted.
 #[test]
 fn every_translated_text_is_still_in_the_code() {
-    let used = texts_in_code();
+    let mut used = texts_in_code();
+    used.extend(ribbon_texts().into_iter().map(str::to_owned));
     let backend = crate::_rust_i18n_backend();
     let mut stale = Vec::new();
     for locale in backend.available_locales() {
@@ -92,6 +96,65 @@ fn placeholders(text: &str) -> BTreeSet<&str> {
         .skip(1)
         .filter_map(|rest| rest.split_once('}').map(|(name, _)| name))
         .collect()
+}
+
+/// The ribbon translates its texts where it draws them, so its labels are
+/// keys without being written in a `t!`.
+#[test]
+fn the_ribbon_texts_include_every_tab_panel_and_button() {
+    let texts = ribbon_texts();
+    for text in ["Home", "Draw", "Line", "Layers", "Block Editor", "Layout"] {
+        assert!(texts.contains(text), "{text}");
+    }
+    assert!(!texts.contains(""));
+}
+
+/// Every text the ribbon draws, in each of its contexts: tab, panel and
+/// button labels (a button's tooltip is its label).
+fn ribbon_texts() -> BTreeSet<&'static str> {
+    let mut texts = BTreeSet::new();
+    let contexts = [
+        RibbonContext::Normal,
+        RibbonContext::Layout,
+        RibbonContext::BlockEditor,
+    ];
+    for context in contexts {
+        add_ribbon(&ribbon_for(context), &mut texts);
+    }
+    texts
+}
+
+fn add_ribbon(ribbon: &Ribbon, texts: &mut BTreeSet<&'static str>) {
+    let item = |i: &Item, texts: &mut BTreeSet<&'static str>| {
+        texts.insert(i.label);
+    };
+    let split = |s: &Split, texts: &mut BTreeSet<&'static str>| {
+        texts.extend(s.label);
+        s.items.iter().for_each(|i| item(i, texts));
+    };
+    for tab in &ribbon.tabs {
+        texts.insert(tab.title);
+        for panel in &tab.panels {
+            texts.insert(panel.title);
+            panel.extra.iter().for_each(|i| item(i, texts));
+            for column in &panel.columns {
+                match column {
+                    Column::Large(i) => item(i, texts),
+                    Column::LargeSplit(s) => split(s, texts),
+                    Column::Stack(items) => items.iter().for_each(|i| item(i, texts)),
+                    Column::Rows(rows) => {
+                        for cell in rows.iter().flatten() {
+                            match cell {
+                                Cell::Button(i) | Cell::Icon(i) => item(i, texts),
+                                Cell::Split(s) | Cell::IconSplit(s) => split(s, texts),
+                                Cell::Slot { .. } => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// The first argument of every `t!("…")` in the program's sources.

@@ -1,5 +1,8 @@
 //! OpenDraft UI toolkit: theme and widgets built on egui.
 
+// Translations of the texts drawn here, shared with the app (issue #138).
+rust_i18n::i18n!("../../locales");
+
 mod doc_tabs;
 pub mod icon_set;
 pub mod icons;

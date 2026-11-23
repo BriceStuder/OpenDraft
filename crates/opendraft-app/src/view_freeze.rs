@@ -4,6 +4,8 @@
 //! switch there): the layer is hidden in the Model tab, while layout
 //! viewports still show it and plot it.
 
+use std::borrow::Cow;
+
 use opendraft_canvas::Space;
 use opendraft_commands::SetLayouts;
 use opendraft_core::{Document, Layer, LayerId, Layout, LayoutId, Viewport};
@@ -48,14 +50,18 @@ pub struct VpSwitch {
 
 impl VpSwitch {
     /// Its tooltip, in the Layers panel and the ribbon's layer list.
-    pub fn tip(self) -> &'static str {
+    pub fn tip(self) -> Cow<'static, str> {
         match (self.place, self.frozen) {
-            (Place::Viewport, true) => "Frozen in this viewport: click to thaw",
-            (Place::Viewport, false) => "Click to freeze in this viewport only",
-            (Place::Paper, true) => "Frozen in this layout's paper space: click to thaw",
-            (Place::Paper, false) => "Click to freeze in this layout's paper space only",
-            (Place::Model, true) => "Frozen in the Model tab: click to thaw",
-            (Place::Model, false) => "Click to freeze in the Model tab only",
+            (Place::Viewport, true) => rust_i18n::t!("Frozen in this viewport: click to thaw"),
+            (Place::Viewport, false) => rust_i18n::t!("Click to freeze in this viewport only"),
+            (Place::Paper, true) => {
+                rust_i18n::t!("Frozen in this layout's paper space: click to thaw")
+            }
+            (Place::Paper, false) => {
+                rust_i18n::t!("Click to freeze in this layout's paper space only")
+            }
+            (Place::Model, true) => rust_i18n::t!("Frozen in the Model tab: click to thaw"),
+            (Place::Model, false) => rust_i18n::t!("Click to freeze in the Model tab only"),
         }
     }
 }
