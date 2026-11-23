@@ -297,6 +297,7 @@ fn view() -> Tab {
                 columns: vec![Column::Stack(vec![
                     Item::new("view.grid", "Grid", icons::VIEW_GRID),
                     Item::new("view.snap", "Snap", icons::VIEW_SNAP),
+                    Item::new("view.nav_gizmo", "Gizmo", icons::VIEW_NAV_GIZMO),
                 ])],
                 ..Default::default()
             },

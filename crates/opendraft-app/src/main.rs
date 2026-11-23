@@ -122,6 +122,7 @@ mod mleader_style_table;
 mod modify;
 mod mtext;
 mod mtext_editor;
+mod nav_gizmo;
 mod object_answer;
 mod object_styles;
 mod offset;

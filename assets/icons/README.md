@@ -173,7 +173,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](layer-list-on.svg) | `layer-list-on.svg` | lightbulb | layer_columns.rs, ribbon_slots.rs |
 | ![](layer-list-thawed.svg) | `layer-list-thawed.svg` | sun | layer_columns.rs, ribbon_slots.rs |
 | ![](layer-list-unlocked.svg) | `layer-list-unlocked.svg` | lock-open | layer_columns.rs, ribbon_slots.rs |
-| ![](layer-lock.svg) | `layer-lock.svg` | lock | Lock |
+| ![](layer-lock.svg) | `layer-lock.svg` | lock | Lock, app/page_setup_dialog/boxes/margins.rs |
 | ![](layer-make-current.svg) | `layer-make-current.svg` | layers-2 | Make Current |
 | ![](layer-match.svg) | `layer-match.svg` | pipette | Match Layer |
 | ![](layer-panel-current.svg) | `layer-panel-current.svg` | check | layers_ui.rs |
@@ -188,7 +188,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](layer-states.svg) | `layer-states.svg` | list | Layer States |
 | ![](layer-thaw-all.svg) | `layer-thaw-all.svg` | sun | Thaw All Layers |
 | ![](layer-unisolate.svg) | `layer-unisolate.svg` | scan | Unisolate |
-| ![](layer-unlock.svg) | `layer-unlock.svg` | lock-open | Unlock |
+| ![](layer-unlock.svg) | `layer-unlock.svg` | lock-open | Unlock, app/page_setup_dialog/boxes/margins.rs |
 | ![](layout-mview.svg) | `layout-mview.svg` | picture-in-picture-2 | Rectangular (Rectangular viewport (MVIEW), on the Layout tab: a frame on a sheet.) |
 | ![](layout-new.svg) | `layout-new.svg` | file-plus | New |
 | ![](layout-page-setup.svg) | `layout-page-setup.svg` | file-cog | Page Setup |
@@ -220,6 +220,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](modify-scale.svg) | `modify-scale.svg` | maximize | Scale, app/context_menu.rs |
 | ![](modify-stretch.svg) | `modify-stretch.svg` | unfold-horizontal | Stretch |
 | ![](modify-trim.svg) | `modify-trim.svg` | scissors | Trim |
+| ![](nav-gizmo-home.svg) | `nav-gizmo-home.svg` | house | nav_gizmo.rs |
 | ![](osnap-apparent-intersection.svg) | `osnap-apparent-intersection.svg` | grid-3x3 | app/status_toggles.rs |
 | ![](osnap-centre.svg) | `osnap-centre.svg` | grid-3x3 | app/status_toggles.rs |
 | ![](osnap-end.svg) | `osnap-end.svg` | grid-3x3 | app/status_toggles.rs |
@@ -276,6 +277,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](view-pan.svg) | `view-pan.svg` | hand | Pan |
 | ![](view-panel-properties.svg) | `view-panel-properties.svg` | rectangle-vertical | Properties |
 | ![](view-reset-layout.svg) | `view-reset-layout.svg` | undo-2 | Reset Layout |
+| ![](view-nav-gizmo.svg) | `view-nav-gizmo.svg` | compass | Gizmo |
 | ![](view-snap.svg) | `view-snap.svg` | magnet | Snap |
 | ![](view-zoom-extents.svg) | `view-zoom-extents.svg` | maximize | Zoom Extents |
 | ![](view-zoom-in.svg) | `view-zoom-in.svg` | zoom-in | Zoom In |
