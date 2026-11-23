@@ -100,6 +100,9 @@ pub struct Settings {
     pub update_checks: Option<bool>,
     /// The drawing cache and the frame-time readout (the Performance page).
     pub performance: crate::performance_settings::PerformanceSettings,
+    /// The interface language (a code of `language::LANGUAGES`); `None`
+    /// follows the system's.
+    pub language: Option<String>,
 }
 
 impl Default for Settings {
@@ -134,6 +137,7 @@ impl Default for Settings {
             recovery_dir: None,
             update_checks: None,
             performance: Default::default(),
+            language: None,
         }
     }
 }
@@ -234,6 +238,10 @@ impl Settings {
     pub fn sanitized(mut self) -> Self {
         self.dynamic_input = self.dynamic_input.sanitized();
         self.performance = self.performance.sanitized();
+        // A language this version does not offer follows the system.
+        self.language = self
+            .language
+            .filter(|code| crate::language::is_offered(code));
         let (min, max) = GRID_SPACING_RANGE;
         self.grid_spacing = if self.grid_spacing.is_finite() {
             self.grid_spacing.clamp(min, max)
@@ -403,6 +411,7 @@ mod tests {
                 draw_as: opendraft_canvas::Render::Triangles,
                 show_frame_time: true,
             },
+            language: Some("fr".into()),
         };
         settings.save(&mut storage);
         assert_eq!(Settings::load(Some(&storage)), settings);

@@ -5,6 +5,10 @@
 // `crash_log`.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+// The translations in `locales/`, shared by the whole program (see `language`).
+// A text with no translation is shown in English, as written in the code.
+rust_i18n::i18n!("../../locales");
+
 mod app;
 mod arc_cmd;
 mod array_cmd;
@@ -92,6 +96,7 @@ mod insert_cmd;
 mod interact;
 mod io;
 mod join;
+mod language;
 mod large_file;
 mod layer_cells;
 mod layer_cmd;
@@ -225,6 +230,7 @@ const MULTISAMPLES: [u16; 2] = [4, 0];
 fn app_creator() -> eframe::AppCreator<'static> {
     Box::new(|cc| {
         let settings = settings::Settings::load(cc.storage);
+        language::apply(settings.language.as_deref());
         let defaults = std::sync::Arc::new(defaults::CommandDefaults::load(cc.storage));
         let theme = opendraft_ui::Theme::with_palette(settings.palette);
         theme.apply(&cc.egui_ctx);

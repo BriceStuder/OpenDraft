@@ -138,6 +138,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Icons: reloading while the app runs, recolouring for a light theme; the Layout tab's six icons (`assets/icons/layout-*.svg`) are Lucide's outlines, not yet redrawn in the Home tab's style.
 - Purge: a confirmation window, previews beyond blocks.
 - Crash log: telling the user, when it happens, that a crash was recorded.
+- Translations (issue #138): only the setup is built (Settings > Display > Language, two French texts). Still to wrap in `t!`: the ribbon, menus and palettes, the prompts, prompt options and command names (both bilingual, `_LINE` always works), messages and dialogs; then the complete French file.
 
 ## Assistant and automation
 
@@ -172,6 +173,7 @@ Built and covered by tests, but not yet seen working where it matters. Take a li
 
 - **By hand in the real app** (tests drive the commands through `AppState` only): DIMEDIT and DIMTEDIT, TEXTEDIT and TEXT typed in place, DIST and AREA, Overkill and Purge, ByBlock, the attribute editor's double-click and the ATTDEF dialog, the warning before a large file opens, the window and lasso selection style, snapping to a polyline while drawing it, the Ortho pointer test, the Paragraph dialog (nobody has seen it), DIVIDE, MEASURE, grips, TRIM and BREAK on points and construction lines, and whether the Settings dialog's Files and Automation pages fit its height without scrolling.
 - **On real machines:** Linux desktops beyond Mint (and on Mint: the Home page's templates and file actions, the assistant's key in the Secret Service, the crash log); the Windows exe on a machine with no Visual C++ Redistributable; the MSI's shortcut and file association opening with no console window; physical printers, and CUPS versions other than the one tried; the update check against the real GitHub.
+- **Language detection on Linux:** the Language setting's "System" choice (`sys_locale`, `language.rs`) has been tried on Windows only; not yet on a Linux desktop set to a real French locale (`fr_FR.UTF-8`), where the ribbon should come up in French.
 - **With a real model:** the assistant with Mistral on a real drawing, including its warning before it generates shapes (it needs your API key, and sends drawing data to the service).
 - **With real files:** DWG polylines (LWPOLYLINE, 2D POLYLINE, VERTEX), rotated or mirrored entities, entities with a Z, true colours on entities and extended data (none of the sample drawings has them); the large DWG object fix against the reporter's file.
 
