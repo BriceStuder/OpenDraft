@@ -1194,7 +1194,7 @@ What the app must keep true so the API is cheap to add later:
 ## Where things are
 
 - Panels: `opendraft-app/src/app/panels.rs`; command line UI: `app/command_line.rs` (and `app/command_line_strip.rs` for its grip when docked above or below the drawing); dock layout: `dock.rs` (panels, default layout, saving), `dock/places.rs` (where hidden panels return), `dock/targets.rs` and `dock/drag.rs` (dragging a panel: tab-bar drops are egui_dock's, body drops float, explicit targets dock);
-  Properties: `properties.rs` (model) and `properties_ui.rs` (view).
+  Properties: `properties.rs` (model) and `properties_ui.rs` (view). The geometry rows are the ones every shown entity has. A polyline that traces a rectangle (four straight sides at right angles, closed or with a fifth vertex back on the first, whichever command drew it and at any angle; `opendraft-core/src/rect_shape.rs`) is titled Rectangular polyline and also shows Width and Height (its first and second sides) and Angle (its first side), typed over with the first vertex, the vertex order and the turn kept; a `Rectangle` object shares Width and Height with it.
 - Visual constants and palettes: `opendraft-ui/src/theme.rs`. What comes next:
   `docs/ROADMAP.md` (priorities and next steps), `docs/parking_lot.md` (everything
   not built yet) and `2d_commands_reference.md` (the AutoCAD command list we

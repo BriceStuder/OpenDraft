@@ -60,6 +60,7 @@ pub mod polygon;
 pub mod polyline;
 pub mod purge;
 pub mod rect;
+pub mod rect_shape;
 pub mod single_line_text;
 mod spatial_index;
 pub mod spline;
