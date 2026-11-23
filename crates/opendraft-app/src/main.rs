@@ -76,6 +76,7 @@ mod dynamic_settings;
 mod edges;
 mod edges_sweep;
 mod ellipse_cmd;
+mod erase;
 mod explode;
 mod field_cmd;
 mod field_context;

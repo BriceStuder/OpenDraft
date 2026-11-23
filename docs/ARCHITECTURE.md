@@ -419,6 +419,12 @@ selected objects (asking "Select objects" with none); construction lines and ray
 have no box and are left out, as `ZE` leaves them out. `ZO` was Zoom Out's alias;
 Zoom Out keeps its command and ribbon button.
 
+**Erase** (`erase.rs`). `ERASE` (`E`, `DEL`, the ribbon button) is an Editor
+command like MOVE: it erases the selection at once, or asks "Select objects"
+until Enter with none (one undo step). In a layout
+a picked viewport is erased instead. The Delete key fires only with something
+selected (`erase::may_fire`), as in AutoCAD, so it never opens a prompt.
+
 **Not taken from the SDK:** a global application object (the context is passed
 in), mutable entity objects that are built and then appended, `Dispose`/`using`,
 and 3D types.

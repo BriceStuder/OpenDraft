@@ -355,7 +355,7 @@ impl OpenDraftApp {
             self.shortcuts
                 .iter()
                 .find(|(shortcut, id)| {
-                    *id != "view.dynamic_input" && consume_shortcut(input, shortcut)
+                    crate::erase::may_fire(id, &self.state) && consume_shortcut(input, shortcut)
                 })
                 .map(|(_, id)| *id)
         });
