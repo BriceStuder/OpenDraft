@@ -15,7 +15,6 @@ use opendraft_commands::{
 };
 use opendraft_core::Point;
 use opendraft_ui::i18n::tr;
-use rust_i18n::t;
 
 use crate::cmdline::{CmdOption, Prompt};
 use crate::coordinates::CoordinateMode;
@@ -215,7 +214,7 @@ impl AppState {
         self.runner.as_ref()?.prompt()
     }
 
-    /// The running command's prompt, in the command line's terms.
+    /// The running command's prompt (asked in English), translated.
     pub(crate) fn runner_prompt(&self) -> Option<Prompt> {
         let runner = self.runner.as_ref()?;
         let Some(ask) = runner.prompt() else {
@@ -225,14 +224,11 @@ impl AppState {
                 options: Vec::new(),
             });
         };
-        // The command asks in English (outside callers read it so); it is
-        // shown in the language of the interface.
         let mut text = tr(&ask.message).into_owned();
         // A keyword-only question reads "Erase source objects? <No> [Yes/No]".
-        if !ask.keywords.is_empty() && ask.wants != Wants::Keyword && !ask.message.ends_with(" or")
-        {
-            text.push(' ');
-            text.push_str(&t!("or"));
+        let joined = ask.message.ends_with(" or");
+        if !ask.keywords.is_empty() && ask.wants != Wants::Keyword && !joined {
+            text = format!("{text} {}", rust_i18n::t!("or"));
         }
         if let Some(hint) = &ask.default_hint {
             text.push_str(&format!(
