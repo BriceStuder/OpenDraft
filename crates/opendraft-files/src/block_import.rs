@@ -32,7 +32,7 @@ pub(crate) struct PendingInsert<K> {
     /// The attributes it held, placed in the drawing (file coordinates).
     pub attributes: Vec<AttributeReference>,
     /// Distances of the block's linear parameters this reference changes.
-    pub dynamic: Vec<(ParameterId, f64)>,
+    pub dynamic: Vec<(ParameterId, DynamicValue)>,
 }
 
 /// Gives `insert` its attributes, brought from the drawing into the block's
@@ -251,10 +251,10 @@ impl<K: Clone + Eq + Hash> ImportedBlocks<K> {
 
     /// `insert` with the parameter values a modified reference had, each
     /// brought into what its parameter allows.
-    fn with_values(&mut self, insert: Insert, values: &[(ParameterId, f64)]) -> Insert {
+    fn with_values(&mut self, insert: Insert, values: &[(ParameterId, DynamicValue)]) -> Insert {
         let mut out = insert.clone();
-        for (parameter, distance) in values {
-            match out.with_dynamic_value(*parameter, DynamicValue::Distance(*distance)) {
+        for (parameter, value) in values {
+            match out.with_dynamic_value(*parameter, value.clone()) {
                 Some(next) => out = next,
                 None => {
                     self.dynamic_unfit += 1;

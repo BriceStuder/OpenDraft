@@ -16,6 +16,12 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
         "BLOCKGRIPLOCATIONCOMPONENT" => return None,
         "BLOCKLINEARPARAMETER" => parameter(object).map(NodeKind::Linear),
         "BLOCKPOLARPARAMETER" => parameter(object).map(NodeKind::Polar),
+        "BLOCKROTATIONPARAMETER" => parameter(object).map(|mut p| {
+            // `143` is an angle increment and `175` how many listed angles.
+            p.restricted = object.number(143).is_some_and(|i| i > 0.0)
+                || object.int(175).is_some_and(|n| n > 0);
+            NodeKind::Rotation(p)
+        }),
         "BLOCKLOOKUPPARAMETER" => Some(NodeKind::Lookup {
             name: object.text(303).unwrap_or("").to_owned(),
         }),
@@ -23,6 +29,7 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
         "BLOCKPOLARSTRETCHACTION" => Some(NodeKind::PolarStretch(action(object, in_block, false))),
         "BLOCKMOVEACTION" => Some(NodeKind::Move(action(object, in_block, true))),
         "BLOCKSCALEACTION" => Some(NodeKind::Scale(action(object, in_block, false))),
+        "BLOCKROTATEACTION" => Some(NodeKind::Rotate(action(object, in_block, false))),
         "BLOCKLOOKUPACTION" => table(object).map(NodeKind::LookupTable),
         n if n.starts_with("BLOCK") && n.ends_with("GRIP") => points(object, 1010, 1020)
             .first()
@@ -35,7 +42,7 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
 /// The state a modified instance records for a node of this kind.
 pub(super) fn state(kind: &NodeKind, record: &Record) -> Option<NodeState> {
     match kind {
-        NodeKind::Linear(_) | NodeKind::Polar(_) => {
+        NodeKind::Linear(_) | NodeKind::Polar(_) | NodeKind::Rotation(_) => {
             let at = points(record, 10, 20);
             Some(NodeState::Parameter {
                 start: *at.first()?,
@@ -53,6 +60,7 @@ fn parameter(object: &Record) -> Option<Parameter> {
         start: *points(object, 1010, 1020).first()?,
         end: *points(object, 1011, 1021).first()?,
         values: value_list(object),
+        restricted: false,
     })
 }
 

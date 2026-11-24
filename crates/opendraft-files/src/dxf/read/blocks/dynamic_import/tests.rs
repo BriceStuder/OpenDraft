@@ -138,7 +138,7 @@ fn a_modified_reference_becomes_a_reference_to_the_definition_with_its_value() {
     );
     assert_eq!(
         loaded.warnings,
-        ["Imported 1 dynamic block with their linear parameters and stretch and move actions: Slide; 1 modified reference rebuilt from recorded values."]
+        ["Imported 1 dynamic block with their linear and rotation parameters and stretch, move and rotate actions: Slide; 1 modified reference rebuilt from recorded values."]
     );
 }
 
@@ -252,4 +252,95 @@ fn an_imported_drawing_survives_being_saved_and_opened_again() {
         DynamicValue::Distance(10.0)
     );
     assert!((refs[0].bounds().max.x - 13.0).abs() < 1e-9);
+}
+
+/// The fixture turned into a rotation: the linear parameter becomes a
+/// rotation about (0, 0), the stretch a rotate, and the modified reference
+/// has its grip straight up.
+fn turned(mutate: impl Fn(&mut Record)) -> opendraft_core::Document {
+    let loaded = read(&dxf(false, |records| {
+        for r in records.iter_mut() {
+            match r.name.as_str() {
+                "BLOCKLINEARPARAMETER" => {
+                    r.name = "BLOCKROTATIONPARAMETER".into();
+                    r.groups.retain(|g| g.code != 144);
+                    for g in &mut r.groups {
+                        if g.code == 175 {
+                            g.value = "0".into();
+                        }
+                    }
+                }
+                "BLOCKSTRETCHACTION" => {
+                    r.name = "BLOCKROTATEACTION".into();
+                    for g in &mut r.groups {
+                        match (g.code, g.value.as_str()) {
+                            (1011, "1") => g.value = "0".into(),
+                            (1021, "-1") => g.value = "0".into(),
+                            _ => {}
+                        }
+                    }
+                }
+                "XRECORD" if r.groups.iter().any(|g| g.code == 5 && g.value == "XR6") => {
+                    // The second point is where the grip is: straight up.
+                    let at = |r: &Record, code| {
+                        r.groups
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, g)| g.code == code)
+                            .map(|(i, _)| i)
+                            .nth(1)
+                    };
+                    if let (Some(x), Some(y)) = (at(r, 10), at(r, 20)) {
+                        r.groups[x].value = "0".into();
+                        r.groups[y].value = "10".into();
+                    }
+                }
+                _ => {}
+            }
+            mutate(r);
+        }
+    }))
+    .unwrap();
+    loaded.document
+}
+
+#[test]
+fn a_rotation_comes_in_with_its_rotate_action_and_a_turned_reference_keeps_its_angle() {
+    let doc = turned(|_| {});
+    let slide = doc.block_named("Slide").unwrap();
+    let schema = slide.dynamic.as_deref().expect("dynamic");
+    assert!(matches!(
+        schema.parameters[0].kind,
+        DynamicParameterKind::Rotation { radius, .. } if (radius - 5.0).abs() < 1e-9
+    ));
+    assert!(matches!(
+        schema.actions[0].kind,
+        DynamicActionKind::Rotate { .. }
+    ));
+    let refs = inserts(&doc);
+    assert_eq!(refs.len(), 1);
+    let state = refs[0].dynamic.as_deref().expect("a state");
+    let DynamicValue::Angle(angle) = state.values[0].value else {
+        panic!("an angle");
+    };
+    assert!(
+        (angle - std::f64::consts::FRAC_PI_2).abs() < 1e-9,
+        "{angle}"
+    );
+}
+
+#[test]
+fn a_rotation_with_a_list_of_angles_is_left_as_a_picture() {
+    let loaded = read(&dxf(false, |records| {
+        for r in records.iter_mut() {
+            if r.name == "BLOCKLINEARPARAMETER" {
+                r.name = "BLOCKROTATIONPARAMETER".into();
+            }
+        }
+    }))
+    .unwrap();
+    assert!(loaded
+        .warnings
+        .iter()
+        .any(|w| w.contains("rotation parameter with a list or increment of angles")));
 }
