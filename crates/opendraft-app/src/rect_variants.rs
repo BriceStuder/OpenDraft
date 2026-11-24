@@ -3,7 +3,9 @@
 //! rectangles take RECTANGLE's remembered corners and line width, and offer
 //! its Chamfer, Fillet and Width options at their first prompt.
 
-use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, NumberOrPoint, PointOptions};
+use opendraft_commands::{
+    Answer, Cancelled, DynamicDimensions, Editor, NumberOptions, NumberOrPoint, PointOptions,
+};
 use opendraft_core::rect::{by_three_points, centred, outline};
 use opendraft_core::{oblong, Point};
 use opendraft_ui::key;
@@ -33,6 +35,7 @@ pub fn draw_rectangle_center(ed: &mut Editor) -> Result<(), Cancelled> {
             .keyword("Rotation", "R")
             .base(centre)
             .corner()
+            .dimensions(DynamicDimensions::Centred)
             .ghost(move |at| {
                 let (origin, dx, dy) =
                     centred(centre, angle, extent(centre, angle, half(size), at));
