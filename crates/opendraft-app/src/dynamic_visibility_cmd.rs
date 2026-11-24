@@ -87,7 +87,11 @@ fn objects_of(ed: &Editor) -> Result<Vec<BlockObjectId>, Cancelled> {
 }
 
 /// `schema` saved when it checks against the block's objects.
-fn save(ed: &Editor, name: &'static str, schema: DynamicBlock) -> Result<bool, Cancelled> {
+pub(crate) fn save(
+    ed: &Editor,
+    name: &'static str,
+    schema: DynamicBlock,
+) -> Result<bool, Cancelled> {
     let candidate = schema.clone();
     let ok = ed.read(move |doc| {
         let ids: HashSet<BlockObjectId> =

@@ -56,6 +56,10 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
         "BLOCKVISIBILITYPARAMETER" => visibility(object).map(NodeKind::Visibility),
         "BLOCKLOOKUPPARAMETER" => Some(NodeKind::Lookup {
             name: object.text(303).unwrap_or("").to_owned(),
+            position: points(object, 1010, 1020)
+                .first()
+                .copied()
+                .unwrap_or(opendraft_core::Point::new(0.0, 0.0)),
         }),
         "BLOCKSTRETCHACTION" => Some(NodeKind::Stretch(action(object, in_block, true))),
         "BLOCKPOLARSTRETCHACTION" => Some(NodeKind::PolarStretch(action(object, in_block, false))),

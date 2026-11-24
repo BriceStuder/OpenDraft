@@ -10,6 +10,7 @@ use crate::attribute_sync_cmd::sync_attributes;
 use crate::block_cmd::define_block;
 use crate::block_dialog_cmd::define_block_dialog;
 use crate::dynamic_block_cmd::{baction, bactionset, bparameter, resetblock};
+use crate::dynamic_lookup_cmd::blookuptable;
 use crate::dynamic_visibility_cmd::{bvhide, bvshow, bvstate};
 use crate::field_cmd::{insert_field, update_field};
 use crate::field_dialog_cmd::insert_field_dialog;
@@ -72,6 +73,13 @@ pub fn commands() -> Vec<Command<AppState>> {
             "Action Objects",
             "BACTIONSET",
             bactionset
+        )
+        .when(AppState::in_block_editor),
+        editor!(
+            "block.lookuptable",
+            "Lookup Table",
+            "BLOOKUPTABLE",
+            blookuptable
         )
         .when(AppState::in_block_editor),
         editor!("block.vstate", "Visibility States", "BVSTATE", bvstate)

@@ -183,6 +183,7 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("BPARAMETER", "BPARAMETER", "block.parameter"),
     ("BACTION", "BACTION", "block.action"),
     ("BACTIONSET", "BACTIONSET", "block.actionset"),
+    ("BLOOKUPTABLE", "BLOOKUPTABLE", "block.lookuptable"),
     ("BVSTATE", "BVSTATE", "block.vstate"),
     ("BVHIDE", "BVHIDE", "block.vhide"),
     ("BVSHOW", "BVSHOW", "block.vshow"),

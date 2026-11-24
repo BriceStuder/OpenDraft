@@ -142,6 +142,26 @@ pub enum DynamicParameterKind {
         position: Point,
         states: Vec<VisibilityState>,
     },
+    /// A choice among the rows of a table. Picking a row sets each input
+    /// parameter to the row's values; what an insert shows is the row whose
+    /// values the inputs have now (a reverse lookup), or "Custom" when none
+    /// has. Nothing is stored for it in an insert, and no action follows it.
+    /// The inputs are linear, rotation or flip parameters of the block.
+    Lookup {
+        position: Point,
+        inputs: Vec<ParameterId>,
+        rows: Vec<LookupRow>,
+    },
+}
+
+/// One row of a lookup table: a label and the value each input parameter
+/// takes in it, in the parameter's own units (radians for an angle).
+#[derive(Clone, Debug, PartialEq)]
+pub struct LookupRow {
+    /// Unique in the table, ignoring case; not empty.
+    pub label: String,
+    /// One value for each of the table's inputs, in order.
+    pub values: Vec<f64>,
 }
 
 /// One named state of a visibility parameter: the objects it hides. An
@@ -164,6 +184,7 @@ pub enum DynamicFamily {
     Xy,
     Point,
     Visibility,
+    Lookup,
 }
 
 impl DynamicParameterKind {
@@ -176,6 +197,7 @@ impl DynamicParameterKind {
             Self::Xy { .. } => DynamicFamily::Xy,
             Self::Point { .. } => DynamicFamily::Point,
             Self::Visibility { .. } => DynamicFamily::Visibility,
+            Self::Lookup { .. } => DynamicFamily::Lookup,
         }
     }
 }

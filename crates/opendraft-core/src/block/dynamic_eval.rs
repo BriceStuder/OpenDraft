@@ -282,7 +282,8 @@ impl Insert {
                     DynamicParameterKind::Polar { .. }
                     | DynamicParameterKind::Xy { .. }
                     | DynamicParameterKind::Point { .. }
-                    | DynamicParameterKind::Visibility { .. } => return None,
+                    | DynamicParameterKind::Visibility { .. }
+                    | DynamicParameterKind::Lookup { .. } => return None,
                 };
                 let at = map.apply(at);
                 let grip = DynamicGrip {
@@ -323,7 +324,8 @@ impl Insert {
             DynamicParameterKind::Polar { .. }
             | DynamicParameterKind::Xy { .. }
             | DynamicParameterKind::Point { .. }
-            | DynamicParameterKind::Visibility { .. } => return None,
+            | DynamicParameterKind::Visibility { .. }
+            | DynamicParameterKind::Lookup { .. } => return None,
             // Flipped when the point is left of the line from its base to its end.
             DynamicParameterKind::Flip { base, end } => {
                 let side = (end.x - base.x) * (at.y - base.y) - (end.y - base.y) * (at.x - base.x);

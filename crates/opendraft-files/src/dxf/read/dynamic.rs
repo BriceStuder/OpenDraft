@@ -69,6 +69,7 @@ pub enum NodeKind {
     Flip(Parameter),
     Lookup {
         name: String,
+        position: Point,
     },
     Visibility(Visibility),
     Stretch(Action),

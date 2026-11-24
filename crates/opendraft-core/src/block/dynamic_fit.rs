@@ -37,7 +37,8 @@ impl DynamicBlock {
                     *end = end.translated(dx, dy);
                 }
                 DynamicParameterKind::Point { position }
-                | DynamicParameterKind::Visibility { position, .. } => {
+                | DynamicParameterKind::Visibility { position, .. }
+                | DynamicParameterKind::Lookup { position, .. } => {
                     *position = position.translated(dx, dy);
                 }
             }

@@ -20,6 +20,7 @@ use opendraft_core::block::{
 use opendraft_core::{Bounds, Entity, EntityId};
 
 use crate::dynamic_block_prompts::{ask_name, free_name, EPS};
+use crate::dynamic_lookup_cmd::{input_candidates, lookup_parameter};
 use crate::dynamic_parameter_cmd::{
     flip_parameter, linear_parameter, point_parameter, polar_parameter, rotation_parameter,
     xy_parameter,
@@ -45,7 +46,7 @@ pub(crate) fn commit(
     })
 }
 
-/// BPARAMETER: add a linear, polar, XY, point, rotation, flip or visibility
+/// BPARAMETER: add a linear, polar, XY, point, rotation, flip, visibility or lookup
 /// parameter to the block being edited.
 pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut schema = draft(ed)?;
@@ -56,7 +57,7 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     let parameter = match ed
         .get_keyword(
             Options::<String>::new(
-                "Enter parameter type [Linear/Polar/XY/Point/Rotation/Flip/Visibility] <Linear>",
+                "Enter parameter type [Linear/Polar/XY/Point/Rotation/Flip/Visibility/LOokup] <Linear>",
             )
             .keyword("Linear", "L")
             .keyword("Polar", "P")
@@ -65,6 +66,7 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
             .keyword("Rotation", "R")
             .keyword("Flip", "F")
             .keyword("Visibility", "V")
+            .keyword("Lookup", "Lo")
             .default("Linear".to_owned()),
         )?
         .as_str()
@@ -74,6 +76,13 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
         "Polar" => polar_parameter(ed, &schema)?,
         "XY" => xy_parameter(ed, &schema)?,
         "Point" => point_parameter(ed, &schema)?,
+        "Lookup" => {
+            if input_candidates(&schema).is_empty() {
+                ed.say("A lookup needs a linear, rotation or flip parameter to take values from.");
+                return Ok(());
+            }
+            lookup_parameter(ed, &schema)?
+        }
         "Visibility" => {
             if schema.visibility().is_some() {
                 ed.say("The block has a visibility parameter already.");
@@ -395,3 +404,7 @@ mod xy_tests;
 #[cfg(test)]
 #[path = "dynamic_visibility_cmd_tests.rs"]
 mod visibility_tests;
+
+#[cfg(test)]
+#[path = "dynamic_lookup_cmd_tests.rs"]
+mod lookup_tests;

@@ -138,24 +138,46 @@ fn a_modified_reference_becomes_a_reference_to_the_definition_with_its_value() {
     );
     assert_eq!(
         loaded.warnings,
-        ["Imported 1 dynamic block with their linear, polar, XY, point, rotation and flip parameters and stretch, move, scale, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
+        ["Imported 1 dynamic block with their linear, polar, XY, point, rotation, flip, visibility and lookup parameters and stretch, move, scale, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
     );
 }
 
 #[test]
-fn a_lookup_table_is_named_but_does_not_stop_a_reference_being_rebuilt() {
+fn a_lookup_table_comes_in_and_does_not_stop_a_reference_being_rebuilt() {
     let loaded = read(&dxf(true, |_| {})).unwrap();
     let doc = &loaded.document;
-    assert!(doc.block_named("Slide").is_some_and(|b| b.is_dynamic()));
+    let slide = doc.block_named("Slide").unwrap();
+    assert!(slide.is_dynamic());
+    let (inputs, rows) = slide
+        .dynamic
+        .as_ref()
+        .unwrap()
+        .parameters
+        .iter()
+        .find_map(|p| p.lookup())
+        .expect("a lookup parameter");
+    assert_eq!(inputs.len(), 1);
+    let labels: Vec<&str> = rows.iter().map(|r| r.label.as_str()).collect();
+    assert_eq!(labels, ["2.5mm", "5.0mm"]);
+    assert_eq!(rows[1].values, [5.0]);
     let refs = inserts(doc);
     assert_eq!(refs.len(), 1);
     assert_eq!(refs[0].block.name, "Slide");
     assert!(refs[0].dynamic.is_some());
+    // The reference's distance, 10, is in no row.
+    let lookup = slide
+        .dynamic
+        .as_ref()
+        .unwrap()
+        .parameters
+        .iter()
+        .find(|p| p.lookup().is_some())
+        .unwrap()
+        .id;
+    let (names, at) = refs[0].choice(lookup).unwrap();
+    assert_eq!(names[at], "Custom");
     assert!(
-        loaded
-            .warnings
-            .iter()
-            .any(|w| w.contains("lookup action, lookup parameter")),
+        loaded.warnings.iter().all(|w| !w.contains("Left out")),
         "{:?}",
         loaded.warnings
     );

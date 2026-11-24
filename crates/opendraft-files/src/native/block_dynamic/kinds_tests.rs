@@ -246,3 +246,56 @@ fn a_visibility_parameter_its_states_and_a_chosen_state_survive_a_round_trip() {
     assert_eq!(back.objects(), doc.objects());
     assert_eq!(back.validate(), Ok(()));
 }
+
+#[test]
+fn a_lookup_parameter_its_table_and_a_picked_row_survive_a_round_trip() {
+    use opendraft_core::block::LookupRow;
+    let mut s = DynamicBlock::new();
+    s.parameters.push(DynamicParameter {
+        id: ParameterId(1),
+        name: "Distance1".into(),
+        label: "Distance".into(),
+        description: String::new(),
+        show: true,
+        grips: 1,
+        kind: DynamicParameterKind::Linear {
+            start: p(0.0, 0.0),
+            end: p(4.0, 0.0),
+            value_set: DynamicValueSet::Any,
+        },
+    });
+    s.parameters.push(DynamicParameter {
+        id: ParameterId(2),
+        name: "Lookup1".into(),
+        label: "Size".into(),
+        description: String::new(),
+        show: true,
+        grips: 0,
+        kind: DynamicParameterKind::Lookup {
+            position: p(0.0, 1.0),
+            inputs: vec![ParameterId(1)],
+            rows: vec![
+                LookupRow {
+                    label: "Short".into(),
+                    values: vec![2.0],
+                },
+                LookupRow {
+                    label: "Long".into(),
+                    values: vec![6.0],
+                },
+            ],
+        },
+    });
+    s.next_parameter_id = 3;
+    let mut doc = Document::default();
+    let block = bar(&mut doc, Some(s));
+    doc.push_block(block.clone());
+    let long = Insert::new(block, p(0.0, 0.0))
+        .with_choice(ParameterId(2), 1)
+        .unwrap();
+    doc.add(Entity::Insert(Box::new(long)));
+    let back = read(&write(&doc)).unwrap();
+    assert_eq!(back.blocks(), doc.blocks());
+    assert_eq!(back.objects(), doc.objects());
+    assert_eq!(back.validate(), Ok(()));
+}

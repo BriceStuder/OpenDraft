@@ -11,6 +11,10 @@ use opendraft_core::{Bounds, Point};
 
 use super::super::super::dynamic::{Action, DynamicDefinition, NodeKind};
 
+mod extras;
+
+use extras::{lookup, visibility};
+
 /// What an action does, before its objects are known.
 pub(super) enum Step {
     Move,
@@ -99,8 +103,6 @@ fn unsupported(kind: &NodeKind) -> Option<String> {
         NodeKind::Xy(p) if p.restricted => {
             Some("xy parameter with a list or increment of distances".to_owned())
         }
-        NodeKind::Lookup { .. } => Some("lookup parameter".to_owned()),
-        NodeKind::LookupTable(_) => Some("lookup action".to_owned()),
         NodeKind::Rotation(p) if p.restricted => {
             Some("rotation parameter with a list or increment of angles".to_owned())
         }
@@ -228,7 +230,7 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
             },
             DynamicFamily::Point => DynamicParameterKind::Point { position: p.start },
             // Read apart, by `visibility`.
-            DynamicFamily::Visibility => continue,
+            DynamicFamily::Visibility | DynamicFamily::Lookup => continue,
             DynamicFamily::Polar => DynamicParameterKind::Polar {
                 base: p.start,
                 end: p.end,
@@ -262,6 +264,14 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
         ));
     }
     let visibility = visibility(def, &mut parameters, &mut kept, &mut names, &mut left_out);
+    let lookup = lookup(
+        def,
+        &mut parameters,
+        &mut kept,
+        &mut names,
+        &mut left_out,
+        &linked,
+    );
     let mut actions: Vec<DraftAction> = Vec::new();
     let mut action_names = HashSet::new();
     for node in &def.nodes {
@@ -343,12 +353,20 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
     // A parameter nothing follows changes no picture.
     let mut used: HashSet<ParameterId> = actions.iter().map(|a| a.parameter).collect();
     used.extend(visibility.as_ref().map(|v| v.parameter));
+    used.extend(lookup);
+    // What a lookup reads stays with it.
+    for (_, p) in &parameters {
+        if let (true, DynamicParameterKind::Lookup { inputs, .. }) = (lookup == Some(p.id), &p.kind)
+        {
+            used.extend(inputs.iter().copied());
+        }
+    }
     kept.retain(|_, k| used.contains(&k.id));
     parameters.retain(|(_, p)| used.contains(&p.id));
     left_out.sort();
     left_out.dedup();
     Read {
-        draft: (!actions.is_empty() || visibility.is_some()).then(|| Draft {
+        draft: (!actions.is_empty() || visibility.is_some() || lookup.is_some()).then(|| Draft {
             parameters: parameters.into_iter().map(|(_, p)| p).collect(),
             actions,
             visibility,
@@ -356,78 +374,4 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
         left_out,
         parameters: kept,
     }
-}
-
-/// The definition's visibility parameter, added to `parameters` with its
-/// states still empty (they need the objects' ids). A second one is left
-/// out.
-fn visibility(
-    def: &DynamicDefinition,
-    parameters: &mut Vec<(u32, DynamicParameter)>,
-    kept: &mut HashMap<u32, Kept>,
-    names: &mut HashSet<String>,
-    left_out: &mut Vec<String>,
-) -> Option<DraftVisibility> {
-    let mut found = def.nodes.iter().filter_map(|n| match &n.kind {
-        NodeKind::Visibility(v) => Some((n.id, v)),
-        _ => None,
-    });
-    let (node, v) = found.next()?;
-    if found.next().is_some() {
-        left_out.push("second visibility parameter".to_owned());
-    }
-    let id = ParameterId(parameters.len() as u64 + 1);
-    let mut name = match v.name.trim() {
-        "" => format!("Visibility{}", id.0),
-        n => n.to_owned(),
-    };
-    if !names.insert(name.to_lowercase()) {
-        name = format!("{name}{}", id.0);
-        names.insert(name.to_lowercase());
-    }
-    // A state with no name or a name already used gets one of its own.
-    let mut used = HashSet::new();
-    let states: Vec<(String, HashSet<String>)> = v
-        .states
-        .iter()
-        .enumerate()
-        .map(|(i, (state, shown))| {
-            let mut state = state.trim().to_owned();
-            if state.is_empty() || !used.insert(state.to_lowercase()) {
-                state = format!("{state}State{}", i + 1);
-                used.insert(state.to_lowercase());
-            }
-            (state, shown.iter().map(|h| upper(h)).collect())
-        })
-        .collect();
-    kept.insert(
-        node,
-        Kept {
-            id,
-            zero_angle: None,
-            unread: false,
-            polar: false,
-            states: states.iter().map(|(s, _)| s.to_lowercase()).collect(),
-        },
-    );
-    parameters.push((
-        node,
-        DynamicParameter {
-            id,
-            name: name.clone(),
-            label: name,
-            description: String::new(),
-            show: true,
-            grips: 0,
-            kind: DynamicParameterKind::Visibility {
-                position: v.position,
-                states: Vec::new(),
-            },
-        },
-    ));
-    Some(DraftVisibility {
-        parameter: id,
-        governed: v.governed.iter().map(|h| upper(h)).collect(),
-        states,
-    })
 }

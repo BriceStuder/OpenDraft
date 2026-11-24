@@ -147,6 +147,7 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("block.parameter", InteractiveInApp, Mutation),
     ("block.action", InteractiveInApp, Mutation),
     ("block.actionset", InteractiveInApp, Mutation),
+    ("block.lookuptable", InteractiveInApp, Mutation),
     ("block.vstate", InteractiveInApp, Mutation),
     ("block.vhide", InteractiveInApp, Mutation),
     ("block.vshow", InteractiveInApp, Mutation),

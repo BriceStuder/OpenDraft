@@ -31,6 +31,7 @@ mod dynamic_apply;
 mod dynamic_check;
 mod dynamic_eval;
 mod dynamic_fit;
+mod dynamic_lookup;
 mod dynamic_parameter;
 mod dynamic_value_set;
 mod dynamic_visibility;
@@ -56,10 +57,11 @@ pub use budget::MAX_EXPANSION;
 pub use dynamic::{
     ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicFamily,
     DynamicGrip, DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue,
-    DynamicValueEntry, DynamicValueSet, ParameterId, VisibilityState,
+    DynamicValueEntry, DynamicValueSet, LookupRow, ParameterId, VisibilityState,
 };
 pub use dynamic_eval::{evaluate, DynamicBlockError};
 pub use dynamic_fit::Pruned;
+pub use dynamic_lookup::CUSTOM;
 pub use editing::BlockEditSave;
 pub use field::{
     DataField, FieldObjectRef, FieldRun, FieldStatus, FieldText, FieldValue, MAX_FIELDS_PER_TEXT,
@@ -279,6 +281,8 @@ mod dynamic_edit_tests;
 mod dynamic_eval_tests;
 #[cfg(test)]
 mod dynamic_flip_tests;
+#[cfg(test)]
+mod dynamic_lookup_tests;
 #[cfg(test)]
 mod dynamic_polar_tests;
 #[cfg(test)]
