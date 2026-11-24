@@ -26,6 +26,7 @@ mod explode;
 mod extend;
 mod fillet;
 mod fillet_ellipse;
+mod fillet_parallel;
 mod grip;
 pub mod hatch;
 pub mod hsl;

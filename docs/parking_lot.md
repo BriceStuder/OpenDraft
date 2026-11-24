@@ -20,7 +20,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - PEDIT: Fit, Spline, Jointype and vertex Tangent (and `PLINECONVERTMODE`).
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
 - JOIN: arcs across gaps and the Close option (lines on one line already join across gaps), a Fuzz distance.
-- Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel lines (AutoCAD draws a semicircle), Chamfer's Method option, Undo inside Multiple; the fillet and chamfer variables are per user, not saved in the drawing.
+- Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle), Chamfer's Method option, Undo inside Multiple; the fillet and chamfer variables are per user, not saved in the drawing.
 - Trim and Extend: the Edge option and Crossing selection of the objects.
 - Offset: the Layer and Multiple options.
 - Break: `@` alone for "same as the first point".
