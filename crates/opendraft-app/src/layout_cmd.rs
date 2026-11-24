@@ -11,12 +11,13 @@ use opendraft_core::{
 
 use crate::defaults::EditorDefaults;
 use crate::layouts::with_viewport;
+use opendraft_ui::key;
 
 /// LAYOUT: Copy, Delete, New or Rename a layout, by name. Entering one is
 /// done from its tab (or `MSPACE` once there); a command cannot change tabs.
 pub fn layout_command(ed: &mut Editor, current: Option<LayoutId>) -> Result<(), Cancelled> {
     let option = ed.get_keyword(
-        Options::<String>::new("Enter layout option")
+        Options::<String>::new(key!("Enter layout option"))
             .keyword("Copy", "C")
             .keyword("Delete", "D")
             .keyword("New", "N")
@@ -24,7 +25,7 @@ pub fn layout_command(ed: &mut Editor, current: Option<LayoutId>) -> Result<(), 
             .default("New".to_owned()),
     )?;
     if option == "New" {
-        let name = ed.get_string(Options::<String>::new("Enter new layout name"))?;
+        let name = ed.get_string(Options::<String>::new(key!("Enter new layout name")))?;
         let margin = ed.defaults().plot_margins.get();
         return edit_layouts(ed, "New layout", move |doc| {
             let name = checked_name(doc, &name, None)?;
@@ -48,7 +49,7 @@ pub fn layout_command(ed: &mut Editor, current: Option<LayoutId>) -> Result<(), 
             })
         }),
         "Copy" => {
-            let name = ed.get_string(Options::<String>::new("Enter name of the copy"))?;
+            let name = ed.get_string(Options::<String>::new(key!("Enter name of the copy")))?;
             edit_layouts(ed, "Copy layout", move |doc| {
                 let id = find(doc, &target)?;
                 let name = checked_name(doc, &name, None)?;
@@ -63,7 +64,7 @@ pub fn layout_command(ed: &mut Editor, current: Option<LayoutId>) -> Result<(), 
             })
         }
         _ => {
-            let name = ed.get_string(Options::<String>::new("Enter new layout name"))?;
+            let name = ed.get_string(Options::<String>::new(key!("Enter new layout name")))?;
             edit_layouts(ed, "Rename layout", move |doc| {
                 let id = find(doc, &target)?;
                 let name = checked_name(doc, &name, Some(id))?;
@@ -88,12 +89,11 @@ fn named_layout(
             .and_then(|id| doc.layout(id))
             .map(|l| l.name.clone())
     })?;
-    let verb = match option {
-        "Copy" => "copy",
-        "Delete" => "delete",
-        _ => "rename",
-    };
-    let options = Options::<String>::new(format!("Enter name of layout to {verb}"));
+    let options = Options::<String>::new(match option {
+        "Copy" => key!("Enter name of layout to copy"),
+        "Delete" => key!("Enter name of layout to delete"),
+        _ => key!("Enter name of layout to rename"),
+    });
     Ok(match default {
         Some(name) => options.default(name),
         None => options,
@@ -176,7 +176,7 @@ pub fn vplayer(
     current: Option<ViewportId>,
 ) -> Result<(), Cancelled> {
     let option = ed.get_keyword(
-        Options::<String>::new("Enter an option")
+        Options::<String>::new(key!("Enter an option"))
             .keyword("Freeze", "F")
             .keyword("Thaw", "T")
             .keyword("Reset", "R")
@@ -185,15 +185,16 @@ pub fn vplayer(
     let names = if option == "Reset" {
         String::new()
     } else {
-        let verb = option.to_lowercase();
-        ed.get_string(Options::<String>::new(format!(
-            "Enter layer name(s) to {verb}, separated by commas, or * for all"
-        )))?
+        ed.get_string(Options::<String>::new(if option == "Thaw" {
+            key!("Enter layer name(s) to thaw, separated by commas, or * for all")
+        } else {
+            key!("Enter layer name(s) to freeze, separated by commas, or * for all")
+        }))?
     };
     let all = match current {
         Some(_) => {
             let scope = ed.get_keyword(
-                Options::<String>::new("Viewports")
+                Options::<String>::new(key!("Viewports"))
                     .keyword("Current", "C")
                     .keyword("All", "A")
                     .default("Current".to_owned()),
@@ -251,8 +252,8 @@ fn resolve_layers(doc: &opendraft_core::Document, names: &str) -> Result<Vec<Lay
 
 /// MVIEW: two corners make a viewport on the sheet showing the whole drawing.
 pub fn mview(ed: &mut Editor, layout: LayoutId) -> Result<(), Cancelled> {
-    let a = ed.get_point(PointOptions::new("Specify first corner of viewport"))?;
-    let b = ed.get_corner(a, "Specify opposite corner")?;
+    let a = ed.get_point(PointOptions::new(key!("Specify first corner of viewport")))?;
+    let b = ed.get_corner(a, key!("Specify opposite corner"))?;
     let (width, height) = ((b.x - a.x).abs(), (b.y - a.y).abs());
     if width < 1e-6 || height < 1e-6 {
         ed.say("The viewport needs some size.");
@@ -288,7 +289,7 @@ pub fn vpscale(ed: &mut Editor, layout: LayoutId, viewport: ViewportId) -> Resul
         return Ok(());
     }
     let text = ed.ask_string(
-        Options::<String>::new("Enter scale as paper:model, for example 1:50")
+        Options::<String>::new(key!("Enter scale as paper:model, for example 1:50"))
             .default(format_scale(scale)),
     )?;
     let text = match text {

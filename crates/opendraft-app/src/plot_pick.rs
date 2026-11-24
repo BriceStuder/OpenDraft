@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options};
 use opendraft_core::{PlotArea, Point};
+use opendraft_ui::key;
 
 use crate::state::AppState;
 
@@ -17,10 +18,10 @@ pub type WindowSlot = Arc<Mutex<Option<(Point, Point)>>>;
 /// height is told and asked for again.
 pub fn ask_window(ed: &Editor) -> Result<(Point, Point), Cancelled> {
     loop {
-        let first = ed.get_point(Options::<Point>::new(
-            "Specify first corner of the plot window",
-        ))?;
-        let other = Options::<Point>::new("Specify opposite corner of the plot window");
+        let first = ed.get_point(Options::<Point>::new(key!(
+            "Specify first corner of the plot window"
+        )))?;
+        let other = Options::<Point>::new(key!("Specify opposite corner of the plot window"));
         let second = match ed.ask_corner(first, other)? {
             Answer::Value(at) => at,
             _ => return Err(Cancelled),

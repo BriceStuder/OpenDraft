@@ -7,6 +7,7 @@ use opendraft_commands::{Answer, Cancelled, Editor, PointOptions};
 use opendraft_core::leader::{Leader, MAX_VERTICES};
 use opendraft_core::mtext::MTextAttachment;
 use opendraft_core::{DimStyle, Entity, EntityId, MText, Point};
+use opendraft_ui::key;
 
 use crate::draw::{add, path_through};
 
@@ -64,10 +65,10 @@ fn ghost(style: &DimStyle, points: &[Point], at: Point) -> Vec<Entity> {
 
 pub fn draw_leader(ed: &mut Editor) -> Result<(), Cancelled> {
     let style = ed.read(|doc| doc.dim_style().clone())?;
-    let mut points = vec![ed.get_point("Specify leader start point")?];
+    let mut points = vec![ed.get_point(key!("Specify leader start point"))?];
     loop {
         let (shown, so_far) = (style.clone(), points.clone());
-        let options = PointOptions::new("Specify next point (Enter to add text)")
+        let options = PointOptions::new(key!("Specify next point (Enter to add text)"))
             .base(points[points.len() - 1])
             .keyword("Undo", "U")
             .snap_to(path_through(&points))

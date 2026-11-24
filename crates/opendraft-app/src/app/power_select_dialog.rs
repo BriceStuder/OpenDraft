@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 use eframe::egui;
 use opendraft_core::{EntityId, EntityKind};
+use opendraft_ui::key;
 use opendraft_ui::{icons, widgets};
 
 use super::OpenDraftApp;
@@ -92,7 +93,7 @@ impl OpenDraftApp {
                             ui,
                             theme,
                             icons::POWER_SELECT_PICK,
-                            "Select objects",
+                            key!("Select objects"),
                         )
                         .clicked();
                     });
@@ -196,7 +197,7 @@ impl OpenDraftApp {
         if pick {
             self.state.docs[self.state.active].selection.clear();
             self.state.start_command("QSELECT", |ed| {
-                let ids = ed.get_selection("Select objects")?;
+                let ids = ed.get_selection(key!("Select objects"))?;
                 ed.select(ids);
                 Ok(())
             });

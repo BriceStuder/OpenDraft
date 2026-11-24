@@ -5,6 +5,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, PointOptions};
 use opendraft_core::mleader::{MLeader, MLeaderContent, MLeaderLineType, MLeaderStyle};
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 use crate::draw::{add, path_through};
 
@@ -48,16 +49,16 @@ pub fn draw_mleader(ed: &mut Editor) -> Result<(), Cancelled> {
     }
     // The text is level with the coordinate system's X axis.
     let level = ed.read(|doc| doc.ccs().angle)?;
-    let mut points = vec![ed.get_point("Specify leader arrowhead location")?];
+    let mut points = vec![ed.get_point(key!("Specify leader arrowhead location"))?];
     let most = style.max_points.map_or(usize::MAX, |n| n as usize);
     loop {
         // The point after this one would still be a leader point when the
         // style allows more than the arrowhead and this one.
         let more = points.len() + 1 < most;
         let message = if more {
-            "Specify next point (Enter to finish)"
+            key!("Specify next point (Enter to finish)")
         } else {
-            "Specify leader landing location"
+            key!("Specify leader landing location")
         };
         let (shown, so_far) = (style.clone(), points.clone());
         let options = PointOptions::new(message)

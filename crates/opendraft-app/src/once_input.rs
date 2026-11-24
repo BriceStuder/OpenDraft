@@ -6,6 +6,7 @@ use opendraft_canvas::SnapPoint;
 use opendraft_commands::{Prompt as Ask, Reply, Wants};
 use opendraft_core::units::parse_length;
 use opendraft_core::Point;
+use opendraft_ui::i18n::tr;
 
 use crate::prompt_reply::{keyword_reply, takes_clicked_points};
 use crate::snap_once::{parse, Deferred, Step, Wish};
@@ -19,7 +20,7 @@ impl AppState {
             Wish::Chain(_) => String::new(),
         };
         self.once.begin(wish);
-        let said = self.once.asking().map_or(said, str::to_owned);
+        let said = self.once.asking().map_or(said, |ask| tr(ask).into_owned());
         self.cmdline.say(said);
     }
 

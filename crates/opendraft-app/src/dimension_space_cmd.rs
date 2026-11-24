@@ -5,6 +5,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, Options, PointOptions};
 use opendraft_core::dimension::spaced_offsets;
 use opendraft_core::{Dimension, Entity, EntityId};
+use opendraft_ui::key;
 
 use crate::dimension_cmd::pick;
 use crate::dimension_edit_cmd::{apply, dimensions_in, Change};
@@ -12,18 +13,19 @@ use crate::dimension_edit_cmd::{apply, dimensions_in, Change};
 /// DIMSPACE: a base dimension, the dimensions to space, then the spacing
 /// (Auto is twice the text height; 0 lines them up with the base).
 pub fn dim_space(ed: &mut Editor) -> Result<(), Cancelled> {
-    let Some((base_picked, Entity::Dimension(base))) = pick(ed, "Select base dimension")? else {
+    let Some((base_picked, Entity::Dimension(base))) = pick(ed, key!("Select base dimension"))?
+    else {
         ed.say("Select a linear dimension.");
         return Err(Cancelled);
     };
     let base_id = base_picked.id;
-    let chosen = ed.get_selection("Select dimensions to space")?;
+    let chosen = ed.get_selection(key!("Select dimensions to space"))?;
     let chosen: Vec<EntityId> = dimensions_in(ed, chosen)?
         .into_iter()
         .filter(|id| *id != base_id)
         .collect();
     let auto = 2.0 * base.style.text_height * base.style.scale;
-    let options = Options::<f64>::new("Enter value")
+    let options = Options::<f64>::new(key!("Enter value"))
         .keyword("Auto", "A")
         .allow_empty();
     let spacing = match ed.ask_distance(options)? {
@@ -68,9 +70,10 @@ pub fn dim_space(ed: &mut Editor) -> Result<(), Cancelled> {
 /// DIMJOGLINE: pick a linear dimension and where the jog goes (Enter for
 /// the default place), or Remove it.
 pub fn dim_jog_line(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select dimension to add jog or [Remove]")?;
+    let ids = ed.pickset_or_select(key!("Select dimension to add jog"))?;
     let ids = dimensions_in(ed, ids)?;
-    let options = PointOptions::new("Specify jog location (or press ENTER)").keyword("Remove", "R");
+    let options =
+        PointOptions::new(key!("Specify jog location (or press ENTER)")).keyword("Remove", "R");
     let change: Change = match ed.ask_point(options)? {
         Answer::Value(at) => Box::new(move |d: &Dimension| d.with_jog_line(Some(at))),
         Answer::Keyword(_) => Box::new(|d: &Dimension| d.with_jog_line(None)),

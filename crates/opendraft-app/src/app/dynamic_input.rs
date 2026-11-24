@@ -69,6 +69,7 @@ impl AppState {
             self.sysvar_prompt().map(|p| Prompt {
                 wants: Wants::Text,
                 message: p.text.into_owned(),
+                wording: None,
                 keywords: Vec::new(),
                 base: None,
                 ghost: None,
@@ -105,6 +106,7 @@ impl AppState {
         .then(|| Prompt {
             wants: Wants::Point,
             message: String::new(),
+            wording: None,
             keywords: Vec::new(),
             base: None,
             ghost: None,

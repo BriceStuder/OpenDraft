@@ -4,6 +4,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options};
 use opendraft_core::purge::{blocked, purgeable, Category, Item};
+use opendraft_ui::key;
 
 use crate::power_select::wildcard_match;
 use crate::purge_cmd::{purge_run, Purge};
@@ -69,7 +70,7 @@ fn matching(ed: &Editor, category: Category, patterns: &str) -> Result<Vec<Item>
 
 /// Whether to ask about each name first.
 fn verify(ed: &Editor) -> Result<bool, Cancelled> {
-    let options = Options::<String>::new("Verify each name to be purged?")
+    let options = Options::<String>::new(key!("Verify each name to be purged?"))
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .default("Yes".to_owned());
@@ -79,7 +80,7 @@ fn verify(ed: &Editor) -> Result<bool, Cancelled> {
 /// -PURGE.
 pub fn purge_prompt(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut options = Options::<String>::new(
-        "Enter type of unused objects to purge [Blocks/Dimstyles/LAyers/LTypes/MUltileaderstyles/textSTyles/Zero-length geometry/Empty text objects/All]",
+        key!("Enter type of unused objects to purge [Blocks/Dimstyles/LAyers/LTypes/MUltileaderstyles/textSTyles/Zero-length geometry/Empty text objects/All]"),
     );
     for (_, label, key) in KINDS {
         options = options.keyword(label, key);
@@ -115,7 +116,8 @@ pub fn purge_prompt(ed: &mut Editor) -> Result<(), Cancelled> {
             let Some((category, ..)) = KINDS.iter().find(|(_, l, _)| *l == label) else {
                 return Ok(());
             };
-            let ask = Options::<String>::new("Enter name(s) to purge").default("*".to_owned());
+            let ask =
+                Options::<String>::new(key!("Enter name(s) to purge")).default("*".to_owned());
             let names = match ed.ask_string(ask)? {
                 Answer::Value(text) if !text.trim().is_empty() => text,
                 _ => "*".to_owned(),

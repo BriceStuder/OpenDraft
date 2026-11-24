@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use opendraft_commands::{Answer, Cancelled, Editor, PointOptions};
 use opendraft_core::{Dimension, Entity, Point};
+use opendraft_ui::key;
 
 use crate::dimension_cmd::pick;
 use crate::draw::add;
@@ -33,7 +34,7 @@ fn newest(ed: &Editor) -> Result<Option<Dimension>, Cancelled> {
 /// pick is the one the next dimension starts at.
 fn select(ed: &mut Editor) -> Result<Base, Cancelled> {
     loop {
-        let Some((picked, entity)) = pick(ed, "Select base dimension")? else {
+        let Some((picked, entity)) = pick(ed, key!("Select base dimension"))? else {
             return Err(Cancelled);
         };
         match entity {
@@ -73,7 +74,7 @@ fn chain(ed: &mut Editor, baseline: bool) -> Result<(), Cancelled> {
         };
         let make = Arc::new(next);
         let ghost = make.clone();
-        let options = PointOptions::new("Specify a second extension line origin")
+        let options = PointOptions::new(key!("Specify a second extension line origin"))
             .keyword("Undo", "U")
             .keyword("Select", "S")
             .base(from.dimension.origin(from.from_second).unwrap_or_default())

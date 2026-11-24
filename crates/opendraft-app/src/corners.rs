@@ -43,23 +43,41 @@ pub fn chamfer_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     join_corners(ed, Kind::Chamfer)
 }
 
-fn settings_text(kind: Kind, m: &Memory) -> String {
-    let mode = if m.trim { "Trim" } else { "No trim" };
-    match kind {
-        Kind::Fillet => format!("({mode} mode, Radius = {})", m.radius),
-        Kind::Chamfer if m.by_angle => {
-            format!("({mode} mode, Length = {}, Angle = {})", m.length, m.angle)
+/// The first prompt, after the current settings: "(Trim mode, Radius =
+/// 10) Select first object".
+fn first_object(kind: Kind, m: &Memory) -> Options<Picked> {
+    let text = match (kind, m.by_angle, m.trim) {
+        (Kind::Fillet, _, true) => key!("(Trim mode, Radius = %{radius}) Select first object"),
+        (Kind::Fillet, _, false) => {
+            key!("(No trim mode, Radius = %{radius}) Select first object")
         }
-        Kind::Chamfer => format!("({mode} mode, Dist1 = {}, Dist2 = {})", m.first, m.second),
-    }
+        (Kind::Chamfer, true, true) => {
+            key!("(Trim mode, Length = %{length}, Angle = %{angle}) Select first object")
+        }
+        (Kind::Chamfer, true, false) => {
+            key!("(No trim mode, Length = %{length}, Angle = %{angle}) Select first object")
+        }
+        (Kind::Chamfer, false, true) => {
+            key!("(Trim mode, Dist1 = %{first}, Dist2 = %{second}) Select first object")
+        }
+        (Kind::Chamfer, false, false) => {
+            key!("(No trim mode, Dist1 = %{first}, Dist2 = %{second}) Select first object")
+        }
+    };
+    let values = [m.radius, m.length, m.angle, m.first, m.second].map(|v| v.to_string());
+    let names = ["radius", "length", "angle", "first", "second"];
+    let pairs: Vec<(&str, &str)> = names
+        .into_iter()
+        .zip(values.iter().map(String::as_str))
+        .collect();
+    Options::worded(text, &pairs)
 }
 
 fn join_corners(ed: &mut Editor, kind: Kind) -> Result<(), Cancelled> {
     let mut multiple = false;
     loop {
         let m = ed.defaults().corner.get();
-        let mut options =
-            Options::<Picked>::new(format!("{} Select first object", settings_text(kind, &m)));
+        let mut options = first_object(kind, &m);
         options = match kind {
             Kind::Fillet => options.keyword("Radius", "R"),
             Kind::Chamfer => options.keyword("Distance", "D").keyword("Angle", "A"),
@@ -132,7 +150,7 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
         "Trim" => {
             let current = if m.trim { "Trim" } else { "No trim" };
             let answer = ed.get_keyword(
-                Options::<String>::new("Trim mode")
+                Options::<String>::new(key!("Trim mode"))
                     .keyword("Trim", "T")
                     .keyword("No trim", "N")
                     .default(current.to_owned()),

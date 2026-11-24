@@ -6,6 +6,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, PointOptions};
 use opendraft_core::block::{TextHorizontal, TextVertical};
 use opendraft_core::{Entity, Point, SingleLineText, TextAlignmentMode, TextStyleId};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::{add, MIN_SIZE};
@@ -38,7 +39,7 @@ enum PlacementMode {
 }
 
 fn choose_justification(ed: &Editor) -> Result<PlacementMode, Cancelled> {
-    let mut options = Options::<String>::new("Enter an option")
+    let mut options = Options::<String>::new(key!("Enter an option"))
         .keyword("Align", "A")
         .keyword("Fit", "F");
     for (name, key, _, _) in JUSTIFY {
@@ -65,9 +66,10 @@ fn choose_style(ed: &Editor, current: TextStyleId) -> Result<TextStyleId, Cancel
             .unwrap_or_else(|| "Standard".to_owned())
     })?;
     loop {
-        let answer = ed.ask_string(Options::<String>::new(format!(
-            "Enter style name <{current_name}>"
-        )))?;
+        let answer = ed.ask_string(Options::<String>::worded(
+            key!("Enter style name <%{name}>"),
+            &[("name", &current_name)],
+        ))?;
         let name = match answer {
             Answer::Value(name) => name,
             Answer::Enter => return Ok(current),
@@ -95,7 +97,7 @@ fn ask_start(ed: &Editor) -> Result<Start, Cancelled> {
     let mut style = ed.read(|doc| doc.current_text_style())?;
     let mut mode = PlacementMode::Justified(TextHorizontal::Left, TextVertical::Baseline);
     let at = loop {
-        let options = PointOptions::new("Specify start point of text")
+        let options = PointOptions::new(key!("Specify start point of text"))
             .keyword("Justify", "J")
             .keyword("Style", "S");
         match ed.ask_point(options)? {
@@ -110,7 +112,7 @@ fn ask_start(ed: &Editor) -> Result<Start, Cancelled> {
     let second = if matches!(mode, PlacementMode::Aligned(_)) {
         Some(loop {
             let point =
-                ed.get_point(PointOptions::new("Specify second endpoint of text").base(at))?;
+                ed.get_point(PointOptions::new(key!("Specify second endpoint of text")).base(at))?;
             if (point.x - at.x).hypot(point.y - at.y) > MIN_SIZE {
                 break point;
             }
@@ -138,7 +140,7 @@ fn ask_height(ed: &Editor, start: &Start, rubber_band: bool) -> Result<f64, Canc
         (true, Some(height)) => Ok(height),
         (true, None) => loop {
             let remembered = ed.defaults().text.get().height;
-            let options = NumberOptions::new("Specify height").default(remembered);
+            let options = NumberOptions::new(key!("Specify height")).default(remembered);
             let height = if rubber_band {
                 ed.get_distance(options.base(start.at))?
             } else {
@@ -198,7 +200,7 @@ pub fn draw_text(ed: &mut Editor) -> Result<(), Cancelled> {
     let rotation = match start.second {
         Some(second) => (second.y - start.at.y).atan2(second.x - start.at.x),
         None => ed.get_angle(
-            NumberOptions::new("Specify rotation of text")
+            NumberOptions::new(key!("Specify rotation of text"))
                 .default(level)
                 .base(start.at),
         )?,
@@ -234,12 +236,12 @@ pub fn draw_text_line(ed: &mut Editor) -> Result<(), Cancelled> {
         0.0
     } else {
         ed.get_angle(
-            NumberOptions::new("Specify rotation angle of text")
+            NumberOptions::new(key!("Specify rotation angle of text"))
                 .default(level)
                 .base(start.at),
         )?
     };
-    let contents = match ed.ask_string(Options::<String>::new("Enter text"))? {
+    let contents = match ed.ask_string(Options::<String>::new(key!("Enter text")))? {
         Answer::Value(text) => text,
         Answer::Enter => return Ok(()),
         Answer::Keyword(_) => return Err(Cancelled),

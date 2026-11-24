@@ -14,7 +14,6 @@ use opendraft_commands::{
     Cancelled, Context, Editor, GhostStyle, Outcome, Prompt as Ask, Reply, Runner, Wants,
 };
 use opendraft_core::Point;
-use opendraft_ui::i18n::tr;
 use rust_i18n::t;
 
 use crate::cmdline::{CmdOption, Prompt};
@@ -221,7 +220,7 @@ impl AppState {
         };
         // The command asks in English (outside callers read it so); it is
         // shown in the language of the interface.
-        let mut text = tr(&ask.message).into_owned();
+        let mut text = crate::prompt_language::shown(ask);
         // A keyword-only question reads "Erase source objects? <No> [Yes/No]".
         if !ask.keywords.is_empty() && ask.wants != Wants::Keyword && !ask.message.ends_with(" or")
         {
@@ -250,10 +249,10 @@ impl AppState {
 
     /// The instruction for the status bar while a command is waiting.
     pub fn command_status(&self) -> Option<String> {
-        let message = tr(&self.waiting()?.message);
+        let message = crate::prompt_language::shown(self.waiting()?);
         Some(match self.once.status() {
             Some(once) => format!("{message} {once}"),
-            None => message.into_owned(),
+            None => message,
         })
     }
 
@@ -464,6 +463,7 @@ mod tests {
             dynamic_dimensions: opendraft_commands::DynamicDimensions::None,
             wants,
             message: "Prompt".to_owned(),
+            wording: None,
             keywords: keywords.iter().map(|(l, k)| Keyword::new(*l, *k)).collect(),
             base,
             ghost: None,

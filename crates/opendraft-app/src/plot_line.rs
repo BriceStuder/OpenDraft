@@ -14,6 +14,7 @@ use opendraft_core::{
 };
 
 use opendraft_core::plot::PlotSpace;
+use opendraft_ui::key;
 
 use crate::layouts::PageDraft;
 use crate::plot_state::PlotFormat;
@@ -178,7 +179,7 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
     loop {
         let landscape = draft.width >= draft.height;
         let current = draft.plot.canonical_media_name.clone();
-        let answer = text(ed, "Enter paper size or [?]", &current)?;
+        let answer = text(ed, key!("Enter paper size or [?]"), &current)?;
         if answer == "?" {
             let names: Vec<String> = PAPER_SIZES.iter().map(|(n, ..)| (*n).to_owned()).collect();
             say_names(ed, "Paper sizes (or width,height in mm)", &names);
@@ -190,7 +191,7 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
             ed.say(format!("\"{answer}\" is not a paper size."));
         }
     }
-    let units = Options::<String>::new("Enter paper units")
+    let units = Options::<String>::new(key!("Enter paper units"))
         .keyword("Inches", "I")
         .keyword("Millimeters", "M")
         .default("Millimeters".to_owned());
@@ -207,7 +208,7 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
     } else {
         "Portrait"
     };
-    let orientation = Options::<String>::new("Enter drawing orientation")
+    let orientation = Options::<String>::new(key!("Enter drawing orientation"))
         .keyword("Portrait", "P")
         .keyword("Landscape", "L")
         .default(now.to_owned());
@@ -218,32 +219,35 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
         draft.plot.rotation,
         PlotRotation::Degrees180 | PlotRotation::Clockwise90
     );
-    set_upside_down(&mut draft.plot, yes_no(ed, "Plot upside down?", upside)?);
+    set_upside_down(
+        &mut draft.plot,
+        yes_no(ed, key!("Plot upside down?"), upside)?,
+    );
     area(ed, draft)?;
     scale_and_offset(ed, draft)?;
     ed.say("Plot styles are not applied yet: the layout's style table and plot-style options are left as they are.");
     let plot = &mut draft.plot;
     let lineweights = yes_no(
         ed,
-        "Plot with lineweights?",
+        key!("Plot with lineweights?"),
         plot.flags & flags::PRINT_LINEWEIGHTS != 0,
     )?;
     set_flag(plot, flags::PRINT_LINEWEIGHTS, lineweights);
     let scaled = yes_no(
         ed,
-        "Scale lineweights with plot scale?",
+        key!("Scale lineweights with plot scale?"),
         plot.flags & flags::SCALE_LINEWEIGHTS != 0,
     )?;
     set_flag(plot, flags::SCALE_LINEWEIGHTS, scaled);
     let last = yes_no(
         ed,
-        "Plot paper space last?",
+        key!("Plot paper space last?"),
         plot.flags & flags::DRAW_VIEWPORTS_FIRST != 0,
     )?;
     set_flag(plot, flags::DRAW_VIEWPORTS_FIRST, last);
     let borders = yes_no(
         ed,
-        "Plot viewport borders?",
+        key!("Plot viewport borders?"),
         plot.flags & flags::PLOT_VIEWPORT_BORDERS != 0,
     )?;
     set_flag(plot, flags::PLOT_VIEWPORT_BORDERS, borders);
@@ -252,7 +256,7 @@ fn detailed(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
 
 fn area(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<String>::new("Enter plot area")
+        let options = Options::<String>::new(key!("Enter plot area"))
             .keyword("Display", "D")
             .keyword("Extents", "E")
             .keyword("Limits", "L")
@@ -282,7 +286,7 @@ fn scale_and_offset(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled>
         let shown = scale_text(&draft.plot.scale);
         let answer = text_or(
             ed,
-            "Enter plot scale (plotted millimeters=drawing units)",
+            key!("Enter plot scale (plotted millimeters=drawing units)"),
             &shown,
             Some(("Fit", "F")),
         )?;
@@ -306,7 +310,12 @@ fn scale_and_offset(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled>
     }
     loop {
         let shown = format!("{},{}", draft.plot.origin_mm.x, draft.plot.origin_mm.y);
-        let answer = text_or(ed, "Enter plot offset (x,y)", &shown, Some(("Center", "C")))?;
+        let answer = text_or(
+            ed,
+            key!("Enter plot offset (x,y)"),
+            &shown,
+            Some(("Center", "C")),
+        )?;
         if answer.eq_ignore_ascii_case("center") || answer.eq_ignore_ascii_case("c") {
             set_flag(&mut draft.plot, flags::PLOT_CENTERED, true);
             return Ok(());
@@ -334,10 +343,10 @@ pub fn plot_prompt(ed: &mut Editor, setup: Setup) -> Result<(), Cancelled> {
             .map_or_else(|| "Model".to_owned(), |l| l.name.clone());
         (names, active)
     })?;
-    let detail = yes_no(ed, "Detailed plot configuration?", false)?;
+    let detail = yes_no(ed, key!("Detailed plot configuration?"), false)?;
     let mut draft = None;
     while draft.is_none() {
-        let answer = text(ed, "Enter a layout name or [?]", &active)?;
+        let answer = text(ed, key!("Enter a layout name or [?]"), &active)?;
         if answer == "?" {
             say_names(ed, "Layouts", &names);
             continue;
@@ -368,7 +377,7 @@ pub fn plot_prompt(ed: &mut Editor, setup: Setup) -> Result<(), Cancelled> {
         .unwrap_or(Device::Pdf)
         .name();
     let device = loop {
-        let answer = text(ed, "Enter an output device name or [?]", &fallback)?;
+        let answer = text(ed, key!("Enter an output device name or [?]"), &fallback)?;
         if answer == "?" {
             let mut names = vec![DEVICE_PDF.to_owned(), DEVICE_SVG.to_owned()];
             names.extend(printers.iter().map(|p| p.id.0.clone()));
@@ -399,12 +408,12 @@ pub fn plot_prompt(ed: &mut Editor, setup: Setup) -> Result<(), Cancelled> {
                 draft.name,
                 format.extension()
             ));
-            let answer = text(ed, "Enter file name", &path.to_string_lossy())?;
+            let answer = text(ed, key!("Enter file name"), &path.to_string_lossy())?;
             Destination::File(format.named(PathBuf::from(answer.trim())))
         }
         Device::Printer(printer) => {
             let copies =
-                ed.ask_number(Options::<f64>::new("Enter number of copies").default(1.0))?;
+                ed.ask_number(Options::<f64>::new(key!("Enter number of copies")).default(1.0))?;
             let copies = match copies {
                 Answer::Value(n) if n >= 1.0 => n.round().min(999.0) as u32,
                 _ => 1,
@@ -416,8 +425,8 @@ pub fn plot_prompt(ed: &mut Editor, setup: Setup) -> Result<(), Cancelled> {
             }
         }
     };
-    let save_changes = yes_no(ed, "Save changes to layout?", false)?;
-    if !yes_no(ed, "Proceed with plot?", true)? {
+    let save_changes = yes_no(ed, key!("Save changes to layout?"), false)?;
+    if !yes_no(ed, key!("Proceed with plot?"), true)? {
         return Ok(());
     }
     if let Ok(mut list) = setup.requests.lock() {

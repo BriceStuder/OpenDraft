@@ -302,15 +302,22 @@ fn ask_widths(
     half: bool,
 ) -> Result<(f64, f64), Cancelled> {
     let scale = if half { 2.0 } else { 1.0 };
-    let name = if half { "half-width" } else { "width" };
+    let (starting, ending) = if half {
+        (
+            key!("Specify starting half-width"),
+            key!("Specify ending half-width"),
+        )
+    } else {
+        (key!("Specify starting width"), key!("Specify ending width"))
+    };
     let start = ed.get_distance(
-        NumberOptions::new(format!("Specify starting {name}"))
+        NumberOptions::new(starting)
             .default(current.0 / scale)
             .base(from)
             .snap_to(drawn.to_vec()),
     )?;
     let end = ed.get_distance(
-        NumberOptions::new(format!("Specify ending {name}"))
+        NumberOptions::new(ending)
             .default(start)
             .base(from)
             .snap_to(drawn.to_vec()),

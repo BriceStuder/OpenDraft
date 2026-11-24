@@ -6,6 +6,7 @@ use std::sync::Arc;
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, PointOptions};
 use opendraft_core::block::AttributeReference;
 use opendraft_core::{BlockDef, Entity, Insert, InsertUnits, Point};
+use opendraft_ui::key;
 
 use crate::attribute_prompt::ask_values;
 use crate::block_cmd::{ask_block_name, list_blocks, NameAnswer};
@@ -64,7 +65,7 @@ pub(crate) fn choose_block(ed: &Editor) -> Result<Option<Arc<BlockDef>>, Cancell
         return Ok(None);
     };
     loop {
-        let mut options = Options::new("Enter block name").default(newest.clone());
+        let mut options = Options::new(key!("Enter block name")).default(newest.clone());
         for name in &names {
             options = options.keyword(name.clone(), name.clone());
         }
@@ -102,7 +103,7 @@ pub fn insert_block(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut rotation = ed.read(|doc| doc.ccs().angle)?;
     let at = loop {
         let (shown, s, r) = (block.clone(), (scale.0 * units, scale.1 * units), rotation);
-        let options = PointOptions::new("Specify insertion point")
+        let options = PointOptions::new(key!("Specify insertion point"))
             .keyword("Scale", "S")
             .keyword("Rotate", "R")
             .ghost(move |at| {
@@ -112,11 +113,11 @@ pub fn insert_block(ed: &mut Editor) -> Result<(), Cancelled> {
         match ed.ask_point(options)? {
             Answer::Value(at) => break at,
             Answer::Keyword(k) if k == "Scale" => {
-                let f = get_factor(ed, "Specify scale factor for XY axes", scale.0)?;
+                let f = get_factor(ed, key!("Specify scale factor for XY axes"), scale.0)?;
                 scale = (f, f);
             }
             Answer::Keyword(_) => {
-                let options = NumberOptions::new("Specify rotation angle").default(rotation);
+                let options = NumberOptions::new(key!("Specify rotation angle")).default(rotation);
                 rotation = ed.get_angle(options)?;
             }
             Answer::Enter => {}
