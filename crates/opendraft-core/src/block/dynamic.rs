@@ -14,8 +14,6 @@
 //! definition's default. Evaluated geometry is derived and is never stored
 //! here.
 
-use std::collections::HashSet;
-
 use crate::{Bounds, Point};
 
 /// Stable identity of one object inside one block definition. It is not a
@@ -68,109 +66,6 @@ impl DynamicBlock {
     }
 }
 
-impl DynamicBlock {
-    /// Why this schema could not exist in a block whose objects have ids
-    /// `objects`, or `Ok`. Checks the structure: the version, parameter and
-    /// action ids (nonzero, unique, already issued), that each action names
-    /// a parameter, and that its selection is non-empty, sorted, without
-    /// repeats and of objects the block has.
-    pub fn check(&self, objects: &HashSet<BlockObjectId>) -> Result<(), String> {
-        if self.version != Self::VERSION {
-            return Err(format!("unknown schema version {}", self.version));
-        }
-        if self.parameters.len() > Self::MAX_PARAMETERS || self.actions.len() > Self::MAX_ACTIONS {
-            return Err("it has too many parameters or actions".to_owned());
-        }
-        let mut parameters = HashSet::new();
-        let mut work = 0usize;
-        for p in &self.parameters {
-            if p.id.0 == 0 || p.id.0 >= self.next_parameter_id || !parameters.insert(p.id) {
-                return Err(format!(
-                    "parameter id {} is zero, repeated or not issued",
-                    p.id.0
-                ));
-            }
-            if p.grips > 2 || p.name.is_empty() || p.is_degenerate() || !p.value_set().is_valid() {
-                return Err(format!(
-                    "parameter {} has no name, too many grips, no length or an unusable value set",
-                    p.id.0
-                ));
-            }
-        }
-        let mut actions = HashSet::new();
-        for a in &self.actions {
-            if a.id.0 == 0 || a.id.0 >= self.next_action_id || !actions.insert(a.id) {
-                return Err(format!(
-                    "action id {} is zero, repeated or not issued",
-                    a.id.0
-                ));
-            }
-            let Some(p) = self.parameters.iter().find(|p| p.id == a.parameter) else {
-                return Err(format!("action {} names a missing parameter", a.id.0));
-            };
-            let suits = p.kind.family() == a.kind.family();
-            let (selected, usable) = match &a.kind {
-                DynamicActionKind::Move {
-                    objects,
-                    multiplier,
-                    angle_offset,
-                } => (
-                    objects,
-                    suits
-                        && multiplier.is_finite()
-                        && *multiplier > 0.0
-                        && angle_offset.is_finite(),
-                ),
-                DynamicActionKind::Stretch {
-                    objects,
-                    frame,
-                    multiplier,
-                    angle_offset,
-                } => {
-                    let (w, h) = (frame.max.x - frame.min.x, frame.max.y - frame.min.y);
-                    (
-                        objects,
-                        suits
-                            && multiplier.is_finite()
-                            && *multiplier > 0.0
-                            && angle_offset.is_finite()
-                            && w.is_finite()
-                            && h.is_finite()
-                            && w > 0.0
-                            && h > 0.0,
-                    )
-                }
-                DynamicActionKind::Rotate { objects }
-                | DynamicActionKind::Flip { objects }
-                | DynamicActionKind::Scale { objects } => (objects, suits),
-            };
-            if !usable {
-                return Err(format!(
-                    "action {} does not suit its parameter, or has a multiplier or angle that is not usable, or an empty frame",
-                    a.id.0
-                ));
-            }
-            work = work.saturating_add(selected.len());
-            if work > Self::MAX_ACTION_WORK {
-                return Err("its actions select too many objects".to_owned());
-            }
-            if selected.is_empty() || selected.windows(2).any(|w| w[0] >= w[1]) {
-                return Err(format!(
-                    "action {} selects nothing, or its selection is unsorted or repeats",
-                    a.id.0
-                ));
-            }
-            if let Some(missing) = selected.iter().find(|o| !objects.contains(o)) {
-                return Err(format!(
-                    "action {} selects object {}, which the block lacks",
-                    a.id.0, missing.0
-                ));
-            }
-        }
-        Ok(())
-    }
-}
-
 impl Default for DynamicBlock {
     fn default() -> Self {
         Self::new()
@@ -214,6 +109,17 @@ pub enum DynamicParameterKind {
     /// A mirror line from `base` to `end`; the value is whether the block is
     /// flipped about it (a `Bool`, not flipped by default).
     Flip { base: Point, end: Point },
+    /// A point `end` at a distance and an angle from `base`. Its value is
+    /// where that point is (a `Point`, `end` by default); each of the
+    /// distance and the angle (radians, from the block's +X) has a value set.
+    Polar {
+        base: Point,
+        end: Point,
+        distance_set: DynamicValueSet,
+        angle_set: DynamicValueSet,
+        /// What the Properties palette calls the angle.
+        angle_label: String,
+    },
 }
 
 /// Which parameters and actions go together.
@@ -222,6 +128,7 @@ pub enum DynamicFamily {
     Linear,
     Rotation,
     Flip,
+    Polar,
 }
 
 impl DynamicParameterKind {
@@ -230,17 +137,23 @@ impl DynamicParameterKind {
             Self::Linear { .. } => DynamicFamily::Linear,
             Self::Rotation { .. } => DynamicFamily::Rotation,
             Self::Flip { .. } => DynamicFamily::Flip,
+            Self::Polar { .. } => DynamicFamily::Polar,
         }
     }
 }
 
 impl DynamicActionKind {
-    /// The kind of parameter this action follows.
-    pub fn family(&self) -> DynamicFamily {
+    /// Whether this action can follow a parameter of `family`: a move,
+    /// stretch or scale follows a distance or a polar point, a rotate an
+    /// angle or a polar point, a flip a flip.
+    pub fn follows(&self, family: DynamicFamily) -> bool {
+        use DynamicFamily::{Flip, Linear, Polar, Rotation};
         match self {
-            Self::Move { .. } | Self::Stretch { .. } | Self::Scale { .. } => DynamicFamily::Linear,
-            Self::Rotate { .. } => DynamicFamily::Rotation,
-            Self::Flip { .. } => DynamicFamily::Flip,
+            Self::Move { .. } | Self::Stretch { .. } | Self::Scale { .. } => {
+                matches!(family, Linear | Polar)
+            }
+            Self::Rotate { .. } => matches!(family, Rotation | Polar),
+            Self::Flip { .. } => family == Flip,
         }
     }
 }

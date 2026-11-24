@@ -14,11 +14,11 @@ use serde_json::{json, Value};
 
 use crate::{FileError, FileFormat, NativeFormat};
 
-fn p(x: f64, y: f64) -> Point {
+pub(super) fn p(x: f64, y: f64) -> Point {
     Point::new(x, y)
 }
 
-fn schema(set: DynamicValueSet) -> DynamicBlock {
+pub(super) fn schema(set: DynamicValueSet) -> DynamicBlock {
     let mut s = DynamicBlock::new();
     s.parameters.push(DynamicParameter {
         id: ParameterId(1),
@@ -59,7 +59,7 @@ fn schema(set: DynamicValueSet) -> DynamicBlock {
     s
 }
 
-fn object(id: u64, entity: Entity) -> BlockEntity {
+pub(super) fn object(id: u64, entity: Entity) -> BlockEntity {
     BlockEntity::new(
         BlockObjectId(id),
         entity,
@@ -67,7 +67,7 @@ fn object(id: u64, entity: Entity) -> BlockEntity {
     )
 }
 
-fn bar(doc: &mut Document, dynamic: Option<DynamicBlock>) -> Arc<BlockDef> {
+pub(super) fn bar(doc: &mut Document, dynamic: Option<DynamicBlock>) -> Arc<BlockDef> {
     Arc::new(BlockDef {
         id: doc.allocate_block_id(),
         name: "Bar".into(),
@@ -110,12 +110,12 @@ fn drawing(set: DynamicValueSet) -> Document {
     doc
 }
 
-fn write(doc: &Document) -> Value {
+pub(super) fn write(doc: &Document) -> Value {
     let bytes = NativeFormat.write(doc).unwrap().bytes;
     serde_json::from_slice(&bytes).unwrap()
 }
 
-fn read(file: &Value) -> Result<Document, FileError> {
+pub(super) fn read(file: &Value) -> Result<Document, FileError> {
     NativeFormat
         .read(file.to_string().as_bytes())
         .map(|r| r.document)
@@ -321,105 +321,4 @@ fn nested_dynamic_inserts_and_blocks_in_any_order_round_trip() {
         panic!("not an insert");
     };
     assert!(i.dynamic.is_some() && i.block.is_dynamic());
-}
-
-#[test]
-fn a_rotation_parameter_and_its_action_and_value_survive_a_round_trip() {
-    let mut s = DynamicBlock::new();
-    s.parameters.push(DynamicParameter {
-        id: ParameterId(1),
-        name: "Angle1".into(),
-        label: "Angle".into(),
-        description: String::new(),
-        show: true,
-        grips: 1,
-        kind: DynamicParameterKind::Rotation {
-            base: p(4.0, 0.0),
-            radius: 1.5,
-            value_set: DynamicValueSet::List(vec![0.0, std::f64::consts::FRAC_PI_2]),
-        },
-    });
-    s.actions.push(DynamicAction {
-        id: ActionId(1),
-        name: "Rotate1".into(),
-        parameter: ParameterId(1),
-        kind: DynamicActionKind::Rotate {
-            objects: vec![BlockObjectId(9)],
-        },
-    });
-    s.next_parameter_id = 2;
-    s.next_action_id = 2;
-    let mut doc = Document::default();
-    let block = bar(&mut doc, Some(s));
-    doc.push_block(block.clone());
-    let turned = Insert::new(block, p(0.0, 0.0))
-        .with_dynamic_value(
-            ParameterId(1),
-            DynamicValue::Angle(std::f64::consts::FRAC_PI_2),
-        )
-        .unwrap();
-    doc.add(Entity::Insert(Box::new(turned)));
-    let back = read(&write(&doc)).unwrap();
-    assert_eq!(back.blocks(), doc.blocks());
-    assert_eq!(back.objects(), doc.objects());
-    assert_eq!(back.validate(), Ok(()));
-}
-
-#[test]
-fn a_flip_parameter_and_action_and_a_flipped_value_survive_a_round_trip() {
-    let mut s = DynamicBlock::new();
-    s.parameters.push(DynamicParameter {
-        id: ParameterId(1),
-        name: "Flip1".into(),
-        label: "Flip".into(),
-        description: String::new(),
-        show: true,
-        grips: 1,
-        kind: DynamicParameterKind::Flip {
-            base: p(0.0, 0.0),
-            end: p(0.0, 3.0),
-        },
-    });
-    s.actions.push(DynamicAction {
-        id: ActionId(1),
-        name: "Flip1".into(),
-        parameter: ParameterId(1),
-        kind: DynamicActionKind::Flip {
-            objects: vec![BlockObjectId(7)],
-        },
-    });
-    s.next_parameter_id = 2;
-    s.next_action_id = 2;
-    let mut doc = Document::default();
-    let block = bar(&mut doc, Some(s));
-    doc.push_block(block.clone());
-    let flipped = Insert::new(block, p(0.0, 0.0))
-        .with_dynamic_value(ParameterId(1), DynamicValue::Bool(true))
-        .unwrap();
-    doc.add(Entity::Insert(Box::new(flipped)));
-    let back = read(&write(&doc)).unwrap();
-    assert_eq!(back.blocks(), doc.blocks());
-    assert_eq!(back.objects(), doc.objects());
-    assert_eq!(back.validate(), Ok(()));
-}
-
-#[test]
-fn a_scale_action_survives_a_round_trip() {
-    let mut s = schema(DynamicValueSet::Any);
-    s.actions.push(DynamicAction {
-        id: ActionId(3),
-        name: "Scale1".into(),
-        parameter: ParameterId(1),
-        kind: DynamicActionKind::Scale {
-            objects: vec![BlockObjectId(9)],
-        },
-    });
-    s.next_action_id = 4;
-    let mut doc = Document::default();
-    let block = bar(&mut doc, Some(s));
-    doc.push_block(block.clone());
-    doc.add(Entity::Insert(Box::new(Insert::new(block, p(0.0, 0.0)))));
-    let back = read(&write(&doc)).unwrap();
-    assert_eq!(back.blocks(), doc.blocks());
-    assert_eq!(back.validate(), Ok(()));
 }

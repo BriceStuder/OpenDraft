@@ -15,12 +15,13 @@ use opendraft_commands::{
 };
 use opendraft_core::block::{
     ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicFamily,
-    DynamicParameter, DynamicParameterKind, ParameterId,
+    DynamicParameter, ParameterId,
 };
 use opendraft_core::{Bounds, Entity, EntityId};
 
-use crate::dynamic_block_prompts::{
-    ask_grips, ask_name, ask_naming, ask_value_set, free_name, Quantity, EPS,
+use crate::dynamic_block_prompts::{ask_name, free_name, EPS};
+use crate::dynamic_parameter_cmd::{
+    flip_parameter, linear_parameter, polar_parameter, rotation_parameter,
 };
 use crate::text::plural;
 
@@ -38,8 +39,8 @@ fn commit(ed: &Editor, name: &'static str, schema: DynamicBlock) -> Result<(), C
     })
 }
 
-/// BPARAMETER: add a linear, rotation or flip parameter to the block being
-/// edited.
+/// BPARAMETER: add a linear, polar, rotation or flip parameter to the block
+/// being edited.
 pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut schema = draft(ed)?;
     if schema.parameters.len() >= DynamicBlock::MAX_PARAMETERS {
@@ -48,8 +49,9 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     }
     let parameter = match ed
         .get_keyword(
-            Options::<String>::new("Enter parameter type [Linear/Rotation/Flip] <Linear>")
+            Options::<String>::new("Enter parameter type [Linear/Polar/Rotation/Flip] <Linear>")
                 .keyword("Linear", "L")
+                .keyword("Polar", "P")
                 .keyword("Rotation", "R")
                 .keyword("Flip", "F")
                 .default("Linear".to_owned()),
@@ -58,6 +60,7 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     {
         "Rotation" => rotation_parameter(ed, &schema)?,
         "Flip" => flip_parameter(ed, &schema)?,
+        "Polar" => polar_parameter(ed, &schema)?,
         _ => linear_parameter(ed, &schema)?,
     };
     let name = parameter.name.clone();
@@ -66,84 +69,6 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     commit(ed, "Add parameter", schema)?;
     ed.say(format!("Parameter \"{name}\" added."));
     Ok(())
-}
-
-fn linear_parameter(ed: &Editor, schema: &DynamicBlock) -> Result<DynamicParameter, Cancelled> {
-    let start = ed.get_point(PointOptions::new("Specify start point"))?;
-    let end = loop {
-        let end = ed.get_point(PointOptions::new("Specify endpoint").base(start))?;
-        if (end.x - start.x).hypot(end.y - start.y) > EPS {
-            break end;
-        }
-        ed.say("The parameter has no length.");
-    };
-    let length = (end.x - start.x).hypot(end.y - start.y);
-    let named = ask_naming(ed, schema, "Distance", "distance")?;
-    let grips = ask_grips(ed)?;
-    let value_set = ask_value_set(ed, Quantity::Distance, length)?;
-    Ok(DynamicParameter {
-        id: ParameterId(schema.next_parameter_id),
-        name: named.name,
-        label: named.label,
-        description: named.description,
-        show: named.show,
-        grips,
-        kind: DynamicParameterKind::Linear {
-            start,
-            end,
-            value_set,
-        },
-    })
-}
-
-fn rotation_parameter(ed: &Editor, schema: &DynamicBlock) -> Result<DynamicParameter, Cancelled> {
-    let base = ed.get_point(PointOptions::new("Specify base point"))?;
-    let radius = loop {
-        let radius = ed.get_number(NumberOptions::new("Specify radius of parameter"))?;
-        if radius.is_finite() && radius > EPS {
-            break radius;
-        }
-        ed.say("The radius must be above zero.");
-    };
-    let named = ask_naming(ed, schema, "Angle", "angle")?;
-    let grips = ask_grips(ed)?;
-    let value_set = ask_value_set(ed, Quantity::Angle, 0.0)?;
-    Ok(DynamicParameter {
-        id: ParameterId(schema.next_parameter_id),
-        name: named.name,
-        label: named.label,
-        description: named.description,
-        show: named.show,
-        grips,
-        kind: DynamicParameterKind::Rotation {
-            base,
-            radius,
-            value_set,
-        },
-    })
-}
-
-fn flip_parameter(ed: &Editor, schema: &DynamicBlock) -> Result<DynamicParameter, Cancelled> {
-    let base = ed.get_point(PointOptions::new("Specify base point of reflection line"))?;
-    let end = loop {
-        let end =
-            ed.get_point(PointOptions::new("Specify endpoint of reflection line").base(base))?;
-        if (end.x - base.x).hypot(end.y - base.y) > EPS {
-            break end;
-        }
-        ed.say("The reflection line has no length.");
-    };
-    let named = ask_naming(ed, schema, "Flip", "flip")?;
-    let grips = ask_grips(ed)?;
-    Ok(DynamicParameter {
-        id: ParameterId(schema.next_parameter_id),
-        name: named.name,
-        label: named.label,
-        description: named.description,
-        show: named.show,
-        grips,
-        kind: DynamicParameterKind::Flip { base, end },
-    })
 }
 
 /// The objects to act on, as ids of the block's objects: the pickset or a
@@ -214,16 +139,22 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
             .default("Move".to_owned()),
     )?;
     let stretch = chosen == "Stretch";
-    // Each action follows its own kind of parameter.
-    let (family, need) = match chosen.as_str() {
-        "Rotate" => (DynamicFamily::Rotation, "rotation"),
-        "Flip" => (DynamicFamily::Flip, "flip"),
-        _ => (DynamicFamily::Linear, "linear"),
+    // Each action follows its own kinds of parameter.
+    let (follows, need): (fn(DynamicFamily) -> bool, &str) = match chosen.as_str() {
+        "Rotate" => (
+            |f| matches!(f, DynamicFamily::Rotation | DynamicFamily::Polar),
+            "rotation or polar",
+        ),
+        "Flip" => (|f| f == DynamicFamily::Flip, "flip"),
+        _ => (
+            |f| matches!(f, DynamicFamily::Linear | DynamicFamily::Polar),
+            "linear or polar",
+        ),
     };
     let usable: Vec<&DynamicParameter> = schema
         .parameters
         .iter()
-        .filter(|p| p.kind.family() == family)
+        .filter(|p| follows(p.kind.family()))
         .collect();
     if usable.is_empty() {
         ed.say(format!(
@@ -242,18 +173,18 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
             DynamicActionKind::Scale { objects }
         });
     }
-    match family {
-        DynamicFamily::Rotation => {
+    match chosen.as_str() {
+        "Rotate" => {
             return add_action(ed, schema, "Rotate", parameter, |_| {
                 DynamicActionKind::Rotate { objects }
             })
         }
-        DynamicFamily::Flip => {
+        "Flip" => {
             return add_action(ed, schema, "Flip", parameter, |_| DynamicActionKind::Flip {
                 objects,
             })
         }
-        DynamicFamily::Linear => {}
+        _ => {}
     }
     let frame = if stretch {
         let first = ed.get_point(PointOptions::new("Specify first corner of stretch frame"))?;
@@ -420,3 +351,7 @@ mod flip_tests;
 #[cfg(test)]
 #[path = "dynamic_scale_cmd_tests.rs"]
 mod scale_tests;
+
+#[cfg(test)]
+#[path = "dynamic_polar_cmd_tests.rs"]
+mod polar_tests;

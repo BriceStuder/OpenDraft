@@ -91,7 +91,7 @@ fn an_action_needs_the_kind_of_parameter_it_follows() {
     state.start_command("BACTION", baction);
     state.settle_command();
     submit_all(&mut state, &["Rotate"]);
-    assert!(said(&state, "needs a rotation parameter"));
+    assert!(said(&state, "needs a rotation or polar parameter"));
     assert!(drafted(&state).unwrap().actions.is_empty());
 
     let mut state = editing_bar();
@@ -100,5 +100,5 @@ fn an_action_needs_the_kind_of_parameter_it_follows() {
     state.start_command("BACTION", baction);
     state.settle_command();
     submit_all(&mut state, &["Stretch"]);
-    assert!(said(&state, "needs a linear parameter"));
+    assert!(said(&state, "needs a linear or polar parameter"));
 }

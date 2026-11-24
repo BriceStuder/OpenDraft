@@ -44,7 +44,8 @@ impl View {
                     .map_or(rect.center(), |p| {
                         let (DynamicParameterKind::Linear { start: at, .. }
                         | DynamicParameterKind::Rotation { base: at, .. }
-                        | DynamicParameterKind::Flip { base: at, .. }) = &p.kind;
+                        | DynamicParameterKind::Flip { base: at, .. }
+                        | DynamicParameterKind::Polar { base: at, .. }) = &p.kind;
                         to_screen(*at) + egui::vec2(0.0, 14.0)
                     }),
             };
@@ -61,6 +62,9 @@ impl View {
                 // The mirror line is drawn like a distance.
                 DynamicParameterKind::Linear { start, end, .. }
                 | DynamicParameterKind::Flip {
+                    base: start, end, ..
+                }
+                | DynamicParameterKind::Polar {
                     base: start, end, ..
                 } => (*start, *end),
                 // A rotation: its circle, and the radius the grip starts on.

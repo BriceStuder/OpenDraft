@@ -15,7 +15,19 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
     let decoded = match name {
         "BLOCKGRIPLOCATIONCOMPONENT" => return None,
         "BLOCKLINEARPARAMETER" => parameter(object).map(NodeKind::Linear),
-        "BLOCKPOLARPARAMETER" => parameter(object).map(NodeKind::Polar),
+        "BLOCKPOLARPARAMETER" => parameter(object).map(|mut p| {
+            // `307` names the angle; `145`, `146` and `147` are its minimum,
+            // maximum and increment; `175` and `176` count listed values.
+            p.angle_name = object.text(307).unwrap_or("").to_owned();
+            p.angle_range = match (object.number(145), object.number(146), object.number(147)) {
+                (Some(lo), Some(hi), Some(step)) if step > 0.0 && lo <= hi => Some((lo, hi, step)),
+                _ => None,
+            };
+            p.restricted = object.number(143).is_some_and(|i| i > 0.0)
+                || object.int(175).is_some_and(|n| n > 0)
+                || object.int(176).is_some_and(|n| n > 0);
+            NodeKind::Polar(p)
+        }),
         "BLOCKROTATIONPARAMETER" => parameter(object).map(|mut p| {
             // `143` is an angle increment and `175` how many listed angles.
             p.restricted = object.number(143).is_some_and(|i| i > 0.0)
@@ -63,6 +75,8 @@ fn parameter(object: &Record) -> Option<Parameter> {
         end: *points(object, 1011, 1021).first()?,
         values: value_list(object),
         restricted: false,
+        angle_name: String::new(),
+        angle_range: None,
     })
 }
 

@@ -27,6 +27,8 @@ mod attribute_world;
 pub mod block_draft;
 mod budget;
 pub mod dynamic;
+mod dynamic_apply;
+mod dynamic_check;
 mod dynamic_eval;
 mod dynamic_fit;
 mod dynamic_parameter;
@@ -276,6 +278,8 @@ mod dynamic_edit_tests;
 mod dynamic_eval_tests;
 #[cfg(test)]
 mod dynamic_flip_tests;
+#[cfg(test)]
+mod dynamic_polar_tests;
 #[cfg(test)]
 mod dynamic_rotation_tests;
 #[cfg(test)]

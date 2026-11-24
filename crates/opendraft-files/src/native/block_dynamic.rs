@@ -8,9 +8,8 @@
 use std::collections::HashSet;
 
 use opendraft_core::block::{
-    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicInstanceState,
-    DynamicParameter, DynamicParameterKind, DynamicValue, DynamicValueEntry, DynamicValueSet,
-    ParameterId,
+    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicParameter,
+    DynamicParameterKind, DynamicValueSet, ParameterId,
 };
 use opendraft_core::Bounds;
 use serde::{Deserialize, Serialize};
@@ -49,6 +48,18 @@ enum ParameterKindDto {
     Linear(LinearDto),
     Rotation(RotationDto),
     Flip(FlipDto),
+    Polar(PolarDto),
+}
+
+/// A polar parameter: the base, the end and the sets of each.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PolarDto {
+    base: PointDto,
+    end: PointDto,
+    distances: ValueSetDto,
+    angles: ValueSetDto,
+    angle_label: String,
 }
 
 /// A flip parameter: its mirror line.
@@ -132,32 +143,6 @@ struct ActionBodyDto {
     angle_offset: f64,
 }
 
-/// What one insert overrides.
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct DynamicStateDto {
-    #[serde(deserialize_with = "super::limits::schema_items")]
-    values: Vec<ValueEntryDto>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ValueEntryDto {
-    parameter: u64,
-    value: ValueDto,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum ValueDto {
-    Distance(f64),
-    Angle(f64),
-    Point(PointDto),
-    Integer(i64),
-    Text(String),
-    Bool(bool),
-}
-
 impl DynamicBlockDto {
     /// The schema as stored, refused if it could not be read back.
     pub(super) fn of(
@@ -225,6 +210,19 @@ impl ParameterDto {
                 base: point(*base),
                 end: point(*end),
             }),
+            DynamicParameterKind::Polar {
+                base,
+                end,
+                distance_set,
+                angle_set,
+                angle_label,
+            } => ParameterKindDto::Polar(PolarDto {
+                base: point(*base),
+                end: point(*end),
+                distances: ValueSetDto::of(distance_set),
+                angles: ValueSetDto::of(angle_set),
+                angle_label: angle_label.clone(),
+            }),
         };
         Self {
             id: p.id.0,
@@ -252,6 +250,13 @@ impl ParameterDto {
             ParameterKindDto::Flip(f) => DynamicParameterKind::Flip {
                 base: from_point(f.base)?,
                 end: from_point(f.end)?,
+            },
+            ParameterKindDto::Polar(p) => DynamicParameterKind::Polar {
+                base: from_point(p.base)?,
+                end: from_point(p.end)?,
+                distance_set: p.distances.to_set(),
+                angle_set: p.angles.to_set(),
+                angle_label: p.angle_label.clone(),
             },
         };
         Ok(DynamicParameter {
@@ -382,52 +387,10 @@ impl ActionDto {
     }
 }
 
-impl DynamicStateDto {
-    pub(super) fn of(state: &DynamicInstanceState) -> Self {
-        Self {
-            values: state
-                .values
-                .iter()
-                .map(|e| ValueEntryDto {
-                    parameter: e.parameter.0,
-                    value: match &e.value {
-                        DynamicValue::Distance(v) => ValueDto::Distance(*v),
-                        DynamicValue::Angle(v) => ValueDto::Angle(*v),
-                        DynamicValue::Point(p) => ValueDto::Point(point(*p)),
-                        DynamicValue::Integer(v) => ValueDto::Integer(*v),
-                        DynamicValue::Text(v) => ValueDto::Text(v.clone()),
-                        DynamicValue::Bool(v) => ValueDto::Bool(*v),
-                    },
-                })
-                .collect(),
-        }
-    }
+mod state;
+pub(super) use state::DynamicStateDto;
 
-    pub(super) fn to_state(&self) -> Result<DynamicInstanceState, FileError> {
-        let values = self
-            .values
-            .iter()
-            .map(|e| {
-                Ok(DynamicValueEntry {
-                    parameter: ParameterId(e.parameter),
-                    value: match &e.value {
-                        ValueDto::Distance(v) => DynamicValue::Distance(*v),
-                        ValueDto::Angle(v) => DynamicValue::Angle(*v),
-                        ValueDto::Point(p) => DynamicValue::Point(from_point(*p)?),
-                        ValueDto::Integer(v) => DynamicValue::Integer(*v),
-                        ValueDto::Text(v) => DynamicValue::Text(v.clone()),
-                        ValueDto::Bool(v) => DynamicValue::Bool(*v),
-                    },
-                })
-            })
-            .collect::<Result<_, FileError>>()?;
-        let state = DynamicInstanceState { values };
-        if !state.is_well_formed() {
-            return invalid("a block insert has values that are not finite or not in order");
-        }
-        Ok(state)
-    }
-}
-
+#[cfg(test)]
+mod kinds_tests;
 #[cfg(test)]
 mod tests;

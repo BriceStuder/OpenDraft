@@ -5,7 +5,7 @@
 
 use crate::block::{
     BlockObjectId, DynamicActionKind, DynamicBlock, DynamicInstanceState, DynamicParameterKind,
-    DynamicValueEntry,
+    DynamicValue, DynamicValueEntry,
 };
 use crate::{Bounds, Point};
 
@@ -30,7 +30,8 @@ impl DynamicBlock {
                     *end = end.translated(dx, dy);
                 }
                 DynamicParameterKind::Rotation { base, .. } => *base = base.translated(dx, dy),
-                DynamicParameterKind::Flip { base, end } => {
+                DynamicParameterKind::Flip { base, end }
+                | DynamicParameterKind::Polar { base, end, .. } => {
                     *base = base.translated(dx, dy);
                     *end = end.translated(dx, dy);
                 }
@@ -91,6 +92,19 @@ impl DynamicBlock {
             .iter()
             .filter_map(|e| {
                 let p = self.parameters.iter().find(|p| p.id == e.parameter)?;
+                if let (true, DynamicValue::Point(end)) = (p.is_polar(), &e.value) {
+                    let fitted = p.fit_end(*end)?;
+                    let DynamicParameterKind::Polar { end: drawn, .. } = &p.kind else {
+                        return None;
+                    };
+                    if (fitted.x - drawn.x).abs() <= 1e-12 && (fitted.y - drawn.y).abs() <= 1e-12 {
+                        return None;
+                    }
+                    return Some(DynamicValueEntry {
+                        parameter: e.parameter,
+                        value: DynamicValue::Point(fitted),
+                    });
+                }
                 let value = p.normalize(p.number_of(&e.value)?)?;
                 if p.default_value()
                     .is_some_and(|d| (value - d).abs() <= 1e-12)

@@ -87,8 +87,13 @@ pub struct Parameter {
     pub end: Point,
     /// A list of allowed distances; empty when there is none.
     pub values: Vec<f64>,
-    /// A rotation whose angle is not free: it has a list or an increment.
+    /// A rotation whose angle is not free (it has a list or an increment), or
+    /// a polar parameter whose distances or angles are a list.
     pub restricted: bool,
+    /// A polar parameter's angle: its name, and its minimum, maximum and
+    /// increment (radians) when it has an increment.
+    pub angle_name: String,
+    pub angle_range: Option<(f64, f64, f64)>,
 }
 
 /// An action and what it acts on.

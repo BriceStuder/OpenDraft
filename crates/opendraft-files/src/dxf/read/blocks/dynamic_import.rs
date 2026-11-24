@@ -1,5 +1,5 @@
 //! Dynamic blocks of a DXF built into the drawing, from what `dynamic`
-//! decoded. A definition keeps its linear, rotation and flip parameters and its
+//! decoded. A definition keeps its linear, polar, rotation and flip parameters and its
 //! stretch, move, scale, rotate and flip actions; what the app cannot represent (polar,
 //! lookup, visibility, scale and the rest) is left out and named in a note. A reference to
 //! an anonymous `*U` block becomes a reference to its definition with the
@@ -47,6 +47,8 @@ pub(super) struct Plan {
     failed: Vec<String>,
 }
 
+#[cfg(test)]
+mod kinds_tests;
 #[cfg(test)]
 mod tests;
 
@@ -96,10 +98,13 @@ impl Plan {
                             Some(zero) => DynamicValue::Angle(
                                 ((end.y - start.y).atan2(end.x - start.x) - zero).rem_euclid(TAU),
                             ),
+                            // So is a polar parameter: its value is the end.
+                            None if kept.polar => DynamicValue::Point(*end),
                             None => DynamicValue::Distance(distance(*start, *end)),
                         };
                         let number = match value {
                             DynamicValue::Angle(v) | DynamicValue::Distance(v) => v,
+                            DynamicValue::Point(p) => p.x + p.y,
                             _ => f64::NAN,
                         };
                         number.is_finite().then_some((kept.id, value))
@@ -206,7 +211,7 @@ impl Plan {
             .collect();
         if !imported.is_empty() {
             let mut line = format!(
-                "Imported {} with their linear, rotation and flip parameters and stretch, move, scale, rotate and flip actions: {}",
+                "Imported {} with their linear, polar, rotation and flip parameters and stretch, move, scale, rotate and flip actions: {}",
                 crate::plural(imported.len() as u64, "dynamic block"),
                 list(&imported)
             );

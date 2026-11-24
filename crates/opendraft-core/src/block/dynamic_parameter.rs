@@ -21,7 +21,11 @@ pub(super) struct Axis {
 
 impl DynamicParameter {
     pub(super) fn axis(&self) -> Option<Axis> {
-        let DynamicParameterKind::Linear { start, end, .. } = &self.kind else {
+        let (DynamicParameterKind::Linear { start, end, .. }
+        | DynamicParameterKind::Polar {
+            base: start, end, ..
+        }) = &self.kind
+        else {
             return None;
         };
         let (vx, vy) = (end.x - start.x, end.y - start.y);
@@ -37,7 +41,9 @@ impl DynamicParameter {
     /// it has a base and a radius (a rotation).
     pub fn is_degenerate(&self) -> bool {
         match &self.kind {
-            DynamicParameterKind::Linear { .. } => self.axis().is_none(),
+            DynamicParameterKind::Linear { .. } | DynamicParameterKind::Polar { .. } => {
+                self.axis().is_none()
+            }
             DynamicParameterKind::Rotation { base, radius, .. } => {
                 !(base.x.is_finite() && base.y.is_finite() && radius.is_finite() && *radius > EPS)
             }
@@ -57,7 +63,9 @@ impl DynamicParameter {
     /// parameter's points, or no turn for a rotation.
     pub fn default_value(&self) -> Option<f64> {
         match &self.kind {
-            DynamicParameterKind::Linear { .. } => self.axis().map(|a| a.length),
+            DynamicParameterKind::Linear { .. } | DynamicParameterKind::Polar { .. } => {
+                self.axis().map(|a| a.length)
+            }
             DynamicParameterKind::Rotation { .. } | DynamicParameterKind::Flip { .. } => {
                 (!self.is_degenerate()).then_some(0.0)
             }
@@ -80,6 +88,7 @@ impl DynamicParameter {
         match &self.kind {
             DynamicParameterKind::Linear { value_set, .. }
             | DynamicParameterKind::Rotation { value_set, .. } => value_set,
+            DynamicParameterKind::Polar { distance_set, .. } => distance_set,
             DynamicParameterKind::Flip { .. } => &FLAG,
         }
     }
@@ -107,6 +116,66 @@ impl DynamicParameter {
         }
     }
 
+    /// Whether its value is a point: a polar parameter's end.
+    pub fn is_polar(&self) -> bool {
+        matches!(self.kind, DynamicParameterKind::Polar { .. })
+    }
+
+    /// Whether the value sets it holds are all usable.
+    pub fn sets_valid(&self) -> bool {
+        match &self.kind {
+            DynamicParameterKind::Polar {
+                distance_set,
+                angle_set,
+                ..
+            } => distance_set.is_valid() && angle_set.is_valid(),
+            _ => self.value_set().is_valid(),
+        }
+    }
+
+    /// Where a polar parameter's end is in an insert with `state`.
+    pub fn polar_end(
+        &self,
+        state: Option<&DynamicInstanceState>,
+    ) -> Result<Point, DynamicBlockError> {
+        let DynamicParameterKind::Polar { end, .. } = &self.kind else {
+            return Err(DynamicBlockError::BadValue(self.id));
+        };
+        match state.and_then(|s| s.get(self.id)) {
+            None => Ok(*end),
+            Some(DynamicValue::Point(p)) if p.x.is_finite() && p.y.is_finite() => Ok(*p),
+            Some(_) => Err(DynamicBlockError::BadValue(self.id)),
+        }
+    }
+
+    /// `end` brought into a polar parameter's sets: its distance from the
+    /// base into the distance set and its angle into the angle set (the
+    /// nearest turn in a list). `None` for a point that is not finite, or
+    /// one that comes to no distance.
+    pub fn fit_end(&self, end: Point) -> Option<Point> {
+        let DynamicParameterKind::Polar {
+            base,
+            distance_set,
+            angle_set,
+            ..
+        } = &self.kind
+        else {
+            return None;
+        };
+        if !(end.x.is_finite() && end.y.is_finite()) {
+            return None;
+        }
+        let (dx, dy) = (end.x - base.x, end.y - base.y);
+        let distance = distance_set.normalize(dx.hypot(dy))?;
+        let angle = normalize_angle(angle_set, dy.atan2(dx), false)?;
+        (distance > EPS).then(|| {
+            Point::new(
+                base.x + distance * angle.cos(),
+                base.y + distance * angle.sin(),
+            )
+        })
+    }
+
     /// The value of the set nearest `value` (see [`DynamicValueSet::normalize`]),
     /// where an angle also counts turns: with no set it is brought into 0 to
     /// a full turn, and in a list the nearest is the one a shorter turn away.
@@ -119,19 +188,7 @@ impl DynamicParameter {
         if !self.is_angle() {
             return self.value_set().normalize(value);
         }
-        if !value.is_finite() {
-            return None;
-        }
-        match self.value_set() {
-            DynamicValueSet::Any => Some(value.rem_euclid(TAU)),
-            DynamicValueSet::List(xs) if self.value_set().is_valid() => {
-                let apart = |x: f64| (x - value).rem_euclid(TAU).min((value - x).rem_euclid(TAU));
-                xs.iter()
-                    .copied()
-                    .min_by(|a, b| apart(*a).total_cmp(&apart(*b)))
-            }
-            set => set.normalize(value),
-        }
+        normalize_angle(self.value_set(), value, true)
     }
 
     /// The value an insert with `state` has.
@@ -159,5 +216,24 @@ impl DynamicParameter {
     ) -> Result<(f64, Axis), DynamicBlockError> {
         let axis = self.axis().ok_or(DynamicBlockError::Degenerate(self.id))?;
         Ok((self.value(state)?, axis))
+    }
+}
+
+/// `value`, an angle, brought into `set`: with no set it is wrapped into 0 to
+/// a full turn when `wrap` (a polar angle keeps its own turn), and in a list
+/// the nearest is the one a shorter turn away.
+fn normalize_angle(set: &DynamicValueSet, value: f64, wrap: bool) -> Option<f64> {
+    if !value.is_finite() {
+        return None;
+    }
+    match set {
+        DynamicValueSet::Any => Some(if wrap { value.rem_euclid(TAU) } else { value }),
+        DynamicValueSet::List(xs) if set.is_valid() => {
+            let apart = |x: f64| (x - value).rem_euclid(TAU).min((value - x).rem_euclid(TAU));
+            xs.iter()
+                .copied()
+                .min_by(|a, b| apart(*a).total_cmp(&apart(*b)))
+        }
+        set => set.normalize(value),
     }
 }
