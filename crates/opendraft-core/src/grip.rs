@@ -9,6 +9,7 @@
 
 use std::f64::consts::FRAC_PI_2;
 
+use crate::block::DynamicGrip;
 use crate::intersect::corners;
 use crate::{arc, bulge, Bounds, Entity, Point};
 
@@ -23,6 +24,9 @@ pub enum GripKind {
     Move,
     /// Changes the size (a radius).
     Resize,
+    /// A parameter's grip on a block reference. Dragging it changes that
+    /// parameter's value on the insert, not the insert's geometry.
+    Dynamic(DynamicGrip),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -54,14 +58,21 @@ impl Entity {
     ///   its start and end (see [`crate::Ellipse::grips`]);
     /// - spline: its fit points, or its control points (see
     ///   [`crate::Spline::grips`]);
-    /// - block reference: its insertion point, which moves it;
+    /// - block reference: its insertion point, which moves it, then the grip
+    ///   of each parameter of a dynamic block;
     /// - hatch: one grip at the middle of its extent, which moves it;
     /// - construction line or ray: its base point, then a point on the line
     ///   (two for a construction line) that turns it ([`crate::infinite`]).
     pub fn grips(&self) -> Vec<Grip> {
         use GripKind::{Move, Resize, Stretch};
         match self {
-            Entity::Insert(i) => vec![grip(i.insertion, Move)],
+            Entity::Insert(i) => std::iter::once(grip(i.insertion, Move))
+                .chain(
+                    i.dynamic_grips()
+                        .into_iter()
+                        .map(|(g, at)| grip(at, GripKind::Dynamic(g))),
+                )
+                .collect(),
             Entity::AttributeDefinition(d) => vec![grip(d.text.position, Move)],
             Entity::Text(t) => t.alignment.map_or_else(
                 || vec![grip(t.position(), Move)],
@@ -157,10 +168,15 @@ impl Entity {
                 .with_grip_moved(index, to)
                 .map(|l| Entity::Leader(Box::new(l))),
             Entity::Xline { .. } | Entity::Ray { .. } => self.line_grip_moved(index, to),
-            Entity::Insert(_)
-            | Entity::AttributeDefinition(_)
-            | Entity::Hatch(_)
-            | Entity::Point { .. } => Some(self.translated(dx, dy)),
+            Entity::Insert(i) => match grips[index].kind {
+                GripKind::Dynamic(g) => i
+                    .with_dynamic_grip_moved(g, to)
+                    .map(|i| Entity::Insert(Box::new(i))),
+                _ => Some(self.translated(dx, dy)),
+            },
+            Entity::AttributeDefinition(_) | Entity::Hatch(_) | Entity::Point { .. } => {
+                Some(self.translated(dx, dy))
+            }
             Entity::Text(t) => match (t.alignment, index) {
                 (Some(a), 0) => t
                     .with_alignment_points(to, a.second)

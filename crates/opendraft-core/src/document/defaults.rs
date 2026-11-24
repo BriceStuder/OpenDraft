@@ -38,6 +38,7 @@ impl Default for Document {
             current_mleader_style: MLeaderStyleId::STANDARD,
             blocks: Vec::new(),
             next_block_id: 1,
+            block_editor_dynamic: None,
             next_attribute_definition_id: 1,
             linetypes: LinetypeTable::default(),
             linetype_scale: 1.0,

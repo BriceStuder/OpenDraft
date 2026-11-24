@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use crate::block::{BlockDef, BlockEntity, BlockId};
+use crate::block::{BlockDef, BlockEntity, BlockId, BlockObjectId};
 use crate::{Document, Entity, EntityId, Layer, Point};
 
 /// What saving the Block Editor changes in the drawing, ready to be
@@ -25,6 +25,12 @@ pub struct BlockEditSave {
     pub blocks: Vec<Arc<BlockDef>>,
     /// Inserts that now point at new records.
     pub objects: Vec<(EntityId, Entity)>,
+    /// Inserts whose values the new schema changed or dropped.
+    pub states_changed: usize,
+    /// Names of the actions removed because no object of theirs is left.
+    pub removed_actions: Vec<String>,
+    /// What else the save did to the schema, one line each.
+    pub notes: Vec<String>,
 }
 
 impl Document {
@@ -60,6 +66,23 @@ impl Document {
             .filter(|b| b.id != id && work.block(b.id).is_none_or(|known| **known != ***b))
             .map(|b| (**b).clone())
             .collect();
+        let (mut notes, mut removed_actions) = (Vec::new(), Vec::new());
+        let dynamic = match editor.block_editor_dynamic() {
+            Some(draft) => {
+                let pruned = draft.pruned(|o| editor.get(EntityId(o.0)).is_some());
+                let ids = editor
+                    .model_objects()
+                    .map(|o| BlockObjectId(o.id.0))
+                    .collect();
+                pruned
+                    .schema
+                    .check(&ids)
+                    .map_err(|_| "The block's parameters and actions are not valid.")?;
+                (notes, removed_actions) = (pruned.notes, pruned.removed);
+                Some(Box::new(pruned.schema))
+            }
+            None => None,
+        };
         let mut edited = BlockDef {
             unit: old.unit,
             id,
@@ -68,11 +91,10 @@ impl Document {
             description: old.description.clone(),
             entities: editor
                 .model_objects()
-                .map(|o| BlockEntity {
-                    entity: o.entity.clone(),
-                    attrs: o.attrs.clone(),
-                })
+                .map(|o| BlockEntity::new(BlockObjectId(o.id.0), o.entity.clone(), o.attrs.clone()))
                 .collect(),
+            // What the editor drafted (it starts as the block's own).
+            dynamic,
         };
         // A copied definition arrives with its original's id.
         edited.renumber_duplicate_attributes(|| work.allocate_attribute_definition_id());
@@ -87,17 +109,29 @@ impl Document {
         if work.validate().is_err() {
             return Err("The block cannot be saved: it uses something the drawing does not have, such as two layers with one name.");
         }
-        let objects = work
+        let objects: Vec<(EntityId, Entity)> = work
             .objects()
             .iter()
             .filter(|o| matches!(o.entity, Entity::Insert(_)) && self.get(o.id) != Some(&o.entity))
             .map(|o| (o.id, o.entity.clone()))
             .collect();
+        let states_changed = objects
+            .iter()
+            .filter(|(id, now)| match (self.get(*id), now) {
+                (Some(Entity::Insert(was)), Entity::Insert(now)) => {
+                    was.dynamic.is_some() && was.dynamic != now.dynamic
+                }
+                _ => false,
+            })
+            .count();
         Ok(BlockEditSave {
             new_layers,
             changed_layers,
             blocks: work.blocks().to_vec(),
             objects,
+            states_changed,
+            removed_actions,
+            notes,
         })
     }
 }

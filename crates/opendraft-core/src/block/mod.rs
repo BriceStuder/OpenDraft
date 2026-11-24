@@ -26,12 +26,22 @@ mod attribute_sync;
 mod attribute_world;
 pub mod block_draft;
 mod budget;
+pub mod dynamic;
+mod dynamic_apply;
+mod dynamic_check;
+mod dynamic_eval;
+mod dynamic_fit;
+mod dynamic_lookup;
+mod dynamic_parameter;
+mod dynamic_value_set;
+mod dynamic_visibility;
 mod edit;
 mod editing;
 pub mod field;
 mod field_draft;
 mod field_eval;
 pub mod field_kinds;
+mod materialize;
 mod picture;
 mod table;
 
@@ -44,6 +54,14 @@ pub use attribute::{
 };
 pub use attribute_sync::{sync_references, Synced};
 pub use budget::MAX_EXPANSION;
+pub use dynamic::{
+    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicFamily,
+    DynamicGrip, DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue,
+    DynamicValueEntry, DynamicValueSet, LookupRow, ParameterId, VisibilityState,
+};
+pub use dynamic_eval::{evaluate, DynamicBlockError};
+pub use dynamic_fit::Pruned;
+pub use dynamic_lookup::CUSTOM;
 pub use editing::BlockEditSave;
 pub use field::{
     DataField, FieldObjectRef, FieldRun, FieldStatus, FieldText, FieldValue, MAX_FIELDS_PER_TEXT,
@@ -51,6 +69,7 @@ pub use field::{
 pub use field_draft::{FieldDraft, ObjectChoice};
 pub use field_eval::{update_all_fields, update_fields, FieldContext, FieldUpdate, ObjectProperty};
 pub use field_kinds::{FieldCategory, FieldKind, FieldTime, FormatChoice};
+pub use materialize::Materialized;
 pub use picture::Piece;
 pub use table::{block_name_problem, Redefinition};
 
@@ -68,8 +87,17 @@ pub const MAX_NESTING: usize = 64;
 /// coordinates, and its layer and properties.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BlockEntity {
+    /// Stable inside this definition, so a dynamic block's actions can name
+    /// the object; not a drawing-wide `EntityId`. Unique in the definition.
+    pub id: BlockObjectId,
     pub entity: Entity,
     pub attrs: Attributes,
+}
+
+impl BlockEntity {
+    pub fn new(id: BlockObjectId, entity: Entity, attrs: Attributes) -> Self {
+        Self { id, entity, attrs }
+    }
 }
 
 /// A block definition: the record in the block table.
@@ -88,9 +116,17 @@ pub struct BlockDef {
     pub unit: InsertUnits,
     /// The objects, in draw order.
     pub entities: Vec<BlockEntity>,
+    /// `None` for an ordinary block; the parameters and actions of a dynamic
+    /// one.
+    pub dynamic: Option<Box<DynamicBlock>>,
 }
 
 impl BlockDef {
+    /// Whether the block has parameters and actions.
+    pub fn is_dynamic(&self) -> bool {
+        self.dynamic.is_some()
+    }
+
     /// The ids of the blocks this one inserts directly.
     pub fn nested_blocks(&self) -> impl Iterator<Item = BlockId> + '_ {
         self.entities.iter().filter_map(|e| match &e.entity {
@@ -143,6 +179,9 @@ pub struct Insert {
     /// One reference per non-constant attribute definition of the block, in
     /// definition order, each with this insert's own value. See [`attribute`].
     pub attributes: Vec<AttributeReference>,
+    /// The values this insert overrides, or `None` for the definition's
+    /// defaults. Only a block with a dynamic schema may have it.
+    pub dynamic: Option<Box<DynamicInstanceState>>,
 }
 
 impl Insert {
@@ -155,6 +194,15 @@ impl Insert {
             scale_y: 1.0,
             rotation: 0.0,
             attributes: Vec::new(),
+            dynamic: None,
+        }
+    }
+
+    /// This insert with every dynamic value back at the definition's default.
+    pub fn reset_dynamic(&self) -> Insert {
+        Insert {
+            dynamic: None,
+            ..self.clone()
         }
     }
 
@@ -173,7 +221,8 @@ impl Insert {
             .any(|r| r.attrs.as_ref().is_some_and(|a| a.layer == layer))
     }
 
-    /// Whether the scales are finite and not zero, and the rest finite.
+    /// Whether the scales are finite and not zero, the rest finite, and its
+    /// dynamic values (if any) well formed.
     pub fn is_valid(&self) -> bool {
         let finite = [
             self.insertion.x,
@@ -184,7 +233,8 @@ impl Insert {
         ]
         .iter()
         .all(|v| v.is_finite());
-        finite && self.scale_x != 0.0 && self.scale_y != 0.0
+        let state_ok = self.dynamic.as_ref().is_none_or(|s| s.is_well_formed());
+        finite && state_ok && self.scale_x != 0.0 && self.scale_y != 0.0
     }
 
     /// Whether the x and y scales have the same size (signs may differ), so
@@ -224,4 +274,30 @@ pub fn inherited(
 #[cfg(test)]
 mod attribute_tests;
 #[cfg(test)]
+mod dynamic_bench;
+#[cfg(test)]
+mod dynamic_edit_tests;
+#[cfg(test)]
+mod dynamic_eval_tests;
+#[cfg(test)]
+mod dynamic_flip_tests;
+#[cfg(test)]
+mod dynamic_lookup_tests;
+#[cfg(test)]
+mod dynamic_polar_tests;
+#[cfg(test)]
+mod dynamic_rotation_tests;
+#[cfg(test)]
+mod dynamic_scale_tests;
+#[cfg(test)]
+mod dynamic_tests;
+#[cfg(test)]
+mod dynamic_visibility_tests;
+#[cfg(test)]
+mod dynamic_xy_tests;
+#[cfg(test)]
+mod expansion_tests;
+#[cfg(test)]
 pub(crate) mod tests;
+#[cfg(test)]
+mod value_set_tests;

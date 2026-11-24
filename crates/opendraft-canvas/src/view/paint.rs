@@ -275,6 +275,20 @@ impl View {
                 } else {
                     style.selected
                 };
+                // A parameter's grip is a diamond, so it is not taken for a
+                // handle that moves or reshapes the object.
+                if matches!(grip.kind, opendraft_core::GripKind::Dynamic(_)) {
+                    let r = half * 1.4;
+                    let corners = [(0.0, -r), (r, 0.0), (0.0, r), (-r, 0.0)]
+                        .map(|(x, y)| at + egui::vec2(x, y))
+                        .to_vec();
+                    painter.add(egui::Shape::convex_polygon(
+                        corners,
+                        fill,
+                        Stroke::new(1.0_f32, style.background),
+                    ));
+                    continue;
+                }
                 let square = Rect::from_center_size(at, egui::vec2(2.0 * half, 2.0 * half));
                 painter.rect_filled(square, 0.0, fill);
                 painter.rect_stroke(

@@ -318,7 +318,8 @@ impl Insert {
     /// This insert pointing at `block`, a redefinition of its block. Its
     /// references stay as they are, except that one whose definition is gone
     /// becomes an orphan (no source), so nothing is lost until the user
-    /// synchronises.
+    /// synchronises. Its dynamic values are kept as far as the new
+    /// definition's schema allows them.
     pub fn rebound(&self, block: Arc<BlockDef>) -> Insert {
         let mut insert = self.clone();
         for r in &mut insert.attributes {
@@ -331,6 +332,11 @@ impl Insert {
                 r.source = None;
             }
         }
+        // The values the new schema still allows; none for a static block.
+        insert.dynamic = match (&block.dynamic, insert.dynamic.as_deref()) {
+            (Some(schema), Some(state)) => schema.fit_state(state).map(Box::new),
+            _ => None,
+        };
         insert.block = block;
         insert
     }
@@ -446,10 +452,12 @@ mod tests {
             ]
             .into_iter()
             .map(|d| BlockEntity {
+                id: crate::BlockObjectId(0),
                 entity: Entity::AttributeDefinition(Box::new(d)),
                 attrs: Attributes::on_layer(crate::LayerId::DEFAULT),
             })
             .collect(),
+            dynamic: None,
         };
         let refs = block.new_references(|d| d.default_value.clone());
         let tags: Vec<_> = refs.iter().map(|r| r.tag.as_str()).collect();

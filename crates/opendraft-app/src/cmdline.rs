@@ -108,12 +108,15 @@ impl CommandLine {
     }
 
     /// Remember a command started with no other command running, for Enter
-    /// to repeat. As in AutoCAD that is any command (U, ZOOM, LAYOFF,
-    /// PLOT...), except the switches and panels, which are settings rather
-    /// than commands: repeating F7 would only turn the grid back off.
+    /// to repeat. As in AutoCAD that is any command (U, ZOOM, ROTATEVIEW,
+    /// PLAN, CCS, LAYOFF, PLOT...), except the switches and panels, which are
+    /// settings rather than commands: repeating F7 would only turn the grid
+    /// back off.
     pub fn note_last(&mut self, id: &'static str) {
         let view = id.starts_with("view.");
-        let moves_the_view = id.starts_with("view.zoom") || id == "view.pan";
+        let moves_the_view = id.starts_with("view.zoom")
+            || id.starts_with("view.ccs")
+            || ["view.pan", "view.rotate", "view.plan"].contains(&id);
         if (view && !moves_the_view) || id == "tool.select" || id == "edit.cancel" {
             return;
         }
@@ -428,6 +431,13 @@ mod tests {
             line.note_last(id);
             assert_eq!(line.last_command, Some(id));
         }
+        // The view commands repeat as well.
+        for id in ["view.rotate", "view.plan", "view.ccs", "view.zoom_extents"] {
+            line.note_last("draw.line");
+            line.note_last(id);
+            assert_eq!(line.last_command, Some(id));
+        }
+        line.note_last("inquiry.distance");
         // Settings and view changes leave the command to repeat alone.
         line.note_last("view.grid");
         assert_eq!(line.last_command, Some("inquiry.distance"));

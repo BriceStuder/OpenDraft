@@ -151,6 +151,15 @@ impl Runner {
         }
     }
 
+    /// [`cancel`](Self::cancel), then give the command up to `patience` for
+    /// each request to do what it does when cancelled (PLINE adds the
+    /// polyline drawn so far) and end, before the runner is dropped. A
+    /// command still busy after that ends on its own, its edits lost.
+    pub fn cancel_and_settle(&mut self, session: &mut Session, patience: Duration) {
+        self.cancel();
+        self.pump(session, Some(patience));
+    }
+
     /// Do the drawing work the command has asked for and stop at its next
     /// prompt or its end. Never blocks.
     pub fn poll(&mut self, session: &mut Session) {

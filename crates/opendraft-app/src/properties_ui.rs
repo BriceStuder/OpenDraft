@@ -46,6 +46,38 @@ pub enum Edit {
         value: String,
         kind: Option<EntityKind>,
     },
+    /// A parameter of the selected dynamic block references, as a length in
+    /// drawing units.
+    Dynamic {
+        parameter: opendraft_core::block::ParameterId,
+        /// Which of the parameter's values (a polar parameter has two).
+        part: u8,
+        value: f64,
+        kind: Option<EntityKind>,
+    },
+}
+
+impl AppState {
+    /// Carry out what the panel's edit asked for.
+    pub fn apply_property_edit(&mut self, edit: Edit) {
+        match edit {
+            Edit::Value {
+                field,
+                label,
+                value,
+                kind,
+            } => self.set_property(field, label, value, kind),
+            Edit::Attr { edit, kind } => self.set_attrs(&edit, kind),
+            Edit::Style(edit) => self.set_object_style(&edit),
+            Edit::Attribute { tag, value, kind } => self.set_attribute_value(&tag, &value, kind),
+            Edit::Dynamic {
+                parameter,
+                part,
+                value,
+                kind,
+            } => self.set_dynamic_value(parameter, part, value, kind),
+        }
+    }
 }
 
 pub fn show(ui: &mut Ui, theme: &Theme, state: &AppState) -> Option<Edit> {
@@ -170,6 +202,21 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
             if let Some((tag, value)) = changed {
                 edit = Some(Edit::Attribute {
                     tag,
+                    value,
+                    kind: filter,
+                });
+            }
+        }
+        let custom = crate::dynamic_rows::rows(&inserts);
+        if !custom.is_empty() {
+            let units = document.units();
+            let changed = section(ui, theme, &t!("Custom"), |ui| {
+                crate::dynamic_rows::show(ui, theme, units, &custom)
+            });
+            if let Some((parameter, part, value)) = changed {
+                edit = Some(Edit::Dynamic {
+                    parameter,
+                    part,
                     value,
                     kind: filter,
                 });

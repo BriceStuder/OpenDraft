@@ -74,7 +74,7 @@ impl AppState {
         self.once.clear();
         self.snap_menu = None;
         if let Some(mut runner) = self.runner.take() {
-            runner.cancel();
+            self.settle_cancelled(&mut runner);
             self.note_command_end(Outcome::Cancelled);
             let last = self.docs.len() - 1;
             self.docs[self.run_doc.min(last)].dynamic_input.clear();

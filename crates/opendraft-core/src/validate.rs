@@ -71,6 +71,13 @@ pub enum DocumentError {
     BadInsert(EntityId),
     /// An attribute definition or reference that could not exist, with the reason.
     BadAttribute(String),
+    /// A block's dynamic schema could not exist (an unknown version, a repeated
+    /// or unissued id, an action naming a missing parameter or object), by
+    /// block name and reason.
+    BadDynamicBlock(String, String),
+    /// A block reference carries dynamic values its block cannot take, with the
+    /// reason.
+    BadDynamicState(EntityId, String),
 }
 
 impl fmt::Display for DocumentError {
@@ -137,6 +144,12 @@ impl fmt::Display for DocumentError {
                 write!(f, "object {} is not a valid block insert", object.0)
             }
             Self::BadAttribute(why) => write!(f, "attribute: {why}"),
+            Self::BadDynamicBlock(name, why) => {
+                write!(f, "block \"{name}\" is not a valid dynamic block: {why}")
+            }
+            Self::BadDynamicState(object, why) => {
+                write!(f, "object {} has an invalid dynamic state: {why}", object.0)
+            }
         }
     }
 }

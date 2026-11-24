@@ -182,12 +182,14 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: vec![BlockEntity {
+                id: crate::BlockObjectId(0),
                 entity: circle(),
                 attrs: Attributes {
                     linetype: Attr::Set(LinetypeId::CENTER),
                     ..Attributes::on_layer(LayerId::DEFAULT)
                 },
             }],
+            dynamic: None,
         }));
         let mut table = doc.mleader_styles().to_vec();
         table[0].leader_linetype = Attr::Set(LinetypeId::PHANTOM);

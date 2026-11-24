@@ -7,7 +7,9 @@
 use crate::{Chamfer, CornerError, Entity, Joined, Point};
 
 /// Round the corner of `a` and `b` with an arc of `radius`; see
-/// [`crate::fillet::fillet`]. Either may be a construction line or ray.
+/// [`crate::fillet::fillet`]. Either may be a construction line or ray. Two
+/// parallel lines are joined by a half circle whatever the radius (see
+/// `fillet_parallel`).
 pub fn fillet(
     a: &Entity,
     b: &Entity,
@@ -15,6 +17,9 @@ pub fn fillet(
     picked_a: Point,
     picked_b: Point,
 ) -> Result<Joined, CornerError> {
+    if let Some(joined) = crate::fillet_parallel::fillet_parallel(a, b, picked_a) {
+        return joined;
+    }
     through_lines(a, b, |x, y| {
         crate::fillet::fillet(x, y, radius, picked_a, picked_b)
     })
