@@ -32,6 +32,9 @@ impl std::error::Error for Cancelled {}
 pub struct Keyword {
     pub label: String,
     pub key: String,
+    /// Tells apart, for translation, two options with the same English label
+    /// and different meanings (TEXT's Fit and SPLINE's Fit).
+    pub context: Option<&'static str>,
 }
 
 impl Keyword {
@@ -39,6 +42,7 @@ impl Keyword {
         Self {
             label: label.into(),
             key: key.into(),
+            context: None,
         }
     }
 }
@@ -152,6 +156,21 @@ impl<T> Options<T> {
     /// Offer a keyword; answer it with `ask_*`.
     pub fn keyword(mut self, label: impl Into<String>, key: impl Into<String>) -> Self {
         self.keywords.push(Keyword::new(label, key));
+        self
+    }
+
+    /// Offer a keyword whose label means something else in other commands:
+    /// it is translated under `context` (see [`Keyword::context`]).
+    pub fn keyword_in(
+        mut self,
+        context: &'static str,
+        label: impl Into<String>,
+        key: impl Into<String>,
+    ) -> Self {
+        self.keywords.push(Keyword {
+            context: Some(context),
+            ..Keyword::new(label, key)
+        });
         self
     }
 

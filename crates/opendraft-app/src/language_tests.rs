@@ -53,7 +53,8 @@ fn every_translated_text_is_still_in_the_code() {
     let mut stale = Vec::new();
     for locale in backend.available_locales() {
         for (key, _) in backend.messages_for_locale(&locale).unwrap_or_default() {
-            if !used.contains(key.as_ref()) {
+            // Options ("[Undo]") are checked in `option_language_tests.rs`.
+            if !key.starts_with('[') && !used.contains(key.as_ref()) {
                 stale.push(format!("{locale}: {key:?}"));
             }
         }

@@ -70,7 +70,7 @@ fn ask_method(ed: &Editor) -> Result<(), Cancelled> {
     };
     let answer = ed.get_keyword(
         Options::<String>::new(key!("Enter spline creation method"))
-            .keyword("Fit", "F")
+            .keyword_in("spline", "Fit", "F")
             .keyword("CV", "C")
             .default(current.to_owned()),
     )?;

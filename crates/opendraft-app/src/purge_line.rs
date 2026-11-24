@@ -79,9 +79,7 @@ fn verify(ed: &Editor) -> Result<bool, Cancelled> {
 
 /// -PURGE.
 pub fn purge_prompt(ed: &mut Editor) -> Result<(), Cancelled> {
-    let mut options = Options::<String>::new(
-        key!("Enter type of unused objects to purge [Blocks/Dimstyles/LAyers/LTypes/MUltileaderstyles/textSTyles/Zero-length geometry/Empty text objects/All]"),
-    );
+    let mut options = Options::<String>::new(key!("Enter type of unused objects to purge"));
     for (_, label, key) in KINDS {
         options = options.keyword(label, key);
     }
