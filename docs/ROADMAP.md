@@ -66,7 +66,7 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 - [x] **Plot gaps (M), done 03-11-2026 (PRs #105 and #108).** Margins, plot area (Layout, Limits, Extents, Window), plot scale, offset and centring, rotation, wide polylines (filled ribbons) and viewport borders are built and tested in `opendraft_core::plot`/`plot_plan`, and set in the Plot dialog and Page Setup. Still refused, with a clear message: Display and named View areas (no persistent view state). Paper output through the Windows and CUPS backends is built; see the next item for what is still unproven.
 - [ ] **Layers to cut settings (S to M).** Laser software reads colour or layer as "cut", "engrave" and "score". Check that SVG and DXF carry layer names and colours in a way those tools use, and document the recipe.
 - [ ] **Clean DXF for fabrication (M).** Correct units, closed polylines, splines handled sensibly. OVERKILL and JOIN already help; add a checklist test of a typical laser-cutting file.
-- [ ] **DXF gaps (M).** Anonymous blocks on import (references to them are skipped and counted). TEXT import and block export are built (checked 21-11-2026).
+- [ ] **DXF gaps (M).** Anonymous blocks on import are built (24-11-2026, not yet checked with a real AutoCAD file; see "Checks still owed"). TEXT import and block export are built (checked 21-11-2026).
 - [ ] **Templates and a first-hour tutorial (S).** A metric sheet, A4 and A3, a laser-cutting template, and a ten-command walkthrough.
 - [ ] **Hatch patterns from `.pat` files, and linetypes from `.lin` files (M).** Check what loads today (there is a stock linetype library) before scoping.
 

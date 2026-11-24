@@ -116,7 +116,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 ## Files
 
-- DXF import: anonymous blocks (references to them are skipped and counted, as dynamic blocks are).
+- DXF and DWG import: an anonymous block a reference places (a modified dynamic block's `*U`) comes in as an ordinary block with its picture; its parameters and actions are not read, and a named dynamic definition with no anonymous copy arrives as a static block of its default state with no warning (it cannot be told apart without the dynamic-block objects).
 - DXF export writes no `FIELD` objects and no hatch associations. (It writes R12, or R2000 when a drawing has layouts, blocks, ellipses, splines, hatches or text.)
 - DWG: import only (no export), and import skips layouts, hatches, dimensions, multiline attributes, attributes of inserts on layouts and MTEXT in columns.
 - DXF and DWG skip fit-point-only splines with end tangents or not cubic.
@@ -169,6 +169,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
+- **Anonymous block import from a real AutoCAD file:** DXF and DWG import of placed `*U` blocks is tested with hand-made data only. No sample drawing holds one, and the `*U` naming and ownership rules come from Autodesk's developer blog, not a specification. Open a drawing with a stretched dynamic block (DXF and DWG), check the picture matches AutoCAD's, then take this line off.
 - **In AutoCAD** (open, `AUDIT`, edit, save): the Model-tab freeze's XDATA on LAYER records (it should survive a save), everything the DXF writer emits for dimensions, multileaders, legacy leaders and block attributes, ByBlock, and the R2000 layout export; the DWG reader's object counts against an AutoCAD listing; the ellipse angle convention and the spline prompts; MTEXT tracking at the end of a line; the rectangular array's default spacing; the multileader style's angle constraints and attachment codes.
 - **Custom coordinate systems in files:** an ordinate dimension made in a turned system has not been checked against one AutoCAD made (only the sign of group 51 against ezdxf); a DXF with a turned UCS has not been opened in AutoCAD (ezdxf reads ours cleanly), and no DWG with a turned UCS has been read: every local sample has the World UCS, so the decoded values are proven only to keep the header aligned. The paper space `$PUCS*` variables are not written (AutoCAD's defaults are World).
 - **By hand in the real app, the custom coordinate system:** tried 22-11-2026: Rotate, Object (on a line) and View in the Model tab; the turned grid, axes, icon and crosshair; grid snap to the turned grid; ortho holding a line along the turned X axis, with the dynamic input fields; LINE with typed relative points; the refusal on a layout's sheet; a viewport's own system (entered with MSPACE, turned 45 degrees while the Model tab's stayed at 30). Not yet tried: polar and object snap tracking, ROTATE and grip rotate, and the commands that orient what they make (TEXT, RECTANG, DIMLINEAR, DIMORDINATE, ARRAYRECT, HATCH, MLEADER), which are covered by tests only.

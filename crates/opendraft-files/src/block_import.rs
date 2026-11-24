@@ -113,12 +113,45 @@ impl<K> Default for ImportedBlocks<K> {
     }
 }
 
-/// The sentence for references to anonymous blocks, which are not read.
+/// The sentence for references to anonymous blocks, which come in as
+/// ordinary blocks that keep their appearance.
 pub(crate) fn anonymous_references(count: u64) -> String {
     format!(
-        "Skipped {} to anonymous blocks, such as dynamic blocks (these are not imported yet).",
+        "Imported {} to anonymous blocks (such as modified dynamic blocks) as ordinary blocks; their parameters and actions were not imported.",
         plural(count, "block reference")
     )
+}
+
+/// A name for an anonymous block (`*U12`), which AutoCAD does not let a block
+/// carry: unique among `taken` (lower-cased), which it joins.
+pub(crate) fn anonymous_name(
+    original: &str,
+    taken: &mut std::collections::HashSet<String>,
+) -> String {
+    let base = format!("Anonymous_{}", original.trim_start_matches('*'));
+    let mut name = base.clone();
+    let mut n = 2;
+    while !taken.insert(name.to_lowercase()) {
+        name = format!("{base}_{n}");
+        n += 1;
+    }
+    name
+}
+
+/// The names to build `names` under, in order: each anonymous one (`*U12`)
+/// renamed, the rest as they are.
+pub(crate) fn importable_names<'a>(names: impl Iterator<Item = &'a str> + Clone) -> Vec<String> {
+    let mut taken: std::collections::HashSet<String> = names
+        .clone()
+        .filter(|n| !n.starts_with('*'))
+        .map(|n| n.trim().to_lowercase())
+        .collect();
+    names
+        .map(|n| match n.starts_with('*') {
+            true => anonymous_name(n, &mut taken),
+            false => n.to_owned(),
+        })
+        .collect()
 }
 
 /// The sentence for references to other drawings, which are not read.
