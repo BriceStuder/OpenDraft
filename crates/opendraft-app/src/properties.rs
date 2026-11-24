@@ -6,6 +6,7 @@ mod ellipse;
 mod hatch;
 mod infinite;
 mod mleader;
+mod oblong;
 mod polyline;
 mod shared;
 mod spline;
@@ -45,6 +46,10 @@ pub enum Field {
     CornerRadius,
     /// How far a rectangular polyline's bevelled corners cut along each side.
     Chamfer,
+    /// The distance between the centres of an oblong polyline's ends, and its
+    /// width across.
+    CenterDistance,
+    OblongWidth,
     Height,
     Area,
     /// What a dimension measures, before its scale factor and rounding.

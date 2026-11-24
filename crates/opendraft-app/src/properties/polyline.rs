@@ -9,7 +9,7 @@ use opendraft_core::rect_shape::{self, Cut, Frame};
 use opendraft_core::{bulge, Entity};
 use opendraft_ui::key;
 
-use super::{row, Field, Row, Unit};
+use super::{oblong, row, Field, Row, Unit};
 
 const ROWS: &[Row] = &[
     row(Field::Vertices, key!("Vertices"), Unit::Count, false),
@@ -68,6 +68,9 @@ pub(super) fn rectangle(entity: &Entity) -> Option<Frame> {
 }
 
 pub(super) fn rows(entity: &Entity) -> &'static [Row] {
+    if oblong::slot(entity).is_some() {
+        return oblong::ROWS;
+    }
     match rectangle(entity).map(|f| f.cut) {
         Some(Cut::Square) => RECTANGLE_ROWS,
         Some(Cut::Round(_)) => ROUNDED_ROWS,
@@ -85,6 +88,9 @@ fn global_width(widths: &[(f64, f64)]) -> Option<f64> {
 /// A field's value; not a number when the polyline has none (segments of
 /// different widths have no global width).
 pub(super) fn value(entity: &Entity, field: Field) -> f64 {
+    if let Some(value) = oblong::value(entity, field) {
+        return value;
+    }
     let Entity::Polyline {
         points,
         closed,
@@ -135,6 +141,9 @@ pub(super) fn value(entity: &Entity, field: Field) -> f64 {
 /// The polyline with `field` set to `new`, or `None` when it is derived or
 /// the value is not allowed.
 pub(super) fn with_value(entity: &Entity, field: Field, new: f64) -> Option<Entity> {
+    if let Some(changed) = oblong::with_value(entity, field, new) {
+        return changed;
+    }
     let data = PolyData::of(entity)?;
     match field {
         Field::Closed => Some(data.with_closed(new != 0.0).into_entity()),
@@ -158,7 +167,7 @@ pub(super) fn with_value(entity: &Entity, field: Field, new: f64) -> Option<Enti
 
 /// An angle in degrees from 0 up to 360, with a side a hair below east read
 /// as 0 rather than 360.
-fn degrees(angle: f64) -> f64 {
+pub(super) fn degrees(angle: f64) -> f64 {
     let d = angle.to_degrees().rem_euclid(360.0);
     if 360.0 - d < 1e-9 {
         0.0
