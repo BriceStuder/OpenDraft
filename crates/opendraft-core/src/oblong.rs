@@ -32,7 +32,7 @@ pub fn outline(a: Point, b: Point, width: f64) -> Option<Entity> {
 pub fn width_through(a: Point, b: Point, at: Point) -> f64 {
     let (dx, dy) = (b.x - a.x, b.y - a.y);
     let length = dx.hypot(dy);
-    if !(length > 0.0) {
+    if length.is_nan() || length <= 0.0 {
         return 0.0;
     }
     2.0 * (dx * (at.y - a.y) - dy * (at.x - a.x)).abs() / length
