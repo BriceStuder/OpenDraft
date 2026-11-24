@@ -74,6 +74,7 @@ mod donut_cmd;
 mod draw;
 mod dynamic_block_cmd;
 mod dynamic_input;
+mod dynamic_rows;
 mod dynamic_settings;
 mod edges;
 mod edges_sweep;

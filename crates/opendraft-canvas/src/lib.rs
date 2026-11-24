@@ -2,6 +2,8 @@
 //! drawing units with Y pointing up; screen space is egui points.
 
 mod camera;
+#[cfg(test)]
+mod dynamic_tests;
 mod grid;
 mod grips;
 mod hatch_cache;

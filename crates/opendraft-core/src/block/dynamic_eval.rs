@@ -281,6 +281,23 @@ impl Insert {
         p.current(self.dynamic.as_deref()).ok().map(|(v, _)| v)
     }
 
+    /// How long one unit of `parameter`'s value is in the drawing: the
+    /// length its line has after the insert's transform. Multiply a value
+    /// by it to show the value in drawing units, divide to read one typed
+    /// there. `None` when the parameter is unknown, or the insert flattens
+    /// the line to nothing.
+    pub fn dynamic_scale(&self, parameter: ParameterId) -> Option<f64> {
+        let axis = self.parameter(parameter)?.axis()?;
+        let map = self.transform();
+        let a = map.apply(axis.start);
+        let b = map.apply(Point::new(
+            axis.start.x + axis.dir.0,
+            axis.start.y + axis.dir.1,
+        ));
+        let scale = (b.x - a.x).hypot(b.y - a.y);
+        (scale.is_finite() && scale > EPS).then_some(scale)
+    }
+
     fn parameter(&self, id: ParameterId) -> Option<&DynamicParameter> {
         self.block
             .dynamic

@@ -391,3 +391,19 @@ fn validate_refuses_a_value_the_schema_does_not_allow() {
         Err(DocumentError::BadDynamicState(..))
     ));
 }
+
+#[test]
+fn the_pieces_a_drawing_paints_and_plots_follow_the_values() {
+    use crate::Document;
+    let block = bar(stretch(1.0, 0.0), DynamicValueSet::Any);
+    let mut doc = Document::default();
+    doc.push_block(block.clone());
+    let id = doc.add(Entity::Insert(Box::new(with_distance(&block, 6.0))));
+    let object = doc.object(id).unwrap();
+    let pieces = doc.insert_pieces(object).unwrap();
+    let reach = pieces
+        .iter()
+        .map(|o| o.entity.bounds().max.x)
+        .fold(f64::MIN, f64::max);
+    assert!((reach - 6.0).abs() < 1e-9, "the post moved to x = 6, not 4");
+}
