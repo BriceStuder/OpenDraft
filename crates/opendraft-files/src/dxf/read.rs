@@ -16,6 +16,7 @@ mod attribute;
 mod basic;
 mod blocks;
 mod dimension;
+pub(super) mod dynamic;
 mod ellipse;
 mod hatch;
 mod hatch_sources;
@@ -387,6 +388,7 @@ pub fn read(bytes: &[u8]) -> Result<Loaded, FileError> {
     importer.resolve_leaders();
     importer.resolve_linetypes();
     let mut warnings = importer.warnings();
+    warnings.extend(dynamic::decode(&records).warning());
     warnings.extend(spaces.warnings());
     spaces.finish(&mut importer);
     importer.document.finish_bulk_load();
