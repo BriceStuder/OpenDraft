@@ -5,6 +5,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked};
 use opendraft_core::{Entity, EntityId, SingleLineText, TextStyle};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::mtext::edit_mtext_with_id;
@@ -62,7 +63,7 @@ fn ask_mode(ed: &Editor) -> Result<(), Cancelled> {
     } else {
         "Single"
     };
-    let options = Options::<String>::new("Enter a text edit mode option")
+    let options = Options::<String>::new(key!("Enter a text edit mode option"))
         .keyword("Single", "S")
         .keyword("Multiple", "M")
         .default(current.to_owned());
@@ -88,7 +89,7 @@ pub fn edit_text(ed: &mut Editor) -> Result<(), Cancelled> {
     }
     let mut edits = 0usize;
     loop {
-        let options = Options::<Picked>::new("Select an annotation object")
+        let options = Options::<Picked>::new(key!("Select an annotation object"))
             .keyword("Undo", "U")
             .keyword("Mode", "M");
         match ed.ask_object(options)? {

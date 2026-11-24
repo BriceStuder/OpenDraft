@@ -166,7 +166,7 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
         }
         "Double" => {
             let answer = ed.get_keyword(
-                Options::<String>::new("Double hatch area")
+                Options::<String>::new(key!("Double hatch area"))
                     .keyword("Yes", "Y")
                     .keyword("No", "N")
                     .default(
@@ -183,7 +183,7 @@ pub(crate) fn adjust(ed: &Editor, keyword: &str) -> Result<(), Cancelled> {
         "Style" => ask_style(ed)?,
         "Associativity" => {
             let answer = ed.get_keyword(
-                Options::<String>::new("Associate the hatch with its boundary")
+                Options::<String>::new(key!("Associate the hatch with its boundary"))
                     .keyword("Yes", "Y")
                     .keyword("No", "N")
                     .default(
@@ -352,9 +352,9 @@ pub fn hatch_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         let shown = hatch.clone();
         let options = with_keywords(
             PointOptions::new(if problem.is_some() {
-                "Change the settings"
+                key!("Change the settings")
             } else {
-                "Press Enter or click to accept the hatch"
+                key!("Press Enter or click to accept the hatch")
             })
             .ghost(move |_| vec![Entity::Hatch(Box::new(shown.clone()))]),
             &ed.defaults().hatch.get().fill,

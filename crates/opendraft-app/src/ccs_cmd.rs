@@ -194,10 +194,13 @@ fn save(
     }
     match found {
         Some(at) => {
-            let options = Options::<String>::new(format!("\"{name}\" already exists. Replace it?"))
-                .keyword("Yes", "Y")
-                .keyword("No", "N")
-                .default("No".to_owned());
+            let options = Options::<String>::worded(
+                key!("\"%{name}\" already exists. Replace it?"),
+                &[("name", &name)],
+            )
+            .keyword("Yes", "Y")
+            .keyword("No", "N")
+            .default("No".to_owned());
             if ed.ask_keyword(options)?.as_deref() != Some("Yes") {
                 return Ok(());
             }

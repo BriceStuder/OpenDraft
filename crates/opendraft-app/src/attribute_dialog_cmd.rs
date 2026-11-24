@@ -6,6 +6,7 @@ use opendraft_commands::{AttributeEditorAnswer, Cancelled, Editor, PointOptions}
 use opendraft_core::block::attribute_draft::{DefinitionDraft, EditorDraft};
 use opendraft_core::block::{AttributeDefinitionId, AttributeFlags};
 use opendraft_core::{Attributes, Entity, EntityId, Insert};
+use opendraft_ui::key;
 
 use crate::attribute_edit::pick_attributed_insert;
 use crate::defaults::EditorDefaults;
@@ -44,7 +45,7 @@ pub fn attdef_dialog(ed: &mut Editor) -> Result<(), Cancelled> {
     let at = if draft.on_screen {
         let shown = draft.clone();
         ed.get_point(
-            PointOptions::new("Specify start point of text").ghost(move |at| {
+            PointOptions::new(key!("Specify start point of text")).ghost(move |at| {
                 let id = AttributeDefinitionId(1);
                 vec![Entity::AttributeDefinition(Box::new(
                     shown.definition(id, at),

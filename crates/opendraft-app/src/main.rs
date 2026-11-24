@@ -156,6 +156,7 @@ mod previews;
 mod primitive_commands;
 mod print_backend;
 mod profile;
+mod prompt_language;
 mod prompt_reply;
 mod properties;
 mod properties_ui;

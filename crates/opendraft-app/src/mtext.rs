@@ -4,6 +4,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked, PointOptions};
 use opendraft_core::mtext::{place_in_corners, MTextAttachment};
 use opendraft_core::{Entity, MText, Point};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::{add, MIN_SIZE};
@@ -59,7 +60,7 @@ fn drag_height(first: Point, second: Point, rotation: f64) -> f64 {
 /// Rotation and Width options), then the text. Enter on an empty line adds
 /// nothing.
 pub fn draw_mtext(ed: &mut Editor) -> Result<(), Cancelled> {
-    let first = ed.get_point("Specify first corner")?;
+    let first = ed.get_point(key!("Specify first corner"))?;
     let (mut height, mut attachment) = (
         ed.defaults().text.get().height,
         ed.defaults().text.get().attachment,
@@ -67,17 +68,20 @@ pub fn draw_mtext(ed: &mut Editor) -> Result<(), Cancelled> {
     // Level with the coordinate system's X axis unless turned.
     let (mut rotation, mut width) = (ed.read(|doc| doc.ccs().angle)?, None);
     let second = loop {
-        let options = PointOptions::new(format!("Specify opposite corner or (height {height})"))
-            .keyword("Height", "H")
-            .keyword("Justify", "J")
-            .keyword("Rotation", "R")
-            .keyword("Width", "W")
-            .ghost(move |at| vec![box_outline(first, at, rotation, width)]);
+        let options = PointOptions::worded(
+            key!("(Current height: %{height}) Specify opposite corner"),
+            &[("height", &height.to_string())],
+        )
+        .keyword("Height", "H")
+        .keyword("Justify", "J")
+        .keyword("Rotation", "R")
+        .keyword("Width", "W")
+        .ghost(move |at| vec![box_outline(first, at, rotation, width)]);
         match ed.ask_corner(first, options)? {
             Answer::Value(at) => break at,
             Answer::Keyword(k) => match k.as_str() {
                 "Height" => {
-                    let options = NumberOptions::new("Specify height").default(height);
+                    let options = NumberOptions::new(key!("Specify height")).default(height);
                     let value = ed.get_distance(options)?;
                     if value > MIN_SIZE {
                         height = value;
@@ -87,7 +91,7 @@ pub fn draw_mtext(ed: &mut Editor) -> Result<(), Cancelled> {
                     }
                 }
                 "Justify" => {
-                    let mut options = Options::new("Enter justification");
+                    let mut options = Options::new(key!("Enter justification"));
                     for (name, _) in JUSTIFY {
                         options = options.keyword(name, name);
                     }
@@ -99,11 +103,11 @@ pub fn draw_mtext(ed: &mut Editor) -> Result<(), Cancelled> {
                 }
                 "Rotation" => {
                     rotation = ed.get_angle(
-                        NumberOptions::new("Specify rotation angle").default(rotation),
+                        NumberOptions::new(key!("Specify rotation angle")).default(rotation),
                     )?;
                 }
                 _ => {
-                    let options = NumberOptions::new("Specify width");
+                    let options = NumberOptions::new(key!("Specify width"));
                     let value = ed.get_distance(options)?;
                     width = (value > MIN_SIZE).then_some(value);
                 }
@@ -137,7 +141,7 @@ fn pick_text(ed: &mut Editor) -> Result<opendraft_core::EntityId, Cancelled> {
         }
     }
     loop {
-        let options = Options::<Picked>::new("Select an MTEXT object");
+        let options = Options::<Picked>::new(key!("Select an MTEXT object"));
         let Answer::Value(picked) = ed.ask_object(options)? else {
             return Err(Cancelled);
         };

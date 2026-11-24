@@ -6,13 +6,14 @@ use std::sync::Arc;
 use opendraft_commands::{Cancelled, Editor, PointOptions};
 use opendraft_core::dimension::suggested_x_datum;
 use opendraft_core::Dimension;
+use opendraft_ui::key;
 
 use crate::dimension_cmd::{place, style, Make};
 
 pub fn dim_ordinate(ed: &mut Editor) -> Result<(), Cancelled> {
     let style = style(ed)?;
     let frame = ed.read(|doc| doc.ccs())?;
-    let feature = ed.get_point(PointOptions::new("Specify feature location"))?;
+    let feature = ed.get_point(PointOptions::new(key!("Specify feature location")))?;
     let make: Make = Arc::new(move |at, tweaks| {
         let x_datum = tweaks
             .datum
@@ -23,7 +24,7 @@ pub fn dim_ordinate(ed: &mut Editor) -> Result<(), Cancelled> {
     });
     place(
         ed,
-        "Specify leader endpoint",
+        key!("Specify leader endpoint"),
         &[("Xdatum", "X"), ("Ydatum", "Y"), ("Text", "T")],
         feature,
         make,

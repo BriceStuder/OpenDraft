@@ -6,6 +6,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, ModifyLayers, Options, Picked};
 use opendraft_core::{EntityId, Layer, LayerId};
+use opendraft_ui::key;
 
 /// What the command does to a layer.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -18,9 +19,9 @@ enum Switch {
 impl Switch {
     fn prompt(self) -> &'static str {
         match self {
-            Switch::Off => "Select an object on the layer to be turned off",
-            Switch::Freeze => "Select an object on the layer to be frozen",
-            Switch::Lock => "Select an object on the layer to be locked",
+            Switch::Off => key!("Select an object on the layer to be turned off"),
+            Switch::Freeze => key!("Select an object on the layer to be frozen"),
+            Switch::Lock => key!("Select an object on the layer to be locked"),
         }
     }
 
@@ -156,11 +157,13 @@ fn switch_one(ed: &Editor, switch: Switch, layer: Layer) -> Result<bool, Cancell
         return Ok(false);
     }
     if current && switch == Switch::Off {
-        let question = format!("Really want layer \"{name}\" (the CURRENT layer) off?");
-        let options = Options::<String>::new(question)
-            .keyword("Yes", "Y")
-            .keyword("No", "N")
-            .default("No".to_owned());
+        let options = Options::<String>::worded(
+            key!("Really want layer \"%{name}\" (the CURRENT layer) off?"),
+            &[("name", &name)],
+        )
+        .keyword("Yes", "Y")
+        .keyword("No", "N")
+        .default("No".to_owned());
         if ed.get_keyword(options)? != "Yes" {
             return Ok(false);
         }

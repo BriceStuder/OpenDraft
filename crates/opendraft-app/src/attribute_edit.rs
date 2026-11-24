@@ -6,6 +6,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked};
 use opendraft_core::block::{AttributeReference, FieldText};
 use opendraft_core::{Entity, EntityId};
+use opendraft_ui::key;
 
 /// The block reference to edit: the one preselected, or one the user clicks.
 pub(crate) fn pick_attributed_insert(
@@ -26,7 +27,7 @@ pub(crate) fn pick_attributed_insert(
         }
     }
     loop {
-        let mut options = Options::<Picked>::new("Select block reference");
+        let mut options = Options::<Picked>::new(key!("Select block reference"));
         if !use_selection {
             // Picking another block from the editor: Esc goes back to it.
             options = options.esc_backs();
@@ -45,18 +46,21 @@ pub(crate) fn pick_attributed_insert(
 /// The new value of `r`, asked for: `None` keeps it.
 fn ask_new(ed: &Editor, r: &AttributeReference) -> Result<Option<FieldText>, Cancelled> {
     let shown = r.value.display();
-    let message = format!("Enter new value for {} <{shown}>", r.tag);
-    let Answer::Value(text) = ed.ask_string(Options::<String>::new(message))? else {
+    let options = Options::<String>::worded(
+        key!("Enter new value for %{tag} <%{value}>"),
+        &[("tag", &r.tag), ("value", &shown)],
+    );
+    let Answer::Value(text) = ed.ask_string(options)? else {
         return Ok(None);
     };
     if text == shown {
         return Ok(None);
     }
     if r.value.has_fields() {
-        let question = Options::<String>::new(format!(
-            "{} holds a data field. Replace it with this text?",
-            r.tag
-        ))
+        let question = Options::<String>::worded(
+            key!("%{tag} holds a data field. Replace it with this text?"),
+            &[("tag", &r.tag)],
+        )
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .default("No".to_owned());

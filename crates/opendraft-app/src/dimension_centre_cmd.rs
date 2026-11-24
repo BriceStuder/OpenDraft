@@ -4,13 +4,14 @@
 use opendraft_commands::{Cancelled, Editor};
 use opendraft_core::dimension::centre_segments;
 use opendraft_core::Entity;
+use opendraft_ui::key;
 
 use crate::dimension_cmd::{pick, style};
 
 pub fn dim_centre(ed: &mut Editor) -> Result<(), Cancelled> {
     let size = style(ed)?.centre_mark * style(ed)?.scale;
     loop {
-        let Some((_, entity)) = pick(ed, "Select arc or circle")? else {
+        let Some((_, entity)) = pick(ed, key!("Select arc or circle"))? else {
             return Err(Cancelled);
         };
         let (Entity::Circle { center, radius } | Entity::Arc { center, radius, .. }) = entity

@@ -124,9 +124,7 @@ pub(crate) fn edit_prompt(
     keywords: &[(&str, &str)],
     ghost: impl Fn(Point) -> Vec<Entity> + Send + Sync + 'static,
 ) -> Result<Option<String>, Cancelled> {
-    let names: Vec<&str> = keywords.iter().map(|(label, _)| *label).collect();
-    let message = format!("Select grip to edit array or [{}/eXit]", names.join("/"));
-    let mut options = PointOptions::new(message).ghost(ghost);
+    let mut options = PointOptions::new(key!("Select grip to edit array")).ghost(ghost);
     for (label, key) in keywords {
         options = options.keyword(*label, *key);
     }

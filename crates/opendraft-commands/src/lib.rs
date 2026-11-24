@@ -25,12 +25,14 @@ mod point_style_action;
 mod prompt;
 mod properties_action;
 mod registry;
+mod reply;
 mod runner;
 mod session;
 mod sysvar;
 mod text_style_action;
 mod transaction;
 mod units_action;
+mod wording;
 
 pub use action::{Action, AddCopies, AddEntity, ModifyAttributes, ModifyEntities, RemoveEntities};
 pub use block_action::SetBlocks;
@@ -50,7 +52,7 @@ pub use point_style_action::SetPointStyle;
 pub use prompt::{
     Answer, BlockDialogButton, Cancelled, DynamicDimensions, Ghost, GhostStyle, Hint, Keyword,
     Marker, NumberOptions, NumberOrPoint, Options, Picked, PointOptions, Prompt, Reply, Swept,
-    TextOptions, Wants,
+    TextOptions, Wants, Wording,
 };
 pub use properties_action::SetProperties;
 pub use registry::{

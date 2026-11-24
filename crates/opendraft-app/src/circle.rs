@@ -100,9 +100,9 @@ pub fn draw_circle_ttr(ed: &mut Editor) -> Result<(), Cancelled> {
 /// CIRCLE, Tan, Tan, Tan: three lines, circles, arcs, ellipses or splines
 /// to touch.
 pub fn draw_circle_3t(ed: &mut Editor) -> Result<(), Cancelled> {
-    let first = pick_touchable(ed, "first")?;
-    let second = pick_touchable(ed, "second")?;
-    let third = pick_touchable(ed, "third")?;
+    let first = pick_touchable(ed, key!("Specify point on object for first tangent"))?;
+    let second = pick_touchable(ed, key!("Specify point on object for second tangent"))?;
+    let third = pick_touchable(ed, key!("Specify point on object for third tangent"))?;
     let objects = [
         (&first.0, first.1),
         (&second.0, second.1),
@@ -117,11 +117,10 @@ pub fn draw_circle_3t(ed: &mut Editor) -> Result<(), Cancelled> {
     }
 }
 
-/// An object a tangent circle can touch, picked for the `which` tangent.
-fn pick_touchable(ed: &Editor, which: &str) -> Result<(Entity, Point), Cancelled> {
-    let message = format!("Specify point on object for {which} tangent");
+/// An object a tangent circle can touch, picked at the prompt `message`.
+fn pick_touchable(ed: &Editor, message: &str) -> Result<(Entity, Point), Cancelled> {
     loop {
-        let (entity, at) = pick_object(ed, &message)?;
+        let (entity, at) = pick_object(ed, message)?;
         if touchable_by_tangent_circle(&entity, at) {
             return Ok((entity, at));
         }
