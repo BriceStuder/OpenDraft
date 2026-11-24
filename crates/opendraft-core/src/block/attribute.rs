@@ -446,10 +446,12 @@ mod tests {
             ]
             .into_iter()
             .map(|d| BlockEntity {
+                id: crate::BlockObjectId(0),
                 entity: Entity::AttributeDefinition(Box::new(d)),
                 attrs: Attributes::on_layer(crate::LayerId::DEFAULT),
             })
             .collect(),
+            dynamic: None,
         };
         let refs = block.new_references(|d| d.default_value.clone());
         let tags: Vec<_> = refs.iter().map(|r| r.tag.as_str()).collect();

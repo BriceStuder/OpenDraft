@@ -126,6 +126,7 @@ pub fn inserts(n: usize) -> Document {
     let mut doc = Document::default();
     let entities = (0..12)
         .map(|i| BlockEntity {
+            id: opendraft_core::BlockObjectId(0),
             entity: if i % 2 == 0 {
                 Entity::Line {
                     start: Point::new(f64::from(i), 0.0),
@@ -147,6 +148,7 @@ pub fn inserts(n: usize) -> Document {
         base: Point::new(0.0, 0.0),
         description: String::new(),
         entities,
+        dynamic: None,
     });
     doc.push_block(block.clone());
     let mut rng = Lcg(9);

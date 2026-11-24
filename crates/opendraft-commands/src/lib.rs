@@ -33,7 +33,7 @@ mod transaction;
 mod units_action;
 
 pub use action::{Action, AddCopies, AddEntity, ModifyAttributes, ModifyEntities, RemoveEntities};
-pub use block_action::SetBlocks;
+pub use block_action::{SetBlockEditorDynamic, SetBlocks};
 pub use ccs_action::{SetCcs, SetNamedCcs};
 pub use changes::Changes;
 pub use context::Context;

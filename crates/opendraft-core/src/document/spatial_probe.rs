@@ -6,6 +6,7 @@ use super::spatial::{Config, SpaceKey};
 use super::spatial_query::Broad;
 use super::*;
 use crate::spatial_index::is_indexable;
+use crate::Bounds;
 
 /// What the tests need to see inside the index.
 impl Document {

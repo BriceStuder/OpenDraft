@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use crate::block::{BlockDef, BlockEntity, BlockId};
+use crate::block::{BlockDef, BlockEntity, BlockId, BlockObjectId};
 use crate::{Document, Entity, EntityId, Layer, Point};
 
 /// What saving the Block Editor changes in the drawing, ready to be
@@ -68,11 +68,10 @@ impl Document {
             description: old.description.clone(),
             entities: editor
                 .model_objects()
-                .map(|o| BlockEntity {
-                    entity: o.entity.clone(),
-                    attrs: o.attrs.clone(),
-                })
+                .map(|o| BlockEntity::new(BlockObjectId(o.id.0), o.entity.clone(), o.attrs.clone()))
                 .collect(),
+            // What the editor drafted (it starts as the block's own).
+            dynamic: editor.block_editor_dynamic().cloned().map(Box::new),
         };
         // A copied definition arrives with its original's id.
         edited.renumber_duplicate_attributes(|| work.allocate_attribute_definition_id());
