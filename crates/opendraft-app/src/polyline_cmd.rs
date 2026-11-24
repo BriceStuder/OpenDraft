@@ -130,6 +130,16 @@ struct Mode {
     widths: (f64, f64),
 }
 
+impl Mode {
+    /// Add a segment with the current widths. A tapered segment hands its
+    /// ending width on: the segments after it are that wide at both ends, as
+    /// in AutoCAD.
+    fn push(&mut self, chain: &mut Chain, to: Point, curve: f64) {
+        chain.push(to, curve, self.widths);
+        self.widths = (self.widths.1, self.widths.1);
+    }
+}
+
 enum Flow {
     Next,
     Finish,
@@ -236,7 +246,7 @@ fn step(ed: &Editor, chain: &mut Chain, mode: &mut Mode) -> Result<Flow, Cancell
                 } else {
                     0.0
                 };
-                chain.push(to, curve, mode.widths);
+                mode.push(chain, to, curve);
             }
             Ok(Flow::Next)
         }
@@ -277,14 +287,14 @@ fn keyword(
             let length = ed.get_distance(options)?;
             if length > MIN_SIZE {
                 let to = Point::new(from.x + heading.x * length, from.y + heading.y * length);
-                chain.push(to, 0.0, mode.widths);
+                mode.push(chain, to, 0.0);
             } else {
                 ed.say("Requires a non-zero value.");
             }
         }
         arc_keyword => match arc_option(ed, arc_keyword, (from, heading), &drawn)? {
             Some((to, curve)) if distance(from, to) > MIN_SIZE => {
-                chain.push(to, curve, mode.widths);
+                mode.push(chain, to, curve);
             }
             _ => ed.say("Those values make no arc."),
         },
@@ -500,8 +510,37 @@ mod tests {
         );
         let (_, _, widths, _) = polyline(&entities(&state)[0]);
         // The first segment was drawn before any width; the second tapers 1 to
-        // 3; the third keeps the start width for both ends (Enter, Enter).
-        assert_eq!(widths, vec![(0.0, 0.0), (1.0, 3.0), (1.0, 1.0), (0.0, 0.0)]);
+        // 3; the third takes the ending width for both ends (Enter, Enter).
+        assert_eq!(widths, vec![(0.0, 0.0), (1.0, 3.0), (3.0, 3.0), (0.0, 0.0)]);
+    }
+
+    #[test]
+    fn a_tapered_segment_hands_its_ending_width_on() {
+        // Width 10 then 5: the second segment is 5 wide at both ends, and so
+        // is an arc or a Length segment after it.
+        let mut state = AppState::new();
+        run(
+            &mut state,
+            &[
+                "0,0", "w", "10", "5", "50,0", "50,50", "l", "20", "a", "0,80", "",
+            ],
+        );
+        let (_, _, widths, _) = polyline(&entities(&state)[0]);
+        assert_eq!(
+            widths,
+            vec![(10.0, 5.0), (5.0, 5.0), (5.0, 5.0), (5.0, 5.0), (0.0, 0.0)]
+        );
+    }
+
+    #[test]
+    fn the_next_width_prompt_offers_the_ending_width() {
+        let mut state = AppState::new();
+        run(&mut state, &["0,0", "w", "10", "5", "50,0", "w"]);
+        assert!(
+            state.cmd_prompt().text.contains("<5"),
+            "{}",
+            state.cmd_prompt().text
+        );
     }
 
     #[test]
