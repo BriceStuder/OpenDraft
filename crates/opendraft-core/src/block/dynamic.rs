@@ -134,6 +134,24 @@ pub enum DynamicParameterKind {
     /// A location in the block. Its value is where it is (a `Point`),
     /// `position` by default; it has no value set.
     Point { position: Point },
+    /// Which objects show. It has named states, each hiding some objects;
+    /// its value is the name of the state shown (`Text`), the first by
+    /// default. It applies to the whole block and no action follows it.
+    /// `position` is where its grip would be.
+    Visibility {
+        position: Point,
+        states: Vec<VisibilityState>,
+    },
+}
+
+/// One named state of a visibility parameter: the objects it hides. An
+/// object it does not list is shown.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VisibilityState {
+    /// Unique in the parameter, ignoring case; not empty.
+    pub name: String,
+    /// Sorted, without repeats.
+    pub hidden: Vec<BlockObjectId>,
 }
 
 /// Which parameters and actions go together.
@@ -145,6 +163,7 @@ pub enum DynamicFamily {
     Polar,
     Xy,
     Point,
+    Visibility,
 }
 
 impl DynamicParameterKind {
@@ -156,6 +175,7 @@ impl DynamicParameterKind {
             Self::Polar { .. } => DynamicFamily::Polar,
             Self::Xy { .. } => DynamicFamily::Xy,
             Self::Point { .. } => DynamicFamily::Point,
+            Self::Visibility { .. } => DynamicFamily::Visibility,
         }
     }
 }
@@ -163,7 +183,7 @@ impl DynamicParameterKind {
 impl DynamicActionKind {
     /// Whether this action can follow a parameter of `family`: a move or
     /// stretch follows a distance or any point, a scale a distance or a
-    /// polar point, a rotate an angle or a polar point, a flip a flip.
+    /// polar point, a rotate an angle or a polar point, a flip a flip, and nothing a visibility.
     pub fn follows(&self, family: DynamicFamily) -> bool {
         use DynamicFamily::{Flip, Linear, Point, Polar, Rotation, Xy};
         match self {
@@ -241,8 +261,8 @@ pub struct DynamicValueEntry {
     pub value: DynamicValue,
 }
 
-/// A parameter's value. `Distance`, `Angle` (radians) and `Bool` (a flip) are
-/// used so far; the rest are the types later parameters will need.
+/// A parameter's value. `Distance`, `Angle` (radians), `Bool` (a flip) and
+/// `Text` (a visibility state's name) are used so far; the rest are the types later parameters will need.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DynamicValue {
     Distance(f64),

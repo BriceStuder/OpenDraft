@@ -70,6 +70,7 @@ pub enum NodeKind {
     Lookup {
         name: String,
     },
+    Visibility(Visibility),
     Stretch(Action),
     PolarStretch(Action),
     Move(Action),
@@ -99,6 +100,20 @@ pub struct Parameter {
     /// increment (radians) when it has an increment.
     pub angle_name: String,
     pub angle_range: Option<(f64, f64, f64)>,
+}
+
+/// A visibility parameter: the objects it governs and, for each named state,
+/// the ones that state shows. An object it governs that a state does not
+/// list is hidden in that state; one it does not govern is always shown.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Visibility {
+    pub name: String,
+    pub position: Point,
+    /// Handles of the objects it governs.
+    pub governed: Vec<String>,
+    /// Each state's name and the handles of the objects it shows, in the
+    /// file's order (the first is the default).
+    pub states: Vec<(String, Vec<String>)>,
 }
 
 /// An action and what it acts on.
@@ -145,6 +160,8 @@ pub enum NodeState {
     Parameter { start: Point, end: Point },
     /// The text a lookup parameter shows.
     Lookup(String),
+    /// The name of the state a visibility parameter shows.
+    Visibility(String),
 }
 
 /// Reads the dynamic blocks of a DXF file.

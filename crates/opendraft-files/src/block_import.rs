@@ -369,7 +369,7 @@ impl<K: Clone + Eq + Hash> Builder<'_, K> {
     }
 
     /// The schema without objects that did not come across, or `None`
-    /// (counted) when no action is left or what is left does not check.
+    /// (counted) when no action or visibility is left or what is left does not check.
     fn kept(
         &mut self,
         schema: &DynamicBlock,
@@ -377,7 +377,9 @@ impl<K: Clone + Eq + Hash> Builder<'_, K> {
     ) -> Option<Box<DynamicBlock>> {
         let ids: std::collections::HashSet<_> = entities.iter().map(|e| e.id).collect();
         let schema = schema.pruned(|o| ids.contains(&o)).schema;
-        if schema.actions.is_empty() || schema.check(&ids).is_err() {
+        if (schema.actions.is_empty() && schema.visibility().is_none())
+            || schema.check(&ids).is_err()
+        {
             self.blocks.dynamic_refused += 1;
             return None;
         }

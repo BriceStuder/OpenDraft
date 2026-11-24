@@ -207,3 +207,42 @@ fn xy_and_point_parameters_survive_a_round_trip() {
         assert_eq!(back.validate(), Ok(()));
     }
 }
+
+#[test]
+fn a_visibility_parameter_its_states_and_a_chosen_state_survive_a_round_trip() {
+    use opendraft_core::block::VisibilityState;
+    let mut s = DynamicBlock::new();
+    s.parameters.push(DynamicParameter {
+        id: ParameterId(1),
+        name: "Visibility1".into(),
+        label: "Visibility".into(),
+        description: String::new(),
+        show: true,
+        grips: 1,
+        kind: DynamicParameterKind::Visibility {
+            position: p(2.0, -1.0),
+            states: vec![
+                VisibilityState {
+                    name: "Plain".into(),
+                    hidden: vec![BlockObjectId(9)],
+                },
+                VisibilityState {
+                    name: "Round".into(),
+                    hidden: vec![BlockObjectId(7)],
+                },
+            ],
+        },
+    });
+    s.next_parameter_id = 2;
+    let mut doc = Document::default();
+    let block = bar(&mut doc, Some(s));
+    doc.push_block(block.clone());
+    let chosen = Insert::new(block, p(0.0, 0.0))
+        .with_visibility_state("Round")
+        .unwrap();
+    doc.add(Entity::Insert(Box::new(chosen)));
+    let back = read(&write(&doc)).unwrap();
+    assert_eq!(back.blocks(), doc.blocks());
+    assert_eq!(back.objects(), doc.objects());
+    assert_eq!(back.validate(), Ok(()));
+}

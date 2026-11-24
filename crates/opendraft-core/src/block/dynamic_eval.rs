@@ -8,7 +8,7 @@
 //! an error, and the insert then draws as its authored definition.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use super::dynamic_apply::apply;
@@ -59,6 +59,7 @@ impl DynamicBlock {
                 return Err(format!("parameter {} does not exist", entry.parameter.0));
             };
             let held = match &entry.value {
+                DynamicValue::Text(name) => p.visibility_value(name).as_ref() == Some(&entry.value),
                 DynamicValue::Point(end) if p.has_point() => p.fit_end(*end).is_some_and(|n| {
                     (n.x - end.x).abs() <= 1e-9 * end.x.abs().max(1.0)
                         && (n.y - end.y).abs() <= 1e-9 * end.y.abs().max(1.0)
@@ -85,12 +86,13 @@ pub fn evaluate<'a>(
     block: &'a BlockDef,
     state: Option<&DynamicInstanceState>,
 ) -> Result<Cow<'a, [BlockEntity]>, DynamicBlockError> {
-    let (Some(schema), Some(state)) = (&block.dynamic, state) else {
+    let Some(schema) = &block.dynamic else {
         return Ok(Cow::Borrowed(&block.entities));
     };
-    if state.is_default() {
-        return Ok(Cow::Borrowed(&block.entities));
-    }
+    let hidden = schema.hidden_objects(state)?;
+    let Some(state) = state.filter(|s| !s.is_default()) else {
+        return Ok(shown(Cow::Borrowed(&block.entities), &hidden));
+    };
     let position: HashMap<BlockObjectId, usize> = block
         .entities
         .iter()
@@ -106,7 +108,24 @@ pub fn evaluate<'a>(
             .ok_or(DynamicBlockError::MissingParameter(action.parameter))?;
         apply(&mut out, &position, action, parameter, state)?;
     }
-    Ok(Cow::Owned(out))
+    Ok(shown(Cow::Owned(out), &hidden))
+}
+
+/// `objects` without the ones a visibility state hides.
+fn shown<'a>(
+    objects: Cow<'a, [BlockEntity]>,
+    hidden: &HashSet<BlockObjectId>,
+) -> Cow<'a, [BlockEntity]> {
+    if hidden.is_empty() {
+        return objects;
+    }
+    Cow::Owned(
+        objects
+            .iter()
+            .filter(|e| !hidden.contains(&e.id))
+            .cloned()
+            .collect(),
+    )
 }
 
 impl Insert {
@@ -185,6 +204,11 @@ impl Insert {
         value: DynamicValue,
     ) -> Option<Insert> {
         let p = self.parameter(parameter)?;
+        if let DynamicValue::Text(name) = &value {
+            return self
+                .with_visibility_state(name)
+                .filter(|_| p.is_visibility());
+        }
         let mut state = self.dynamic.as_deref().cloned().unwrap_or_default();
         if let (DynamicValue::Point(end), Some(drawn)) = (&value, p.drawn_end()) {
             let drawn = &drawn;
@@ -257,7 +281,8 @@ impl Insert {
                     }
                     DynamicParameterKind::Polar { .. }
                     | DynamicParameterKind::Xy { .. }
-                    | DynamicParameterKind::Point { .. } => return None,
+                    | DynamicParameterKind::Point { .. }
+                    | DynamicParameterKind::Visibility { .. } => return None,
                 };
                 let at = map.apply(at);
                 let grip = DynamicGrip {
@@ -297,7 +322,8 @@ impl Insert {
             DynamicParameterKind::Rotation { base, .. } => (at.y - base.y).atan2(at.x - base.x),
             DynamicParameterKind::Polar { .. }
             | DynamicParameterKind::Xy { .. }
-            | DynamicParameterKind::Point { .. } => return None,
+            | DynamicParameterKind::Point { .. }
+            | DynamicParameterKind::Visibility { .. } => return None,
             // Flipped when the point is left of the line from its base to its end.
             DynamicParameterKind::Flip { base, end } => {
                 let side = (end.x - base.x) * (at.y - base.y) - (end.y - base.y) * (at.x - base.x);
