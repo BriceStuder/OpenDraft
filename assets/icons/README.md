@@ -206,6 +206,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](modify-array-rect.svg) | `modify-array-rect.svg` | grid-2x2 | Rectangular Array |
 | ![](modify-blend.svg) | `modify-blend.svg` | spline | Blend Curves |
 | ![](modify-break.svg) | `modify-break.svg` | scissors-line-dashed | Break |
+| ![](modify-break-at-point.svg) | `modify-break-at-point.svg` | scissors-line-dashed | Break at Point |
 | ![](modify-chamfer.svg) | `modify-chamfer.svg` | triangle-right | Chamfer |
 | ![](modify-copy.svg) | `modify-copy.svg` | copy | Copy, app/context_menu.rs |
 | ![](modify-erase.svg) | `modify-erase.svg` | eraser | Erase |

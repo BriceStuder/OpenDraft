@@ -298,7 +298,7 @@ Rectangle (`rectangle.rs`, settings in `rect_memory.rs`), Polyline
 (`polyline_cmd.rs`, arc options in `polyline_arc.rs`), the window polygon, crossing polygon and fence
 selections (`selection.rs`), Trim and Extend (`edges.rs`), Offset
 (`offset.rs`), Fillet and Chamfer (`corners.rs`, settings in
-`corner_memory.rs`), Join (`join.rs`), Explode (`explode.rs`), Break (`break_cmd.rs`), Stretch (`stretch.rs`) and the grip editor (`grips.rs`, which
+`corner_memory.rs`), Join (`join.rs`), Explode (`explode.rs`), Break and Break at Point (`break_cmd.rs`; BREAKATPOINT, alias BP, asks for the object, then the one point where it is divided in two, without AutoCAD's `@`), Stretch (`stretch.rs`) and the grip editor (`grips.rs`, which
 starts a "Stretch" command when a grip is pressed). The old model, where a canvas `Tool`
 was armed and each command was spread over a prompt table, a typed-input
 handler and the canvas, is gone. The canvas now only does three things for a

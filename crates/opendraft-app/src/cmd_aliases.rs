@@ -190,6 +190,7 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("RESETBLOCK", "RESETBLOCK", "block.reset"),
     ("BCLOSE", "BCLOSE", "block.close"),
     ("BR", "BREAK", "modify.break"),
+    ("BP", "BREAKATPOINT", "modify.break_at_point"),
     ("S", "STRETCH", "modify.stretch"),
     ("PL", "POLYLINE", "draw.polyline"),
     ("DLI", "DIMLINEAR", "dim.linear"),
