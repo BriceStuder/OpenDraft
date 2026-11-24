@@ -98,6 +98,12 @@ pub struct Document {
     /// Block definitions, shared with the inserts that place them.
     blocks: Vec<Arc<BlockDef>>,
     next_block_id: u64,
+    /// Only ever `Some` in a Block Editor's drawing: the dynamic schema being
+    /// authored. It is not drawing data: no file holds it, `validate` does not
+    /// look at it, `clone_tables` leaves it behind, and BSAVE turns it into
+    /// the block's schema. It lives here so that editing it is undone with the
+    /// editor's other edits.
+    block_editor_dynamic: Option<crate::block::DynamicBlock>,
     next_attribute_definition_id: u64,
     /// The linetype table (`CONTINUOUS`, `BYLAYER` and `BYBLOCK` always exist).
     linetypes: LinetypeTable,

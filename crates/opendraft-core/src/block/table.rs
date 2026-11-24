@@ -171,7 +171,11 @@ impl Document {
                 }
                 let layer_ok = self.layer(child.attrs.layer).is_some();
                 let shape_ok = match &child.entity {
-                    Entity::Insert(i) => i.block.id != block.id && self.is_current(i),
+                    Entity::Insert(i) => {
+                        i.block.id != block.id
+                            && self.is_current(i)
+                            && (i.dynamic.is_none() || i.block.dynamic.is_some())
+                    }
                     Entity::Ellipse(e) => e.validate().is_ok(),
                     Entity::Spline(s) => s.validate().is_ok(),
                     Entity::Polyline {
@@ -189,11 +193,20 @@ impl Document {
                     return bad(block);
                 }
             }
+            if let Some(schema) = &block.dynamic {
+                schema
+                    .check(&object_ids)
+                    .map_err(|why| DocumentError::BadDynamicBlock(block.name.clone(), why))?;
+            }
         }
         for object in self.objects() {
             if let Entity::Insert(i) = &object.entity {
                 if !self.is_current(i) {
                     return Err(DocumentError::BadInsert(object.id));
+                }
+                if i.dynamic.is_some() && i.block.dynamic.is_none() {
+                    let why = "the block has no parameters".to_owned();
+                    return Err(DocumentError::BadDynamicState(object.id, why));
                 }
             }
         }

@@ -191,7 +191,15 @@ impl Merge<'_> {
             }
             Entity::Insert(i) => {
                 let mut i = i.clone();
+                let source = i.block.clone();
                 i.block = self.block(&i.block);
+                // Values mean something only to the schema they were made for.
+                if i.dynamic.is_some() && i.block.dynamic != source.dynamic {
+                    i.dynamic = None;
+                    let name = source.name.clone();
+                    self.warnings
+                        .push(TransferWarning::DynamicStateDropped(name));
+                }
                 self.insert_attributes(&mut i);
                 Entity::Insert(i)
             }

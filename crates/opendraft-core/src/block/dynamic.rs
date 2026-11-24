@@ -14,6 +14,8 @@
 //! definition's default. Evaluated geometry is derived and is never stored
 //! here.
 
+use std::collections::HashSet;
+
 use crate::{Bounds, Point};
 
 /// Stable identity of one object inside one block definition. It is not a
@@ -57,6 +59,59 @@ impl DynamicBlock {
             next_parameter_id: 1,
             next_action_id: 1,
         }
+    }
+}
+
+impl DynamicBlock {
+    /// Why this schema could not exist in a block whose objects have ids
+    /// `objects`, or `Ok`. Checks the structure: the version, parameter and
+    /// action ids (nonzero, unique, already issued), that each action names
+    /// a parameter, and that its selection is non-empty, sorted, without
+    /// repeats and of objects the block has.
+    pub fn check(&self, objects: &HashSet<BlockObjectId>) -> Result<(), String> {
+        if self.version != Self::VERSION {
+            return Err(format!("unknown schema version {}", self.version));
+        }
+        let mut parameters = HashSet::new();
+        for p in &self.parameters {
+            if p.id.0 == 0 || p.id.0 >= self.next_parameter_id || !parameters.insert(p.id) {
+                return Err(format!(
+                    "parameter id {} is zero, repeated or not issued",
+                    p.id.0
+                ));
+            }
+        }
+        let mut actions = HashSet::new();
+        for a in &self.actions {
+            if a.id.0 == 0 || a.id.0 >= self.next_action_id || !actions.insert(a.id) {
+                return Err(format!(
+                    "action id {} is zero, repeated or not issued",
+                    a.id.0
+                ));
+            }
+            if !parameters.contains(&a.parameter) {
+                return Err(format!("action {} names a missing parameter", a.id.0));
+            }
+            let (DynamicActionKind::Move {
+                objects: selected, ..
+            }
+            | DynamicActionKind::Stretch {
+                objects: selected, ..
+            }) = &a.kind;
+            if selected.is_empty() || selected.windows(2).any(|w| w[0] >= w[1]) {
+                return Err(format!(
+                    "action {} selects nothing, or its selection is unsorted or repeats",
+                    a.id.0
+                ));
+            }
+            if let Some(missing) = selected.iter().find(|o| !objects.contains(o)) {
+                return Err(format!(
+                    "action {} selects object {}, which the block lacks",
+                    a.id.0, missing.0
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -182,6 +237,21 @@ impl DynamicInstanceState {
                 .values
                 .insert(i, DynamicValueEntry { parameter, value }),
         }
+    }
+
+    /// Whether every value is finite and the parameter ids are strictly
+    /// increasing (sorted, one entry each).
+    pub fn is_well_formed(&self) -> bool {
+        let finite = |v: &DynamicValue| match v {
+            DynamicValue::Distance(x) | DynamicValue::Angle(x) => x.is_finite(),
+            DynamicValue::Point(p) => p.x.is_finite() && p.y.is_finite(),
+            DynamicValue::Integer(_) | DynamicValue::Text(_) | DynamicValue::Bool(_) => true,
+        };
+        self.values.iter().all(|e| finite(&e.value))
+            && self
+                .values
+                .windows(2)
+                .all(|w| w[0].parameter < w[1].parameter)
     }
 
     /// Whether nothing is overridden, which is the same as no state.

@@ -208,7 +208,8 @@ impl Insert {
             .any(|r| r.attrs.as_ref().is_some_and(|a| a.layer == layer))
     }
 
-    /// Whether the scales are finite and not zero, and the rest finite.
+    /// Whether the scales are finite and not zero, the rest finite, and its
+    /// dynamic values (if any) well formed.
     pub fn is_valid(&self) -> bool {
         let finite = [
             self.insertion.x,
@@ -219,7 +220,8 @@ impl Insert {
         ]
         .iter()
         .all(|v| v.is_finite());
-        finite && self.scale_x != 0.0 && self.scale_y != 0.0
+        let state_ok = self.dynamic.as_ref().is_none_or(|s| s.is_well_formed());
+        finite && state_ok && self.scale_x != 0.0 && self.scale_y != 0.0
     }
 
     /// Whether the x and y scales have the same size (signs may differ), so
@@ -258,6 +260,8 @@ pub fn inherited(
 
 #[cfg(test)]
 mod attribute_tests;
+#[cfg(test)]
+mod dynamic_tests;
 #[cfg(test)]
 mod expansion_tests;
 #[cfg(test)]

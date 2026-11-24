@@ -61,6 +61,9 @@ pub enum TransferWarning {
     /// A linetype could not be added (its name was refused); it is drawn
     /// continuous.
     LinetypeRefused(String),
+    /// A block reference carried dynamic values, but the block of that name
+    /// here has another schema; the reference takes the block's defaults.
+    DynamicStateDropped(String),
 }
 
 impl std::fmt::Display for TransferWarning {
@@ -76,6 +79,10 @@ impl std::fmt::Display for TransferWarning {
             Self::LinetypeRefused(name) => {
                 write!(f, "Linetype {name} could not be added; drawn continuous.")
             }
+            Self::DynamicStateDropped(name) => write!(
+                f,
+                "Block {name} here has other parameters; its dynamic values were not kept."
+            ),
         }
     }
 }

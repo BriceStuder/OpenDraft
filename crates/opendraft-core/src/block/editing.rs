@@ -70,7 +70,8 @@ impl Document {
                 .model_objects()
                 .map(|o| BlockEntity::new(BlockObjectId(o.id.0), o.entity.clone(), o.attrs.clone()))
                 .collect(),
-            dynamic: old.dynamic.clone(),
+            // What the editor drafted (it starts as the block's own).
+            dynamic: editor.block_editor_dynamic().cloned().map(Box::new),
         };
         // A copied definition arrives with its original's id.
         edited.renumber_duplicate_attributes(|| work.allocate_attribute_definition_id());
