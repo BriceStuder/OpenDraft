@@ -248,3 +248,23 @@ fn a_stored_state_survives_a_schema_edit_only_if_it_still_exists() {
     gone.set(ParameterId(1), DynamicValue::Text("Gone".into()));
     assert!(schema.fit_state(&gone).is_none());
 }
+
+#[test]
+fn a_block_nested_in_another_shows_its_own_state() {
+    let inner = Insert::new(table(), p(0.0, 0.0))
+        .with_visibility_state("Round")
+        .unwrap();
+    let outer = Arc::new(BlockDef {
+        id: BlockId(6),
+        name: "Outer".into(),
+        base: p(0.0, 0.0),
+        description: String::new(),
+        unit: Default::default(),
+        entities: numbered(vec![object(Entity::Insert(Box::new(inner)))]),
+        dynamic: None,
+    });
+    let picture = Insert::new(outer, p(100.0, 0.0)).picture();
+    // "Round" hides the line, so the circle and the point remain.
+    assert_eq!(picture.len(), 2);
+    assert!(picture.iter().all(|e| !matches!(e, Entity::Line { .. })));
+}
