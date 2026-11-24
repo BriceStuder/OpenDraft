@@ -11,7 +11,7 @@ use crate::draw::{add, MIN_SIZE};
 use crate::rect_memory::Memory;
 
 /// The corner style the remembered settings call for.
-fn corners(m: &Memory) -> Corners {
+pub(crate) fn corners(m: &Memory) -> Corners {
     if m.radius > 0.0 {
         Corners::Fillet(m.radius)
     } else {
@@ -20,12 +20,12 @@ fn corners(m: &Memory) -> Corners {
 }
 
 /// A size given by Area or Dimensions: along the rectangle's own x and y.
-type Size = (f64, f64);
+pub(crate) type Size = (f64, f64);
 
 /// Where the opposite corner is, in the rectangle's own axes, from the first
 /// corner: the picked point's offset, or the given size on the side of the
 /// first corner the pick lies on.
-fn extent(first: Point, angle: f64, size: Option<Size>, at: Point) -> (f64, f64) {
+pub(crate) fn extent(first: Point, angle: f64, size: Option<Size>, at: Point) -> (f64, f64) {
     let (rx, ry) = (at.x - first.x, at.y - first.y);
     let (x, y) = (
         rx * angle.cos() + ry * angle.sin(),
@@ -77,7 +77,7 @@ fn set_option(ed: &Editor, option: &str) -> Result<(), Cancelled> {
     Ok(())
 }
 
-fn positive(ed: &Editor, message: &str) -> Result<f64, Cancelled> {
+pub(crate) fn positive(ed: &Editor, message: &str) -> Result<f64, Cancelled> {
     loop {
         let value = ed.get_distance(message)?;
         if value > MIN_SIZE {
@@ -88,7 +88,7 @@ fn positive(ed: &Editor, message: &str) -> Result<f64, Cancelled> {
 }
 
 /// Area: the area, then the length or the width, give the other side.
-fn size_from_area(ed: &Editor) -> Result<Size, Cancelled> {
+pub(crate) fn size_from_area(ed: &Editor) -> Result<Size, Cancelled> {
     let area = loop {
         let area = ed.get_number(key!("Enter area of rectangle in current units"))?;
         if area > MIN_SIZE {
@@ -112,7 +112,7 @@ fn size_from_area(ed: &Editor) -> Result<Size, Cancelled> {
 }
 
 /// Rotation: an angle, typed or picked from the first corner, or two points.
-fn rotation(ed: &Editor, first: Point, current: f64) -> Result<f64, Cancelled> {
+pub(crate) fn rotation(ed: &Editor, first: Point, current: f64) -> Result<f64, Cancelled> {
     let options = NumberOptions::new(key!("Specify rotation angle"))
         .default(current)
         .base(first)
@@ -128,23 +128,29 @@ fn rotation(ed: &Editor, first: Point, current: f64) -> Result<f64, Cancelled> {
     })
 }
 
+/// The first point of a rectangle; its prompt also offers the options that
+/// set what the next rectangles look like.
+pub(crate) fn first_point(ed: &Editor, message: &str) -> Result<Point, Cancelled> {
+    loop {
+        let options = PointOptions::new(message)
+            .keyword("Chamfer", "C")
+            .keyword("Fillet", "F")
+            .keyword("Width", "W");
+        match ed.ask_point(options)? {
+            Answer::Value(first) => return Ok(first),
+            Answer::Keyword(option) => set_option(ed, &option)?,
+            Answer::Enter => return Err(Cancelled),
+        }
+    }
+}
+
 /// RECTANGLE. The first corner prompt also sets what the next rectangles look
 /// like (Chamfer, Fillet and Width; AutoCAD's Elevation and Thickness are 3D
 /// and are not offered). After it, Area and Dimensions give a size and the
 /// pointer chooses which of the four ways it lies from the first corner, and
 /// Rotation turns the whole rectangle about the first corner.
 pub fn draw_rectangle(ed: &mut Editor) -> Result<(), Cancelled> {
-    let first = loop {
-        let options = PointOptions::new(key!("Specify first corner point"))
-            .keyword("Chamfer", "C")
-            .keyword("Fillet", "F")
-            .keyword("Width", "W");
-        match ed.ask_point(options)? {
-            Answer::Value(first) => break first,
-            Answer::Keyword(option) => set_option(ed, &option)?,
-            Answer::Enter => return Err(Cancelled),
-        }
-    };
+    let first = first_point(ed, key!("Specify first corner point"))?;
     let m = ed.defaults().rect.get();
     let (style, width) = (corners(&m), m.width);
     // Square to the coordinate system's axes (a polyline when they are turned).

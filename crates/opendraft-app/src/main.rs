@@ -173,6 +173,7 @@ mod purge_memory;
 mod recent;
 mod recovery;
 mod rect_memory;
+mod rect_variants;
 mod rectangle;
 mod reveal;
 mod ribbon_def;
