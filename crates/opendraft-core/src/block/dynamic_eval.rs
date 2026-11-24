@@ -9,6 +9,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::f64::consts::TAU;
 use std::fmt;
 
 use crate::block::{
@@ -26,7 +27,8 @@ pub const EPS: f64 = 1e-9;
 pub enum DynamicBlockError {
     MissingParameter(ParameterId),
     MissingObject(BlockObjectId),
-    /// A linear parameter whose two points coincide, or are not finite.
+    /// A linear parameter whose two points coincide, or a rotation with no
+    /// radius, or either not finite.
     Degenerate(ParameterId),
     /// A value that is not finite, or of the wrong type for its parameter.
     BadValue(ParameterId),
@@ -48,73 +50,6 @@ impl fmt::Display for DynamicBlockError {
 
 impl std::error::Error for DynamicBlockError {}
 
-impl DynamicValueSet {
-    /// Whether the set can hold a value: a list is non-empty, finite and
-    /// strictly increasing; a range is finite with `min <= max` and a
-    /// positive increment, if it has one.
-    pub fn is_valid(&self) -> bool {
-        match self {
-            Self::Any => true,
-            Self::List(xs) => {
-                !xs.is_empty()
-                    && xs.iter().all(|x| x.is_finite())
-                    && xs.windows(2).all(|w| w[0] < w[1])
-            }
-            Self::Range {
-                min,
-                max,
-                increment,
-            } => {
-                min.is_finite()
-                    && max.is_finite()
-                    && min <= max
-                    && increment.is_none_or(|i| i.is_finite() && i > 0.0)
-            }
-        }
-    }
-
-    /// The value of the set nearest `value`, or `None` when `value` is not
-    /// finite or the set is invalid. A list takes the nearest entry (the
-    /// lower on a tie); a range clamps, then rounds to its increment counted
-    /// from `min` (never past `max`).
-    pub fn normalize(&self, value: f64) -> Option<f64> {
-        if !value.is_finite() || !self.is_valid() {
-            return None;
-        }
-        Some(match self {
-            Self::Any => value,
-            Self::List(xs) => {
-                let mut best = xs[0];
-                for &x in &xs[1..] {
-                    if (x - value).abs() < (best - value).abs() {
-                        best = x;
-                    }
-                }
-                best
-            }
-            Self::Range {
-                min,
-                max,
-                increment,
-            } => {
-                let v = value.clamp(*min, *max);
-                match increment {
-                    Some(i) => {
-                        let mut steps = ((v - min) / i).round();
-                        // Rounding up past the end lands on no step: take
-                        // the last one inside the range.
-                        if min + steps * i > *max {
-                            steps -= 1.0;
-                        }
-                        (min + steps * i).clamp(*min, *max)
-                    }
-                    None => v,
-                }
-            }
-        })
-    }
-}
-
 /// A linear parameter's line, in block coordinates.
 #[derive(Clone, Copy, Debug)]
 struct Axis {
@@ -125,7 +60,9 @@ struct Axis {
 
 impl DynamicParameter {
     fn axis(&self) -> Option<Axis> {
-        let DynamicParameterKind::Linear { start, end, .. } = &self.kind;
+        let DynamicParameterKind::Linear { start, end, .. } = &self.kind else {
+            return None;
+        };
         let (vx, vy) = (end.x - start.x, end.y - start.y);
         let length = vx.hypot(vy);
         (length.is_finite() && length > EPS).then(|| Axis {
@@ -135,33 +72,99 @@ impl DynamicParameter {
         })
     }
 
-    /// Whether its points make a line with a length.
+    /// Whether its points make a line with a length (a linear parameter), or
+    /// it has a base and a radius (a rotation).
     pub fn is_degenerate(&self) -> bool {
-        self.axis().is_none()
+        match &self.kind {
+            DynamicParameterKind::Linear { .. } => self.axis().is_none(),
+            DynamicParameterKind::Rotation { base, radius, .. } => {
+                !(base.x.is_finite() && base.y.is_finite() && radius.is_finite() && *radius > EPS)
+            }
+        }
     }
 
-    /// The value of the untouched block: the distance between its points.
+    /// Whether its value is an angle (in radians) rather than a distance.
+    pub fn is_angle(&self) -> bool {
+        matches!(self.kind, DynamicParameterKind::Rotation { .. })
+    }
+
+    /// The value of the untouched block: the distance between a linear
+    /// parameter's points, or no turn for a rotation.
     pub fn default_value(&self) -> Option<f64> {
-        self.axis().map(|a| a.length)
+        match &self.kind {
+            DynamicParameterKind::Linear { .. } => self.axis().map(|a| a.length),
+            DynamicParameterKind::Rotation { .. } => (!self.is_degenerate()).then_some(0.0),
+        }
     }
 
     /// The values it may take.
     pub fn value_set(&self) -> &DynamicValueSet {
-        let DynamicParameterKind::Linear { value_set, .. } = &self.kind;
+        let (DynamicParameterKind::Linear { value_set, .. }
+        | DynamicParameterKind::Rotation { value_set, .. }) = &self.kind;
         value_set
     }
 
-    /// The value an insert with `state` has, and the axis it measures along.
+    /// `value` as this parameter's kind of value.
+    pub fn make_value(&self, value: f64) -> DynamicValue {
+        if self.is_angle() {
+            DynamicValue::Angle(value)
+        } else {
+            DynamicValue::Distance(value)
+        }
+    }
+
+    /// The number in `value` when it is this parameter's kind of value.
+    pub fn number_of(&self, value: &DynamicValue) -> Option<f64> {
+        match (self.is_angle(), value) {
+            (false, DynamicValue::Distance(v)) | (true, DynamicValue::Angle(v)) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// The value of the set nearest `value` (see [`DynamicValueSet::normalize`]),
+    /// where an angle also counts turns: with no set it is brought into 0 to
+    /// a full turn, and in a list the nearest is the one a shorter turn away.
+    pub fn normalize(&self, value: f64) -> Option<f64> {
+        if !self.is_angle() {
+            return self.value_set().normalize(value);
+        }
+        if !value.is_finite() {
+            return None;
+        }
+        match self.value_set() {
+            DynamicValueSet::Any => Some(value.rem_euclid(TAU)),
+            DynamicValueSet::List(xs) if self.value_set().is_valid() => {
+                let apart = |x: f64| (x - value).rem_euclid(TAU).min((value - x).rem_euclid(TAU));
+                xs.iter()
+                    .copied()
+                    .min_by(|a, b| apart(*a).total_cmp(&apart(*b)))
+            }
+            set => set.normalize(value),
+        }
+    }
+
+    /// The value an insert with `state` has.
+    fn value(&self, state: Option<&DynamicInstanceState>) -> Result<f64, DynamicBlockError> {
+        let default = self
+            .default_value()
+            .ok_or(DynamicBlockError::Degenerate(self.id))?;
+        match state.and_then(|s| s.get(self.id)) {
+            None => Ok(default),
+            Some(v) => self
+                .number_of(v)
+                .filter(|v| v.is_finite())
+                .ok_or(DynamicBlockError::BadValue(self.id)),
+        }
+    }
+
+    /// The value an insert with `state` has, and the axis a linear parameter
+    /// measures along.
     fn current(
         &self,
         state: Option<&DynamicInstanceState>,
     ) -> Result<(f64, Axis), DynamicBlockError> {
         let axis = self.axis().ok_or(DynamicBlockError::Degenerate(self.id))?;
-        match state.and_then(|s| s.get(self.id)) {
-            None => Ok((axis.length, axis)),
-            Some(DynamicValue::Distance(v)) if v.is_finite() => Ok((*v, axis)),
-            Some(_) => Err(DynamicBlockError::BadValue(self.id)),
-        }
+        Ok((self.value(state)?, axis))
     }
 }
 
@@ -174,13 +177,10 @@ impl DynamicBlock {
             let Some(p) = self.parameters.iter().find(|p| p.id == entry.parameter) else {
                 return Err(format!("parameter {} does not exist", entry.parameter.0));
             };
-            let held = match entry.value {
-                DynamicValue::Distance(v) => p
-                    .value_set()
-                    .normalize(v)
-                    .is_some_and(|n| (n - v).abs() <= 1e-9 * v.abs().max(1.0)),
-                _ => false,
-            };
+            let held = p.number_of(&entry.value).is_some_and(|v| {
+                p.normalize(v)
+                    .is_some_and(|n| (n - v).abs() <= 1e-9 * v.abs().max(1.0))
+            });
             if !held {
                 return Err(format!(
                     "the value of parameter {} is not one its value set allows",
@@ -217,6 +217,10 @@ pub fn evaluate<'a>(
             .iter()
             .find(|p| p.id == action.parameter)
             .ok_or(DynamicBlockError::MissingParameter(action.parameter))?;
+        if let DynamicActionKind::Rotate { objects } = &action.kind {
+            rotate(&mut out, &position, objects, parameter, state)?;
+            continue;
+        }
         let (current, axis) = parameter.current(Some(state))?;
         let (objects, frame, multiplier, offset) = match &action.kind {
             DynamicActionKind::Move {
@@ -230,6 +234,7 @@ pub fn evaluate<'a>(
                 multiplier,
                 angle_offset,
             } => (objects, Some(frame), *multiplier, *angle_offset),
+            DynamicActionKind::Rotate { .. } => continue,
         };
         let amount = (current - axis.length) * multiplier;
         if !amount.is_finite() {
@@ -266,6 +271,34 @@ pub fn evaluate<'a>(
     Ok(Cow::Owned(out))
 }
 
+/// Turn `objects` about a rotation parameter's base point by its value.
+fn rotate(
+    out: &mut [BlockEntity],
+    position: &HashMap<BlockObjectId, usize>,
+    objects: &[BlockObjectId],
+    parameter: &DynamicParameter,
+    state: &DynamicInstanceState,
+) -> Result<(), DynamicBlockError> {
+    let DynamicParameterKind::Rotation { base, .. } = &parameter.kind else {
+        return Err(DynamicBlockError::BadValue(parameter.id));
+    };
+    let angle = parameter.value(Some(state))?;
+    if angle == 0.0 {
+        return Ok(());
+    }
+    for id in objects {
+        let at = *position
+            .get(id)
+            .ok_or(DynamicBlockError::MissingObject(*id))?;
+        let object = &mut out[at];
+        if matches!(object.entity, Entity::AttributeDefinition(_)) {
+            return Err(DynamicBlockError::UnsupportedObject(*id));
+        }
+        object.entity = object.entity.rotated(*base, angle);
+    }
+    Ok(())
+}
+
 impl Insert {
     /// The objects this insert draws, in block coordinates: the definition's
     /// with the insert's values applied. A schema or state that cannot be
@@ -278,16 +311,21 @@ impl Insert {
     /// The value of `parameter` on this insert, in the block's units.
     pub fn dynamic_value(&self, parameter: ParameterId) -> Option<f64> {
         let p = self.parameter(parameter)?;
-        p.current(self.dynamic.as_deref()).ok().map(|(v, _)| v)
+        p.value(self.dynamic.as_deref()).ok()
     }
 
     /// How long one unit of `parameter`'s value is in the drawing: the
     /// length its line has after the insert's transform. Multiply a value
     /// by it to show the value in drawing units, divide to read one typed
     /// there. `None` when the parameter is unknown, or the insert flattens
-    /// the line to nothing.
+    /// the line to nothing. An angle is shown in degrees, whatever the
+    /// insert's scale, so its factor is 180 over pi.
     pub fn dynamic_scale(&self, parameter: ParameterId) -> Option<f64> {
-        let axis = self.parameter(parameter)?.axis()?;
+        let p = self.parameter(parameter)?;
+        if p.is_angle() {
+            return Some(180.0 / std::f64::consts::PI);
+        }
+        let axis = p.axis()?;
         let map = self.transform();
         let a = map.apply(axis.start);
         let b = map.apply(Point::new(
@@ -317,9 +355,7 @@ impl Insert {
         value: DynamicValue,
     ) -> Option<Insert> {
         let p = self.parameter(parameter)?;
-        let DynamicValue::Distance(v) = value else {
-            return None;
-        };
+        let v = p.number_of(&value)?;
         if !v.is_finite() {
             return None;
         }
@@ -337,7 +373,8 @@ impl Insert {
 
     /// The grips the parameters show, in drawing coordinates, in schema
     /// order. A linear parameter's end grip sits `value` along its line from
-    /// its start.
+    /// its start; a rotation's sits its radius from the base, turned by the
+    /// value.
     pub fn dynamic_grips(&self) -> Vec<(DynamicGrip, Point)> {
         let Some(schema) = &self.block.dynamic else {
             return Vec::new();
@@ -348,11 +385,20 @@ impl Insert {
             .iter()
             .filter(|p| p.grips >= 1)
             .filter_map(|p| {
-                let (value, axis) = p.current(self.dynamic.as_deref()).ok()?;
-                let at = map.apply(Point::new(
-                    axis.start.x + axis.dir.0 * value,
-                    axis.start.y + axis.dir.1 * value,
-                ));
+                let value = p.value(self.dynamic.as_deref()).ok()?;
+                let at = match &p.kind {
+                    DynamicParameterKind::Linear { .. } => {
+                        let axis = p.axis()?;
+                        Point::new(
+                            axis.start.x + axis.dir.0 * value,
+                            axis.start.y + axis.dir.1 * value,
+                        )
+                    }
+                    DynamicParameterKind::Rotation { base, radius, .. } => {
+                        Point::new(base.x + radius * value.cos(), base.y + radius * value.sin())
+                    }
+                };
+                let at = map.apply(at);
                 let grip = DynamicGrip {
                     parameter: p.id,
                     index: 0,
@@ -372,13 +418,19 @@ impl Insert {
             return None;
         }
         let p = self.parameter(grip.parameter)?;
-        let (current, axis) = p.current(self.dynamic.as_deref()).ok()?;
+        let current = p.value(self.dynamic.as_deref()).ok()?;
         let at = self.transform().inverse()?.apply(to_drawing);
-        let raw = (at.x - axis.start.x) * axis.dir.0 + (at.y - axis.start.y) * axis.dir.1;
-        let value = p.value_set().normalize(raw)?;
+        let raw = match &p.kind {
+            DynamicParameterKind::Linear { .. } => {
+                let axis = p.axis()?;
+                (at.x - axis.start.x) * axis.dir.0 + (at.y - axis.start.y) * axis.dir.1
+            }
+            DynamicParameterKind::Rotation { base, .. } => (at.y - base.y).atan2(at.x - base.x),
+        };
+        let value = p.normalize(raw)?;
         if (value - current).abs() <= 1e-12 {
             return None;
         }
-        self.with_dynamic_value(grip.parameter, DynamicValue::Distance(value))
+        self.with_dynamic_value(grip.parameter, p.make_value(value))
     }
 }

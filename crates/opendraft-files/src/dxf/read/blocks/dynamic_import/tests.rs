@@ -99,7 +99,9 @@ fn a_definition_comes_in_with_its_parameter_and_action() {
     assert_eq!(schema.parameters.len(), 1);
     let p = &schema.parameters[0];
     assert_eq!((p.name.as_str(), p.grips), ("Distance1", 1));
-    let DynamicParameterKind::Linear { value_set, .. } = &p.kind;
+    let DynamicParameterKind::Linear { value_set, .. } = &p.kind else {
+        panic!("a linear parameter");
+    };
     assert_eq!(*value_set, DynamicValueSet::List(vec![2.5, 5.0, 7.5, 10.0]));
     let DynamicActionKind::Stretch {
         objects,

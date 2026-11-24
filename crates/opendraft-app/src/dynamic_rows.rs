@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, Ui};
 use opendraft_commands::ModifyEntities;
-use opendraft_core::block::{DynamicValue, ParameterId};
+use opendraft_core::block::ParameterId;
 use opendraft_core::{Entity, EntityKind, Insert, Units};
 use opendraft_ui::Theme;
 
@@ -22,6 +22,8 @@ use crate::state::AppState;
 pub struct Row {
     pub parameter: ParameterId,
     pub label: String,
+    /// Whether the value is an angle, shown in degrees.
+    pub angle: bool,
     /// `None` when the references disagree.
     pub value: Option<f64>,
 }
@@ -52,6 +54,7 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
             }
             Some(Row {
                 parameter: p.id,
+                angle: p.is_angle(),
                 label: if p.label.is_empty() {
                     p.name.clone()
                 } else {
@@ -63,27 +66,35 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
         .collect()
 }
 
-/// `insert` with `parameter` set to `display`, a length in drawing units,
-/// brought into the parameter's value set; `None` when that changes nothing
+/// `insert` with `parameter` set to `display`, a length in drawing units (an
+/// angle in degrees), brought into the parameter's value set; `None` when
+/// that changes nothing
 /// or cannot be done (an unknown parameter, a flattened insert, a value that
 /// is not finite).
 pub fn with_display_value(insert: &Insert, parameter: ParameterId, display: f64) -> Option<Insert> {
     let scale = insert.dynamic_scale(parameter)?;
-    let set = insert
+    let p = insert
         .block
         .dynamic
         .as_ref()?
         .parameters
         .iter()
-        .find(|p| p.id == parameter)?
-        .value_set();
-    let value = set.normalize(display / scale)?;
-    let out = insert.with_dynamic_value(parameter, DynamicValue::Distance(value))?;
+        .find(|p| p.id == parameter)?;
+    let value = p.normalize(display / scale)?;
+    let out = insert.with_dynamic_value(parameter, p.make_value(value))?;
     (out != *insert).then_some(out)
 }
 
+fn unit_of(row: &Row) -> Unit {
+    if row.angle {
+        Unit::Angle
+    } else {
+        Unit::Length
+    }
+}
+
 /// The rows drawn, with the value cells editable. Returns the parameter and
-/// the length typed, in drawing units.
+/// the length typed, in drawing units (an angle, in degrees).
 pub fn show(ui: &mut Ui, theme: &Theme, units: &Units, rows: &[Row]) -> Option<(ParameterId, f64)> {
     let mut edit = None;
     for row in rows {
@@ -96,11 +107,11 @@ pub fn show(ui: &mut Ui, theme: &Theme, units: &Units, rows: &[Row]) -> Option<(
         .on_hover_text(&row.label);
         let shown = row
             .value
-            .map(|v| properties::format(units, Unit::Length, v))
+            .map(|v| properties::format(units, unit_of(row), v))
             .unwrap_or_default();
         let id = egui::Id::new(("property_dynamic", row.parameter.0));
         if let Some(typed) = text_cell(ui, theme, cell, id, &shown) {
-            if let Some(v) = properties::parse(units, Unit::Length, &typed) {
+            if let Some(v) = properties::parse(units, unit_of(row), &typed) {
                 edit = Some((row.parameter, v));
             }
         }

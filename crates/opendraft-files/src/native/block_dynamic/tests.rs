@@ -322,3 +322,45 @@ fn nested_dynamic_inserts_and_blocks_in_any_order_round_trip() {
     };
     assert!(i.dynamic.is_some() && i.block.is_dynamic());
 }
+
+#[test]
+fn a_rotation_parameter_and_its_action_and_value_survive_a_round_trip() {
+    let mut s = DynamicBlock::new();
+    s.parameters.push(DynamicParameter {
+        id: ParameterId(1),
+        name: "Angle1".into(),
+        label: "Angle".into(),
+        description: String::new(),
+        show: true,
+        grips: 1,
+        kind: DynamicParameterKind::Rotation {
+            base: p(4.0, 0.0),
+            radius: 1.5,
+            value_set: DynamicValueSet::List(vec![0.0, std::f64::consts::FRAC_PI_2]),
+        },
+    });
+    s.actions.push(DynamicAction {
+        id: ActionId(1),
+        name: "Rotate1".into(),
+        parameter: ParameterId(1),
+        kind: DynamicActionKind::Rotate {
+            objects: vec![BlockObjectId(9)],
+        },
+    });
+    s.next_parameter_id = 2;
+    s.next_action_id = 2;
+    let mut doc = Document::default();
+    let block = bar(&mut doc, Some(s));
+    doc.push_block(block.clone());
+    let turned = Insert::new(block, p(0.0, 0.0))
+        .with_dynamic_value(
+            ParameterId(1),
+            DynamicValue::Angle(std::f64::consts::FRAC_PI_2),
+        )
+        .unwrap();
+    doc.add(Entity::Insert(Box::new(turned)));
+    let back = read(&write(&doc)).unwrap();
+    assert_eq!(back.blocks(), doc.blocks());
+    assert_eq!(back.objects(), doc.objects());
+    assert_eq!(back.validate(), Ok(()));
+}

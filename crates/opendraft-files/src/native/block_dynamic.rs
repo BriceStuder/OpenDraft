@@ -47,6 +47,7 @@ struct ParameterDto {
 #[serde(rename_all = "snake_case")]
 enum ParameterKindDto {
     Linear(LinearDto),
+    Rotation(RotationDto),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,6 +55,15 @@ enum ParameterKindDto {
 struct LinearDto {
     start: PointDto,
     end: PointDto,
+    values: ValueSetDto,
+}
+
+/// A rotation parameter; its value set is in radians.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RotationDto {
+    base: PointDto,
+    radius: f64,
     values: ValueSetDto,
 }
 
@@ -88,6 +98,14 @@ struct ActionDto {
 enum ActionKindDto {
     Move(ActionBodyDto),
     Stretch(ActionBodyDto),
+    Rotate(RotateDto),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RotateDto {
+    #[serde(deserialize_with = "super::limits::block_objects")]
+    objects: Vec<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -172,11 +190,26 @@ impl DynamicBlockDto {
 
 impl ParameterDto {
     fn of(p: &DynamicParameter) -> Self {
-        let DynamicParameterKind::Linear {
-            start,
-            end,
-            value_set,
-        } = &p.kind;
+        let kind = match &p.kind {
+            DynamicParameterKind::Linear {
+                start,
+                end,
+                value_set,
+            } => ParameterKindDto::Linear(LinearDto {
+                start: point(*start),
+                end: point(*end),
+                values: ValueSetDto::of(value_set),
+            }),
+            DynamicParameterKind::Rotation {
+                base,
+                radius,
+                value_set,
+            } => ParameterKindDto::Rotation(RotationDto {
+                base: point(*base),
+                radius: *radius,
+                values: ValueSetDto::of(value_set),
+            }),
+        };
         Self {
             id: p.id.0,
             name: p.name.clone(),
@@ -184,28 +217,23 @@ impl ParameterDto {
             description: p.description.clone(),
             show: p.show,
             grips: p.grips,
-            kind: ParameterKindDto::Linear(LinearDto {
-                start: point(*start),
-                end: point(*end),
-                values: match value_set {
-                    DynamicValueSet::Any => ValueSetDto::Any,
-                    DynamicValueSet::List(xs) => ValueSetDto::List(xs.clone()),
-                    DynamicValueSet::Range {
-                        min,
-                        max,
-                        increment,
-                    } => ValueSetDto::Range(RangeDto {
-                        min: *min,
-                        max: *max,
-                        increment: *increment,
-                    }),
-                },
-            }),
+            kind,
         }
     }
 
     fn to_parameter(&self) -> Result<DynamicParameter, FileError> {
-        let ParameterKindDto::Linear(l) = &self.kind;
+        let kind = match &self.kind {
+            ParameterKindDto::Linear(l) => DynamicParameterKind::Linear {
+                start: from_point(l.start)?,
+                end: from_point(l.end)?,
+                value_set: l.values.to_set(),
+            },
+            ParameterKindDto::Rotation(r) => DynamicParameterKind::Rotation {
+                base: from_point(r.base)?,
+                radius: r.radius,
+                value_set: r.values.to_set(),
+            },
+        };
         Ok(DynamicParameter {
             id: ParameterId(self.id),
             name: self.name.clone(),
@@ -213,20 +241,38 @@ impl ParameterDto {
             description: self.description.clone(),
             show: self.show,
             grips: self.grips,
-            kind: DynamicParameterKind::Linear {
-                start: from_point(l.start)?,
-                end: from_point(l.end)?,
-                value_set: match &l.values {
-                    ValueSetDto::Any => DynamicValueSet::Any,
-                    ValueSetDto::List(xs) => DynamicValueSet::List(xs.clone()),
-                    ValueSetDto::Range(r) => DynamicValueSet::Range {
-                        min: r.min,
-                        max: r.max,
-                        increment: r.increment,
-                    },
-                },
-            },
+            kind,
         })
+    }
+}
+
+impl ValueSetDto {
+    fn of(set: &DynamicValueSet) -> Self {
+        match set {
+            DynamicValueSet::Any => Self::Any,
+            DynamicValueSet::List(xs) => Self::List(xs.clone()),
+            DynamicValueSet::Range {
+                min,
+                max,
+                increment,
+            } => Self::Range(RangeDto {
+                min: *min,
+                max: *max,
+                increment: *increment,
+            }),
+        }
+    }
+
+    fn to_set(&self) -> DynamicValueSet {
+        match self {
+            Self::Any => DynamicValueSet::Any,
+            Self::List(xs) => DynamicValueSet::List(xs.clone()),
+            Self::Range(r) => DynamicValueSet::Range {
+                min: r.min,
+                max: r.max,
+                increment: r.increment,
+            },
+        }
     }
 }
 
@@ -251,6 +297,9 @@ impl ActionDto {
                 multiplier,
                 angle_offset,
             } => ActionKindDto::Stretch(body(objects, Some(frame), *multiplier, *angle_offset)),
+            DynamicActionKind::Rotate { objects } => ActionKindDto::Rotate(RotateDto {
+                objects: objects.iter().map(|o| o.0).collect(),
+            }),
         };
         Self {
             id: a.id.0,
@@ -288,6 +337,9 @@ impl ActionDto {
                     angle_offset: b.angle_offset,
                 }
             }
+            ActionKindDto::Rotate(r) => DynamicActionKind::Rotate {
+                objects: r.objects.iter().map(|&o| BlockObjectId(o)).collect(),
+            },
         };
         Ok(DynamicAction {
             id: ActionId(self.id),

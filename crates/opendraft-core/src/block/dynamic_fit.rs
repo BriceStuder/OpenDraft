@@ -5,7 +5,7 @@
 
 use crate::block::{
     BlockObjectId, DynamicActionKind, DynamicBlock, DynamicInstanceState, DynamicParameterKind,
-    DynamicValue, DynamicValueEntry,
+    DynamicValueEntry,
 };
 use crate::{Bounds, Point};
 
@@ -24,9 +24,13 @@ impl DynamicBlock {
     pub fn translated(&self, dx: f64, dy: f64) -> DynamicBlock {
         let mut out = self.clone();
         for p in &mut out.parameters {
-            let DynamicParameterKind::Linear { start, end, .. } = &mut p.kind;
-            *start = start.translated(dx, dy);
-            *end = end.translated(dx, dy);
+            match &mut p.kind {
+                DynamicParameterKind::Linear { start, end, .. } => {
+                    *start = start.translated(dx, dy);
+                    *end = end.translated(dx, dy);
+                }
+                DynamicParameterKind::Rotation { base, .. } => *base = base.translated(dx, dy),
+            }
         }
         for a in &mut out.actions {
             if let DynamicActionKind::Stretch { frame, .. } = &mut a.kind {
@@ -46,7 +50,8 @@ impl DynamicBlock {
         let (mut notes, mut removed) = (Vec::new(), Vec::new());
         schema.actions.retain_mut(|a| {
             let (DynamicActionKind::Move { objects, .. }
-            | DynamicActionKind::Stretch { objects, .. }) = &mut a.kind;
+            | DynamicActionKind::Stretch { objects, .. }
+            | DynamicActionKind::Rotate { objects }) = &mut a.kind;
             let before = objects.len();
             objects.retain(|o| exists(*o));
             let lost = before - objects.len();
@@ -80,10 +85,7 @@ impl DynamicBlock {
             .iter()
             .filter_map(|e| {
                 let p = self.parameters.iter().find(|p| p.id == e.parameter)?;
-                let DynamicValue::Distance(v) = e.value else {
-                    return None;
-                };
-                let value = p.value_set().normalize(v)?;
+                let value = p.normalize(p.number_of(&e.value)?)?;
                 if p.default_value()
                     .is_some_and(|d| (value - d).abs() <= 1e-12)
                 {
@@ -91,7 +93,7 @@ impl DynamicBlock {
                 }
                 Some(DynamicValueEntry {
                     parameter: e.parameter,
-                    value: DynamicValue::Distance(value),
+                    value: p.make_value(value),
                 })
             })
             .collect();

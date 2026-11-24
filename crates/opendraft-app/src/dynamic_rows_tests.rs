@@ -3,7 +3,7 @@ use std::sync::Arc;
 use opendraft_commands::SetBlocks;
 use opendraft_core::block::{
     ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicParameter,
-    DynamicParameterKind, DynamicValueSet,
+    DynamicParameterKind, DynamicValue, DynamicValueSet,
 };
 use opendraft_core::{
     Attributes, BlockDef, BlockEntity, BlockId, Bounds, Entity, EntityId, LayerId, Point,
@@ -175,4 +175,71 @@ fn a_flattened_reference_is_left_alone() {
     flat.scale_x = 1e-30;
     assert_eq!(flat.dynamic_scale(ParameterId(1)), None);
     assert_eq!(with_display_value(&flat, ParameterId(1), 5.0), None);
+}
+
+/// A line turned about its start by a rotation parameter.
+fn turning_line() -> Insert {
+    let mut schema = DynamicBlock::new();
+    schema.parameters.push(DynamicParameter {
+        id: ParameterId(1),
+        name: "Angle1".into(),
+        label: "Turn".into(),
+        description: String::new(),
+        show: true,
+        grips: 1,
+        kind: DynamicParameterKind::Rotation {
+            base: p(0.0, 0.0),
+            radius: 1.0,
+            value_set: DynamicValueSet::Any,
+        },
+    });
+    schema.actions.push(DynamicAction {
+        id: ActionId(1),
+        name: "Rotate1".into(),
+        parameter: ParameterId(1),
+        kind: DynamicActionKind::Rotate {
+            objects: vec![BlockObjectId(0)],
+        },
+    });
+    schema.next_parameter_id = 2;
+    schema.next_action_id = 2;
+    let block = BlockDef {
+        id: BlockId(3),
+        name: "Turn".into(),
+        base: p(0.0, 0.0),
+        description: String::new(),
+        unit: Default::default(),
+        entities: vec![BlockEntity::new(
+            BlockObjectId(0),
+            Entity::Line {
+                start: p(0.0, 0.0),
+                end: p(2.0, 0.0),
+            },
+            Attributes::on_layer(LayerId::DEFAULT),
+        )],
+        dynamic: Some(Box::new(schema)),
+    };
+    Insert::new(Arc::new(block), p(5.0, 5.0))
+}
+
+#[test]
+fn an_angle_row_reads_and_takes_degrees() {
+    let insert = turning_line();
+    let shown = rows(&[&insert]);
+    assert_eq!(shown.len(), 1);
+    assert!(shown[0].angle);
+    assert_eq!(shown[0].value, Some(0.0));
+    let turned = with_display_value(&insert, ParameterId(1), 90.0).unwrap();
+    let row = rows(&[&turned]);
+    assert!((row[0].value.unwrap() - 90.0).abs() < 1e-9);
+    assert!(
+        (turned.bounds().max.y - 7.0).abs() < 1e-9,
+        "{:?}",
+        turned.bounds()
+    );
+    // Typing 450 is the same turn as 90.
+    let wrapped = with_display_value(&insert, ParameterId(1), 450.0).unwrap();
+    assert!((rows(&[&wrapped])[0].value.unwrap() - 90.0).abs() < 1e-9);
+    // Typing what it already is changes nothing.
+    assert!(with_display_value(&insert, ParameterId(1), 0.0).is_none());
 }

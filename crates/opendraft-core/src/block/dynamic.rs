@@ -105,34 +105,46 @@ impl DynamicBlock {
                     a.id.0
                 ));
             }
-            if !parameters.contains(&a.parameter) {
+            let Some(p) = self.parameters.iter().find(|p| p.id == a.parameter) else {
                 return Err(format!("action {} names a missing parameter", a.id.0));
-            }
-            let (DynamicActionKind::Move {
-                objects: selected,
-                multiplier,
-                angle_offset,
-            }
-            | DynamicActionKind::Stretch {
-                objects: selected,
-                multiplier,
-                angle_offset,
-                ..
-            }) = &a.kind;
-            let frame_ok = match &a.kind {
-                DynamicActionKind::Stretch { frame, .. } => {
-                    let (w, h) = (frame.max.x - frame.min.x, frame.max.y - frame.min.y);
-                    w.is_finite() && h.is_finite() && w > 0.0 && h > 0.0
-                }
-                DynamicActionKind::Move { .. } => true,
             };
-            if !(multiplier.is_finite()
-                && *multiplier > 0.0
-                && angle_offset.is_finite()
-                && frame_ok)
-            {
+            let linear = matches!(p.kind, DynamicParameterKind::Linear { .. });
+            let (selected, usable) = match &a.kind {
+                DynamicActionKind::Move {
+                    objects,
+                    multiplier,
+                    angle_offset,
+                } => (
+                    objects,
+                    linear
+                        && multiplier.is_finite()
+                        && *multiplier > 0.0
+                        && angle_offset.is_finite(),
+                ),
+                DynamicActionKind::Stretch {
+                    objects,
+                    frame,
+                    multiplier,
+                    angle_offset,
+                } => {
+                    let (w, h) = (frame.max.x - frame.min.x, frame.max.y - frame.min.y);
+                    (
+                        objects,
+                        linear
+                            && multiplier.is_finite()
+                            && *multiplier > 0.0
+                            && angle_offset.is_finite()
+                            && w.is_finite()
+                            && h.is_finite()
+                            && w > 0.0
+                            && h > 0.0,
+                    )
+                }
+                DynamicActionKind::Rotate { objects } => (objects, !linear),
+            };
+            if !usable {
                 return Err(format!(
-                    "action {} has a multiplier or angle that is not usable, or an empty frame",
+                    "action {} does not suit its parameter, or has a multiplier or angle that is not usable, or an empty frame",
                     a.id.0
                 ));
             }
@@ -188,6 +200,15 @@ pub enum DynamicParameterKind {
         end: Point,
         value_set: DynamicValueSet,
     },
+    /// An angle about a point of the block. Its value is the turn from the
+    /// block as drawn, in radians, so the default is 0; the grip sits
+    /// `radius` from `base`, along the turned direction.
+    Rotation {
+        base: Point,
+        radius: f64,
+        /// In radians.
+        value_set: DynamicValueSet,
+    },
 }
 
 /// The values a parameter may take.
@@ -230,6 +251,9 @@ pub enum DynamicActionKind {
         multiplier: f64,
         angle_offset: f64,
     },
+    /// Turns the objects about its rotation parameter's base point by the
+    /// parameter's value.
+    Rotate { objects: Vec<BlockObjectId> },
 }
 
 /// The values one insert overrides. A parameter it does not list has the
@@ -246,8 +270,8 @@ pub struct DynamicValueEntry {
     pub value: DynamicValue,
 }
 
-/// A parameter's value. Only `Distance` is used so far; the rest are the
-/// types later parameters will need.
+/// A parameter's value. `Distance` and `Angle` (radians) are used so far; the
+/// rest are the types later parameters will need.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DynamicValue {
     Distance(f64),
@@ -306,8 +330,9 @@ impl DynamicInstanceState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DynamicGrip {
     pub parameter: ParameterId,
-    /// 0 is the end grip. 1 is the start grip, reserved for the linear
-    /// parameter's Startpoint/Midpoint base behaviour.
+    /// 0 is the end grip (a rotation's only grip). 1 is the start grip,
+    /// reserved for the linear parameter's Startpoint/Midpoint base
+    /// behaviour.
     pub index: u8,
 }
 

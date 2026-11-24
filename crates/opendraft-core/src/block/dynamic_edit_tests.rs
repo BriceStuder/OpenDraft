@@ -32,7 +32,9 @@ fn the_editor_shows_the_schema_where_it_shows_the_geometry() {
     let (doc, def) = drawing(None);
     let editor = doc.block_editor_document(def.id).unwrap();
     let draft = editor.block_editor_dynamic().unwrap();
-    let DynamicParameterKind::Linear { start, end, .. } = &draft.parameters[0].kind;
+    let DynamicParameterKind::Linear { start, end, .. } = &draft.parameters[0].kind else {
+        panic!("a linear parameter");
+    };
     assert_eq!((*start, *end), (p(0.0, 0.0), p(1.0, 0.0)));
     let DynamicActionKind::Stretch { frame, .. } = &draft.actions[0].kind else {
         panic!("not a stretch");
@@ -91,7 +93,9 @@ fn an_insert_keeps_its_value_brought_into_the_new_set_and_loses_it_when_the_para
     let (doc, def) = drawing(Some(3.4));
     let mut editor = doc.block_editor_document(def.id).unwrap();
     let mut draft = editor.block_editor_dynamic().unwrap().clone();
-    let DynamicParameterKind::Linear { value_set, .. } = &mut draft.parameters[0].kind;
+    let DynamicParameterKind::Linear { value_set, .. } = &mut draft.parameters[0].kind else {
+        panic!("a linear parameter");
+    };
     *value_set = DynamicValueSet::List(vec![2.0, 4.0]);
     editor.set_block_editor_dynamic(Some(draft));
     let save = doc.block_edit_save(&editor, def.id).unwrap();
@@ -115,7 +119,9 @@ fn a_value_that_the_new_set_would_make_the_default_is_not_kept() {
     let (doc, def) = drawing(Some(3.0));
     let mut editor = doc.block_editor_document(def.id).unwrap();
     let mut draft = editor.block_editor_dynamic().unwrap().clone();
-    let DynamicParameterKind::Linear { value_set, .. } = &mut draft.parameters[0].kind;
+    let DynamicParameterKind::Linear { value_set, .. } = &mut draft.parameters[0].kind else {
+        panic!("a linear parameter");
+    };
     *value_set = DynamicValueSet::Range {
         min: 0.0,
         max: 1.0,

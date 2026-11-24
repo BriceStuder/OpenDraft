@@ -29,6 +29,7 @@ mod budget;
 pub mod dynamic;
 mod dynamic_eval;
 mod dynamic_fit;
+mod dynamic_value_set;
 mod edit;
 mod editing;
 pub mod field;
@@ -272,6 +273,8 @@ mod dynamic_bench;
 mod dynamic_edit_tests;
 #[cfg(test)]
 mod dynamic_eval_tests;
+#[cfg(test)]
+mod dynamic_rotation_tests;
 #[cfg(test)]
 mod dynamic_tests;
 #[cfg(test)]

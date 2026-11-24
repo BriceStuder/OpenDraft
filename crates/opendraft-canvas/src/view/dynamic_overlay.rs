@@ -5,7 +5,7 @@
 
 use egui::{Align2, Color32, FontId, Painter, Rect, Stroke, StrokeKind};
 use opendraft_core::block::{DynamicActionKind, DynamicParameterKind};
-use opendraft_core::Document;
+use opendraft_core::{Document, Point};
 
 use super::*;
 
@@ -34,13 +34,14 @@ impl View {
                     );
                     frame.left_top()
                 }
-                DynamicActionKind::Move { .. } => schema
+                DynamicActionKind::Move { .. } | DynamicActionKind::Rotate { .. } => schema
                     .parameters
                     .iter()
                     .find(|p| p.id == action.parameter)
                     .map_or(rect.center(), |p| {
-                        let DynamicParameterKind::Linear { start, .. } = &p.kind;
-                        to_screen(*start) + egui::vec2(0.0, 14.0)
+                        let (DynamicParameterKind::Linear { start: at, .. }
+                        | DynamicParameterKind::Rotation { base: at, .. }) = &p.kind;
+                        to_screen(*at) + egui::vec2(0.0, 14.0)
                     }),
             };
             painter.text(
@@ -52,8 +53,21 @@ impl View {
             );
         }
         for parameter in &schema.parameters {
-            let DynamicParameterKind::Linear { start, end, .. } = &parameter.kind;
-            let (a, b) = (to_screen(*start), to_screen(*end));
+            let (start, end) = match &parameter.kind {
+                DynamicParameterKind::Linear { start, end, .. } => (*start, *end),
+                // A rotation: its circle, and the radius the grip starts on.
+                DynamicParameterKind::Rotation { base, radius, .. } => {
+                    let end = Point::new(base.x + radius, base.y);
+                    let centre = to_screen(*base);
+                    painter.circle_stroke(
+                        centre,
+                        (to_screen(end) - centre).length(),
+                        Stroke::new(1.0_f32, SCHEMA.gamma_multiply(0.6)),
+                    );
+                    (*base, end)
+                }
+            };
+            let (a, b) = (to_screen(start), to_screen(end));
             painter.line_segment([a, b], stroke);
             let along = (b - a).normalized();
             if along.is_finite() {
