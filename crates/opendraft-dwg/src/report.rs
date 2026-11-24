@@ -25,6 +25,10 @@ pub enum Degradation {
     /// Text "aligned" or "fit" between two points was read as left-aligned
     /// text along the line between them, at its own height and width.
     TextFitApproximated,
+    /// A reference to an anonymous block (a modified dynamic block's stored
+    /// form), imported as an ordinary block: its picture is kept, its
+    /// parameters and actions are not read.
+    AnonymousBlock,
 }
 
 /// Content that did not come across.
@@ -38,9 +42,6 @@ pub enum Skipped {
     Invisible,
     /// An entity in paper space (layouts are not imported yet).
     PaperSpace,
-    /// A reference to an anonymous block, such as a dynamic block's
-    /// (anonymous blocks are not imported).
-    AnonymousBlockReference,
     /// A reference to an external drawing (xref).
     ExternalReference,
     /// Geometry that cannot exist: a non-finite or huge coordinate, a zero radius.

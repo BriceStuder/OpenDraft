@@ -16,6 +16,7 @@ mod attribute;
 mod basic;
 mod blocks;
 mod dimension;
+pub(super) mod dynamic;
 mod ellipse;
 mod hatch;
 mod hatch_sources;
@@ -149,6 +150,8 @@ struct Importer {
     skipped: BTreeMap<String, usize>,
     damaged: usize,
     paper_space: usize,
+    /// Objects with group 60 set to 1, which the file hides.
+    invisible: usize,
     imported: usize,
     blocks: blocks::BlockReading,
     ltypes: ltype::Reading,
@@ -307,6 +310,10 @@ impl Importer {
         if self.paper_space > 0 {
             warnings.push(format!("Skipped {} paper space objects.", self.paper_space));
         }
+        if self.invisible > 0 {
+            let objects = crate::plural(self.invisible as u64, "object");
+            warnings.push(format!("Skipped {objects} marked invisible."));
+        }
         if self.damaged > 0 {
             warnings.push(format!("Skipped {} damaged objects.", self.damaged));
         }
@@ -381,6 +388,7 @@ pub fn read(bytes: &[u8]) -> Result<Loaded, FileError> {
     importer.resolve_leaders();
     importer.resolve_linetypes();
     let mut warnings = importer.warnings();
+    warnings.extend(dynamic::decode(&records).warning());
     warnings.extend(spaces.warnings());
     spaces.finish(&mut importer);
     importer.document.finish_bulk_load();
