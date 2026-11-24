@@ -81,6 +81,22 @@ fn draw() -> Panel {
             Column::Rows(vec![
                 vec![Cell::IconSplit(Split::new(vec![
                     item("draw.rectangle", "Rectangle", icons::DRAW_RECTANGLE),
+                    item(
+                        "draw.rectangle_center",
+                        "Rectangle, Center",
+                        icons::DRAW_RECTANGLE_CENTER,
+                    ),
+                    item(
+                        "draw.rectangle_3p",
+                        "Rectangle, 3-Point",
+                        icons::DRAW_RECTANGLE_3P,
+                    ),
+                    item(
+                        "draw.oblong_center",
+                        "Oblong, Center",
+                        icons::DRAW_OBLONG_CENTER,
+                    ),
+                    item("draw.oblong_2p", "Oblong, 2-Point", icons::DRAW_OBLONG_2P),
                     item("draw.polygon", "Polygon", icons::DRAW_POLYGON),
                 ]))],
                 vec![icon("draw.ellipse", "Ellipse", icons::DRAW_ELLIPSE)],

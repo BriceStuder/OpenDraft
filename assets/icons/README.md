@@ -114,11 +114,15 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](draw-hatch.svg) | `draw-hatch.svg` | square-slash | Hatch (A square with a diagonal: the nearest Lucide has to hatching.) |
 | ![](draw-line.svg) | `draw-line.svg` | minus | Line |
 | ![](draw-measure.svg) | `draw-measure.svg` | between-horizontal-start | Measure (Lucide's marks between two ends.) |
+| ![](draw-oblong-2p.svg) | `draw-oblong-2p.svg` | square | Oblong, 2-Point |
+| ![](draw-oblong-center.svg) | `draw-oblong-center.svg` | square | Oblong, Center |
 | ![](draw-point.svg) | `draw-point.svg` | dot | Multiple Point, Point Style..., Single Point (Lucide's dot.) |
 | ![](draw-polygon.svg) | `draw-polygon.svg` | hexagon | Polygon |
 | ![](draw-polyline.svg) | `draw-polyline.svg` | spline | Polyline |
 | ![](draw-ray.svg) | `draw-ray.svg` | move-up-right | Ray (Lucide's arrow up and right: a line that leaves a point.) |
 | ![](draw-rectangle.svg) | `draw-rectangle.svg` | square | Rectangle, icon_set.rs |
+| ![](draw-rectangle-3p.svg) | `draw-rectangle-3p.svg` | square | Rectangle, 3-Point |
+| ![](draw-rectangle-center.svg) | `draw-rectangle-center.svg` | square | Rectangle, Center |
 | ![](draw-spline.svg) | `draw-spline.svg` | spline | Spline |
 | ![](draw-xline.svg) | `draw-xline.svg` | slash | Construction Line (Lucide's slash: a line that runs on both ways.) |
 | ![](dropdown-arrow.svg) | `dropdown-arrow.svg` | chevron-down | widgets.rs |

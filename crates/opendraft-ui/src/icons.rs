@@ -133,6 +133,8 @@ icons! {
     /// A square with a diagonal: the nearest Lucide has to hatching.
     DRAW_HATCH = '\u{e177}';
     DRAW_LINE = '\u{e11f}';
+    DRAW_OBLONG_2P = '\u{e16a}';
+    DRAW_OBLONG_CENTER = '\u{e16a}';
     /// Lucide's marks between two ends.
     DRAW_MEASURE = '\u{e596}';
     /// Lucide's dot.
@@ -142,6 +144,8 @@ icons! {
     /// Lucide's arrow up and right: a line that leaves a point.
     DRAW_RAY = '\u{e497}';
     DRAW_RECTANGLE = '\u{e16a}';
+    DRAW_RECTANGLE_3P = '\u{e16a}';
+    DRAW_RECTANGLE_CENTER = '\u{e16a}';
     DRAW_SPLINE = '\u{e38e}';
     /// Lucide's slash: a line that runs on both ways.
     DRAW_XLINE = '\u{e521}';

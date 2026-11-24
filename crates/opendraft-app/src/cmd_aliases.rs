@@ -30,6 +30,11 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("DDEDIT", "TEXTEDIT", "annotate.textedit"),
     ("-TEXT", "-TEXT", "annotate.text_line"),
     ("REC", "RECTANGLE", "draw.rectangle"),
+    // The ribbon's rectangle and oblong types (AutoCAD has neither).
+    ("RC", "RECTANGLE CENTER", "draw.rectangle_center"),
+    ("R3", "RECTANGLE 3P", "draw.rectangle_3p"),
+    ("OC", "OBLONG CENTER", "draw.oblong_center"),
+    ("O2", "OBLONG 2P", "draw.oblong_2p"),
     ("BO", "BOUNDARY", "draw.boundary"),
     ("BOUNDARY", "BOUNDARY", "draw.boundary"),
     ("DIV", "DIVIDE", "draw.divide"),
