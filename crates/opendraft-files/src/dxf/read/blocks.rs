@@ -229,6 +229,12 @@ impl Importer {
 
     /// Adds an object to the definition being read, or to the drawing.
     pub(super) fn add_item(&mut self, record: &Record, item: Item<String>) {
+        // A hidden object (group 60 is 1, as a dynamic block's other
+        // visibility states are) is left out, as the DWG reader does.
+        if record.int(60) == Some(1) {
+            self.invisible += 1;
+            return;
+        }
         let attrs = self.attributes(record);
         if let Some(items) = self.blocks.collecting.as_mut() {
             items.push((item, attrs));
@@ -416,6 +422,32 @@ mod tests {
         let loaded = read(&dxf(&block("*D0", "1", &LINE), &[])).unwrap();
         assert!(loaded.document.blocks().is_empty());
         assert!(loaded.warnings.is_empty());
+    }
+
+    #[test]
+    fn objects_marked_invisible_are_left_out_and_counted() {
+        let hidden = [
+            (0, "LINE"),
+            (8, "0"),
+            (60, "1"),
+            (10, "0"),
+            (20, "0"),
+            (11, "2"),
+            (21, "0"),
+        ];
+        let mut body = LINE.to_vec();
+        body.extend(hidden);
+        let mut blocks = block("*Model_Space", "0", &[]);
+        blocks.extend(block("Switch", "0", &body));
+        let mut entities = insert_of("Switch");
+        entities.extend(hidden);
+        let loaded = read(&dxf(&blocks, &entities)).unwrap();
+        let doc = &loaded.document;
+        doc.validate().unwrap();
+        // The block keeps its visible line; the hidden line outside it is gone.
+        assert_eq!(doc.blocks()[0].entities.len(), 1);
+        assert_eq!(doc.len(), 1);
+        assert_eq!(loaded.warnings, ["Skipped 2 objects marked invisible."]);
     }
 
     #[test]

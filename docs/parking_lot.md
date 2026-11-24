@@ -116,6 +116,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 ## Files
 
+- DXF and DWG import: an object the file marks invisible is dropped (and counted), not kept hidden, because objects have no visibility of their own; hiding and showing by layer is the only way to keep one.
 - DXF and DWG import: an anonymous block a reference places (a modified dynamic block's `*U`) comes in as an ordinary block with its picture; its parameters and actions are not read, and a named dynamic definition with no anonymous copy arrives as a static block of its default state with no warning (it cannot be told apart without the dynamic-block objects).
 - DXF export writes no `FIELD` objects and no hatch associations. (It writes R12, or R2000 when a drawing has layouts, blocks, ellipses, splines, hatches or text.)
 - DWG: import only (no export), and import skips layouts, hatches, dimensions, multiline attributes, attributes of inserts on layouts and MTEXT in columns.
