@@ -48,6 +48,12 @@ pub struct DynamicBlock {
 impl DynamicBlock {
     /// The schema version written today.
     pub const VERSION: u16 = 1;
+    /// Most parameters, and most actions, a block may have.
+    pub const MAX_PARAMETERS: usize = 256;
+    pub const MAX_ACTIONS: usize = 1024;
+    /// Most objects all the actions together may select: the work of one
+    /// evaluation, so a hostile schema cannot make drawing it slow.
+    pub const MAX_ACTION_WORK: usize = 100_000;
 
     /// A schema with no parameters or actions. Ids start at 1, so zero is
     /// never a valid parameter or action id.
@@ -72,7 +78,11 @@ impl DynamicBlock {
         if self.version != Self::VERSION {
             return Err(format!("unknown schema version {}", self.version));
         }
+        if self.parameters.len() > Self::MAX_PARAMETERS || self.actions.len() > Self::MAX_ACTIONS {
+            return Err("it has too many parameters or actions".to_owned());
+        }
         let mut parameters = HashSet::new();
+        let mut work = 0usize;
         for p in &self.parameters {
             if p.id.0 == 0 || p.id.0 >= self.next_parameter_id || !parameters.insert(p.id) {
                 return Err(format!(
@@ -125,6 +135,10 @@ impl DynamicBlock {
                     "action {} has a multiplier or angle that is not usable, or an empty frame",
                     a.id.0
                 ));
+            }
+            work = work.saturating_add(selected.len());
+            if work > Self::MAX_ACTION_WORK {
+                return Err("its actions select too many objects".to_owned());
             }
             if selected.is_empty() || selected.windows(2).any(|w| w[0] >= w[1]) {
                 return Err(format!(
