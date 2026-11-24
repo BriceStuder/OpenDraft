@@ -21,6 +21,8 @@ pub enum CornerError {
     NotLines,
     /// The lines run side by side and never meet.
     Parallel,
+    /// The lines lie on one line: no gap for a fillet to bridge.
+    Collinear,
     /// A line is too short for the radius or distances asked for.
     TooLong,
     /// Objects of a kind that cannot be joined this way.
@@ -29,6 +31,9 @@ pub enum CornerError {
     NoFit,
     /// Two segments of a polyline that do not meet at a vertex.
     NotAdjacent,
+    /// Parallel lines where the second lies wholly beyond the end of the
+    /// first, so no half circle can join them.
+    PastTheEnd,
 }
 
 impl fmt::Display for CornerError {
@@ -36,10 +41,12 @@ impl fmt::Display for CornerError {
         f.write_str(match self {
             CornerError::NotLines => "A chamfer needs lines or polyline segments.",
             CornerError::Parallel => "The lines are parallel.",
+            CornerError::Collinear => "The lines are collinear.",
             CornerError::TooLong => "The radius or distance is too large for these objects.",
             CornerError::Unsupported => "Those objects cannot be joined at a corner.",
             CornerError::NoFit => "No arc of that radius fits between those objects.",
             CornerError::NotAdjacent => "Select two adjacent segments of the polyline.",
+            CornerError::PastTheEnd => "The second line lies beyond the end of the first.",
         })
     }
 }
