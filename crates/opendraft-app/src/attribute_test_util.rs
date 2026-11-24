@@ -16,6 +16,7 @@ use crate::state::AppState;
 
 pub(crate) fn definition(id: u64, tag: &str, flags: u16) -> BlockEntity {
     BlockEntity {
+        id: opendraft_core::BlockObjectId(id),
         entity: Entity::AttributeDefinition(Box::new(AttributeDefinition {
             id: AttributeDefinitionId(id),
             tag: tag.into(),
@@ -40,8 +41,10 @@ pub(crate) fn attributed_insert() -> (AppState, EntityId) {
         base: Point::default(),
         description: String::new(),
         entities: vec![definition(1, "A", 0), definition(2, "B", 0)],
+        dynamic: None,
     };
     block.entities.push(BlockEntity {
+        id: opendraft_core::BlockObjectId(0),
         entity: Entity::Line {
             start: Point::new(0.0, 0.0),
             end: Point::new(4.0, 0.0),

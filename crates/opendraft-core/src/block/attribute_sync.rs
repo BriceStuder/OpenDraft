@@ -128,6 +128,7 @@ mod tests {
 
     fn def(id: u64, tag: &str, flags: u16, default: &str) -> BlockEntity {
         BlockEntity {
+            id: crate::BlockObjectId(id),
             entity: Entity::AttributeDefinition(Box::new(AttributeDefinition {
                 id: AttributeDefinitionId(id),
                 tag: tag.into(),
@@ -150,6 +151,7 @@ mod tests {
             base: Point::default(),
             description: String::new(),
             entities,
+            dynamic: None,
         })
     }
 

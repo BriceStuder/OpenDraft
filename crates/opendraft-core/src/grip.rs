@@ -9,6 +9,7 @@
 
 use std::f64::consts::FRAC_PI_2;
 
+use crate::block::DynamicGrip;
 use crate::intersect::corners;
 use crate::{arc, bulge, Bounds, Entity, Point};
 
@@ -23,6 +24,9 @@ pub enum GripKind {
     Move,
     /// Changes the size (a radius).
     Resize,
+    /// A parameter's grip on a block reference. Dragging it changes that
+    /// parameter's value on the insert, not the insert's geometry.
+    Dynamic(DynamicGrip),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

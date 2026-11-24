@@ -4,6 +4,7 @@
 use super::spatial_query::Broad;
 use super::spatial_tests::{grid, near, object, Rng, SMALL, SPACES};
 use super::*;
+use crate::Bounds;
 use crate::{Layer, Point};
 
 #[test]

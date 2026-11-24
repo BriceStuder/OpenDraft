@@ -78,6 +78,35 @@ fn bsave_redefines_the_block_in_the_drawing_and_bclose_puts_the_drawing_back() {
 }
 
 #[test]
+fn saving_keeps_the_ids_of_the_blocks_objects_and_gives_a_new_one_its_own() {
+    let mut state = with_box();
+    let block_ids = |state: &AppState| -> Vec<u64> {
+        let doc = state.docs[state.active].drawing().document();
+        doc.blocks()[0].entities.iter().map(|e| e.id.0).collect()
+    };
+    assert_eq!(block_ids(&state), [0]);
+    state.bedit();
+    state.add_entity(Entity::Line {
+        start: p(0.0, 0.0),
+        end: p(5.0, 0.0),
+    });
+    assert!(state.bsave());
+    let saved = block_ids(&state);
+    assert_eq!(saved.len(), 2);
+    assert_eq!(saved[0], 0, "the rectangle keeps its id");
+    assert_ne!(saved[0], saved[1], "the line has one of its own");
+    // Editing again and saving with nothing changed leaves every id alone.
+    state.bclose();
+    state.bedit();
+    state.bsave();
+    assert_eq!(block_ids(&state), saved);
+    assert_eq!(
+        state.docs[state.active].drawing().document().validate(),
+        Ok(())
+    );
+}
+
+#[test]
 fn bclose_asks_about_unsaved_changes_and_can_discard_them() {
     let mut state = with_box();
     let before = reference_bounds(&state);

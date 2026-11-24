@@ -381,6 +381,7 @@ mod tests {
         }
         .definition(AttributeDefinitionId(id), Point::new(0.0, 1.0));
         BlockEntity {
+            id: crate::BlockObjectId(id),
             entity: Entity::AttributeDefinition(Box::new(d)),
             attrs: Attributes::on_layer(LayerId::DEFAULT),
         }
@@ -394,6 +395,7 @@ mod tests {
             base: Point::default(),
             description: String::new(),
             entities: vec![definition(1, "A", "A?"), definition(2, "B", "B?")],
+            dynamic: None,
         });
         let mut i = Insert::new(block.clone(), Point::new(5.0, 5.0));
         i.attributes = block.new_references(|d| d.default_value.clone());
@@ -529,6 +531,7 @@ mod field_row_tests {
 
     fn two_attributes() -> Insert {
         let def = |id: u64, tag: &str| BlockEntity {
+            id: crate::BlockObjectId(1),
             entity: Entity::AttributeDefinition(Box::new(
                 DefinitionDraft {
                     tag: tag.into(),
@@ -547,6 +550,7 @@ mod field_row_tests {
             base: Point::default(),
             description: String::new(),
             entities: vec![def(1, "A"), def(2, "B")],
+            dynamic: None,
         });
         let mut i = Insert::new(block.clone(), Point::new(5.0, 5.0));
         i.attributes = block.new_references(|d| d.default_value.clone());

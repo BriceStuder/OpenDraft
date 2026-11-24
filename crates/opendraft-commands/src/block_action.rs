@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use opendraft_core::block::DynamicBlock;
 use opendraft_core::{BlockDef, Document};
 
 use crate::{Action, Changes};
@@ -46,6 +47,46 @@ impl Action for SetBlocks {
     }
 }
 
+/// Replace the dynamic schema a Block Editor drawing is authoring (`None`
+/// clears it). The drawing's own block table is not touched: BSAVE turns the
+/// schema into the block's.
+pub struct SetBlockEditorDynamic {
+    name: String,
+    /// Applying and reverting both swap, so each leaves the other state ready.
+    schema: Option<DynamicBlock>,
+}
+
+impl SetBlockEditorDynamic {
+    pub fn new(name: impl Into<String>, schema: Option<DynamicBlock>) -> Self {
+        Self {
+            name: name.into(),
+            schema,
+        }
+    }
+
+    fn swap(&mut self, doc: &mut Document) {
+        self.schema = doc.set_block_editor_dynamic(self.schema.take());
+    }
+}
+
+impl Action for SetBlockEditorDynamic {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn apply(&mut self, doc: &mut Document) {
+        self.swap(doc);
+    }
+
+    fn revert(&mut self, doc: &mut Document) {
+        self.swap(doc);
+    }
+
+    fn changes(&self) -> Changes {
+        Changes::dynamic_blocks()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use opendraft_core::{BlockId, Point};
@@ -62,6 +103,7 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: Vec::new(),
+            dynamic: None,
         });
         let mut action = SetBlocks::new("Block", vec![block]);
         action.apply(&mut doc);
@@ -71,6 +113,23 @@ mod tests {
         action.apply(&mut doc);
         assert_eq!(doc.blocks()[0].id, BlockId(1));
         assert_eq!(action.changes(), Changes::blocks());
+        assert_eq!(doc.validate(), Ok(()));
+    }
+
+    #[test]
+    fn the_editors_schema_changes_and_comes_back_without_touching_the_blocks() {
+        let mut doc = Document::default();
+        let mut schema = DynamicBlock::new();
+        schema.next_parameter_id = 5;
+        let mut action = SetBlockEditorDynamic::new("Parameter", Some(schema.clone()));
+        action.apply(&mut doc);
+        assert_eq!(doc.block_editor_dynamic(), Some(&schema));
+        assert!(doc.blocks().is_empty());
+        action.revert(&mut doc);
+        assert_eq!(doc.block_editor_dynamic(), None);
+        action.apply(&mut doc);
+        assert_eq!(doc.block_editor_dynamic(), Some(&schema));
+        assert_eq!(action.changes(), Changes::dynamic_blocks());
         assert_eq!(doc.validate(), Ok(()));
     }
 }

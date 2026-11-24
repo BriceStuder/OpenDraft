@@ -206,9 +206,11 @@ fn block_with_a_line() -> Entity {
         base: p(0.0, 0.0),
         description: String::new(),
         entities: vec![BlockEntity {
+            id: opendraft_core::BlockObjectId(0),
             entity: line(0.0, 0.0, 10.0, 0.0),
             attrs: Attributes::on_layer(LayerId::DEFAULT),
         }],
+        dynamic: None,
     };
     Entity::Insert(Box::new(Insert::new(Arc::new(block), p(0.0, 20.0))))
 }

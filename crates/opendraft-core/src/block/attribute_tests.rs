@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use crate::block::attribute::AttributeText;
+use crate::block::tests::numbered;
 use crate::block::{
     AttributeDefinition, AttributeDefinitionId, AttributeFlags, BlockDef, BlockEntity, BlockId,
     FieldText, Insert,
@@ -25,6 +26,7 @@ fn definition(id: u64, tag: &str, flags: u16, at: Point) -> AttributeDefinition 
 
 fn member(entity: Entity) -> BlockEntity {
     BlockEntity {
+        id: crate::BlockObjectId(0),
         entity,
         attrs: Attributes::on_layer(LayerId::DEFAULT),
     }
@@ -44,7 +46,7 @@ fn drawing() -> (Document, Arc<BlockDef>) {
         name: "Tag".into(),
         base: Point::default(),
         description: String::new(),
-        entities: vec![
+        entities: numbered(vec![
             member(Entity::Line {
                 start: Point::new(0.0, 0.0),
                 end: Point::new(4.0, 0.0),
@@ -67,7 +69,8 @@ fn drawing() -> (Document, Arc<BlockDef>) {
                 AttributeFlags::INVISIBLE,
                 at(20.0),
             )))),
-        ],
+        ]),
+        dynamic: None,
     });
     doc.push_block(block.clone());
     (doc, block)
@@ -216,6 +219,7 @@ fn noted_source() -> (Document, crate::EntityId) {
         base: Point::default(),
         description: String::new(),
         entities: vec![member(Entity::AttributeDefinition(Box::new(def)))],
+        dynamic: None,
     });
     doc.push_block(block.clone());
     let mut insert = Insert::new(block.clone(), Point::new(3.0, 3.0));
@@ -283,6 +287,7 @@ fn a_block_of_the_same_name_with_other_definitions_orphans_the_reference() {
             0,
             Point::default(),
         ))))],
+        dynamic: None,
     });
     dst.reserve_attribute_definition_ids(2);
     dst.push_block(other);

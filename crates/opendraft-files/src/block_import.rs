@@ -12,7 +12,9 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use opendraft_core::block::{block_name_problem, AttributeReference, MAX_NESTING};
-use opendraft_core::{Attributes, BlockDef, BlockEntity, BlockId, Document, Entity, Insert, Point};
+use opendraft_core::{
+    Attributes, BlockDef, BlockEntity, BlockId, BlockObjectId, Document, Entity, Insert, Point,
+};
 
 use crate::plural;
 
@@ -190,6 +192,7 @@ impl<K: Clone + Eq + Hash> ImportedBlocks<K> {
             scale_y: p.scale_y,
             rotation: p.rotation,
             attributes: Vec::new(),
+            dynamic: None,
         };
         let mut insert = insert;
         if insert.is_valid() && attach_attributes(&mut insert, &p.attributes) {
@@ -257,10 +260,8 @@ impl<K: Clone + Eq + Hash> Builder<'_, K> {
                 Item::Insert(insert) => self.nested(insert, depth),
             };
             if let Some(entity) = entity {
-                entities.push(BlockEntity {
-                    entity,
-                    attrs: attrs.clone(),
-                });
+                let id = BlockObjectId(entities.len() as u64);
+                entities.push(BlockEntity::new(id, entity, attrs.clone()));
             }
         }
         let def = BlockDef {
@@ -270,6 +271,7 @@ impl<K: Clone + Eq + Hash> Builder<'_, K> {
             base: p.base,
             description: p.description.clone(),
             entities,
+            dynamic: None,
         };
         self.blocks.built.insert(p.key.clone(), Arc::new(def));
         self.states[i] = None;
