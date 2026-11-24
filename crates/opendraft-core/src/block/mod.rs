@@ -27,8 +27,12 @@ mod attribute_world;
 pub mod block_draft;
 mod budget;
 pub mod dynamic;
+mod dynamic_apply;
+mod dynamic_check;
 mod dynamic_eval;
 mod dynamic_fit;
+mod dynamic_parameter;
+mod dynamic_value_set;
 mod edit;
 mod editing;
 pub mod field;
@@ -49,9 +53,9 @@ pub use attribute::{
 pub use attribute_sync::{sync_references, Synced};
 pub use budget::MAX_EXPANSION;
 pub use dynamic::{
-    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicGrip,
-    DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue, DynamicValueEntry,
-    DynamicValueSet, ParameterId,
+    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicFamily,
+    DynamicGrip, DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue,
+    DynamicValueEntry, DynamicValueSet, ParameterId,
 };
 pub use dynamic_eval::{evaluate, DynamicBlockError};
 pub use dynamic_fit::Pruned;
@@ -273,7 +277,17 @@ mod dynamic_edit_tests;
 #[cfg(test)]
 mod dynamic_eval_tests;
 #[cfg(test)]
+mod dynamic_flip_tests;
+#[cfg(test)]
+mod dynamic_polar_tests;
+#[cfg(test)]
+mod dynamic_rotation_tests;
+#[cfg(test)]
+mod dynamic_scale_tests;
+#[cfg(test)]
 mod dynamic_tests;
+#[cfg(test)]
+mod dynamic_xy_tests;
 #[cfg(test)]
 mod expansion_tests;
 #[cfg(test)]

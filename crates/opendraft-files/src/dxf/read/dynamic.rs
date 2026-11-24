@@ -9,7 +9,7 @@
 //! files (see `docs/ARCHITECTURE.md`, "Dynamic blocks in DXF") and not yet
 //! checked against AutoCAD. The result describes the file and knows nothing
 //! of the drawing; `blocks/dynamic_import` maps it onto dynamic blocks. Only what was read is decoded: linear, polar and
-//! lookup parameters, stretch, polar stretch, move, scale and lookup actions
+//! lookup and rotation parameters, stretch, polar stretch, move, scale, rotate and lookup actions
 //! and grips. Anything else is kept by its object name in [`NodeKind::Other`].
 
 use std::collections::{HashMap, HashSet};
@@ -57,6 +57,16 @@ pub struct Node {
 pub enum NodeKind {
     Linear(Parameter),
     Polar(Parameter),
+    /// An XY parameter: `start` is its base and `end` its corner; `name` is
+    /// the X distance's and `angle_name` the Y distance's.
+    Xy(Parameter),
+    /// A point parameter: `start` and `end` are its location.
+    Point(Parameter),
+    /// A rotation parameter: `start` is its base point and `end` where its
+    /// grip starts.
+    Rotation(Parameter),
+    /// A flip parameter: `start` and `end` are its mirror line.
+    Flip(Parameter),
     Lookup {
         name: String,
     },
@@ -64,6 +74,9 @@ pub enum NodeKind {
     PolarStretch(Action),
     Move(Action),
     Scale(Action),
+    /// A rotate action: `frame` holds the point it turns about.
+    Rotate(Action),
+    FlipAction(Action),
     LookupTable(Table),
     Grip(Point),
     /// An object not decoded, by its DXF name.
@@ -79,6 +92,13 @@ pub struct Parameter {
     pub end: Point,
     /// A list of allowed distances; empty when there is none.
     pub values: Vec<f64>,
+    /// A rotation whose angle is not free (it has a list or an increment), or
+    /// a polar parameter whose distances or angles are a list.
+    pub restricted: bool,
+    /// A polar parameter's angle: its name, and its minimum, maximum and
+    /// increment (radians) when it has an increment.
+    pub angle_name: String,
+    pub angle_range: Option<(f64, f64, f64)>,
 }
 
 /// An action and what it acts on.
@@ -121,7 +141,7 @@ pub struct DynamicInstance {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum NodeState {
-    /// A linear or polar parameter's current end point.
+    /// A linear, polar or rotation parameter's current end point.
     Parameter { start: Point, end: Point },
     /// The text a lookup parameter shows.
     Lookup(String),

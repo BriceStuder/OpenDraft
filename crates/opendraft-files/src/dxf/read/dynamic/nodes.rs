@@ -15,7 +15,42 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
     let decoded = match name {
         "BLOCKGRIPLOCATIONCOMPONENT" => return None,
         "BLOCKLINEARPARAMETER" => parameter(object).map(NodeKind::Linear),
-        "BLOCKPOLARPARAMETER" => parameter(object).map(NodeKind::Polar),
+        "BLOCKPOLARPARAMETER" => parameter(object).map(|mut p| {
+            // `307` names the angle; `145`, `146` and `147` are its minimum,
+            // maximum and increment; `175` and `176` count listed values.
+            p.angle_name = object.text(307).unwrap_or("").to_owned();
+            p.angle_range = match (object.number(145), object.number(146), object.number(147)) {
+                (Some(lo), Some(hi), Some(step)) if step > 0.0 && lo <= hi => Some((lo, hi, step)),
+                _ => None,
+            };
+            p.restricted = object.number(143).is_some_and(|i| i > 0.0)
+                || object.int(175).is_some_and(|n| n > 0)
+                || object.int(176).is_some_and(|n| n > 0);
+            NodeKind::Polar(p)
+        }),
+        "BLOCKXYPARAMETER" => parameter(object).map(|mut p| {
+            // `306` names the X distance and `305` the Y distance; the
+            // increments are `144` (X) and `148` (Y), and `175` and `176`
+            // count listed values.
+            p.name = object.text(306).unwrap_or("").to_owned();
+            p.angle_name = object.text(305).unwrap_or("").to_owned();
+            p.restricted = object.number(144).is_some_and(|i| i > 0.0)
+                || object.number(148).is_some_and(|i| i > 0.0)
+                || object.int(175).is_some_and(|n| n > 0)
+                || object.int(176).is_some_and(|n| n > 0);
+            NodeKind::Xy(p)
+        }),
+        "BLOCKPOINTPARAMETER" => parameter(object).map(|mut p| {
+            // The location is `1010`; `1011` is only where its label goes.
+            p.end = p.start;
+            NodeKind::Point(p)
+        }),
+        "BLOCKROTATIONPARAMETER" => parameter(object).map(|mut p| {
+            // `143` is an angle increment and `175` how many listed angles.
+            p.restricted = object.number(143).is_some_and(|i| i > 0.0)
+                || object.int(175).is_some_and(|n| n > 0);
+            NodeKind::Rotation(p)
+        }),
         "BLOCKLOOKUPPARAMETER" => Some(NodeKind::Lookup {
             name: object.text(303).unwrap_or("").to_owned(),
         }),
@@ -23,6 +58,9 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
         "BLOCKPOLARSTRETCHACTION" => Some(NodeKind::PolarStretch(action(object, in_block, false))),
         "BLOCKMOVEACTION" => Some(NodeKind::Move(action(object, in_block, true))),
         "BLOCKSCALEACTION" => Some(NodeKind::Scale(action(object, in_block, false))),
+        "BLOCKFLIPPARAMETER" => parameter(object).map(NodeKind::Flip),
+        "BLOCKFLIPACTION" => Some(NodeKind::FlipAction(action(object, in_block, false))),
+        "BLOCKROTATEACTION" => Some(NodeKind::Rotate(action(object, in_block, false))),
         "BLOCKLOOKUPACTION" => table(object).map(NodeKind::LookupTable),
         n if n.starts_with("BLOCK") && n.ends_with("GRIP") => points(object, 1010, 1020)
             .first()
@@ -35,7 +73,7 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
 /// The state a modified instance records for a node of this kind.
 pub(super) fn state(kind: &NodeKind, record: &Record) -> Option<NodeState> {
     match kind {
-        NodeKind::Linear(_) | NodeKind::Polar(_) => {
+        NodeKind::Linear(_) | NodeKind::Polar(_) | NodeKind::Xy(_) | NodeKind::Rotation(_) => {
             let at = points(record, 10, 20);
             Some(NodeState::Parameter {
                 start: *at.first()?,
@@ -53,6 +91,9 @@ fn parameter(object: &Record) -> Option<Parameter> {
         start: *points(object, 1010, 1020).first()?,
         end: *points(object, 1011, 1021).first()?,
         values: value_list(object),
+        restricted: false,
+        angle_name: String::new(),
+        angle_range: None,
     })
 }
 

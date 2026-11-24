@@ -14,8 +14,6 @@
 //! definition's default. Evaluated geometry is derived and is never stored
 //! here.
 
-use std::collections::HashSet;
-
 use crate::{Bounds, Point};
 
 /// Stable identity of one object inside one block definition. It is not a
@@ -68,95 +66,6 @@ impl DynamicBlock {
     }
 }
 
-impl DynamicBlock {
-    /// Why this schema could not exist in a block whose objects have ids
-    /// `objects`, or `Ok`. Checks the structure: the version, parameter and
-    /// action ids (nonzero, unique, already issued), that each action names
-    /// a parameter, and that its selection is non-empty, sorted, without
-    /// repeats and of objects the block has.
-    pub fn check(&self, objects: &HashSet<BlockObjectId>) -> Result<(), String> {
-        if self.version != Self::VERSION {
-            return Err(format!("unknown schema version {}", self.version));
-        }
-        if self.parameters.len() > Self::MAX_PARAMETERS || self.actions.len() > Self::MAX_ACTIONS {
-            return Err("it has too many parameters or actions".to_owned());
-        }
-        let mut parameters = HashSet::new();
-        let mut work = 0usize;
-        for p in &self.parameters {
-            if p.id.0 == 0 || p.id.0 >= self.next_parameter_id || !parameters.insert(p.id) {
-                return Err(format!(
-                    "parameter id {} is zero, repeated or not issued",
-                    p.id.0
-                ));
-            }
-            if p.grips > 2 || p.name.is_empty() || p.is_degenerate() || !p.value_set().is_valid() {
-                return Err(format!(
-                    "parameter {} has no name, too many grips, no length or an unusable value set",
-                    p.id.0
-                ));
-            }
-        }
-        let mut actions = HashSet::new();
-        for a in &self.actions {
-            if a.id.0 == 0 || a.id.0 >= self.next_action_id || !actions.insert(a.id) {
-                return Err(format!(
-                    "action id {} is zero, repeated or not issued",
-                    a.id.0
-                ));
-            }
-            if !parameters.contains(&a.parameter) {
-                return Err(format!("action {} names a missing parameter", a.id.0));
-            }
-            let (DynamicActionKind::Move {
-                objects: selected,
-                multiplier,
-                angle_offset,
-            }
-            | DynamicActionKind::Stretch {
-                objects: selected,
-                multiplier,
-                angle_offset,
-                ..
-            }) = &a.kind;
-            let frame_ok = match &a.kind {
-                DynamicActionKind::Stretch { frame, .. } => {
-                    let (w, h) = (frame.max.x - frame.min.x, frame.max.y - frame.min.y);
-                    w.is_finite() && h.is_finite() && w > 0.0 && h > 0.0
-                }
-                DynamicActionKind::Move { .. } => true,
-            };
-            if !(multiplier.is_finite()
-                && *multiplier > 0.0
-                && angle_offset.is_finite()
-                && frame_ok)
-            {
-                return Err(format!(
-                    "action {} has a multiplier or angle that is not usable, or an empty frame",
-                    a.id.0
-                ));
-            }
-            work = work.saturating_add(selected.len());
-            if work > Self::MAX_ACTION_WORK {
-                return Err("its actions select too many objects".to_owned());
-            }
-            if selected.is_empty() || selected.windows(2).any(|w| w[0] >= w[1]) {
-                return Err(format!(
-                    "action {} selects nothing, or its selection is unsorted or repeats",
-                    a.id.0
-                ));
-            }
-            if let Some(missing) = selected.iter().find(|o| !objects.contains(o)) {
-                return Err(format!(
-                    "action {} selects object {}, which the block lacks",
-                    a.id.0, missing.0
-                ));
-            }
-        }
-        Ok(())
-    }
-}
-
 impl Default for DynamicBlock {
     fn default() -> Self {
         Self::new()
@@ -188,6 +97,84 @@ pub enum DynamicParameterKind {
         end: Point,
         value_set: DynamicValueSet,
     },
+    /// An angle about a point of the block. Its value is the turn from the
+    /// block as drawn, in radians, so the default is 0; the grip sits
+    /// `radius` from `base`, along the turned direction.
+    Rotation {
+        base: Point,
+        radius: f64,
+        /// In radians.
+        value_set: DynamicValueSet,
+    },
+    /// A mirror line from `base` to `end`; the value is whether the block is
+    /// flipped about it (a `Bool`, not flipped by default).
+    Flip { base: Point, end: Point },
+    /// A point `end` at a distance and an angle from `base`. Its value is
+    /// where that point is (a `Point`, `end` by default); each of the
+    /// distance and the angle (radians, from the block's +X) has a value set.
+    Polar {
+        base: Point,
+        end: Point,
+        distance_set: DynamicValueSet,
+        angle_set: DynamicValueSet,
+        /// What the Properties palette calls the angle.
+        angle_label: String,
+    },
+    /// A point `end` at a horizontal and a vertical distance from `base`.
+    /// Its value is where `end` is (a `Point`); each distance has a value
+    /// set.
+    Xy {
+        base: Point,
+        end: Point,
+        x_set: DynamicValueSet,
+        y_set: DynamicValueSet,
+        /// What the Properties palette calls the vertical distance.
+        y_label: String,
+    },
+    /// A location in the block. Its value is where it is (a `Point`),
+    /// `position` by default; it has no value set.
+    Point { position: Point },
+}
+
+/// Which parameters and actions go together.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DynamicFamily {
+    Linear,
+    Rotation,
+    Flip,
+    Polar,
+    Xy,
+    Point,
+}
+
+impl DynamicParameterKind {
+    pub fn family(&self) -> DynamicFamily {
+        match self {
+            Self::Linear { .. } => DynamicFamily::Linear,
+            Self::Rotation { .. } => DynamicFamily::Rotation,
+            Self::Flip { .. } => DynamicFamily::Flip,
+            Self::Polar { .. } => DynamicFamily::Polar,
+            Self::Xy { .. } => DynamicFamily::Xy,
+            Self::Point { .. } => DynamicFamily::Point,
+        }
+    }
+}
+
+impl DynamicActionKind {
+    /// Whether this action can follow a parameter of `family`: a move or
+    /// stretch follows a distance or any point, a scale a distance or a
+    /// polar point, a rotate an angle or a polar point, a flip a flip.
+    pub fn follows(&self, family: DynamicFamily) -> bool {
+        use DynamicFamily::{Flip, Linear, Point, Polar, Rotation, Xy};
+        match self {
+            Self::Move { .. } | Self::Stretch { .. } => {
+                matches!(family, Linear | Polar | Xy | Point)
+            }
+            Self::Scale { .. } => matches!(family, Linear | Polar),
+            Self::Rotate { .. } => matches!(family, Rotation | Polar),
+            Self::Flip { .. } => family == Flip,
+        }
+    }
 }
 
 /// The values a parameter may take.
@@ -230,6 +217,14 @@ pub enum DynamicActionKind {
         multiplier: f64,
         angle_offset: f64,
     },
+    /// Turns the objects about its rotation parameter's base point by the
+    /// parameter's value.
+    Rotate { objects: Vec<BlockObjectId> },
+    /// Mirrors the objects about its flip parameter's line when flipped.
+    Flip { objects: Vec<BlockObjectId> },
+    /// Enlarges the objects about the start of its linear parameter by the
+    /// parameter's value over its value as drawn.
+    Scale { objects: Vec<BlockObjectId> },
 }
 
 /// The values one insert overrides. A parameter it does not list has the
@@ -246,8 +241,8 @@ pub struct DynamicValueEntry {
     pub value: DynamicValue,
 }
 
-/// A parameter's value. Only `Distance` is used so far; the rest are the
-/// types later parameters will need.
+/// A parameter's value. `Distance`, `Angle` (radians) and `Bool` (a flip) are
+/// used so far; the rest are the types later parameters will need.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DynamicValue {
     Distance(f64),
@@ -306,8 +301,9 @@ impl DynamicInstanceState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DynamicGrip {
     pub parameter: ParameterId,
-    /// 0 is the end grip. 1 is the start grip, reserved for the linear
-    /// parameter's Startpoint/Midpoint base behaviour.
+    /// 0 is the end grip (a rotation's only grip). 1 is the start grip,
+    /// reserved for the linear parameter's Startpoint/Midpoint base
+    /// behaviour.
     pub index: u8,
 }
 

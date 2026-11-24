@@ -1,7 +1,7 @@
 //! Dynamic blocks of a DXF built into the drawing, from what `dynamic`
-//! decoded. A definition keeps its linear parameters and its stretch and move
-//! actions; what the app cannot represent (polar, lookup, visibility, rotation,
-//! flip, scale and the rest) is left out and named in a note. A reference to
+//! decoded. A definition keeps its linear, polar, XY, point, rotation and flip parameters and its
+//! stretch, move, scale, rotate and flip actions; what the app cannot represent (polar,
+//! lookup, visibility, scale and the rest) is left out and named in a note. A reference to
 //! an anonymous `*U` block becomes a reference to its definition with the
 //! parameter values it recorded, but only when everything that moves geometry
 //! in the definition is understood (a lookup table changes no geometry, so it
@@ -12,40 +12,24 @@
 //! objects survive until a block is read, so a [`Draft`] holds the handles and
 //! is turned into a schema at the end of each block.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::f64::consts::TAU;
 
 use opendraft_core::block::{
-    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicParameter,
-    DynamicParameterKind, DynamicValueSet, ParameterId,
+    BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicValue, ParameterId,
 };
-use opendraft_core::{Bounds, Point};
 
-use super::super::dynamic::{decode, DynamicBlocks, DynamicDefinition, NodeKind, NodeState};
+use self::definition::{distance, read, upper, Draft, Kept, Step};
+use super::super::dynamic::{decode, DynamicBlocks, NodeState};
 use super::super::Record;
+
+mod definition;
 
 /// The values a modified reference records, and the block it is a reference to.
 pub(super) struct Mapped {
     /// The lower-cased name of the definition.
     pub definition: String,
-    pub values: Vec<(ParameterId, f64)>,
-}
-
-struct DraftAction {
-    id: ActionId,
-    name: String,
-    parameter: ParameterId,
-    /// Upper-cased handles of the objects it acts on.
-    handles: HashSet<String>,
-    /// `Some` for a stretch.
-    frame: Option<Bounds>,
-    multiplier: f64,
-    angle_offset: f64,
-}
-
-/// A definition's schema before its objects are known.
-struct Draft {
-    parameters: Vec<DynamicParameter>,
-    actions: Vec<DraftAction>,
+    pub values: Vec<(ParameterId, DynamicValue)>,
 }
 
 /// What the file's dynamic blocks come to, for the importer.
@@ -63,178 +47,8 @@ pub(super) struct Plan {
     failed: Vec<String>,
 }
 
-fn upper(handle: &str) -> String {
-    handle.trim().to_ascii_uppercase()
-}
-
-fn distance(a: Point, b: Point) -> f64 {
-    (b.x - a.x).hypot(b.y - a.y)
-}
-
-/// The kind of an object the app cannot represent, if it is a parameter or
-/// an action.
-fn unsupported(kind: &NodeKind) -> Option<String> {
-    let named = |n: &str| {
-        let n = n.strip_prefix("BLOCK").unwrap_or(n);
-        for (end, word) in [("PARAMETER", "parameter"), ("ACTION", "action")] {
-            if let Some(head) = n.strip_suffix(end) {
-                return Some(format!("{} {word}", head.to_lowercase()));
-            }
-        }
-        None
-    };
-    match kind {
-        NodeKind::Polar(_) => Some("polar parameter".to_owned()),
-        NodeKind::Lookup { .. } => Some("lookup parameter".to_owned()),
-        NodeKind::PolarStretch(_) => Some("polar stretch action".to_owned()),
-        NodeKind::Scale(_) => Some("scale action".to_owned()),
-        NodeKind::LookupTable(_) => Some("lookup action".to_owned()),
-        NodeKind::Other(name) => named(name),
-        _ => None,
-    }
-}
-
-/// A definition read for what the app keeps of it.
-struct Read {
-    draft: Option<Draft>,
-    left_out: Vec<String>,
-    /// Parameters kept, by the file's node id.
-    parameters: HashMap<u32, ParameterId>,
-}
-
-fn read(def: &DynamicDefinition) -> Read {
-    let mut left_out: Vec<String> = def
-        .nodes
-        .iter()
-        .filter_map(|n| unsupported(&n.kind))
-        .collect();
-    let linked = |a: u32, b: u32| {
-        def.links
-            .iter()
-            .any(|&(f, t)| (f, t) == (a, b) || (f, t) == (b, a))
-    };
-    let mut parameters = Vec::new();
-    let mut ids = HashMap::new();
-    let mut names = HashSet::new();
-    for node in &def.nodes {
-        let NodeKind::Linear(p) = &node.kind else {
-            continue;
-        };
-        if distance(p.start, p.end).partial_cmp(&1e-9) != Some(std::cmp::Ordering::Greater) {
-            left_out.push("linear parameter with no length".to_owned());
-            continue;
-        }
-        let id = ParameterId(parameters.len() as u64 + 1);
-        let mut name = match p.name.trim() {
-            "" => format!("Distance{}", id.0),
-            n => n.to_owned(),
-        };
-        if !names.insert(name.to_lowercase()) {
-            name = format!("{name}{}", id.0);
-            names.insert(name.to_lowercase());
-        }
-        let mut allowed = p.values.clone();
-        allowed.sort_by(f64::total_cmp);
-        allowed.dedup();
-        let value_set = DynamicValueSet::List(allowed);
-        let value_set = match value_set.is_valid() {
-            true => value_set,
-            false => DynamicValueSet::Any,
-        };
-        let grips = def
-            .nodes
-            .iter()
-            .filter(|g| matches!(g.kind, NodeKind::Grip(_)) && linked(node.id, g.id))
-            .count()
-            .min(2) as u8;
-        ids.insert(node.id, id);
-        parameters.push((
-            node.id,
-            DynamicParameter {
-                id,
-                name: name.clone(),
-                label: name,
-                description: String::new(),
-                show: true,
-                grips,
-                kind: DynamicParameterKind::Linear {
-                    start: p.start,
-                    end: p.end,
-                    value_set,
-                },
-            },
-        ));
-    }
-    let mut actions: Vec<DraftAction> = Vec::new();
-    let mut action_names = HashSet::new();
-    for node in &def.nodes {
-        let (action, stretch) = match &node.kind {
-            NodeKind::Stretch(a) => (a, true),
-            NodeKind::Move(a) => (a, false),
-            _ => continue,
-        };
-        let parameter = parameters
-            .iter()
-            .find(|(id, _)| linked(*id, node.id))
-            .map(|(_, p)| p.id);
-        let frame = (stretch && action.frame.len() >= 2).then(|| {
-            let (mut lo, mut hi) = (action.frame[0], action.frame[0]);
-            for p in &action.frame {
-                lo = Point::new(lo.x.min(p.x), lo.y.min(p.y));
-                hi = Point::new(hi.x.max(p.x), hi.y.max(p.y));
-            }
-            Bounds { min: lo, max: hi }
-        });
-        let (Some(parameter), true) = (parameter, !stretch || frame.is_some()) else {
-            left_out.push(format!(
-                "{} action with nothing to follow",
-                if stretch { "stretch" } else { "move" }
-            ));
-            continue;
-        };
-        let id = ActionId(actions.len() as u64 + 1);
-        let mut name = match node.label.trim() {
-            "" if stretch => "Stretch".to_owned(),
-            "" => "Move".to_owned(),
-            n => n.to_owned(),
-        };
-        if !action_names.insert(name.to_lowercase()) {
-            name = format!("{name}{}", id.0);
-            action_names.insert(name.to_lowercase());
-        }
-        actions.push(DraftAction {
-            id,
-            name,
-            parameter,
-            handles: action.selection.iter().map(|h| upper(h)).collect(),
-            frame,
-            multiplier: action
-                .multiplier
-                .filter(|m| m.is_finite() && *m > 0.0)
-                .unwrap_or(1.0),
-            angle_offset: action.angle_offset.filter(|a| a.is_finite()).unwrap_or(0.0),
-        });
-    }
-    // A parameter nothing follows changes no picture.
-    let used: HashSet<ParameterId> = actions.iter().map(|a| a.parameter).collect();
-    for (node, p) in &parameters {
-        if !used.contains(&p.id) {
-            ids.remove(node);
-        }
-    }
-    parameters.retain(|(_, p)| used.contains(&p.id));
-    left_out.sort();
-    left_out.dedup();
-    Read {
-        draft: (!actions.is_empty()).then(|| Draft {
-            parameters: parameters.into_iter().map(|(_, p)| p).collect(),
-            actions,
-        }),
-        left_out,
-        parameters: ids,
-    }
-}
-
+#[cfg(test)]
+mod kinds_tests;
 #[cfg(test)]
 mod tests;
 
@@ -246,7 +60,7 @@ impl Plan {
 
     fn from(found: &DynamicBlocks) -> Plan {
         let mut plan = Plan::default();
-        let mut whole: HashMap<String, (HashMap<u32, ParameterId>, bool)> = HashMap::new();
+        let mut whole: HashMap<String, (HashMap<u32, Kept>, bool)> = HashMap::new();
         for def in &found.definitions {
             let key = def.name.to_lowercase();
             let read = read(def);
@@ -255,7 +69,10 @@ impl Plan {
                 Some(draft) => {
                     plan.imported.push(def.name.clone());
                     plan.drafts.insert(key.clone(), draft);
-                    let exact = read.left_out.iter().all(|k| k.starts_with("lookup "));
+                    // A flip's state in a modified reference is not read, so a
+                    // definition with one cannot rebuild its references.
+                    let exact = read.left_out.iter().all(|k| k.starts_with("lookup "))
+                        && !read.parameters.values().any(|k| k.unread);
                     whole.insert(key, (read.parameters, exact));
                 }
                 None => plan.pictures.push(def.name.clone()),
@@ -270,13 +87,27 @@ impl Plan {
             };
             // A lookup's text changes no geometry; any other state must be
             // of a parameter that came in.
-            let values: Option<Vec<(ParameterId, f64)>> = instance
+            let values: Option<Vec<(ParameterId, DynamicValue)>> = instance
                 .states
                 .iter()
                 .filter(|(_, state)| !matches!(state, NodeState::Lookup(_)))
                 .map(|(node, state)| match (parameters.get(node), state) {
-                    (Some(id), NodeState::Parameter { start, end }) => {
-                        Some((*id, distance(*start, *end))).filter(|(_, d)| d.is_finite())
+                    (Some(kept), NodeState::Parameter { start, end }) => {
+                        let value = match kept.zero_angle {
+                            // A rotation is recorded as where its grip is.
+                            Some(zero) => DynamicValue::Angle(
+                                ((end.y - start.y).atan2(end.x - start.x) - zero).rem_euclid(TAU),
+                            ),
+                            // So is a polar parameter: its value is the end.
+                            None if kept.polar => DynamicValue::Point(*end),
+                            None => DynamicValue::Distance(distance(*start, *end)),
+                        };
+                        let number = match value {
+                            DynamicValue::Angle(v) | DynamicValue::Distance(v) => v,
+                            DynamicValue::Point(p) => p.x + p.y,
+                            _ => f64::NAN,
+                        };
+                        number.is_finite().then_some((kept.id, value))
                     }
                     _ => None,
                 })
@@ -327,18 +158,21 @@ impl Plan {
                 id: a.id,
                 name: a.name.clone(),
                 parameter: a.parameter,
-                kind: match a.frame {
-                    Some(frame) => DynamicActionKind::Stretch {
+                kind: match a.step {
+                    Step::Stretch(frame) => DynamicActionKind::Stretch {
                         objects,
                         frame,
                         multiplier: a.multiplier,
                         angle_offset: a.angle_offset,
                     },
-                    None => DynamicActionKind::Move {
+                    Step::Move => DynamicActionKind::Move {
                         objects,
                         multiplier: a.multiplier,
                         angle_offset: a.angle_offset,
                     },
+                    Step::Rotate => DynamicActionKind::Rotate { objects },
+                    Step::Flip => DynamicActionKind::Flip { objects },
+                    Step::Scale => DynamicActionKind::Scale { objects },
                 },
             });
         }
@@ -377,7 +211,7 @@ impl Plan {
             .collect();
         if !imported.is_empty() {
             let mut line = format!(
-                "Imported {} with their linear parameters and stretch and move actions: {}",
+                "Imported {} with their linear, polar, XY, point, rotation and flip parameters and stretch, move, scale, rotate and flip actions: {}",
                 crate::plural(imported.len() as u64, "dynamic block"),
                 list(&imported)
             );

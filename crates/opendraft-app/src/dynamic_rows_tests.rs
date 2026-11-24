@@ -3,7 +3,7 @@ use std::sync::Arc;
 use opendraft_commands::SetBlocks;
 use opendraft_core::block::{
     ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicParameter,
-    DynamicParameterKind, DynamicValueSet,
+    DynamicParameterKind, DynamicValue, DynamicValueSet,
 };
 use opendraft_core::{
     Attributes, BlockDef, BlockEntity, BlockId, Bounds, Entity, EntityId, LayerId, Point,
@@ -132,26 +132,26 @@ fn several_references_say_varies_when_their_values_differ_and_need_one_block() {
 fn a_typed_length_is_divided_by_the_scale_and_brought_into_the_value_set() {
     let b = block(1, DynamicValueSet::List(vec![2.0, 4.0, 8.0]));
     let two = insert(&b, 0.0, 2.0);
-    let made = with_display_value(&two, ParameterId(1), 14.0).unwrap();
+    let made = with_display_value(&two, ParameterId(1), 0, 14.0).unwrap();
     assert_eq!(
         made.dynamic_value(ParameterId(1)),
         Some(8.0),
         "7 snaps to 8"
     );
     assert_eq!(
-        with_display_value(&two, ParameterId(1), 8.0),
+        with_display_value(&two, ParameterId(1), 0, 8.0),
         None,
         "no change"
     );
-    assert_eq!(with_display_value(&two, ParameterId(9), 8.0), None);
-    assert_eq!(with_display_value(&two, ParameterId(1), f64::NAN), None);
+    assert_eq!(with_display_value(&two, ParameterId(9), 0, 8.0), None);
+    assert_eq!(with_display_value(&two, ParameterId(1), 0, f64::NAN), None);
 }
 
 #[test]
 fn editing_in_the_panel_changes_the_selected_references_in_one_undo_step() {
     let b = block(1, DynamicValueSet::Any);
     let (mut state, ids) = drawing(&b, vec![insert(&b, 0.0, 1.0), insert(&b, 20.0, 2.0)]);
-    state.set_dynamic_value(ParameterId(1), 10.0, None);
+    state.set_dynamic_value(ParameterId(1), 0, 10.0, None);
     // The scale-2 reference holds 5, the other 10: both show 10.
     let values: Vec<_> = ids
         .iter()
@@ -160,8 +160,8 @@ fn editing_in_the_panel_changes_the_selected_references_in_one_undo_step() {
     assert_eq!(values, [Some(10.0), Some(5.0)]);
     assert_eq!(state.session().document().validate(), Ok(()));
     let before = state.session().revision();
-    state.set_dynamic_value(ParameterId(1), 10.0, None);
-    state.set_dynamic_value(ParameterId(1), 3.0, Some(EntityKind::Line));
+    state.set_dynamic_value(ParameterId(1), 0, 10.0, None);
+    state.set_dynamic_value(ParameterId(1), 0, 3.0, Some(EntityKind::Line));
     assert_eq!(state.session().revision(), before, "no change, no step");
     assert_eq!(state.undo().as_deref(), Some("Edit dynamic property"));
     assert_eq!(insert_of(&state, ids[0]).dynamic, None);
@@ -174,5 +174,99 @@ fn a_flattened_reference_is_left_alone() {
     flat.scale_y = 1e-30;
     flat.scale_x = 1e-30;
     assert_eq!(flat.dynamic_scale(ParameterId(1)), None);
-    assert_eq!(with_display_value(&flat, ParameterId(1), 5.0), None);
+    assert_eq!(with_display_value(&flat, ParameterId(1), 0, 5.0), None);
+}
+
+/// A line turned about its start by a rotation parameter.
+fn turning_line() -> Insert {
+    let mut schema = DynamicBlock::new();
+    schema.parameters.push(DynamicParameter {
+        id: ParameterId(1),
+        name: "Angle1".into(),
+        label: "Turn".into(),
+        description: String::new(),
+        show: true,
+        grips: 1,
+        kind: DynamicParameterKind::Rotation {
+            base: p(0.0, 0.0),
+            radius: 1.0,
+            value_set: DynamicValueSet::Any,
+        },
+    });
+    schema.actions.push(DynamicAction {
+        id: ActionId(1),
+        name: "Rotate1".into(),
+        parameter: ParameterId(1),
+        kind: DynamicActionKind::Rotate {
+            objects: vec![BlockObjectId(0)],
+        },
+    });
+    schema.next_parameter_id = 2;
+    schema.next_action_id = 2;
+    let block = BlockDef {
+        id: BlockId(3),
+        name: "Turn".into(),
+        base: p(0.0, 0.0),
+        description: String::new(),
+        unit: Default::default(),
+        entities: vec![BlockEntity::new(
+            BlockObjectId(0),
+            Entity::Line {
+                start: p(0.0, 0.0),
+                end: p(2.0, 0.0),
+            },
+            Attributes::on_layer(LayerId::DEFAULT),
+        )],
+        dynamic: Some(Box::new(schema)),
+    };
+    Insert::new(Arc::new(block), p(5.0, 5.0))
+}
+
+#[test]
+fn an_angle_row_reads_and_takes_degrees() {
+    let insert = turning_line();
+    let shown = rows(&[&insert]);
+    assert_eq!(shown.len(), 1);
+    assert!(shown[0].angle);
+    assert_eq!(shown[0].value, Some(0.0));
+    let turned = with_display_value(&insert, ParameterId(1), 0, 90.0).unwrap();
+    let row = rows(&[&turned]);
+    assert!((row[0].value.unwrap() - 90.0).abs() < 1e-9);
+    assert!(
+        (turned.bounds().max.y - 7.0).abs() < 1e-9,
+        "{:?}",
+        turned.bounds()
+    );
+    // Typing 450 is the same turn as 90.
+    let wrapped = with_display_value(&insert, ParameterId(1), 0, 450.0).unwrap();
+    assert!((rows(&[&wrapped])[0].value.unwrap() - 90.0).abs() < 1e-9);
+    // Typing what it already is changes nothing.
+    assert!(with_display_value(&insert, ParameterId(1), 0, 0.0).is_none());
+}
+
+#[test]
+fn a_flip_row_is_a_yes_or_no_that_takes_one_or_zero() {
+    let turning = turning_line();
+    let mut block = (*turning.block).clone();
+    let schema = block.dynamic.as_mut().unwrap();
+    schema.parameters[0].kind = DynamicParameterKind::Flip {
+        base: p(0.0, 0.0),
+        end: p(0.0, 1.0),
+    };
+    schema.actions[0].kind = DynamicActionKind::Flip {
+        objects: vec![BlockObjectId(0)],
+    };
+    let insert = Insert::new(Arc::new(block), p(5.0, 5.0));
+    let shown = rows(&[&insert]);
+    assert!(shown[0].flag && !shown[0].angle);
+    assert_eq!(shown[0].value, Some(0.0));
+    let yes = with_display_value(&insert, ParameterId(1), 0, 1.0).unwrap();
+    assert_eq!(rows(&[&yes])[0].value, Some(1.0));
+    // The line (0,0)-(2,0) mirrors about x = 0 into (0,0)-(-2,0), moved by 5.
+    assert!(
+        (yes.bounds().min.x - 3.0).abs() < 1e-9,
+        "{:?}",
+        yes.bounds()
+    );
+    assert!(with_display_value(&insert, ParameterId(1), 0, 0.0).is_none());
 }

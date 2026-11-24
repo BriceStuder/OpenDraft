@@ -1,29 +1,31 @@
-use opendraft_core::block::{DynamicActionKind, DynamicParameterKind, DynamicValue, ParameterId};
+use opendraft_core::block::{
+    DynamicActionKind, DynamicParameterKind, DynamicValue, DynamicValueSet, ParameterId,
+};
 use opendraft_core::Point;
 
 use super::*;
 use crate::block_cmd::define_block;
 use crate::state::AppState;
 
-fn p(x: f64, y: f64) -> Point {
+pub(super) fn p(x: f64, y: f64) -> Point {
     Point::new(x, y)
 }
 
-fn submit_all(state: &mut AppState, answers: &[&str]) {
+pub(super) fn submit_all(state: &mut AppState, answers: &[&str]) {
     for answer in answers {
         state.cmd_submit(answer);
         state.settle_command();
     }
 }
 
-fn said(state: &AppState, text: &str) -> bool {
+pub(super) fn said(state: &AppState, text: &str) -> bool {
     state.cmdline.log.iter().any(|l| l.contains(text))
 }
 
 /// A drawing with block "Bar": a bar from (10,10) to (14,10) and a post at
 /// its right end, base point (10,10), made into one reference, with the
 /// Block Editor open on it.
-fn editing_bar() -> AppState {
+pub(super) fn editing_bar() -> AppState {
     let mut state = AppState::new();
     state.add_entity(Entity::Line {
         start: p(10.0, 10.0),
@@ -43,7 +45,7 @@ fn editing_bar() -> AppState {
     state
 }
 
-fn drafted(state: &AppState) -> Option<DynamicBlock> {
+pub(super) fn drafted(state: &AppState) -> Option<DynamicBlock> {
     state.docs[state.active]
         .session
         .document()
@@ -51,7 +53,7 @@ fn drafted(state: &AppState) -> Option<DynamicBlock> {
         .cloned()
 }
 
-fn add_parameter(state: &mut AppState) {
+pub(super) fn add_parameter(state: &mut AppState) {
     state.start_command("BPARAMETER", bparameter);
     state.settle_command();
     submit_all(state, &["", "0,0", "4,0", "", "", "", "", "", ""]);
@@ -79,7 +81,10 @@ fn a_parameter_takes_its_defaults_and_is_one_undo_step_of_the_editor() {
         start,
         end,
         value_set,
-    } = &param.kind;
+    } = &param.kind
+    else {
+        panic!("a linear parameter");
+    };
     assert_eq!(
         (*start, *end, value_set),
         (p(0.0, 0.0), p(4.0, 0.0), &DynamicValueSet::Any)
@@ -239,8 +244,11 @@ fn a_move_action_and_bactionset_change_which_objects_an_action_acts_on() {
     state.settle_command();
     assert!(!state.command_running());
     let schema = drafted(&state).unwrap();
-    let (DynamicActionKind::Move { objects, .. } | DynamicActionKind::Stretch { objects, .. }) =
-        &schema.actions[0].kind;
+    let (DynamicActionKind::Move { objects, .. }
+    | DynamicActionKind::Stretch { objects, .. }
+    | DynamicActionKind::Rotate { objects }
+    | DynamicActionKind::Flip { objects }
+    | DynamicActionKind::Scale { objects }) = &schema.actions[0].kind;
     assert_eq!(objects, &[BlockObjectId(post.0)]);
 }
 
@@ -353,7 +361,9 @@ fn bsave_reports_the_references_it_adjusted_and_the_actions_it_removed() {
     state.select_all();
     state.bedit();
     let mut draft = drafted(&state).unwrap();
-    let DynamicParameterKind::Linear { value_set, .. } = &mut draft.parameters[0].kind;
+    let DynamicParameterKind::Linear { value_set, .. } = &mut draft.parameters[0].kind else {
+        panic!("a linear parameter");
+    };
     *value_set = DynamicValueSet::List(vec![2.0, 4.0, 8.0]);
     state.docs[state.active]
         .session

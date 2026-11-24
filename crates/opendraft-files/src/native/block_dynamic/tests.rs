@@ -14,11 +14,11 @@ use serde_json::{json, Value};
 
 use crate::{FileError, FileFormat, NativeFormat};
 
-fn p(x: f64, y: f64) -> Point {
+pub(super) fn p(x: f64, y: f64) -> Point {
     Point::new(x, y)
 }
 
-fn schema(set: DynamicValueSet) -> DynamicBlock {
+pub(super) fn schema(set: DynamicValueSet) -> DynamicBlock {
     let mut s = DynamicBlock::new();
     s.parameters.push(DynamicParameter {
         id: ParameterId(1),
@@ -59,7 +59,7 @@ fn schema(set: DynamicValueSet) -> DynamicBlock {
     s
 }
 
-fn object(id: u64, entity: Entity) -> BlockEntity {
+pub(super) fn object(id: u64, entity: Entity) -> BlockEntity {
     BlockEntity::new(
         BlockObjectId(id),
         entity,
@@ -67,7 +67,7 @@ fn object(id: u64, entity: Entity) -> BlockEntity {
     )
 }
 
-fn bar(doc: &mut Document, dynamic: Option<DynamicBlock>) -> Arc<BlockDef> {
+pub(super) fn bar(doc: &mut Document, dynamic: Option<DynamicBlock>) -> Arc<BlockDef> {
     Arc::new(BlockDef {
         id: doc.allocate_block_id(),
         name: "Bar".into(),
@@ -110,12 +110,12 @@ fn drawing(set: DynamicValueSet) -> Document {
     doc
 }
 
-fn write(doc: &Document) -> Value {
+pub(super) fn write(doc: &Document) -> Value {
     let bytes = NativeFormat.write(doc).unwrap().bytes;
     serde_json::from_slice(&bytes).unwrap()
 }
 
-fn read(file: &Value) -> Result<Document, FileError> {
+pub(super) fn read(file: &Value) -> Result<Document, FileError> {
     NativeFormat
         .read(file.to_string().as_bytes())
         .map(|r| r.document)

@@ -11,7 +11,7 @@ use opendraft_core::{Entity, Insert};
 use crate::dxf::read::dynamic::tests::file;
 use crate::dxf::read::{read, Group, Record};
 
-fn group(code: i32, value: &str) -> Group {
+pub(super) fn group(code: i32, value: &str) -> Group {
     Group {
         code,
         value: value.to_owned(),
@@ -20,7 +20,7 @@ fn group(code: i32, value: &str) -> Group {
 
 /// The fixture as DXF text. `lookup` keeps the lookup parameter and action;
 /// the reference is placed at (3, 4).
-fn dxf(lookup: bool, mutate: impl Fn(&mut Vec<Record>)) -> Vec<u8> {
+pub(super) fn dxf(lookup: bool, mutate: impl Fn(&mut Vec<Record>)) -> Vec<u8> {
     let mut records: Vec<Record> = file()
         .into_iter()
         .filter(|r| {
@@ -80,7 +80,7 @@ fn dxf(lookup: bool, mutate: impl Fn(&mut Vec<Record>)) -> Vec<u8> {
     text.into_bytes()
 }
 
-fn inserts(doc: &opendraft_core::Document) -> Vec<Insert> {
+pub(super) fn inserts(doc: &opendraft_core::Document) -> Vec<Insert> {
     doc.objects()
         .iter()
         .filter_map(|o| match &o.entity {
@@ -99,7 +99,9 @@ fn a_definition_comes_in_with_its_parameter_and_action() {
     assert_eq!(schema.parameters.len(), 1);
     let p = &schema.parameters[0];
     assert_eq!((p.name.as_str(), p.grips), ("Distance1", 1));
-    let DynamicParameterKind::Linear { value_set, .. } = &p.kind;
+    let DynamicParameterKind::Linear { value_set, .. } = &p.kind else {
+        panic!("a linear parameter");
+    };
     assert_eq!(*value_set, DynamicValueSet::List(vec![2.5, 5.0, 7.5, 10.0]));
     let DynamicActionKind::Stretch {
         objects,
@@ -136,7 +138,7 @@ fn a_modified_reference_becomes_a_reference_to_the_definition_with_its_value() {
     );
     assert_eq!(
         loaded.warnings,
-        ["Imported 1 dynamic block with their linear parameters and stretch and move actions: Slide; 1 modified reference rebuilt from recorded values."]
+        ["Imported 1 dynamic block with their linear, polar, XY, point, rotation and flip parameters and stretch, move, scale, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
     );
 }
 

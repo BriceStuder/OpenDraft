@@ -50,6 +50,8 @@ pub enum Edit {
     /// drawing units.
     Dynamic {
         parameter: opendraft_core::block::ParameterId,
+        /// Which of the parameter's values (a polar parameter has two).
+        part: u8,
         value: f64,
         kind: Option<EntityKind>,
     },
@@ -70,9 +72,10 @@ impl AppState {
             Edit::Attribute { tag, value, kind } => self.set_attribute_value(&tag, &value, kind),
             Edit::Dynamic {
                 parameter,
+                part,
                 value,
                 kind,
-            } => self.set_dynamic_value(parameter, value, kind),
+            } => self.set_dynamic_value(parameter, part, value, kind),
         }
     }
 }
@@ -210,9 +213,10 @@ fn body(ui: &mut Ui, theme: &Theme, document: &Document, selected: &[&Object]) -
             let changed = section(ui, theme, &t!("Custom"), |ui| {
                 crate::dynamic_rows::show(ui, theme, units, &custom)
             });
-            if let Some((parameter, value)) = changed {
+            if let Some((parameter, part, value)) = changed {
                 edit = Some(Edit::Dynamic {
                     parameter,
+                    part,
                     value,
                     kind: filter,
                 });
