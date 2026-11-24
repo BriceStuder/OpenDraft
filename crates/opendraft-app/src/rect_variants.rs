@@ -75,12 +75,15 @@ pub fn draw_rectangle_3p(ed: &mut Editor) -> Result<(), Cancelled> {
     // The first side; `other_point` made sure it has a length.
     let (angle, length, _) = by_three_points(first, second, second).ok_or(Cancelled)?;
     loop {
-        let options = NumberOptions::new(key!("Specify height or a point on the opposite side")).ghost(move |at| {
-            by_three_points(first, second, at)
-                .map(|(angle, length, height)| outline(first, angle, length, height, style, width))
-                .into_iter()
-                .collect()
-        });
+        let options = NumberOptions::new(key!("Specify height or a point on the opposite side"))
+            .ghost(move |at| {
+                by_three_points(first, second, at)
+                    .map(|(angle, length, height)| {
+                        outline(first, angle, length, height, style, width)
+                    })
+                    .into_iter()
+                    .collect()
+            });
         let height = match ed.ask_distance_or_point(options)? {
             Answer::Value(NumberOrPoint::Number(height)) => height,
             Answer::Value(NumberOrPoint::Point(at)) => {
