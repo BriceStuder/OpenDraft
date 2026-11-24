@@ -54,6 +54,11 @@ pub(super) fn modify() -> Panel {
         ],
         extra: vec![
             item("modify.break", "Break", icons::MODIFY_BREAK),
+            item(
+                "modify.break_at_point",
+                "Break at Point",
+                icons::MODIFY_BREAK_AT_POINT,
+            ),
             item("modify.join", "Join", icons::MODIFY_JOIN),
             item("modify.lengthen", "Lengthen", icons::MODIFY_LENGTHEN),
             item("modify.pedit", "Edit Polyline", icons::MODIFY_PEDIT),

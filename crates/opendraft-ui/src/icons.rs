@@ -228,6 +228,7 @@ icons! {
     MODIFY_ARRAY_RECT = '\u{e503}';
     MODIFY_BLEND = '\u{e38e}';
     MODIFY_BREAK = '\u{e4ed}';
+    MODIFY_BREAK_AT_POINT = '\u{e4ed}';
     MODIFY_CHAMFER = '\u{e4f1}';
     MODIFY_COPY = '\u{e0a2}';
     MODIFY_ERASE = '\u{e28e}';
