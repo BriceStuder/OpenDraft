@@ -109,6 +109,7 @@ enum ActionKindDto {
     Stretch(ActionBodyDto),
     Rotate(ObjectsDto),
     Flip(ObjectsDto),
+    Scale(ObjectsDto),
 }
 
 /// An action that only names its objects.
@@ -322,6 +323,9 @@ impl ActionDto {
             DynamicActionKind::Flip { objects } => ActionKindDto::Flip(ObjectsDto {
                 objects: objects.iter().map(|o| o.0).collect(),
             }),
+            DynamicActionKind::Scale { objects } => ActionKindDto::Scale(ObjectsDto {
+                objects: objects.iter().map(|o| o.0).collect(),
+            }),
         };
         Self {
             id: a.id.0,
@@ -363,6 +367,9 @@ impl ActionDto {
                 objects: r.objects.iter().map(|&o| BlockObjectId(o)).collect(),
             },
             ActionKindDto::Flip(r) => DynamicActionKind::Flip {
+                objects: r.objects.iter().map(|&o| BlockObjectId(o)).collect(),
+            },
+            ActionKindDto::Scale(r) => DynamicActionKind::Scale {
                 objects: r.objects.iter().map(|&o| BlockObjectId(o)).collect(),
             },
         };

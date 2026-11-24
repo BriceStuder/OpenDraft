@@ -105,6 +105,25 @@ pub fn evaluate<'a>(
             continue;
         }
         let (current, axis) = parameter.current(Some(state))?;
+        if let DynamicActionKind::Scale { objects } = &action.kind {
+            let factor = current / axis.length;
+            if !(factor.is_finite() && factor > 0.0) {
+                return Err(DynamicBlockError::BadValue(parameter.id));
+            }
+            if factor != 1.0 {
+                for id in objects {
+                    let at = *position
+                        .get(id)
+                        .ok_or(DynamicBlockError::MissingObject(*id))?;
+                    let object = &mut out[at];
+                    if matches!(object.entity, Entity::AttributeDefinition(_)) {
+                        return Err(DynamicBlockError::UnsupportedObject(*id));
+                    }
+                    object.entity = object.entity.scaled(axis.start, factor);
+                }
+            }
+            continue;
+        }
         let (objects, frame, multiplier, offset) = match &action.kind {
             DynamicActionKind::Move {
                 objects,
@@ -117,7 +136,9 @@ pub fn evaluate<'a>(
                 multiplier,
                 angle_offset,
             } => (objects, Some(frame), *multiplier, *angle_offset),
-            DynamicActionKind::Rotate { .. } | DynamicActionKind::Flip { .. } => continue,
+            DynamicActionKind::Rotate { .. }
+            | DynamicActionKind::Flip { .. }
+            | DynamicActionKind::Scale { .. } => continue,
         };
         let amount = (current - axis.length) * multiplier;
         if !amount.is_finite() {

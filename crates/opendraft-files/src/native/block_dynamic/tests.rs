@@ -402,3 +402,24 @@ fn a_flip_parameter_and_action_and_a_flipped_value_survive_a_round_trip() {
     assert_eq!(back.objects(), doc.objects());
     assert_eq!(back.validate(), Ok(()));
 }
+
+#[test]
+fn a_scale_action_survives_a_round_trip() {
+    let mut s = schema(DynamicValueSet::Any);
+    s.actions.push(DynamicAction {
+        id: ActionId(3),
+        name: "Scale1".into(),
+        parameter: ParameterId(1),
+        kind: DynamicActionKind::Scale {
+            objects: vec![BlockObjectId(9)],
+        },
+    });
+    s.next_action_id = 4;
+    let mut doc = Document::default();
+    let block = bar(&mut doc, Some(s));
+    doc.push_block(block.clone());
+    doc.add(Entity::Insert(Box::new(Insert::new(block, p(0.0, 0.0)))));
+    let back = read(&write(&doc)).unwrap();
+    assert_eq!(back.blocks(), doc.blocks());
+    assert_eq!(back.validate(), Ok(()));
+}

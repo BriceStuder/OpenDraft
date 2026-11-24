@@ -247,7 +247,8 @@ fn a_move_action_and_bactionset_change_which_objects_an_action_acts_on() {
     let (DynamicActionKind::Move { objects, .. }
     | DynamicActionKind::Stretch { objects, .. }
     | DynamicActionKind::Rotate { objects }
-    | DynamicActionKind::Flip { objects }) = &schema.actions[0].kind;
+    | DynamicActionKind::Flip { objects }
+    | DynamicActionKind::Scale { objects }) = &schema.actions[0].kind;
     assert_eq!(objects, &[BlockObjectId(post.0)]);
 }
 

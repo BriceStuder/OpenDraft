@@ -17,6 +17,7 @@ pub(super) enum Step {
     Stretch(Bounds),
     Rotate,
     Flip,
+    Scale,
 }
 
 pub(super) struct DraftAction {
@@ -82,7 +83,6 @@ fn unsupported(kind: &NodeKind) -> Option<String> {
         NodeKind::Polar(_) => Some("polar parameter".to_owned()),
         NodeKind::Lookup { .. } => Some("lookup parameter".to_owned()),
         NodeKind::PolarStretch(_) => Some("polar stretch action".to_owned()),
-        NodeKind::Scale(_) => Some("scale action".to_owned()),
         NodeKind::LookupTable(_) => Some("lookup action".to_owned()),
         NodeKind::Rotation(p) if p.restricted => {
             Some("rotation parameter with a list or increment of angles".to_owned())
@@ -207,6 +207,7 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
         let (action, word, family): (&Action, &str, DynamicFamily) = match &node.kind {
             NodeKind::Stretch(a) => (a, "Stretch", DynamicFamily::Linear),
             NodeKind::Move(a) => (a, "Move", DynamicFamily::Linear),
+            NodeKind::Scale(a) => (a, "Scale", DynamicFamily::Linear),
             NodeKind::Rotate(a) => (a, "Rotate", DynamicFamily::Rotation),
             NodeKind::FlipAction(a) => (a, "Flip", DynamicFamily::Flip),
             _ => continue,
@@ -219,6 +220,20 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
             "Stretch" => bounding(&action.frame).map(Step::Stretch),
             "Move" => Some(Step::Move),
             "Flip" => followed.map(|_| Step::Flip),
+            // It enlarges about its parameter's start point; one about a
+            // point of its own is a different action.
+            "Scale" => followed
+                .and_then(|(_, p)| match &p.kind {
+                    DynamicParameterKind::Linear { start, .. } => Some(*start),
+                    _ => None,
+                })
+                .filter(|start| {
+                    action
+                        .frame
+                        .first()
+                        .is_some_and(|b| !has_length(*b, *start))
+                })
+                .map(|_| Step::Scale),
             // It turns about its parameter's base point; one about a point
             // of its own is a different action.
             _ => followed
@@ -230,7 +245,7 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
                 .map(|_| Step::Rotate),
         };
         let (Some((_, parameter)), Some(step)) = (followed, step) else {
-            let why = match (followed.is_some(), angular) {
+            let why = match (followed.is_some(), angular || word == "Scale") {
                 (true, true) => "about a point of its own",
                 _ => "with nothing to follow",
             };

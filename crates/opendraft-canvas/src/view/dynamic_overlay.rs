@@ -36,7 +36,8 @@ impl View {
                 }
                 DynamicActionKind::Move { .. }
                 | DynamicActionKind::Rotate { .. }
-                | DynamicActionKind::Flip { .. } => schema
+                | DynamicActionKind::Flip { .. }
+                | DynamicActionKind::Scale { .. } => schema
                     .parameters
                     .iter()
                     .find(|p| p.id == action.parameter)

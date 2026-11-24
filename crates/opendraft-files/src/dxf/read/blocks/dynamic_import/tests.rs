@@ -138,7 +138,7 @@ fn a_modified_reference_becomes_a_reference_to_the_definition_with_its_value() {
     );
     assert_eq!(
         loaded.warnings,
-        ["Imported 1 dynamic block with their linear, rotation and flip parameters and stretch, move, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
+        ["Imported 1 dynamic block with their linear, rotation and flip parameters and stretch, move, scale, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
     );
 }
 
@@ -375,4 +375,52 @@ fn a_flip_comes_in_but_its_modified_references_keep_their_pictures() {
     assert_eq!(refs.len(), 1);
     assert!(refs[0].dynamic.is_none());
     assert!(!refs[0].block.is_dynamic(), "the anonymous block's picture");
+}
+
+#[test]
+fn a_scale_comes_in_and_a_reference_to_it_is_rebuilt_with_its_value() {
+    let loaded = read(&dxf(false, |records| {
+        for r in records.iter_mut() {
+            if r.name == "BLOCKSTRETCHACTION" {
+                r.name = "BLOCKSCALEACTION".into();
+                // It enlarges about the parameter's start, (0, 0).
+                for g in &mut r.groups {
+                    match (g.code, g.value.as_str()) {
+                        (1011, "1") => g.value = "0".into(),
+                        (1021, "-1") => g.value = "0".into(),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }))
+    .unwrap();
+    let slide = loaded.document.block_named("Slide").unwrap();
+    let schema = slide.dynamic.as_deref().expect("dynamic");
+    assert!(matches!(
+        schema.actions[0].kind,
+        DynamicActionKind::Scale { .. }
+    ));
+    let refs = inserts(&loaded.document);
+    assert_eq!(refs.len(), 1);
+    assert_eq!(refs[0].block.name, "Slide");
+    // The parameter went from 5 to 10: the line, 5 long, is now 10 long.
+    let b = refs[0].bounds();
+    assert!((b.max.x - b.min.x - 10.0).abs() < 1e-9, "{b:?}");
+}
+
+#[test]
+fn a_scale_about_a_point_of_its_own_is_left_out() {
+    let loaded = read(&dxf(false, |records| {
+        for r in records.iter_mut() {
+            if r.name == "BLOCKSTRETCHACTION" {
+                r.name = "BLOCKSCALEACTION".into();
+            }
+        }
+    }))
+    .unwrap();
+    assert!(loaded
+        .warnings
+        .iter()
+        .any(|w| w.contains("scale action about a point of its own")));
 }

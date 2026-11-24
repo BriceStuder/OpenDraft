@@ -192,8 +192,8 @@ fn ask_choice(ed: &Editor, message: &str, names: &[String]) -> Result<usize, Can
     Ok(names.iter().position(|n| *n == chosen).unwrap_or(0))
 }
 
-/// BACTION: add a Move or Stretch action driven by a linear parameter, a
-/// Rotate driven by a rotation, or a Flip driven by a flip.
+/// BACTION: add a Move, Stretch or Scale action driven by a linear parameter,
+/// a Rotate driven by a rotation, or a Flip driven by a flip.
 pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
     let schema = draft(ed)?;
     if schema.parameters.is_empty() {
@@ -205,9 +205,10 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     }
     let chosen = ed.get_keyword(
-        Options::<String>::new("Enter action type [Move/Stretch/Rotate/Flip] <Move>")
+        Options::<String>::new("Enter action type [Move/Stretch/Scale/Rotate/Flip] <Move>")
             .keyword("Move", "M")
             .keyword("Stretch", "S")
+            .keyword("Scale", "Sc")
             .keyword("Rotate", "R")
             .keyword("Flip", "F")
             .default("Move".to_owned()),
@@ -236,6 +237,11 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
     let Some(objects) = select_objects(ed)? else {
         return Ok(());
     };
+    if chosen == "Scale" {
+        return add_action(ed, schema, "Scale", parameter, |_| {
+            DynamicActionKind::Scale { objects }
+        });
+    }
     match family {
         DynamicFamily::Rotation => {
             return add_action(ed, schema, "Rotate", parameter, |_| {
@@ -342,7 +348,8 @@ pub fn bactionset(ed: &mut Editor) -> Result<(), Cancelled> {
     let (DynamicActionKind::Move { objects, .. }
     | DynamicActionKind::Stretch { objects, .. }
     | DynamicActionKind::Rotate { objects }
-    | DynamicActionKind::Flip { objects }) = &mut schema.actions[at].kind;
+    | DynamicActionKind::Flip { objects }
+    | DynamicActionKind::Scale { objects }) = &mut schema.actions[at].kind;
     *objects = chosen;
     let candidate = schema.clone();
     let ok = ed.read(move |doc| {
@@ -409,3 +416,7 @@ mod rotation_tests;
 #[cfg(test)]
 #[path = "dynamic_flip_cmd_tests.rs"]
 mod flip_tests;
+
+#[cfg(test)]
+#[path = "dynamic_scale_cmd_tests.rs"]
+mod scale_tests;

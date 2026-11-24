@@ -140,9 +140,9 @@ impl DynamicBlock {
                             && h > 0.0,
                     )
                 }
-                DynamicActionKind::Rotate { objects } | DynamicActionKind::Flip { objects } => {
-                    (objects, suits)
-                }
+                DynamicActionKind::Rotate { objects }
+                | DynamicActionKind::Flip { objects }
+                | DynamicActionKind::Scale { objects } => (objects, suits),
             };
             if !usable {
                 return Err(format!(
@@ -238,7 +238,7 @@ impl DynamicActionKind {
     /// The kind of parameter this action follows.
     pub fn family(&self) -> DynamicFamily {
         match self {
-            Self::Move { .. } | Self::Stretch { .. } => DynamicFamily::Linear,
+            Self::Move { .. } | Self::Stretch { .. } | Self::Scale { .. } => DynamicFamily::Linear,
             Self::Rotate { .. } => DynamicFamily::Rotation,
             Self::Flip { .. } => DynamicFamily::Flip,
         }
@@ -290,6 +290,9 @@ pub enum DynamicActionKind {
     Rotate { objects: Vec<BlockObjectId> },
     /// Mirrors the objects about its flip parameter's line when flipped.
     Flip { objects: Vec<BlockObjectId> },
+    /// Enlarges the objects about the start of its linear parameter by the
+    /// parameter's value over its value as drawn.
+    Scale { objects: Vec<BlockObjectId> },
 }
 
 /// The values one insert overrides. A parameter it does not list has the

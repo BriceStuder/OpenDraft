@@ -56,7 +56,8 @@ impl DynamicBlock {
             let (DynamicActionKind::Move { objects, .. }
             | DynamicActionKind::Stretch { objects, .. }
             | DynamicActionKind::Rotate { objects }
-            | DynamicActionKind::Flip { objects }) = &mut a.kind;
+            | DynamicActionKind::Flip { objects }
+            | DynamicActionKind::Scale { objects }) = &mut a.kind;
             let before = objects.len();
             objects.retain(|o| exists(*o));
             let lost = before - objects.len();

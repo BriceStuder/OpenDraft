@@ -1,6 +1,6 @@
 //! Dynamic blocks of a DXF built into the drawing, from what `dynamic`
 //! decoded. A definition keeps its linear, rotation and flip parameters and its
-//! stretch, move, rotate and flip actions; what the app cannot represent (polar,
+//! stretch, move, scale, rotate and flip actions; what the app cannot represent (polar,
 //! lookup, visibility, scale and the rest) is left out and named in a note. A reference to
 //! an anonymous `*U` block becomes a reference to its definition with the
 //! parameter values it recorded, but only when everything that moves geometry
@@ -167,6 +167,7 @@ impl Plan {
                     },
                     Step::Rotate => DynamicActionKind::Rotate { objects },
                     Step::Flip => DynamicActionKind::Flip { objects },
+                    Step::Scale => DynamicActionKind::Scale { objects },
                 },
             });
         }
@@ -205,7 +206,7 @@ impl Plan {
             .collect();
         if !imported.is_empty() {
             let mut line = format!(
-                "Imported {} with their linear, rotation and flip parameters and stretch, move, rotate and flip actions: {}",
+                "Imported {} with their linear, rotation and flip parameters and stretch, move, scale, rotate and flip actions: {}",
                 crate::plural(imported.len() as u64, "dynamic block"),
                 list(&imported)
             );

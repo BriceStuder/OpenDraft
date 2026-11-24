@@ -279,6 +279,8 @@ mod dynamic_flip_tests;
 #[cfg(test)]
 mod dynamic_rotation_tests;
 #[cfg(test)]
+mod dynamic_scale_tests;
+#[cfg(test)]
 mod dynamic_tests;
 #[cfg(test)]
 mod expansion_tests;
