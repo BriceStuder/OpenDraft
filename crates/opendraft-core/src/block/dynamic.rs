@@ -80,6 +80,12 @@ impl DynamicBlock {
                     p.id.0
                 ));
             }
+            if p.grips > 2 || p.name.is_empty() || p.is_degenerate() || !p.value_set().is_valid() {
+                return Err(format!(
+                    "parameter {} has no name, too many grips, no length or an unusable value set",
+                    p.id.0
+                ));
+            }
         }
         let mut actions = HashSet::new();
         for a in &self.actions {
@@ -93,11 +99,33 @@ impl DynamicBlock {
                 return Err(format!("action {} names a missing parameter", a.id.0));
             }
             let (DynamicActionKind::Move {
-                objects: selected, ..
+                objects: selected,
+                multiplier,
+                angle_offset,
             }
             | DynamicActionKind::Stretch {
-                objects: selected, ..
+                objects: selected,
+                multiplier,
+                angle_offset,
+                ..
             }) = &a.kind;
+            let frame_ok = match &a.kind {
+                DynamicActionKind::Stretch { frame, .. } => {
+                    let (w, h) = (frame.max.x - frame.min.x, frame.max.y - frame.min.y);
+                    w.is_finite() && h.is_finite() && w > 0.0 && h > 0.0
+                }
+                DynamicActionKind::Move { .. } => true,
+            };
+            if !(multiplier.is_finite()
+                && *multiplier > 0.0
+                && angle_offset.is_finite()
+                && frame_ok)
+            {
+                return Err(format!(
+                    "action {} has a multiplier or angle that is not usable, or an empty frame",
+                    a.id.0
+                ));
+            }
             if selected.is_empty() || selected.windows(2).any(|w| w[0] >= w[1]) {
                 return Err(format!(
                     "action {} selects nothing, or its selection is unsorted or repeats",

@@ -27,6 +27,7 @@ mod attribute_world;
 pub mod block_draft;
 mod budget;
 pub mod dynamic;
+mod dynamic_eval;
 mod edit;
 mod editing;
 pub mod field;
@@ -50,6 +51,7 @@ pub use dynamic::{
     DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue, DynamicValueEntry,
     DynamicValueSet, ParameterId,
 };
+pub use dynamic_eval::{evaluate, DynamicBlockError};
 pub use editing::BlockEditSave;
 pub use field::{
     DataField, FieldObjectRef, FieldRun, FieldStatus, FieldText, FieldValue, MAX_FIELDS_PER_TEXT,
@@ -261,8 +263,12 @@ pub fn inherited(
 #[cfg(test)]
 mod attribute_tests;
 #[cfg(test)]
+mod dynamic_eval_tests;
+#[cfg(test)]
 mod dynamic_tests;
 #[cfg(test)]
 mod expansion_tests;
 #[cfg(test)]
 pub(crate) mod tests;
+#[cfg(test)]
+mod value_set_tests;
