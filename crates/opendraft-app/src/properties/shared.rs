@@ -4,18 +4,19 @@
 use opendraft_core::{Entity, EntityKind};
 use opendraft_ui::key;
 
-use super::{polyline, rows, value, Field, Row};
+use super::{oblong, polyline, rows, value, Field, Row};
 
 /// The name the panel gives the given entities of `kind`: "Rectangular
-/// polyline" when every polyline among them traces a rectangle.
+/// polyline" when every polyline among them traces a rectangle, "Oblong
+/// polyline" when every one traces an oblong.
 pub fn title(kind: EntityKind, entities: &[&Entity]) -> &'static str {
-    let rectangles = kind == EntityKind::Polyline
-        && entities
-            .iter()
-            .filter(|e| e.kind() == kind)
-            .all(|e| polyline::rectangle(e).is_some());
-    if rectangles {
+    let every = |is: fn(&Entity) -> bool| {
+        kind == EntityKind::Polyline && entities.iter().filter(|e| e.kind() == kind).all(|e| is(e))
+    };
+    if every(|e| polyline::rectangle(e).is_some()) {
         key!("Rectangular polyline")
+    } else if every(|e| oblong::slot(e).is_some()) {
+        key!("Oblong polyline")
     } else {
         kind.title()
     }

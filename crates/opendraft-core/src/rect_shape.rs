@@ -1,7 +1,7 @@
-//! Recognising a rectangle in a polyline, whichever command drew it and at
-//! whatever angle, so that its sides, angle and corners can be read and
-//! changed. Its corners may be square, or all four rounded or bevelled alike
-//! (as RECTANGLE's Fillet and Chamfer make them).
+//! Recognising a rectangle or an oblong in a polyline, whichever command drew
+//! it and at whatever angle, so that its sizes and angle can be read and
+//! changed. A rectangle's corners may be square, or all four rounded or
+//! bevelled alike (as RECTANGLE's Fillet and Chamfer make them).
 
 use std::f64::consts::FRAC_PI_8;
 
@@ -111,6 +111,21 @@ impl Frame {
 /// rotation leaves are tolerated, in proportion to the size of the shape and
 /// of the coordinates.
 pub fn of_polyline(points: &[Point], bulges: &[f64], closed: bool) -> Option<Frame> {
+    let (ring, tol) = ring_of(points, closed)?;
+    if !matches!(ring.len(), 4 | 8) {
+        return None;
+    }
+    let bulge = |i: usize| bulges.get(i).copied().unwrap_or(0.0);
+    if ring.len() == 4 {
+        return read(ring, &bulge, 0, tol);
+    }
+    // RECTANGLE starts with a corner; another command may start with a side.
+    read(ring, &bulge, 1, tol).or_else(|| read(ring, &bulge, 0, tol))
+}
+
+/// The vertices of a closed outline, without a last vertex back on the first,
+/// and the tolerance its size and coordinates call for.
+fn ring_of(points: &[Point], closed: bool) -> Option<(&[Point], f64)> {
     let first = *points.first()?;
     let reach = points.iter().map(|q| gap(*q, first)).fold(0.0, f64::max);
     let size = points
@@ -118,19 +133,15 @@ pub fn of_polyline(points: &[Point], bulges: &[f64], closed: bool) -> Option<Fra
         .map(|q| q.x.abs().max(q.y.abs()))
         .fold(0.0, f64::max);
     let tol = 1e-9 * reach + 1e-12 * size;
-    let ring = match points {
-        [.., last] if matches!(points.len(), 5 | 9) && gap(*last, first) <= tol => {
-            &points[..points.len() - 1]
-        }
-        _ if closed && matches!(points.len(), 4 | 8) => points,
-        _ => return None,
+    let back = points.len() > 1 && gap(points[points.len() - 1], first) <= tol;
+    let ring = if back {
+        &points[..points.len() - 1]
+    } else if closed {
+        points
+    } else {
+        return None;
     };
-    let bulge = |i: usize| bulges.get(i).copied().unwrap_or(0.0);
-    if ring.len() == 4 {
-        return read(ring, &bulge, 0, tol);
-    }
-    // RECTANGLE starts with a corner; another command may start with a side.
-    read(ring, &bulge, 1, tol).or_else(|| read(ring, &bulge, 0, tol))
+    Some((ring, tol))
 }
 
 /// The rectangle `ring` traces with its first side as segment `start`.
@@ -217,6 +228,93 @@ fn corner_cut(
     } else {
         None
     }
+}
+
+/// An oblong (a slot) read from a polyline: two straight sides joined by two
+/// half circles of the same radius.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Slot {
+    /// Midway between the centres of its ends.
+    pub centre: Point,
+    /// Direction of its first straight side, in radians.
+    pub angle: f64,
+    /// Distance between the centres of its ends.
+    pub distance: f64,
+    /// Width across (twice the radius of its ends).
+    pub width: f64,
+    /// Whether the first straight side runs on the right of the line through
+    /// the centres (then the outline turns counter-clockwise).
+    pub right: bool,
+    /// Whether the polyline starts with an end rather than a straight side.
+    pub end_first: bool,
+}
+
+impl Slot {
+    /// The polyline's four vertices in drawing order.
+    pub fn vertices(&self) -> [Point; 4] {
+        let u = (self.angle.cos(), self.angle.sin());
+        let side = if self.right { -0.5 } else { 0.5 } * self.width;
+        let m = (-u.1 * side, u.0 * side);
+        let half = self.distance / 2.0;
+        let c = self.centre;
+        let at = |along: f64, across: f64| {
+            Point::new(
+                c.x + u.0 * along + m.0 * across,
+                c.y + u.1 * along + m.1 * across,
+            )
+        };
+        let mut out = [
+            at(-half, 1.0),
+            at(half, 1.0),
+            at(half, -1.0),
+            at(-half, -1.0),
+        ];
+        if self.end_first {
+            out.rotate_right(1);
+        }
+        out
+    }
+}
+
+/// The oblong a polyline traces, if it is one: four vertices, two straight
+/// sides the same length facing each other and two half circles that turn the
+/// same way, closed or with a fifth vertex back on the first.
+pub fn slot_of_polyline(points: &[Point], bulges: &[f64], closed: bool) -> Option<Slot> {
+    let (ring, tol) = ring_of(points, closed)?;
+    let [_, _, _, _] = ring else {
+        return None;
+    };
+    let bulge = |i: usize| bulges.get(i % 4).copied().unwrap_or(0.0);
+    (0..2).find_map(|start| {
+        let half_turn = bulge(start + 1);
+        let shape_ok = bulge(start) == 0.0
+            && bulge(start + 2) == 0.0
+            && ((half_turn.abs() - 1.0).abs() <= 1e-9)
+            && bulge(start + 3) == half_turn;
+        if !shape_ok {
+            return None;
+        }
+        let [p, q, r, t] = [0, 1, 2, 3].map(|k| ring[(start + k) % 4]);
+        let side = sub(q, p);
+        let (length, chord) = (side.0.hypot(side.1), sub(r, q));
+        let width = chord.0.hypot(chord.1);
+        let left = side.0 * chord.1 - side.1 * chord.0 > 0.0;
+        let facing = gap(Point::new(t.x + side.0, t.y + side.1), r) <= tol;
+        let square = dot(side, chord).abs() <= tol * length;
+        let turning = (half_turn > 0.0) == left;
+        if length <= tol || width <= tol || !facing || !square || !turning {
+            return None;
+        }
+        let centre = Point::new((p.x + r.x) / 2.0, (p.y + r.y) / 2.0);
+        Some(Slot {
+            centre,
+            angle: side.1.atan2(side.0),
+            distance: length,
+            width,
+            right: left,
+            end_first: start == 1,
+        })
+    })
 }
 
 fn gap(a: Point, b: Point) -> f64 {
@@ -384,6 +482,95 @@ mod tests {
         let (mut points, bulges) = drawn(0.0, 10.0, 4.0, Corners::Fillet(1.0));
         points[3].x += 0.5;
         assert_eq!(of_polyline(&points, &bulges, true), None, "one radius off");
+    }
+
+    fn slot(start_with_end: bool, turn: f64) -> (Vec<Point>, Vec<f64>) {
+        // Centres (0, 0) and (10, 0), width 4, counter-clockwise when turn is 1.
+        let mut points = vec![p(0.0, -2.0), p(10.0, -2.0), p(10.0, 2.0), p(0.0, 2.0)];
+        if turn < 0.0 {
+            points = vec![p(0.0, 2.0), p(10.0, 2.0), p(10.0, -2.0), p(0.0, -2.0)];
+        }
+        let mut bulges = vec![0.0, turn, 0.0, turn];
+        if start_with_end {
+            points.rotate_left(1);
+            bulges.rotate_left(1);
+        }
+        (points, bulges)
+    }
+
+    #[test]
+    fn an_oblong_is_read_whichever_way_it_turns_and_starts() {
+        for start_with_end in [false, true] {
+            for turn in [1.0, -1.0] {
+                let (points, bulges) = slot(start_with_end, turn);
+                let found = slot_of_polyline(&points, &bulges, true).unwrap();
+                assert!(near(found.centre, p(5.0, 0.0)));
+                assert!((found.distance - 10.0).abs() < 1e-12);
+                assert!((found.width - 4.0).abs() < 1e-12);
+                assert_eq!(found.end_first, start_with_end);
+                let back = found.vertices();
+                assert!(back.iter().zip(&points).all(|(a, b)| near(*a, *b)));
+            }
+        }
+        let (points, bulges) = slot(false, 1.0);
+        let found = slot_of_polyline(&points, &bulges, true).unwrap();
+        assert_eq!(found.angle, 0.0, "along its first straight side");
+        assert!(
+            of_polyline(&points, &bulges, true).is_none(),
+            "no rectangle"
+        );
+    }
+
+    #[test]
+    fn an_oblong_turned_and_far_away_with_a_fifth_vertex() {
+        let turned = Slot {
+            centre: p(1234.5, -987.25),
+            angle: 0.3,
+            distance: 7.0,
+            width: 3.0,
+            right: true,
+            end_first: false,
+        };
+        let mut points = turned.vertices().to_vec();
+        points.push(points[0]);
+        let found = slot_of_polyline(&points, &[0.0, 1.0, 0.0, 1.0, 0.0], false).unwrap();
+        assert!(near(found.centre, turned.centre));
+        assert!((found.angle - 0.3).abs() < 1e-12);
+        assert!((found.distance - 7.0).abs() < 1e-9 && (found.width - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn shapes_close_to_an_oblong_are_not_one() {
+        let (points, bulges) = slot(false, 1.0);
+        let inward = [0.0, -1.0, 0.0, -1.0];
+        assert_eq!(
+            slot_of_polyline(&points, &inward, true),
+            None,
+            "ends bulging in"
+        );
+        let flat = [0.0, 0.9, 0.0, 0.9];
+        assert_eq!(
+            slot_of_polyline(&points, &flat, true),
+            None,
+            "not half circles"
+        );
+        let one_end = [0.0, 1.0, 0.0, 0.0];
+        assert_eq!(
+            slot_of_polyline(&points, &one_end, true),
+            None,
+            "one end straight"
+        );
+        let mut skewed = points.clone();
+        skewed[2].x += 1.0;
+        skewed[3].x += 1.0;
+        assert_eq!(
+            slot_of_polyline(&skewed, &bulges, true),
+            None,
+            "ends not square"
+        );
+        assert_eq!(slot_of_polyline(&points, &bulges, false), None, "left open");
+        let circle = [p(0.0, -2.0), p(0.0, -2.0), p(0.0, 2.0), p(0.0, 2.0)];
+        assert_eq!(slot_of_polyline(&circle, &bulges, true), None, "no length");
     }
 
     #[test]
