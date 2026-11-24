@@ -45,6 +45,7 @@ use crate::{Encoded, FileError, FileFormat, Loaded};
 
 pub(super) mod attribute;
 mod block;
+mod block_dynamic;
 mod ccs;
 mod dimension;
 mod dimension_style;
