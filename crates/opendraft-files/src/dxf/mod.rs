@@ -51,6 +51,10 @@ impl FileFormat for DxfFormat {
     }
 
     fn write(&self, document: &Document) -> Result<Encoded, FileError> {
+        // DXF cannot keep a dynamic block's parameters and actions, so each
+        // reference is written as the block it draws now.
+        let materialized = document.materialized_static();
+        let document = materialized.as_ref().map_or(document, |m| &m.document);
         if let Some(tag) = blocks::first_field(document) {
             return Err(FileError::Unsupported(format!(
                 "attribute \"{tag}\" holds a data field, which DXF export cannot keep yet; save as .odraft"
@@ -83,6 +87,21 @@ impl FileFormat for DxfFormat {
                 "Multileaders were written as DXF 2007 MULTILEADER objects following the layout of AutoCAD 2018; they have not been reopened in AutoCAD, arrowheads other than closed filled are written as closed filled, and override flags and preview graphics are not written.".to_owned(),
             );
         }
+        if let Some(m) = &materialized {
+            let (count, noun) = if m.references > 0 {
+                (m.references, "dynamic block reference")
+            } else {
+                (m.definitions, "dynamic block")
+            };
+            encoded.notes.push(format!(
+                "{} {} written as ordinary blocks of the shape they have now: the parameters and actions are not in the DXF file.",
+                crate::plural(count as u64, noun),
+                if count == 1 { "was" } else { "were" }
+            ));
+        }
         Ok(encoded)
     }
 }
+
+#[cfg(test)]
+mod dynamic_tests;
