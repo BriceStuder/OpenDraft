@@ -35,6 +35,7 @@ pub mod field;
 mod field_draft;
 mod field_eval;
 pub mod field_kinds;
+mod materialize;
 mod picture;
 mod table;
 
@@ -61,6 +62,7 @@ pub use field::{
 pub use field_draft::{FieldDraft, ObjectChoice};
 pub use field_eval::{update_all_fields, update_fields, FieldContext, FieldUpdate, ObjectProperty};
 pub use field_kinds::{FieldCategory, FieldKind, FieldTime, FormatChoice};
+pub use materialize::Materialized;
 pub use picture::Piece;
 pub use table::{block_name_problem, Redefinition};
 
@@ -264,6 +266,8 @@ pub fn inherited(
 
 #[cfg(test)]
 mod attribute_tests;
+#[cfg(test)]
+mod dynamic_bench;
 #[cfg(test)]
 mod dynamic_edit_tests;
 #[cfg(test)]
