@@ -6,6 +6,7 @@
 use opendraft_commands::{BlockDialogButton, Cancelled, Editor, Options, PointOptions};
 use opendraft_core::block::block_draft::BlockDraft;
 use opendraft_core::Point;
+use opendraft_ui::key;
 
 use crate::block_cmd::{make_block, Made};
 use crate::block_editor::request_edit;
@@ -29,13 +30,13 @@ pub fn define_block_dialog(ed: &mut Editor) -> Result<(), Cancelled> {
         match button {
             // Esc in either pick goes back to the dialog, as in AutoCAD.
             BlockDialogButton::PickPoint => {
-                let ask = PointOptions::new("Specify insertion base point").esc_backs();
+                let ask = PointOptions::new(key!("Specify insertion base point")).esc_backs();
                 if let Ok(at) = ed.get_point(ask) {
                     (draft.x, draft.y, draft.base_on_screen) = (at.x, at.y, false);
                 }
             }
             BlockDialogButton::SelectObjects => {
-                let ask = Options::<()>::new("Select objects")
+                let ask = Options::<()>::new(key!("Select objects"))
                     .allow_empty()
                     .esc_backs();
                 if let Ok(chosen) = ed.ask_selection(ask) {
@@ -52,11 +53,13 @@ pub fn define_block_dialog(ed: &mut Editor) -> Result<(), Cancelled> {
                 let Some((_, shown)) = &found else {
                     break found;
                 };
-                let question =
-                    Options::new(format!("Block \"{shown}\" already exists. Redefine it?"))
-                        .keyword("Yes", "Y")
-                        .keyword("No", "N")
-                        .default("No".to_owned());
+                let question = Options::worded(
+                    key!("Block \"%{name}\" already exists. Redefine it?"),
+                    &[("name", shown)],
+                )
+                .keyword("Yes", "Y")
+                .keyword("No", "N")
+                .default("No".to_owned());
                 if ed.get_keyword(question)? == "Yes" {
                     break found;
                 }
@@ -64,12 +67,12 @@ pub fn define_block_dialog(ed: &mut Editor) -> Result<(), Cancelled> {
         }
     };
     let base = if draft.base_on_screen {
-        ed.get_point("Specify insertion base point")?
+        ed.get_point(key!("Specify insertion base point"))?
     } else {
         draft.base()
     };
     let chosen = if draft.objects_on_screen {
-        ed.get_selection("Select objects")?
+        ed.get_selection(key!("Select objects"))?
     } else {
         draft.objects.clone()
     };

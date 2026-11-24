@@ -179,6 +179,18 @@ impl AppState {
                 return false;
             }
         };
+        let mut notes = save.notes.clone();
+        for action in &save.removed_actions {
+            notes.push(format!(
+                "Action \"{action}\" was removed: none of its objects is left."
+            ));
+        }
+        if save.states_changed > 0 {
+            notes.push(format!(
+                "{} adjusted to the new parameters and value sets.",
+                crate::text::plural(save.states_changed, "reference")
+            ));
+        }
         let step = format!("Save block {}", edit.name);
         let saved = edit.drawing.transaction(&step, move |tx| {
             for layer in save.new_layers {
@@ -199,6 +211,9 @@ impl AppState {
         doc.session.mark_saved();
         let name = edit.name.clone();
         self.tell(format!("Block \"{name}\" saved."));
+        for note in notes {
+            self.tell(note);
+        }
         true
     }
 

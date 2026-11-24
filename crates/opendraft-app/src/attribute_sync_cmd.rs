@@ -7,6 +7,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, ModifyEntities, Options};
 use opendraft_core::block::sync_references;
 use opendraft_core::{BlockId, Entity, EntityId};
+use opendraft_ui::key;
 
 use crate::attribute_edit::pick_attributed_insert;
 use crate::text::plural;
@@ -46,8 +47,8 @@ fn plan(doc: &opendraft_core::Document, block: BlockId, remove_orphans: bool) ->
     plan
 }
 
-fn ask_yes_no(ed: &Editor, question: String, default: &str) -> Result<bool, Cancelled> {
-    let options = Options::<String>::new(question)
+fn ask_yes_no(ed: &Editor, question: Options<String>, default: &str) -> Result<bool, Cancelled> {
+    let options = question
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .default(default.to_owned());
@@ -70,7 +71,7 @@ fn choose_block(ed: &mut Editor) -> Result<Option<BlockId>, Cancelled> {
         }
     }
     loop {
-        let options = Options::<String>::new("Enter an option [?/Name/Select]")
+        let options = Options::<String>::new(key!("Enter an option"))
             .keyword("?", "?")
             .keyword("Name", "N")
             .keyword("Select", "S")
@@ -93,7 +94,7 @@ fn choose_block(ed: &mut Editor) -> Result<Option<BlockId>, Cancelled> {
             }
             "Name" => {
                 let Answer::Value(name) =
-                    ed.ask_string(Options::<String>::new("Enter block name"))?
+                    ed.ask_string(Options::<String>::new(key!("Enter block name")))?
                 else {
                     return Ok(None);
                 };
@@ -125,9 +126,13 @@ pub fn sync_attributes(ed: &mut Editor) -> Result<(), Cancelled> {
     let remove = kept.orphaned > 0
         && ask_yes_no(
             ed,
-            format!(
-                "{} no longer in the block definition. Remove them?",
-                plural(kept.orphaned, "attribute")
+            Options::worded(
+                if kept.orphaned == 1 {
+                    key!("%{count} attribute no longer in the block definition. Remove it?")
+                } else {
+                    key!("%{count} attributes no longer in the block definition. Remove them?")
+                },
+                &[("count", &kept.orphaned.to_string())],
             ),
             "No",
         )?;
@@ -153,7 +158,7 @@ pub fn sync_attributes(ed: &mut Editor) -> Result<(), Cancelled> {
     ));
     if !ask_yes_no(
         ed,
-        "Settings changed on a reference are lost. Update?".to_owned(),
+        Options::new(key!("Settings changed on a reference are lost. Update?")),
         "Yes",
     )? {
         return Ok(());

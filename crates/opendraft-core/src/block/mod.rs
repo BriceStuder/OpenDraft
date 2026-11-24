@@ -27,12 +27,21 @@ mod attribute_world;
 pub mod block_draft;
 mod budget;
 pub mod dynamic;
+mod dynamic_apply;
+mod dynamic_check;
+mod dynamic_eval;
+mod dynamic_fit;
+mod dynamic_lookup;
+mod dynamic_parameter;
+mod dynamic_value_set;
+mod dynamic_visibility;
 mod edit;
 mod editing;
 pub mod field;
 mod field_draft;
 mod field_eval;
 pub mod field_kinds;
+mod materialize;
 mod picture;
 mod table;
 
@@ -46,10 +55,13 @@ pub use attribute::{
 pub use attribute_sync::{sync_references, Synced};
 pub use budget::MAX_EXPANSION;
 pub use dynamic::{
-    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicGrip,
-    DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue, DynamicValueEntry,
-    DynamicValueSet, ParameterId,
+    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicFamily,
+    DynamicGrip, DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue,
+    DynamicValueEntry, DynamicValueSet, LookupRow, ParameterId, VisibilityState,
 };
+pub use dynamic_eval::{evaluate, DynamicBlockError};
+pub use dynamic_fit::Pruned;
+pub use dynamic_lookup::CUSTOM;
 pub use editing::BlockEditSave;
 pub use field::{
     DataField, FieldObjectRef, FieldRun, FieldStatus, FieldText, FieldValue, MAX_FIELDS_PER_TEXT,
@@ -57,6 +69,7 @@ pub use field::{
 pub use field_draft::{FieldDraft, ObjectChoice};
 pub use field_eval::{update_all_fields, update_fields, FieldContext, FieldUpdate, ObjectProperty};
 pub use field_kinds::{FieldCategory, FieldKind, FieldTime, FormatChoice};
+pub use materialize::Materialized;
 pub use picture::Piece;
 pub use table::{block_name_problem, Redefinition};
 
@@ -261,8 +274,30 @@ pub fn inherited(
 #[cfg(test)]
 mod attribute_tests;
 #[cfg(test)]
+mod dynamic_bench;
+#[cfg(test)]
+mod dynamic_edit_tests;
+#[cfg(test)]
+mod dynamic_eval_tests;
+#[cfg(test)]
+mod dynamic_flip_tests;
+#[cfg(test)]
+mod dynamic_lookup_tests;
+#[cfg(test)]
+mod dynamic_polar_tests;
+#[cfg(test)]
+mod dynamic_rotation_tests;
+#[cfg(test)]
+mod dynamic_scale_tests;
+#[cfg(test)]
 mod dynamic_tests;
+#[cfg(test)]
+mod dynamic_visibility_tests;
+#[cfg(test)]
+mod dynamic_xy_tests;
 #[cfg(test)]
 mod expansion_tests;
 #[cfg(test)]
 pub(crate) mod tests;
+#[cfg(test)]
+mod value_set_tests;

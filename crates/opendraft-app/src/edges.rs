@@ -190,42 +190,23 @@ impl Mode {
 /// click or gesture is its own undo step; Undo takes back the last one; Enter
 /// or Esc ends.
 pub fn trim_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    edit_against_edges(
-        ed,
-        Mode::Trim,
-        "select cutting edges first",
-        "select object to trim or shift-select to extend",
-    )
+    edit_against_edges(ed, Mode::Trim)
 }
 
 /// EXTEND: click each object near the end to lengthen. Shift-click trims
 /// instead.
 pub fn extend_objects(ed: &mut Editor) -> Result<(), Cancelled> {
-    edit_against_edges(
-        ed,
-        Mode::Extend,
-        "select boundary edges first",
-        "select object to extend or shift-select to trim",
-    )
+    edit_against_edges(ed, Mode::Extend)
 }
 
-fn edit_against_edges(
-    ed: &mut Editor,
-    mode: Mode,
-    edges_message: &str,
-    object_message: &str,
-) -> Result<(), Cancelled> {
+fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
     let mut quick = ed.defaults().trim.get().quick;
-    let mut edges = choose_edges(ed, &mut quick, ed.pickset().to_vec(), edges_message)?;
+    let mut edges = choose_edges(ed, &mut quick, ed.pickset().to_vec(), mode)?;
     let mut changed = 0_usize;
     loop {
         // Quick mode is named here, its only prompt; Standard mode was named
         // at the edge question.
-        let message = if quick {
-            with_mode(true, object_message)
-        } else {
-            sentence(object_message)
-        };
+        let message = object_prompt(mode, quick);
         // No Crossing option: a click in empty space starts the window.
         let mut options = Options::<Swept>::new(message)
             .keyword("Fence", "F")
@@ -245,7 +226,7 @@ fn edit_against_edges(
                 },
                 "mOde" => {
                     if switch_mode(ed, &mut quick)? {
-                        edges = choose_edges(ed, &mut quick, Vec::new(), edges_message)?;
+                        edges = choose_edges(ed, &mut quick, Vec::new(), mode)?;
                     }
                     false
                 }
@@ -273,20 +254,15 @@ fn edit_against_edges(
     }
 }
 
-/// `message` after the mode, as a reminder: "Quick mode, select object to
-/// trim".
-fn with_mode(quick: bool, message: &str) -> String {
-    let named = if quick { "Quick mode" } else { "Standard mode" };
-    format!("{named}, {message}")
-}
-
-/// `message` with a capital first letter, as a prompt starts.
-fn sentence(message: &str) -> String {
-    let mut chars = message.chars();
-    chars
-        .next()
-        .map(|first| first.to_uppercase().chain(chars).collect())
-        .unwrap_or_default()
+/// The prompt for the objects to change. Quick mode is named here, its
+/// only prompt, as a reminder; Standard mode was named at the edges.
+fn object_prompt(mode: Mode, quick: bool) -> &'static str {
+    match (mode, quick) {
+        (Mode::Trim, true) => key!("Quick mode, select object to trim or shift-select to extend"),
+        (Mode::Trim, false) => key!("Select object to trim or shift-select to extend"),
+        (Mode::Extend, true) => key!("Quick mode, select object to extend or shift-select to trim"),
+        (Mode::Extend, false) => key!("Select object to extend or shift-select to trim"),
+    }
 }
 
 /// The edges: the objects selected before the command (`chosen`); with none,
@@ -296,12 +272,15 @@ fn choose_edges(
     ed: &Editor,
     quick: &mut bool,
     mut chosen: Vec<EntityId>,
-    edges_message: &str,
+    mode: Mode,
 ) -> Result<Option<Vec<EntityId>>, Cancelled> {
     while chosen.is_empty() && !*quick {
-        let options = Options::<()>::new(with_mode(false, edges_message))
-            .allow_empty()
-            .keyword("mOde", "O");
+        let options = Options::<()>::new(match mode {
+            Mode::Trim => key!("Standard mode, select cutting edges first"),
+            Mode::Extend => key!("Standard mode, select boundary edges first"),
+        })
+        .allow_empty()
+        .keyword("mOde", "O");
         match ed.ask_selection_or_keyword(options, "select all")? {
             Answer::Value(ids) => {
                 if ids.is_empty() {

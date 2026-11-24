@@ -83,7 +83,7 @@ impl Insert {
             return;
         }
         let map = self.transform().then(outer);
-        for child in &self.block.entities {
+        for child in self.evaluated().iter() {
             if *walk.budget == 0 {
                 return;
             }
@@ -128,7 +128,7 @@ impl Insert {
         let map = self.transform();
         let even = map.similarity().is_some();
         let mut out = Vec::new();
-        for child in &self.block.entities {
+        for child in self.evaluated().iter() {
             // Only ByBlock changes: the layer stays the object's own.
             let own = Attributes {
                 layer: child.attrs.layer,

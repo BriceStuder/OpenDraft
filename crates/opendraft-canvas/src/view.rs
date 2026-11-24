@@ -24,6 +24,7 @@ mod background;
 mod builder;
 mod crosshair;
 mod dash_paint;
+mod dynamic_overlay;
 mod entity_paint;
 mod hatch_paint;
 mod image_paint;
@@ -386,6 +387,7 @@ impl View {
             self.paint_grips(&painter, rect, style, document, selection, marks);
         }
 
+        self.paint_block_schema(&painter, rect, document);
         if let (Some(prompt), Some(to)) = (&self.point_prompt, preview_to) {
             self.paint_prompt_preview(&painter, rect, style, prompt, to);
         }

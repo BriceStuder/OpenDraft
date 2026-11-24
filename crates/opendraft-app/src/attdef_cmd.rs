@@ -9,6 +9,7 @@ use opendraft_core::block::{
     AttributeDefinition, AttributeDefinitionId, AttributeFlags, AttributeText, FieldText,
 };
 use opendraft_core::{Entity, Point};
+use opendraft_ui::key;
 
 use crate::attribute_memory::Memory;
 use crate::defaults::EditorDefaults;
@@ -46,9 +47,7 @@ fn ask_modes(ed: &Editor) -> Result<Memory, Cancelled> {
     let mut memory = defaults.attribute.get();
     loop {
         ed.say(format!("Current attribute modes: {}", describe(&memory)));
-        let mut options = Options::<String>::new(
-            "Enter an option to change [Invisible/Constant/Verify/Preset/Lock position] <done>",
-        );
+        let mut options = Options::<String>::new(key!("Enter an option to change <done>"));
         for (name, key, _) in MODES {
             options = options.keyword(name, key);
         }
@@ -72,7 +71,7 @@ fn ask_modes(ed: &Editor) -> Result<Memory, Cancelled> {
 
 fn ask_tag(ed: &Editor) -> Result<String, Cancelled> {
     loop {
-        let tag = ed.get_string(Options::<String>::new("Enter attribute tag"))?;
+        let tag = ed.get_string(Options::<String>::new(key!("Enter attribute tag")))?;
         match tag_problem(tag.trim()) {
             None => return Ok(normalized_tag(tag.trim())),
             Some(why) => ed.say(why),
@@ -118,23 +117,23 @@ pub fn define_attribute(ed: &mut Editor) -> Result<(), Cancelled> {
     let prompt = if flags.constant() {
         String::new()
     } else {
-        ask_line(ed, "Enter attribute prompt", &tag)?
+        ask_line(ed, key!("Enter attribute prompt"), &tag)?
     };
     let value = if flags.constant() {
-        ask_line(ed, "Enter attribute value", "")?
+        ask_line(ed, key!("Enter attribute value"), "")?
     } else {
-        ask_line(ed, "Enter default attribute value", "")?
+        ask_line(ed, key!("Enter default attribute value"), "")?
     };
     let style = ed.read(|doc| doc.current_text_style())?;
     let height = ed.defaults().text.get().height;
     let sketch = AttributeText::new(Point::default(), height, style);
     let (shown, tag_shown) = (sketch.clone(), tag.clone());
     let at = ed.get_point(
-        PointOptions::new("Specify start point of text")
+        PointOptions::new(key!("Specify start point of text"))
             .ghost(move |at| draft(&tag_shown, flags, &shown, at)),
     )?;
     let height = ed.get_distance(
-        NumberOptions::new("Specify height")
+        NumberOptions::new(key!("Specify height"))
             .default(height)
             .base(at),
     )?;
@@ -145,7 +144,7 @@ pub fn define_attribute(ed: &mut Editor) -> Result<(), Cancelled> {
     ed.defaults().text.change(|m| m.height = height);
     let level = ed.read(|doc| doc.ccs().angle)?;
     let rotation = ed.get_angle(
-        NumberOptions::new("Specify rotation angle of text")
+        NumberOptions::new(key!("Specify rotation angle of text"))
             .default(level)
             .base(at),
     )?;

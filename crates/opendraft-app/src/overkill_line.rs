@@ -1,5 +1,5 @@
 //! -OVERKILL: the command-line form of OVERKILL. After the objects it loops
-//! on `Enter an option [Ignore/Tolerance/...] <accept>`, shares its settings
+//! on `Enter an option <accept> [Ignore/Tolerance/...]`, shares its settings
 //! with the dialog, and tidies with the same `run`.
 
 use opendraft_commands::{Cancelled, Editor, Options};
@@ -96,15 +96,13 @@ pub fn overkill_prompt(ed: &mut Editor) -> Result<(), Cancelled> {
     loop {
         let line = describe(ed, &settings)?;
         ed.say(line);
-        let options = Options::<String>::new(
-            "Enter an option [Ignore/Tolerance/Optimize polylines/Combine partial overlap/combine End to end/Associativity] <accept>",
-        )
-        .keyword("Ignore", "I")
-        .keyword("Tolerance", "T")
-        .keyword(key!("Optimize polylines"), "O")
-        .keyword(key!("Combine partial overlap"), "C")
-        .keyword("combine End to end", "E")
-        .keyword("Associativity", "A");
+        let options = Options::<String>::new(key!("Enter an option <accept>"))
+            .keyword("Ignore", "I")
+            .keyword("Tolerance", "T")
+            .keyword(key!("Optimize polylines"), "O")
+            .keyword(key!("Combine partial overlap"), "C")
+            .keyword("combine End to end", "E")
+            .keyword("Associativity", "A");
         match ed.ask_keyword(options)?.as_deref() {
             Some("Ignore") => ask_ignore(ed, &mut settings.ignore)?,
             Some("Tolerance") => {

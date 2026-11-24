@@ -8,6 +8,7 @@ use std::sync::Arc;
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked, PointOptions};
 use opendraft_core::dimension::{auto_rotation, object_ends};
 use opendraft_core::{DimStyle, DimText, Dimension, Entity, Point};
+use opendraft_ui::key;
 
 use crate::draw::{add, distance, MIN_SIZE};
 
@@ -80,17 +81,17 @@ pub(crate) fn place(
                 "Xdatum" => tweaks.datum = Some(true),
                 "Ydatum" => tweaks.datum = Some(false),
                 "Partial" => {
-                    let first = ed.get_point(PointOptions::new(
-                        "Specify first point for arc length dimension",
-                    ))?;
+                    let first = ed.get_point(PointOptions::new(key!(
+                        "Specify first point for arc length dimension"
+                    )))?;
                     let second = ed.get_point(
-                        PointOptions::new("Specify second point for arc length dimension")
+                        PointOptions::new(key!("Specify second point for arc length dimension"))
                             .base(first),
                     )?;
                     tweaks.partial = Some((first, second));
                 }
                 "Rotated" => {
-                    tweaks.rotation = Some(ed.get_angle("Specify angle of dimension line")?);
+                    tweaks.rotation = Some(ed.get_angle(key!("Specify angle of dimension line"))?);
                 }
                 _ => {}
             },
@@ -107,11 +108,14 @@ fn ask_text(
     tweaks: &Tweaks,
 ) -> Result<DimText, Cancelled> {
     let measured = make(sample, &Tweaks::default()).map(|d| d.label());
-    let message = match &measured {
-        Some(m) => format!("Enter dimension text <{m}>"),
-        None => "Enter dimension text".to_owned(),
+    let options = match &measured {
+        Some(m) => Options::<String>::worded(
+            key!("Enter dimension text <%{measured}>"),
+            &[("measured", m)],
+        ),
+        None => Options::<String>::new(key!("Enter dimension text")),
     };
-    Ok(match ed.ask_string(Options::<String>::new(message))? {
+    Ok(match ed.ask_string(options)? {
         Answer::Value(typed) if measured.as_deref() != Some(typed.as_str()) => {
             DimText::from_entry(&typed)
         }
@@ -125,14 +129,16 @@ fn ask_text(
 /// vertically, whichever way the cursor is, unless told otherwise.
 fn linear(ed: &mut Editor, aligned: bool) -> Result<(), Cancelled> {
     let style = style(ed)?;
-    let options = PointOptions::new("Specify first extension line origin or <select object>");
+    let options = PointOptions::new(key!(
+        "Specify first extension line origin or <select object>"
+    ));
     let (p1, p2) = match ed.ask_point(options)? {
         Answer::Value(p1) => {
-            let second = PointOptions::new("Specify second extension line origin").base(p1);
+            let second = PointOptions::new(key!("Specify second extension line origin")).base(p1);
             (p1, ed.get_point(second)?)
         }
         Answer::Enter => loop {
-            let Some((picked, entity)) = pick(ed, "Select object to dimension")? else {
+            let Some((picked, entity)) = pick(ed, key!("Select object to dimension"))? else {
                 return Err(Cancelled);
             };
             match object_ends(&entity, picked.at) {
@@ -185,7 +191,7 @@ fn place_linear(
     let sample = Point::new((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
     place(
         ed,
-        "Specify dimension line location",
+        key!("Specify dimension line location"),
         keywords,
         sample,
         make,
@@ -204,7 +210,7 @@ pub fn dim_linear(ed: &mut Editor) -> Result<(), Cancelled> {
 fn radial(ed: &mut Editor, diameter: bool) -> Result<(), Cancelled> {
     let style = style(ed)?;
     let (center, radius) = loop {
-        let Some((_, entity)) = pick(ed, "Select arc or circle")? else {
+        let Some((_, entity)) = pick(ed, key!("Select arc or circle"))? else {
             return Err(Cancelled);
         };
         match entity {
@@ -232,7 +238,7 @@ fn place_radial(
     let sample = Point::new(center.x + radius, center.y);
     place(
         ed,
-        "Specify dimension line location",
+        key!("Specify dimension line location"),
         &[("Text", "T")],
         sample,
         make,
@@ -252,14 +258,15 @@ pub fn dim_diameter(ed: &mut Editor) -> Result<(), Cancelled> {
 /// a linear dimension from two points instead.
 pub fn dim_auto(ed: &mut Editor) -> Result<(), Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select object to dimension or <specify points>")
-            .keyword("Angular", "A")
-            .keyword("Baseline", "B")
-            .keyword("Continue", "C")
-            .keyword("Ordinate", "O")
-            .keyword("aLign", "L")
-            .keyword("Space", "S")
-            .allow_empty();
+        let options =
+            Options::<Picked>::new(key!("Select object to dimension or <specify points>"))
+                .keyword("Angular", "A")
+                .keyword("Baseline", "B")
+                .keyword("Continue", "C")
+                .keyword("Ordinate", "O")
+                .keyword("aLign", "L")
+                .keyword("Space", "S")
+                .allow_empty();
         let picked = match ed.ask_object(options)? {
             Answer::Value(picked) => picked,
             Answer::Keyword(k) => {
@@ -310,7 +317,7 @@ fn on_arc(center: Point, on: Point, toward: Point) -> Point {
 pub fn dim_arc(ed: &mut Editor) -> Result<(), Cancelled> {
     let style = style(ed)?;
     let (center, start, end) = loop {
-        let Some((_, entity)) = pick(ed, "Select arc")? else {
+        let Some((_, entity)) = pick(ed, key!("Select arc"))? else {
             return Err(Cancelled);
         };
         match entity {
@@ -340,7 +347,7 @@ pub fn dim_arc(ed: &mut Editor) -> Result<(), Cancelled> {
     });
     place(
         ed,
-        "Specify arc length dimension location",
+        key!("Specify arc length dimension location"),
         &[("Text", "T"), ("Partial", "P"), ("Leader", "L")],
         start,
         make,

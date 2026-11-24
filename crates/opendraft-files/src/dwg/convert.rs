@@ -15,7 +15,7 @@ use opendraft_dwg::{
 
 use super::attribute;
 use super::text::{self, Styles};
-use crate::block_import::{ImportedBlocks, Item, PendingBlock, PendingInsert};
+use crate::block_import::{self, ImportedBlocks, Item, PendingBlock, PendingInsert};
 use crate::native::spline::MAX_FILE_SPLINE_POINTS;
 use crate::FileError;
 
@@ -230,6 +230,7 @@ fn item(shape: &Shape, styles: &Styles) -> Result<Item<DwgHandle>, Refused> {
                     .iter()
                     .filter_map(|a| attribute::reference(a, styles))
                     .collect(),
+                dynamic: Vec::new(),
             }));
         }
         Shape::AttributeDefinition { .. } => {
@@ -390,7 +391,8 @@ pub(super) fn to_document(
 
     let styles = text::import_styles(&mut document, &drawing.text_styles);
     let mut pending = Vec::with_capacity(drawing.blocks.len());
-    for b in &drawing.blocks {
+    let names = block_import::importable_names(drawing.blocks.iter().map(|b| b.name.as_str()));
+    for (b, name) in drawing.blocks.iter().zip(names) {
         let mut items = Vec::with_capacity(b.entities.len());
         for e in &b.entities {
             let attrs = attributes(e, &ids, &mut document, &mut notes.linetypes)?;
@@ -403,10 +405,11 @@ pub(super) fn to_document(
         pending.push(PendingBlock {
             unit: Default::default(),
             key: b.handle,
-            name: b.name.clone(),
+            name,
             base: point(b.base),
             description: b.description.clone(),
             items,
+            dynamic: None,
         });
     }
     let mut blocks = ImportedBlocks::build(&mut document, pending);

@@ -4,6 +4,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options, PointOptions};
 use opendraft_core::{DimText, Dimension, Entity, EntityId};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -65,7 +66,7 @@ fn home(d: &Dimension) -> Option<Dimension> {
 /// lines).
 pub fn dim_edit(ed: &mut Editor) -> Result<(), Cancelled> {
     let kind = ed.get_keyword(
-        Options::new("Enter type of dimension editing")
+        Options::new(key!("Enter type of dimension editing"))
             .keyword("Home", "H")
             .keyword("New", "N")
             .keyword("Rotate", "R")
@@ -74,7 +75,7 @@ pub fn dim_edit(ed: &mut Editor) -> Result<(), Cancelled> {
     )?;
     let change: Change = match kind.as_str() {
         "New" => {
-            let prompt = "Enter new dimension text (<> is the measurement)";
+            let prompt = key!("Enter new dimension text (<> is the measurement)");
             let text = match ed.ask_string(Options::<String>::new(prompt))? {
                 Answer::Value(typed) => DimText::from_entry(&typed),
                 _ => return Err(Cancelled),
@@ -86,11 +87,11 @@ pub fn dim_edit(ed: &mut Editor) -> Result<(), Cancelled> {
             })
         }
         "Rotate" => {
-            let angle = ed.get_angle("Specify angle for dimension text")?;
+            let angle = ed.get_angle(key!("Specify angle for dimension text"))?;
             Box::new(move |d| Some(d.with_text_angle(Some(angle))))
         }
         "Oblique" => {
-            let prompt = "Enter obliquing angle (press ENTER for none)";
+            let prompt = key!("Enter obliquing angle (press ENTER for none)");
             let angle = match ed.ask_angle(Options::<f64>::new(prompt).allow_empty())? {
                 Answer::Value(a) => Some(a),
                 _ => None,
@@ -99,7 +100,7 @@ pub fn dim_edit(ed: &mut Editor) -> Result<(), Cancelled> {
         }
         _ => Box::new(home),
     };
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let ids = dimensions_in(ed, ids)?;
     apply(ed, "Edit dimension", ids, change)
 }
@@ -108,13 +109,13 @@ pub fn dim_edit(ed: &mut Editor) -> Result<(), Cancelled> {
 /// Right, Center (along the dimension line), Home or Angle.
 pub fn dim_text_edit(ed: &mut Editor) -> Result<(), Cancelled> {
     let ids = loop {
-        let ids = ed.pickset_or_select("Select dimension")?;
+        let ids = ed.pickset_or_select(key!("Select dimension"))?;
         if let Ok(found) = dimensions_in(ed, ids) {
             break found;
         }
     };
     let ids = vec![ids[0]];
-    let options = PointOptions::new("Specify new location for dimension text")
+    let options = PointOptions::new(key!("Specify new location for dimension text"))
         .keyword("Left", "L")
         .keyword("Right", "R")
         .keyword("Center", "C")
@@ -131,7 +132,7 @@ pub fn dim_text_edit(ed: &mut Editor) -> Result<(), Cancelled> {
             "Right" => Box::new(|d| d.with_text_justified(2)),
             "Center" => Box::new(|d| d.with_text_justified(0)),
             "Angle" => {
-                let angle = ed.get_angle("Specify angle for dimension text")?;
+                let angle = ed.get_angle(key!("Specify angle for dimension text"))?;
                 Box::new(move |d| Some(d.with_text_angle(Some(angle))))
             }
             _ => Box::new(home),
@@ -143,7 +144,7 @@ pub fn dim_text_edit(ed: &mut Editor) -> Result<(), Cancelled> {
 
 /// DIMDISASSOCIATE: the selected dimensions no longer follow their objects.
 pub fn dim_disassociate(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select dimensions")?;
+    let ids = ed.pickset_or_select(key!("Select dimensions"))?;
     let ids = dimensions_in(ed, ids)?;
     apply(
         ed,
@@ -156,7 +157,7 @@ pub fn dim_disassociate(ed: &mut Editor) -> Result<(), Cancelled> {
 /// DIMREASSOCIATE: the selected dimensions follow the objects their points
 /// now sit on (an end, a centre, a vertex).
 pub fn dim_reassociate(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select dimensions")?;
+    let ids = ed.pickset_or_select(key!("Select dimensions"))?;
     let ids = dimensions_in(ed, ids)?;
     let tied = ed.transaction("Reassociate dimension", move |tx| {
         let mut tied = 0usize;

@@ -22,7 +22,6 @@ fn skipped(why: &Skipped, count: u64) -> Option<String> {
             "Skipped {} in paper space (layouts are not imported yet).",
             plural(count, "object")
         ),
-        Skipped::AnonymousBlockReference => block_import::anonymous_references(count),
         Skipped::ExternalReference => block_import::external_references(count),
         Skipped::InvalidGeometry => {
             format!("Skipped {} with damaged geometry.", plural(count, "object"))
@@ -50,6 +49,7 @@ fn degraded(how: Degradation, count: u64) -> String {
             "{} lost the control points of a fitted curve; the fitted curve itself was kept.",
             plural(count, "polyline")
         ),
+        Degradation::AnonymousBlock => block_import::anonymous_references(count),
         Degradation::TextFitApproximated => format!(
             "{} set \"aligned\" or \"fit\" between two points was read as ordinary text along that line.",
             plural(count, "text")

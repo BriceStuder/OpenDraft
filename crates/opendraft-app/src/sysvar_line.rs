@@ -8,6 +8,8 @@
 
 use std::borrow::Cow;
 
+use rust_i18n::t;
+
 use crate::cmdline::Prompt;
 use crate::state::AppState;
 use crate::sysvars::table;
@@ -37,13 +39,20 @@ impl AppState {
     pub(crate) fn sysvar_prompt(&self) -> Option<Prompt> {
         let (text, command): (Cow<'static, str>, &'static str) =
             match self.cmdline.sysvar.as_ref()? {
-                SysVarPrompt::Name => ("Enter variable name or [?]".into(), "SETVAR"),
+                SysVarPrompt::Name => (t!("Enter variable name or [?]"), "SETVAR"),
                 SysVarPrompt::Value(name) => {
                     let current = table()
                         .get(name, self)
                         .map(|v| v.to_string())
                         .unwrap_or_default();
-                    (format!("Enter new value for {name} <{current}>").into(), "")
+                    (
+                        t!(
+                            "Enter new value for %{name} <%{current}>",
+                            name = name,
+                            current = current
+                        ),
+                        "",
+                    )
                 }
             };
         Some(Prompt {

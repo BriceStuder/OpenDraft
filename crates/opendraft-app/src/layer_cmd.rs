@@ -7,6 +7,7 @@ use opendraft_commands::{
     SetCurrentLayer, TextOptions,
 };
 use opendraft_core::{EntityId, Layer, LayerId};
+use opendraft_ui::key;
 
 use crate::layer_switch;
 use crate::state::AppState;
@@ -91,7 +92,7 @@ fn change_layer(ed: &Editor, name: &'static str, layer: Layer) -> Result<(), Can
 /// LAYULK: unlock the layer of the object picked; objects on locked layers
 /// can be picked here.
 pub fn unlock_layer(ed: &mut Editor) -> Result<(), Cancelled> {
-    let options = Options::<Picked>::new("Select an object on the layer to be unlocked")
+    let options = Options::<Picked>::new(key!("Select an object on the layer to be unlocked"))
         .pick_locked()
         .allow_empty();
     let Answer::Value(Picked { id, .. }) = ed.ask_object(options)? else {
@@ -136,8 +137,9 @@ pub fn make_current(ed: &mut Editor) -> Result<(), Cancelled> {
     let layer = match preselected {
         Some(layer) => layer,
         None => {
-            let options = Options::<Picked>::new("Select object whose layer will become current")
-                .allow_empty();
+            let options =
+                Options::<Picked>::new(key!("Select object whose layer will become current"))
+                    .allow_empty();
             let Answer::Value(Picked { id, .. }) = ed.ask_object(options)? else {
                 return Ok(());
             };
@@ -163,7 +165,7 @@ pub fn make_current(ed: &mut Editor) -> Result<(), Cancelled> {
 /// LAYMCH: move the selected objects to the layer of an object picked, or
 /// of a layer named. One undo step.
 pub fn match_layer(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects to be changed")?;
+    let ids = ed.pickset_or_select(key!("Select objects to be changed"))?;
     let Some(layer) = destination(ed)? else {
         return Ok(());
     };
@@ -196,13 +198,14 @@ pub fn match_layer(ed: &mut Editor) -> Result<(), Cancelled> {
 /// The layer LAYMCH moves objects to: an object's, or one typed by name.
 fn destination(ed: &mut Editor) -> Result<Option<LayerId>, Cancelled> {
     loop {
-        let options = Options::<Picked>::new("Select object on destination layer")
+        let options = Options::<Picked>::new(key!("Select object on destination layer"))
             .keyword("Name", "N")
             .allow_empty();
         match ed.ask_object(options)? {
             Answer::Value(Picked { id, .. }) => return Ok(layer_of(ed, id)?.map(|l| l.id)),
             Answer::Keyword(_) => {
-                let Answer::Value(typed) = ed.ask_string(TextOptions::new("Enter layer name"))?
+                let Answer::Value(typed) =
+                    ed.ask_string(TextOptions::new(key!("Enter layer name")))?
                 else {
                     continue;
                 };

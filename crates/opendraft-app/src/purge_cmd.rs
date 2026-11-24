@@ -9,6 +9,7 @@ use opendraft_core::{BlockId, Document};
 
 use crate::purge_delete::delete_actions;
 use crate::text::plural;
+use opendraft_ui::key;
 
 /// Which page of the dialog shows.
 #[derive(Clone, Copy, Default, PartialEq)]
@@ -119,8 +120,17 @@ fn confirmed(ed: &Editor, p: &Purgeable, all: &mut bool) -> Result<bool, Cancell
     if *all {
         return Ok(true);
     }
-    let what = p.item.category().title();
-    let options = Options::<String>::new(format!("Purge {what} \"{}\"?", p.name))
+    let text = match p.item.category() {
+        Category::Blocks => key!("Purge Blocks \"%{name}\"?"),
+        Category::DimStyles => key!("Purge Dimension styles \"%{name}\"?"),
+        Category::Layers => key!("Purge Layers \"%{name}\"?"),
+        Category::Linetypes => key!("Purge Linetypes \"%{name}\"?"),
+        Category::MLeaderStyles => key!("Purge Multileader styles \"%{name}\"?"),
+        Category::TextStyles => key!("Purge Text styles \"%{name}\"?"),
+        Category::ZeroLength => key!("Purge Zero-length geometry \"%{name}\"?"),
+        Category::EmptyText => key!("Purge Empty text objects \"%{name}\"?"),
+    };
+    let options = Options::<String>::worded(text, &[("name", &p.name)])
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .keyword("All", "A")

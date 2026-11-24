@@ -107,6 +107,9 @@ pub(super) enum EntityDto {
             deserialize_with = "super::limits::block_objects"
         )]
         attributes: Vec<AttributeReferenceDto>,
+        /// The values this insert overrides, for a dynamic block.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dynamic: Option<super::block_dynamic::DynamicStateDto>,
     },
     /// A template text in a block, or loose in the drawing.
     AttributeDefinition(AttributeDefinitionDto),
@@ -206,6 +209,10 @@ impl EntityDto {
                     scale: [i.scale_x, i.scale_y],
                     rotation: i.rotation,
                     attributes: i.attributes.iter().map(AttributeReferenceDto::of).collect(),
+                    dynamic: i
+                        .dynamic
+                        .as_deref()
+                        .map(super::block_dynamic::DynamicStateDto::of),
                 });
             }
             Entity::Polyline {
@@ -239,7 +246,16 @@ impl EntityDto {
                 scale,
                 rotation,
                 attributes,
-            } => insert_entity(blocks, *block, *insertion, *scale, *rotation, attributes)?,
+                dynamic,
+            } => insert_entity(
+                blocks,
+                *block,
+                *insertion,
+                *scale,
+                *rotation,
+                attributes,
+                dynamic.as_ref(),
+            )?,
             EntityDto::AttributeDefinition(d) => {
                 Entity::AttributeDefinition(Box::new(d.to_definition()?))
             }

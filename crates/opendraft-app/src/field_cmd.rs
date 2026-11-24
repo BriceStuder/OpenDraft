@@ -8,6 +8,7 @@ use opendraft_core::block::{
     update_fields, DataField, FieldContext, FieldRun, FieldText, ObjectProperty,
 };
 use opendraft_core::Entity;
+use opendraft_ui::key;
 
 use crate::attribute_edit::pick_attributed_insert;
 use crate::text::plural;
@@ -33,7 +34,7 @@ fn key(property: ObjectProperty) -> &'static str {
 /// UPDATEFIELD: evaluate every data field in the attributes of the selected
 /// block references. One undo step.
 pub fn update_field(ed: &mut Editor) -> Result<(), Cancelled> {
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let context = field_context(ed);
     let update = ed.read(move |doc| update_fields(doc, &ids, &context))?;
     if update.found == 0 {
@@ -71,8 +72,11 @@ fn ask_tag(ed: &Editor, tags: &[String]) -> Result<usize, Cancelled> {
         return Ok(0);
     }
     loop {
-        let message = format!("Enter tag of the attribute that will show the field <{first}>");
-        let Answer::Value(typed) = ed.ask_string(Options::<String>::new(message))? else {
+        let options = Options::<String>::worded(
+            key!("Enter tag of the attribute that will show the field <%{first}>"),
+            &[("first", first)],
+        );
+        let Answer::Value(typed) = ed.ask_string(options)? else {
             return Ok(0);
         };
         match tags
@@ -88,7 +92,7 @@ fn ask_tag(ed: &Editor, tags: &[String]) -> Result<usize, Cancelled> {
 /// The field to put in, asked for: the file name, or a property of an object
 /// picked.
 fn ask_field(ed: &mut Editor) -> Result<DataField, Cancelled> {
-    let kind = Options::<String>::new("Field type")
+    let kind = Options::<String>::new(key!("Field type"))
         .keyword("Object property", "O")
         .keyword("Filename", "F")
         .default("Object property".to_owned());
@@ -96,7 +100,7 @@ fn ask_field(ed: &mut Editor) -> Result<DataField, Cancelled> {
         return Ok(DataField::file_name());
     }
     loop {
-        let Answer::Value(picked) = ed.ask_object(Options::new("Select object"))? else {
+        let Answer::Value(picked) = ed.ask_object(Options::new(key!("Select object")))? else {
             return Err(Cancelled);
         };
         let id = picked.id;
@@ -106,7 +110,7 @@ fn ask_field(ed: &mut Editor) -> Result<DataField, Cancelled> {
         let Some(first) = properties.first().copied() else {
             continue;
         };
-        let mut options = Options::<String>::new("Property").default(first.name().to_owned());
+        let mut options = Options::<String>::new(key!("Property")).default(first.name().to_owned());
         for p in &properties {
             options = options.keyword(p.name(), key(*p));
         }

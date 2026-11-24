@@ -7,6 +7,7 @@ use opendraft_commands::{
 use opendraft_core::block::block_draft::ObjectsAction;
 use opendraft_core::block::block_name_problem;
 use opendraft_core::{BlockDef, BlockId, Document, Entity, EntityId, Insert, Point};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -57,7 +58,7 @@ pub(crate) fn ask_block_name(
 /// redefining it, which updates every reference. One undo step.
 pub fn define_block(ed: &mut Editor) -> Result<(), Cancelled> {
     let (name, existing) = loop {
-        let name = match ask_block_name(ed, Options::new("Enter block name"))? {
+        let name = match ask_block_name(ed, Options::new(key!("Enter block name")))? {
             NameAnswer::Done => return Ok(()),
             NameAnswer::List => {
                 for line in ed.read(list_blocks)? {
@@ -77,16 +78,19 @@ pub fn define_block(ed: &mut Editor) -> Result<(), Cancelled> {
         let Some((id, shown)) = existing else {
             break (name, None);
         };
-        let question = Options::new(format!("Block \"{shown}\" already exists. Redefine it?"))
-            .keyword("Yes", "Y")
-            .keyword("No", "N")
-            .default("No".to_owned());
+        let question = Options::worded(
+            key!("Block \"%{name}\" already exists. Redefine it?"),
+            &[("name", &shown)],
+        )
+        .keyword("Yes", "Y")
+        .keyword("No", "N")
+        .default("No".to_owned());
         if ed.get_keyword(question)? == "Yes" {
             break (shown, Some(id));
         }
     };
-    let base = ed.get_point("Specify insertion base point")?;
-    let chosen = ed.pickset_or_select("Select objects")?;
+    let base = ed.get_point(key!("Specify insertion base point"))?;
+    let chosen = ed.pickset_or_select(key!("Select objects"))?;
     if chosen.is_empty() {
         ed.say("No objects selected; the block was not made.");
         return Ok(());
@@ -130,6 +134,14 @@ pub(crate) fn make_block(ed: &Editor, made: Made) -> Result<Option<BlockId>, Can
         description,
         unit,
     } = made;
+    if let Some(id) = existing {
+        if ed.read(move |doc| doc.block(id).is_some_and(|b| b.is_dynamic()))? {
+            ed.say(format!(
+                "Block \"{name}\" is a dynamic block: change it in the Block Editor (BEDIT)."
+            ));
+            return Ok(None);
+        }
+    }
     let redefining = existing.is_some();
     let label = name.clone();
     let result = ed.transaction("Block", move |tx| {

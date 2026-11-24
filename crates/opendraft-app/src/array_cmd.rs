@@ -125,7 +125,7 @@ pub(crate) fn edit_prompt(
     ghost: impl Fn(Point) -> Vec<Entity> + Send + Sync + 'static,
 ) -> Result<Option<String>, Cancelled> {
     // The command line lists the options after the message.
-    let mut options = PointOptions::new("Select grip to edit array").ghost(ghost);
+    let mut options = PointOptions::new(key!("Select grip to edit array")).ghost(ghost);
     for (label, key) in keywords {
         options = options.keyword(*label, *key);
     }

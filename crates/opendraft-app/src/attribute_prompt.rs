@@ -10,6 +10,7 @@ use opendraft_core::block::{AttributeReference, FieldText};
 use opendraft_core::BlockDef;
 
 use crate::defaults::EditorDefaults;
+use opendraft_ui::key;
 
 /// The references for a new insert of `block`.
 pub(crate) fn ask_values(
@@ -47,22 +48,25 @@ fn ask_value(
         &d.prompt
     };
     let shown = current.display();
-    let message = if shown.is_empty() {
-        format!("Enter attribute value {name}")
+    let options = if shown.is_empty() {
+        Options::<String>::worded(key!("Enter attribute value %{name}"), &[("name", name)])
     } else {
-        format!("Enter attribute value {name} <{shown}>")
+        Options::<String>::worded(
+            key!("Enter attribute value %{name} <%{value}>"),
+            &[("name", name), ("value", &shown)],
+        )
     };
-    Ok(match ed.ask_string(Options::<String>::new(message))? {
+    Ok(match ed.ask_string(options)? {
         Answer::Value(text) => FieldText::Literal(text),
         Answer::Enter | Answer::Keyword(_) => current.clone(),
     })
 }
 
 fn confirmed(ed: &Editor, value: &FieldText) -> Result<bool, Cancelled> {
-    let question = Options::<String>::new(format!(
-        "Verify attribute value \"{}\": is it correct?",
-        value.display()
-    ))
+    let question = Options::<String>::worded(
+        key!("Verify attribute value \"%{value}\": is it correct?"),
+        &[("value", &value.display())],
+    )
     .keyword("Yes", "Y")
     .keyword("No", "N")
     .default("Yes".to_owned());

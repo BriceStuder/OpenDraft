@@ -6,10 +6,12 @@ use std::sync::Arc;
 
 use opendraft_core::block::attribute_draft::{DefinitionDraft, EditorDraft};
 use opendraft_core::block::block_draft::BlockDraft;
-use opendraft_core::block::{DataField, FieldDraft};
+use opendraft_core::block::FieldDraft;
 use opendraft_core::{overkill, Entity, EntityId, MText, Point};
 
 pub use crate::answer::{Answer, NumberOrPoint, Picked, Swept};
+pub use crate::reply::{BlockDialogButton, Reply};
+pub use crate::wording::Wording;
 
 /// The user cancelled (Esc), or the command was abandoned. Commands pass it up
 /// with `?`; a cancelled transaction leaves no trace in the drawing.
@@ -77,6 +79,8 @@ pub enum DynamicDimensions {
 pub struct Options<T> {
     pub dynamic_dimensions: DynamicDimensions,
     pub message: String,
+    /// For a message with a value in it: its wording, to translate.
+    pub wording: Option<Wording>,
     pub keywords: Vec<Keyword>,
     /// Used when the user presses Enter with nothing typed.
     pub default: Option<T>,
@@ -126,6 +130,7 @@ impl<T> Options<T> {
         Self {
             dynamic_dimensions: DynamicDimensions::None,
             message: message.into(),
+            wording: None,
             keywords: Vec::new(),
             default: None,
             base: None,
@@ -308,6 +313,8 @@ pub struct Prompt {
     pub dynamic_dimensions: DynamicDimensions,
     pub wants: Wants,
     pub message: String,
+    /// See [`Options::wording`].
+    pub wording: Option<Wording>,
     pub keywords: Vec<Keyword>,
     pub base: Option<Point>,
     pub ghost: Option<Ghost>,
@@ -357,6 +364,7 @@ impl Prompt {
             dynamic_dimensions: options.dynamic_dimensions,
             wants,
             message: options.message.clone(),
+            wording: options.wording.clone(),
             keywords: options.keywords.clone(),
             base: options.base,
             ghost: options.ghost.clone(),
@@ -382,65 +390,4 @@ impl Prompt {
             field_dialog: None,
         }
     }
-}
-
-/// The button that closed the Block Definition dialog. The pick buttons hide
-/// it while the user picks in the drawing, and it opens again.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BlockDialogButton {
-    Ok,
-    PickPoint,
-    SelectObjects,
-}
-
-/// What the UI sends back.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Reply {
-    Point(Point),
-    Number(f64),
-    Text(String),
-    /// The text the editor was closed with.
-    MText(Box<MText>),
-    /// The settings the OVERKILL dialog was closed with.
-    Overkill(overkill::Settings),
-    /// The Attribute Definition dialog, accepted.
-    AttributeDefinition(Box<DefinitionDraft>),
-    /// The Attribute Editor: what it holds, and whether it is
-    /// closing (OK) or staying open (Apply).
-    AttributeEditor(Box<EditorDraft>, bool),
-    /// The Attribute Editor, closed to choose another block reference.
-    AttributeEditorSelect(Box<EditorDraft>),
-    /// The Attribute Editor, closed to choose a data field for a value.
-    AttributeEditorField(Box<EditorDraft>),
-    /// The Block Definition dialog, closed by a button.
-    BlockDialog(Box<BlockDraft>, BlockDialogButton),
-    /// The Field dialog, accepted: the field it made.
-    Field(Box<DataField>),
-    /// The Field dialog, closed to pick an object for an object field.
-    FieldPick(Box<FieldDraft>),
-    /// The label of a chosen keyword.
-    Keyword(String),
-    Selection(Vec<EntityId>),
-    /// An object clicked, where, and whether Shift was held.
-    Object {
-        id: EntityId,
-        at: Point,
-        shift: bool,
-    },
-    /// At a [`Options::sweep`] prompt: a click in empty space.
-    Missed {
-        at: Point,
-        shift: bool,
-    },
-    /// At a [`Options::sweep`] prompt: a path dragged from empty space.
-    Path {
-        points: Vec<Point>,
-        shift: bool,
-    },
-    /// Enter with nothing typed.
-    Enter,
-    Cancel,
-    /// Esc at a prompt that asked for [`Options::esc_backs`]: that ask fails
-    /// with `Cancelled`, and the command goes on.
-    Back,
 }

@@ -7,6 +7,7 @@
 
 use opendraft_canvas::{SnapKind, SnapOverride};
 use opendraft_core::{Entity, EntityId, Point};
+use opendraft_ui::i18n::tr;
 use opendraft_ui::key;
 
 /// The snaps a typed word names, by the full name (three letters or more of it
@@ -241,13 +242,13 @@ impl OneShot {
             return Some(key!("Specify the other point:"));
         }
         match self.chain? {
-            Chain::From(None) => Some("Base point:"),
-            Chain::From(Some(_)) => Some("<Offset>:"),
-            Chain::Mid(None) => Some("First point of mid:"),
-            Chain::Mid(Some(_)) => Some("Second point of mid:"),
+            Chain::From(None) => Some(key!("Base point:")),
+            Chain::From(Some(_)) => Some(key!("<Offset>:")),
+            Chain::Mid(None) => Some(key!("First point of mid:")),
+            Chain::Mid(Some(_)) => Some(key!("Second point of mid:")),
             Chain::Temp => Some(key!("Specify temporary tracking point:")),
-            Chain::Track(None) => Some("First tracking point:"),
-            Chain::Track(Some(_)) => Some("Next point (Enter to end tracking):"),
+            Chain::Track(None) => Some(key!("First tracking point:")),
+            Chain::Track(Some(_)) => Some(key!("Next point (Enter to end tracking):")),
         }
     }
 
@@ -256,7 +257,11 @@ impl OneShot {
         let deferred = self.deferred.map(|d| format!("[Deferred {:?}]", d.kind));
         match (self.asking(), &self.over) {
             (Some(ask), _) => {
-                Some(deferred.map_or_else(|| ask.to_owned(), |d| format!("{d} {ask}")))
+                let ask = tr(ask);
+                Some(match deferred {
+                    Some(d) => format!("{d} {ask}"),
+                    None => ask.into_owned(),
+                })
             }
             (None, Some(over)) => Some(format!("[{}]", over.label())),
             _ => None,
@@ -278,15 +283,15 @@ impl OneShot {
             }
             Some(Chain::Track(_)) => {
                 self.chain = Some(Chain::Track(Some(at)));
-                Step::Consumed("Next point (Enter to end tracking):")
+                Step::Consumed(key!("Next point (Enter to end tracking):"))
             }
             Some(Chain::From(None)) => {
                 self.chain = Some(Chain::From(Some(at)));
-                Step::Consumed("<Offset>:")
+                Step::Consumed(key!("<Offset>:"))
             }
             Some(Chain::Mid(None)) => {
                 self.chain = Some(Chain::Mid(Some(at)));
-                Step::Consumed("Second point of mid:")
+                Step::Consumed(key!("Second point of mid:"))
             }
             Some(Chain::From(Some(_))) => {
                 self.chain = None;

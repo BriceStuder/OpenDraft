@@ -4,6 +4,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options};
 use opendraft_core::{AngleFormat, Arrow, DimStyle, Entity, EntityId, LengthFormat};
+use opendraft_ui::key;
 
 use crate::text::plural;
 
@@ -224,29 +225,29 @@ pub fn dim_override(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut changes: Vec<(String, String)> = Vec::new();
     let mut scratch = ed.read(|doc| doc.dim_style().clone())?;
     loop {
-        let options = Options::<String>::new("Enter dimension variable name to override")
+        let options = Options::<String>::new(key!("Enter dimension variable name to override"))
             .keyword("Clear overrides", "C")
             .allow_empty();
         match ed.ask_string(options)? {
             Answer::Keyword(_) => {
-                let ids = ed.pickset_or_select("Select objects")?;
+                let ids = ed.pickset_or_select(key!("Select objects"))?;
                 let ids = dimensions_in(ed, ids)?;
                 return restyle(ed, ids, |own, named| {
                     named.cloned().unwrap_or_else(|| own.clone())
                 });
             }
             Answer::Value(name) if name.trim().eq_ignore_ascii_case("C") => {
-                let ids = ed.pickset_or_select("Select objects")?;
+                let ids = ed.pickset_or_select(key!("Select objects"))?;
                 let ids = dimensions_in(ed, ids)?;
                 return restyle(ed, ids, |own, named| {
                     named.cloned().unwrap_or_else(|| own.clone())
                 });
             }
             Answer::Value(name) => {
-                let value = match ed.ask_string(Options::<String>::new(format!(
-                    "Enter new value for dimension variable {}",
-                    name.trim().to_ascii_uppercase()
-                )))? {
+                let value = match ed.ask_string(Options::<String>::worded(
+                    key!("Enter new value for dimension variable %{name}"),
+                    &[("name", &name.trim().to_ascii_uppercase())],
+                ))? {
                     Answer::Value(v) => v,
                     _ => continue,
                 };
@@ -261,7 +262,7 @@ pub fn dim_override(ed: &mut Editor) -> Result<(), Cancelled> {
     if changes.is_empty() {
         return Ok(());
     }
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let ids = dimensions_in(ed, ids)?;
     restyle(ed, ids, move |own, _| {
         let mut style = own.clone();
@@ -275,7 +276,7 @@ pub fn dim_override(ed: &mut Editor) -> Result<(), Cancelled> {
 /// `-DIMSTYLE` Apply: the selected dimensions take the current style.
 pub fn dim_update(ed: &mut Editor) -> Result<(), Cancelled> {
     let current = ed.read(|doc| doc.dim_style().clone())?;
-    let ids = ed.pickset_or_select("Select objects")?;
+    let ids = ed.pickset_or_select(key!("Select objects"))?;
     let ids = dimensions_in(ed, ids)?;
     restyle(ed, ids, move |_, _| current.clone())
 }

@@ -115,7 +115,11 @@ impl Document {
             ccs_previous: Vec::new(),
             ..self.clone_tables()
         };
-        doc.block_editor_dynamic = block.dynamic.as_deref().cloned();
+        // The schema moves with the geometry, to the origin.
+        doc.block_editor_dynamic = block
+            .dynamic
+            .as_deref()
+            .map(|d| d.translated(-block.base.x, -block.base.y));
         for e in &block.entities {
             let entity = e.entity.translated(-block.base.x, -block.base.y);
             // An object keeps its block id as its id here, and BSAVE reads it

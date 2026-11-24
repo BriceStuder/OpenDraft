@@ -7,6 +7,7 @@
 use opendraft_commands::{Answer, Cancelled, Editor, FieldAnswer, Options, Picked};
 use opendraft_core::block::{DataField, FieldDraft, ObjectChoice};
 use opendraft_core::{Entity, MText};
+use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::add;
@@ -16,7 +17,7 @@ use crate::field_cmd::field_context;
 /// out with Esc, which returns to the dialog.
 fn pick_object(ed: &mut Editor) -> Result<Option<ObjectChoice>, Cancelled> {
     loop {
-        let ask = Options::<Picked>::new("Select object for field").esc_backs();
+        let ask = Options::<Picked>::new(key!("Select object for field")).esc_backs();
         let Ok(Answer::Value(picked)) = ed.ask_object(ask) else {
             return Ok(None);
         };
@@ -47,7 +48,7 @@ pub(crate) fn choose_field(ed: &mut Editor) -> Result<DataField, Cancelled> {
 
 pub fn insert_field_dialog(ed: &mut Editor) -> Result<(), Cancelled> {
     let field = choose_field(ed)?;
-    let at = ed.get_point("Specify start point of multiline text")?;
+    let at = ed.get_point(key!("Specify start point of multiline text"))?;
     let context = field_context(ed);
     let field = ed.read(move |doc| field.evaluated(doc, &context))?;
     let style = ed.read(|doc| doc.current_text_style())?;

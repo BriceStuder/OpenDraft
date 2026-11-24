@@ -3,6 +3,7 @@
 
 use opendraft_commands::{Cancelled, Editor, PointOptions};
 use opendraft_core::{Dimension, Entity, Point};
+use opendraft_ui::key;
 
 use crate::dimension_cmd::{pick, style};
 use crate::draw::add;
@@ -14,7 +15,7 @@ fn midway(a: Point, b: Point) -> Point {
 pub fn dim_jogged(ed: &mut Editor) -> Result<(), Cancelled> {
     let style = style(ed)?;
     let (center, radius, near) = loop {
-        let Some((picked, entity)) = pick(ed, "Select arc or circle")? else {
+        let Some((picked, entity)) = pick(ed, key!("Select arc or circle"))? else {
             return Err(Cancelled);
         };
         match entity {
@@ -24,7 +25,7 @@ pub fn dim_jogged(ed: &mut Editor) -> Result<(), Cancelled> {
             _ => ed.say("Select an arc or a circle."),
         }
     };
-    let shown = ed.get_point(PointOptions::new("Specify center location override"))?;
+    let shown = ed.get_point(PointOptions::new(key!("Specify center location override")))?;
     // The point of the circle the dimension touches: where the user picked.
     let (dx, dy) = (near.x - center.x, near.y - center.y);
     let length = dx.hypot(dy);
@@ -38,7 +39,7 @@ pub fn dim_jogged(ed: &mut Editor) -> Result<(), Cancelled> {
     );
     let text_style = style.clone();
     let text_at = ed.get_point(
-        PointOptions::new("Specify dimension line location")
+        PointOptions::new(key!("Specify dimension line location"))
             .base(shown)
             .ghost(move |at| {
                 let mut d =
@@ -48,13 +49,15 @@ pub fn dim_jogged(ed: &mut Editor) -> Result<(), Cancelled> {
             }),
     )?;
     let ghost_style = style.clone();
-    let jog = ed.get_point(PointOptions::new("Specify jog location").base(chord).ghost(
-        move |at| {
-            let mut d = Dimension::jogged(center, chord, shown, at, &ghost_style);
-            d.text_pos = Some(text_at);
-            vec![Entity::Dimension(Box::new(d))]
-        },
-    ))?;
+    let jog = ed.get_point(
+        PointOptions::new(key!("Specify jog location"))
+            .base(chord)
+            .ghost(move |at| {
+                let mut d = Dimension::jogged(center, chord, shown, at, &ghost_style);
+                d.text_pos = Some(text_at);
+                vec![Entity::Dimension(Box::new(d))]
+            }),
+    )?;
     let mut dimension = Dimension::jogged(center, chord, shown, jog, &style);
     dimension.text_pos = Some(text_at);
     if dimension.picture().is_empty() {

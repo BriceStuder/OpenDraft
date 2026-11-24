@@ -8,6 +8,7 @@ use std::sync::Arc;
 use opendraft_commands::{Cancelled, Editor, PointOptions};
 use opendraft_core::dimension::{lines_angle_points, object_ends};
 use opendraft_core::{Dimension, Entity, Point};
+use opendraft_ui::key;
 
 use crate::dimension_cmd::{pick, place, style, Make};
 
@@ -29,7 +30,8 @@ fn angle(from: Point, to: Point) -> f64 {
 /// Pick what to dimension; `None` when the user chose to give three points.
 fn rays(ed: &mut Editor) -> Result<Rays, Cancelled> {
     loop {
-        let Some((picked, entity)) = pick(ed, "Select arc, circle, line, or <specify vertex>")?
+        let Some((picked, entity)) =
+            pick(ed, key!("Select arc, circle, line, or <specify vertex>"))?
         else {
             return three_points(ed);
         };
@@ -50,8 +52,9 @@ fn rays(ed: &mut Editor) -> Result<Rays, Cancelled> {
                 });
             }
             Entity::Circle { center, .. } => {
-                let second =
-                    ed.get_point(PointOptions::new("Specify second angle endpoint").base(center))?;
+                let second = ed.get_point(
+                    PointOptions::new(key!("Specify second angle endpoint")).base(center),
+                )?;
                 return Ok(Rays {
                     vertex: center,
                     p1: picked.at,
@@ -73,7 +76,7 @@ fn rays(ed: &mut Editor) -> Result<Rays, Cancelled> {
 
 fn second_line(ed: &mut Editor, first: (Point, Point)) -> Result<Rays, Cancelled> {
     loop {
-        let Some((picked, entity)) = pick(ed, "Select second line")? else {
+        let Some((picked, entity)) = pick(ed, key!("Select second line"))? else {
             return Err(Cancelled);
         };
         let Some(second) = object_ends(&entity, picked.at) else {
@@ -96,9 +99,9 @@ fn second_line(ed: &mut Editor, first: (Point, Point)) -> Result<Rays, Cancelled
 }
 
 fn three_points(ed: &mut Editor) -> Result<Rays, Cancelled> {
-    let vertex = ed.get_point(PointOptions::new("Specify angle vertex"))?;
-    let p1 = ed.get_point(PointOptions::new("Specify first angle endpoint").base(vertex))?;
-    let p2 = ed.get_point(PointOptions::new("Specify second angle endpoint").base(vertex))?;
+    let vertex = ed.get_point(PointOptions::new(key!("Specify angle vertex")))?;
+    let p1 = ed.get_point(PointOptions::new(key!("Specify first angle endpoint")).base(vertex))?;
+    let p2 = ed.get_point(PointOptions::new(key!("Specify second angle endpoint")).base(vertex))?;
     Ok(Rays {
         vertex,
         p1,
@@ -136,7 +139,7 @@ pub fn dim_angular(ed: &mut Editor) -> Result<(), Cancelled> {
     let sample = Point::new((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
     place(
         ed,
-        "Specify dimension arc line location",
+        key!("Specify dimension arc line location"),
         &[("Text", "T")],
         sample,
         make,
