@@ -114,7 +114,11 @@ fn ghost_dimensions(
             if cx.units.units.clockwise { 1.0 } else { -1.0 },
         ),
         [Field::Distance] => dimensions::linear(base, end),
-        [Field::X, Field::Y] if relative => dimensions::cartesian(base, end),
+        // A box centred on the base is measured from its opposite corner.
+        [Field::X, Field::Y] if relative => match cx.ask.dynamic_dimensions {
+            DynamicDimensions::Centred => dimensions::cartesian(base + (base - end), end),
+            _ => dimensions::cartesian(base, end),
+        },
         _ => None,
     }
 }
