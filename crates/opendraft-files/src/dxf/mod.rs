@@ -22,6 +22,15 @@ use opendraft_core::Document;
 
 use crate::{Encoded, FileError, FileFormat, Loaded};
 
+/// The dynamic blocks a DXF holds, read into plain values (not yet used to
+/// build blocks).
+pub mod dynamic {
+    pub use super::read::dynamic::{
+        dynamic_blocks, Action, Column, DynamicBlocks, DynamicDefinition, DynamicInstance, Node,
+        NodeKind, NodeState, Parameter, Table,
+    };
+}
+
 pub struct DxfFormat;
 
 /// The largest DXF read, as for DWG: the reader holds the whole file and
