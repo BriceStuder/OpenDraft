@@ -294,7 +294,8 @@ plus a field on `CommandDefaults`. The one remaining global is
 **Status.** Every interactive command is written this way: Move, Copy, Rotate,
 Mirror (`opendraft-app/src/modify.rs`), Scale and Rotate with Copy and Reference
 (`scale_rotate.rs`), Line (`draw.rs`), Circle (`circle.rs`), Arc (`arc_cmd.rs`),
-Rectangle (`rectangle.rs`, settings in `rect_memory.rs`), Polyline
+Rectangle (`rectangle.rs`, settings in `rect_memory.rs`; from the centre, by
+three points and the oblongs in `rect_variants.rs`), Polyline
 (`polyline_cmd.rs`, arc options in `polyline_arc.rs`), the window polygon, crossing polygon and fence
 selections (`selection.rs`), Trim and Extend (`edges.rs`), Offset
 (`offset.rs`), Fillet and Chamfer (`corners.rs`, settings in
@@ -1086,7 +1087,23 @@ centre or on an edge, for POLYGON), `array` (where array items go:
   corrects each answer by Newton steps until it touches the real curves,
   an elliptical arc counting as its whole ellipse and a spline only as
   itself) and `rect` (a rectangle at an angle with rounded or
-  bevelled corners and a width, as a plain `Rectangle` when it can be).
+  bevelled corners and a width, as a plain `Rectangle` when it can be; also
+  placed from its centre, `rect::centred`, or by three points,
+  `rect::by_three_points`) and `oblong` (a slot: two half circles of the
+  same radius joined by straight sides, as a closed polyline of four
+  vertices, from the centres of its ends and its width).
+- **Rectangle and oblong types.** The Draw panel's Rectangle list also has
+  Rectangle, Center (`draw.rectangle_center`, alias RC), Rectangle, 3-Point
+  (`draw.rectangle_3p`, R3), Oblong, Center (`draw.oblong_center`, OC) and
+  Oblong, 2-Point (`draw.oblong_2p`, O2); AutoCAD has none of them. The two
+  rectangles take RECTANGLE's remembered corners and line width and its
+  Chamfer/Fillet/Width options at their first prompt; from the centre, Area,
+  Dimensions (full sizes) and Rotation (about the centre) work as in
+  RECTANGLE. By three points, the third is a point on the opposite side or a
+  typed height (positive on the left of the first side). An oblong is given
+  by the centres of its two ends (or its centre and one end's centre, the
+  other end mirrored), then its width, typed or as a point on a side. Oblongs
+  are hairline and take no options.
 - **Results are lists of entities.** A trim, split or join returns the
   entities that replace the old one; the first keeps the object's id and draw
   order, the rest are new objects with the same attributes.

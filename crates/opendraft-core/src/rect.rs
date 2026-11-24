@@ -115,6 +115,33 @@ fn cut_corners(square: &[Point; 4], corners: Corners, left: bool) -> (Vec<Point>
     (points, bulges)
 }
 
+/// The corner and sides, as [`outline`] takes them, of the rectangle centred
+/// on `centre`, turned `angle` radians, with a corner `half.0` along its own x
+/// axis and `half.1` along its y axis from the centre.
+pub fn centred(centre: Point, angle: f64, half: (f64, f64)) -> (Point, f64, f64) {
+    let (u, v) = ((angle.cos(), angle.sin()), (-angle.sin(), angle.cos()));
+    let origin = Point::new(
+        centre.x - u.0 * half.0 - v.0 * half.1,
+        centre.y - u.1 * half.0 - v.1 * half.1,
+    );
+    (origin, 2.0 * half.0, 2.0 * half.1)
+}
+
+/// The angle and the two sides, as [`outline`] takes them from `first`, of
+/// the rectangle with one side from `first` to `second` and the opposite side
+/// through `third`: its height is positive when `third` lies on the left of
+/// the first side. `None` when the first two points are the same.
+pub fn by_three_points(first: Point, second: Point, third: Point) -> Option<(f64, f64, f64)> {
+    let (dx, dy) = (second.x - first.x, second.y - first.y);
+    let length = dx.hypot(dy);
+    if !(length > 0.0) {
+        return None;
+    }
+    let (tx, ty) = (third.x - first.x, third.y - first.y);
+    let height = (dx * ty - dy * tx) / length;
+    Some((dy.atan2(dx), length, height))
+}
+
 #[cfg(test)]
 mod tests {
     use std::f64::consts::FRAC_PI_2;
@@ -250,5 +277,26 @@ mod tests {
             plain,
             "a bevel with no depth"
         );
+    }
+
+    #[test]
+    fn a_centred_rectangle_reaches_as_far_on_each_side_of_its_centre() {
+        let (origin, dx, dy) = centred(p(5.0, 5.0), 0.0, (3.0, -2.0));
+        assert!(near(origin, p(2.0, 7.0)));
+        assert_eq!((dx, dy), (6.0, -4.0));
+        let (origin, dx, dy) = centred(p(0.0, 0.0), FRAC_PI_2, (3.0, 2.0));
+        assert!(near(origin, p(2.0, -3.0)), "{origin:?}");
+        assert_eq!((dx, dy), (6.0, 4.0));
+    }
+
+    #[test]
+    fn three_points_give_the_first_side_and_the_height_across_it() {
+        let (angle, length, height) =
+            by_three_points(p(1.0, 1.0), p(1.0, 5.0), p(-2.0, 9.0)).unwrap();
+        assert!((angle - FRAC_PI_2).abs() < 1e-12);
+        assert_eq!((length, height), (4.0, 3.0), "on the left: positive");
+        let (_, _, below) = by_three_points(p(0.0, 0.0), p(4.0, 0.0), p(1.0, -2.0)).unwrap();
+        assert_eq!(below, -2.0);
+        assert_eq!(by_three_points(p(1.0, 1.0), p(1.0, 1.0), p(3.0, 3.0)), None);
     }
 }
