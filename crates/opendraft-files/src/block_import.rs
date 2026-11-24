@@ -11,7 +11,9 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
 
-use opendraft_core::block::{block_name_problem, AttributeReference, MAX_NESTING};
+use opendraft_core::block::{
+    block_name_problem, AttributeReference, DynamicBlock, DynamicValue, ParameterId, MAX_NESTING,
+};
 use opendraft_core::{
     Attributes, BlockDef, BlockEntity, BlockId, BlockObjectId, Document, Entity, Insert, Point,
 };
@@ -29,6 +31,8 @@ pub(crate) struct PendingInsert<K> {
     pub rotation: f64,
     /// The attributes it held, placed in the drawing (file coordinates).
     pub attributes: Vec<AttributeReference>,
+    /// Distances of the block's linear parameters this reference changes.
+    pub dynamic: Vec<(ParameterId, f64)>,
 }
 
 /// Gives `insert` its attributes, brought from the drawing into the block's
@@ -80,6 +84,9 @@ pub(crate) struct PendingBlock<K> {
     pub description: String,
     pub unit: opendraft_core::InsertUnits,
     pub items: Vec<(Item<K>, Attributes)>,
+    /// The block's parameters and actions, its objects named by their
+    /// position in `items`. Dropped when an object an action needs is gone.
+    pub dynamic: Option<Box<DynamicBlock>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -101,6 +108,10 @@ pub(crate) struct ImportedBlocks<K> {
     missing: usize,
     /// References with a zero or non-finite scale, position or rotation.
     invalid: usize,
+    /// Dynamic blocks whose parameters and actions could not be kept.
+    dynamic_refused: usize,
+    /// References whose changed values the block's parameters do not allow.
+    dynamic_unfit: usize,
 }
 
 impl<K> Default for ImportedBlocks<K> {
@@ -111,6 +122,8 @@ impl<K> Default for ImportedBlocks<K> {
             looped: 0,
             missing: 0,
             invalid: 0,
+            dynamic_refused: 0,
+            dynamic_unfit: 0,
         }
     }
 }
@@ -227,12 +240,39 @@ impl<K: Clone + Eq + Hash> ImportedBlocks<K> {
             attributes: Vec::new(),
             dynamic: None,
         };
-        let mut insert = insert;
+        let mut insert = self.with_values(insert, &p.dynamic);
         if insert.is_valid() && attach_attributes(&mut insert, &p.attributes) {
             Some(Entity::Insert(Box::new(insert)))
         } else {
             self.invalid += 1;
             None
+        }
+    }
+
+    /// `insert` with the parameter values a modified reference had, each
+    /// brought into what its parameter allows.
+    fn with_values(&mut self, insert: Insert, values: &[(ParameterId, f64)]) -> Insert {
+        let mut out = insert.clone();
+        for (parameter, distance) in values {
+            match out.with_dynamic_value(*parameter, DynamicValue::Distance(*distance)) {
+                Some(next) => out = next,
+                None => {
+                    self.dynamic_unfit += 1;
+                    return insert;
+                }
+            }
+        }
+        let fitted = out
+            .dynamic
+            .as_deref()
+            .zip(out.block.dynamic.as_deref())
+            .map(|(state, schema)| schema.fit_state(state));
+        match fitted {
+            Some(state) => Insert {
+                dynamic: state.map(Box::new),
+                ..out
+            },
+            None => out,
         }
     }
 
@@ -263,6 +303,18 @@ impl<K: Clone + Eq + Hash> ImportedBlocks<K> {
                 plural(self.invalid as u64, "block reference")
             ));
         }
+        if self.dynamic_refused > 0 {
+            out.push(format!(
+                "Kept {} as ordinary: the parameters and actions did not read as a valid dynamic block.",
+                plural(self.dynamic_refused as u64, "block")
+            ));
+        }
+        if self.dynamic_unfit > 0 {
+            out.push(format!(
+                "Placed {} at the block's defaults: their values did not fit its parameters.",
+                plural(self.dynamic_unfit as u64, "dynamic block reference")
+            ));
+        }
         out
     }
 }
@@ -287,16 +339,22 @@ impl<K: Clone + Eq + Hash> Builder<'_, K> {
         let pending = self.pending;
         let p = &pending[i];
         let mut entities = Vec::with_capacity(p.items.len());
-        for (item, attrs) in &p.items {
+        for (index, (item, attrs)) in p.items.iter().enumerate() {
             let entity = match item {
                 Item::Entity(e) => Some(e.clone()),
                 Item::Insert(insert) => self.nested(insert, depth),
             };
             if let Some(entity) = entity {
-                let id = BlockObjectId(entities.len() as u64);
+                // An object keeps its place in the file's list as its id, which
+                // is what a dynamic block's actions name.
+                let id = BlockObjectId(index as u64);
                 entities.push(BlockEntity::new(id, entity, attrs.clone()));
             }
         }
+        let dynamic = p
+            .dynamic
+            .as_deref()
+            .and_then(|schema| self.kept(schema, &entities));
         let def = BlockDef {
             unit: p.unit,
             id: self.ids[i],
@@ -304,10 +362,26 @@ impl<K: Clone + Eq + Hash> Builder<'_, K> {
             base: p.base,
             description: p.description.clone(),
             entities,
-            dynamic: None,
+            dynamic,
         };
         self.blocks.built.insert(p.key.clone(), Arc::new(def));
         self.states[i] = None;
+    }
+
+    /// The schema without objects that did not come across, or `None`
+    /// (counted) when no action is left or what is left does not check.
+    fn kept(
+        &mut self,
+        schema: &DynamicBlock,
+        entities: &[BlockEntity],
+    ) -> Option<Box<DynamicBlock>> {
+        let ids: std::collections::HashSet<_> = entities.iter().map(|e| e.id).collect();
+        let schema = schema.pruned(|o| ids.contains(&o)).schema;
+        if schema.actions.is_empty() || schema.check(&ids).is_err() {
+            self.blocks.dynamic_refused += 1;
+            return None;
+        }
+        Some(Box::new(schema))
     }
 
     fn nested(&mut self, insert: &PendingInsert<K>, depth: usize) -> Option<Entity> {
@@ -355,6 +429,7 @@ mod tests {
             scale_y: 1.0,
             rotation: 0.0,
             attributes: Vec::new(),
+            dynamic: Vec::new(),
         };
         (Item::Insert(i), Attributes::on_layer(LayerId::DEFAULT))
     }
@@ -370,6 +445,7 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             items,
+            dynamic: None,
         }
     }
 
@@ -396,6 +472,7 @@ mod tests {
             scale_y: 2.0,
             rotation: 0.0,
             attributes: Vec::new(),
+            dynamic: Vec::new(),
         });
         doc.add(entity.unwrap());
         doc.validate().unwrap();
@@ -424,6 +501,7 @@ mod tests {
                 scale_y: 1.0,
                 rotation: 0.0,
                 attributes: Vec::new(),
+                dynamic: Vec::new(),
             })
             .is_none());
         assert_eq!(

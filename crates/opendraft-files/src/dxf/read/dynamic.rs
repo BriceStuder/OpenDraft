@@ -8,8 +8,7 @@
 //! Autodesk does not publish these objects: this is read from AutoCAD's own
 //! files (see `docs/ARCHITECTURE.md`, "Dynamic blocks in DXF") and not yet
 //! checked against AutoCAD. The result describes the file and knows nothing
-//! of the drawing; the importer only reports it, and a later step maps it onto
-//! a dynamic block model. Only what was read is decoded: linear, polar and
+//! of the drawing; `blocks/dynamic_import` maps it onto dynamic blocks. Only what was read is decoded: linear, polar and
 //! lookup parameters, stretch, polar stretch, move, scale and lookup actions
 //! and grips. Anything else is kept by its object name in [`NodeKind::Other`].
 
@@ -131,26 +130,6 @@ pub enum NodeState {
 /// Reads the dynamic blocks of a DXF file.
 pub fn dynamic_blocks(bytes: &[u8]) -> Result<DynamicBlocks, FileError> {
     Ok(decode(&super::records(bytes)?))
-}
-
-impl DynamicBlocks {
-    /// What the import tells the user about definitions it kept only as
-    /// pictures; none when the file has no dynamic block.
-    pub fn warning(&self) -> Option<String> {
-        let names: Vec<&str> = self.definitions.iter().map(|d| d.name.as_str()).collect();
-        let first: Vec<&str> = names.iter().copied().take(5).collect();
-        let more = match names.len() - first.len() {
-            0 => String::new(),
-            n => format!(" and {n} more"),
-        };
-        (!names.is_empty()).then(|| {
-            format!(
-                "Kept the default picture of {}: {}{more}. Their parameters and actions were not imported.",
-                crate::plural(names.len() as u64, "dynamic block"),
-                first.join(", ")
-            )
-        })
-    }
 }
 
 /// Everything of the file looked up by handle.
@@ -402,4 +381,4 @@ fn points(record: &Record, x: i32, y: i32) -> Vec<Point> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::dxf::read) mod tests;

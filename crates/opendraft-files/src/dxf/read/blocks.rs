@@ -12,6 +12,9 @@ use std::collections::{HashMap, HashSet};
 use opendraft_core::block::AttributeReference;
 use opendraft_core::{Entity, Point};
 
+mod dynamic_import;
+
+use self::dynamic_import::Plan;
 use super::layouts::Spaces;
 use super::polyline::Vertex;
 use super::{decode, Importer, Record};
@@ -28,6 +31,10 @@ enum Unread {
 pub(super) struct BlockReading {
     /// The objects of the definition being read, while one is.
     collecting: Option<Vec<(Item<String>, opendraft_core::Attributes)>>,
+    /// The DXF handle of each of those objects, in the same order.
+    handles: Vec<Option<String>>,
+    /// What the file's dynamic blocks come to.
+    plan: Plan,
     built: ImportedBlocks<String>,
     /// Blocks in the file that are not read, by lower-cased name.
     unread: HashMap<String, Unread>,
@@ -68,6 +75,7 @@ impl BlockReading {
     pub(super) fn warnings(&self) -> Vec<String> {
         let mut out = self.built.warnings();
         out.extend(self.attributes.warnings());
+        out.extend(self.plan.warnings());
         if self.anonymous_references > 0 {
             out.push(block_import::anonymous_references(
                 self.anonymous_references,
@@ -129,15 +137,18 @@ impl Importer {
                             description: decode(record.text(4).unwrap_or("")),
                             unit,
                             items: Vec::new(),
+                            dynamic: None,
                         };
                         current = Some((block, anonymous));
                         self.blocks.collecting = Some(Vec::new());
+                        self.blocks.handles.clear();
                     }
                 }
                 "ENDBLK" => {
                     self.drop_open_insert();
                     if let Some((mut block, anonymous)) = current.take() {
                         block.items = self.blocks.collecting.take().unwrap_or_default();
+                        block.dynamic = self.blocks.plan.schema(&block.key, &self.blocks.handles);
                         pending.push((block, anonymous));
                     }
                 }
@@ -166,7 +177,10 @@ impl Importer {
         let mut kept = Vec::new();
         for (mut block, anonymous) in blocks {
             if anonymous {
-                if !inserted.contains(&block.key) {
+                // A modified dynamic block's picture is not needed once its
+                // references are rebuilt from the definition.
+                if !inserted.contains(&block.key) || self.blocks.plan.instance(&block.key).is_some()
+                {
                     continue;
                 }
                 block.name = block_import::anonymous_name(&block.name, &mut taken);
@@ -211,15 +225,26 @@ impl Importer {
             self.damaged += 1;
             return;
         };
+        let key = decode(record.text(2).unwrap_or("")).to_lowercase();
+        let (block, dynamic) = match self.blocks.plan.instance(&key) {
+            Some(m) => (m.definition.clone(), m.values.clone()),
+            None => (key, Vec::new()),
+        };
         let insert = PendingInsert {
-            block: decode(record.text(2).unwrap_or("")).to_lowercase(),
+            block,
             insertion,
             scale_x: record.number(41).unwrap_or(1.0),
             scale_y: record.number(42).unwrap_or(1.0),
             rotation: record.number(50).unwrap_or(0.0).to_radians(),
             attributes,
+            dynamic,
         };
         self.add_item(record, Item::Insert(insert));
+    }
+
+    /// Decodes the file's dynamic blocks, before any block is read.
+    pub(super) fn scan_dynamic(&mut self, records: &[Record]) {
+        self.blocks.plan = Plan::scan(records);
     }
 
     /// Whether a block definition is being read (its objects go to it).
@@ -238,6 +263,7 @@ impl Importer {
         let attrs = self.attributes(record);
         if let Some(items) = self.blocks.collecting.as_mut() {
             items.push((item, attrs));
+            self.blocks.handles.push(record.text(5).map(str::to_owned));
             self.imported += 1;
             return;
         }

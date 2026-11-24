@@ -46,7 +46,7 @@ fn edge(number: &str, from: &str, to: &str) -> Vec<(i32, String)> {
 }
 
 /// The records of the file, in section order.
-fn file() -> Vec<Record> {
+pub(in crate::dxf::read) fn file() -> Vec<Record> {
     let mut graph = vec![
         (5, "G1".to_owned()),
         (100, "AcDbEvalGraph".to_owned()),
@@ -355,29 +355,6 @@ fn a_file_without_dynamic_blocks_has_none_and_no_warning() {
     let records = [rec("SECTION", &[(2, "ENTITIES")]), rec("LINE", &[(5, "1")])];
     let found = decode(&records);
     assert_eq!(found, DynamicBlocks::default());
-    assert_eq!(found.warning(), None);
-}
-
-#[test]
-fn the_warning_names_the_definitions_kept_as_pictures() {
-    let found = decoded();
-    assert_eq!(
-        found.warning().as_deref(),
-        Some("Kept the default picture of 1 dynamic block: Slide. Their parameters and actions were not imported.")
-    );
-    let mut many = DynamicBlocks::default();
-    for i in 0..7 {
-        many.definitions.push(DynamicDefinition {
-            name: format!("B{i}"),
-            nodes: Vec::new(),
-            links: Vec::new(),
-        });
-    }
-    let text = many.warning().unwrap();
-    assert!(
-        text.contains("7 dynamic blocks: B0, B1, B2, B3, B4 and 2 more."),
-        "{text}"
-    );
 }
 
 #[test]
@@ -423,27 +400,4 @@ fn a_table_that_does_not_add_up_is_kept_as_an_unread_object() {
         panic!("a linear parameter");
     };
     assert!(distance.values.is_empty());
-}
-
-#[test]
-fn reading_a_dxf_adds_the_warning() {
-    let mut text = String::new();
-    for record in file() {
-        text.push_str(&format!("0\r\n{}\r\n", record.name));
-        for g in &record.groups {
-            text.push_str(&format!("{}\r\n{}\r\n", g.code, g.value));
-        }
-    }
-    text.push_str("0\r\nEOF\r\n");
-    let found = dynamic_blocks(text.as_bytes()).unwrap();
-    assert_eq!(found.definitions.len(), 1);
-    let loaded = super::super::read(text.as_bytes()).unwrap();
-    assert!(
-        loaded
-            .warnings
-            .iter()
-            .any(|w| w.starts_with("Kept the default picture of 1 dynamic block: Slide.")),
-        "{:?}",
-        loaded.warnings
-    );
 }

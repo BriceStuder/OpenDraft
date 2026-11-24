@@ -230,6 +230,7 @@ fn item(shape: &Shape, styles: &Styles) -> Result<Item<DwgHandle>, Refused> {
                     .iter()
                     .filter_map(|a| attribute::reference(a, styles))
                     .collect(),
+                dynamic: Vec::new(),
             }));
         }
         Shape::AttributeDefinition { .. } => {
@@ -408,6 +409,7 @@ pub(super) fn to_document(
             base: point(b.base),
             description: b.description.clone(),
             items,
+            dynamic: None,
         });
     }
     let mut blocks = ImportedBlocks::build(&mut document, pending);

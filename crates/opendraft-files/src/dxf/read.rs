@@ -331,6 +331,7 @@ pub fn read(bytes: &[u8]) -> Result<Loaded, FileError> {
     let mut importer = Importer::new();
     let mut spaces = layouts::Spaces::scan(&records, &mut importer.document);
     importer.scan_styles(&records);
+    importer.scan_dynamic(&records);
     let mut section = String::new();
     let mut table = String::new();
     // The block being read in BLOCKS (only a sheet's own is of interest).
@@ -388,7 +389,6 @@ pub fn read(bytes: &[u8]) -> Result<Loaded, FileError> {
     importer.resolve_leaders();
     importer.resolve_linetypes();
     let mut warnings = importer.warnings();
-    warnings.extend(dynamic::decode(&records).warning());
     warnings.extend(spaces.warnings());
     spaces.finish(&mut importer);
     importer.document.finish_bulk_load();
