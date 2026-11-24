@@ -42,6 +42,7 @@ pub mod measure;
 pub mod mleader;
 pub mod mtext;
 pub mod name_order;
+pub mod oblong;
 mod offset;
 pub mod ortho;
 pub mod outline;

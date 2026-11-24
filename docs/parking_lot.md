@@ -99,7 +99,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Layer tools: LAYISO and LAYUNISO, Layer States, LAYFRZ's Settings (it freezes in every viewport), LAYOFF and LAYLCK without asking; a filter or search in the Layers panel.
 - The layer plot flag (AutoCAD's Plot / No Plot column, DXF group 290): not kept, so a non-plotting layer read from a file is plotted and is written back as plotted (only Defpoints is written not plotted). Objects on Defpoints are plotted too, though AutoCAD never plots them.
 - Properties panel parity with AutoCAD, kind by kind: `private_material/properties_gap.md`.
-- Rectangular polylines: rounded or bevelled corners (a radius or chamfer row) are not recognised yet, nor the oblong (slot); RECTANGLE has no variants (from the centre, three points). RECTANGLE still makes a `Rectangle` object when the rectangle is level, square-cornered and hairline; DXF writes it as a polyline, so it comes back as a rectangular polyline.
+- Rectangular polylines: rounded or bevelled corners (a radius or chamfer row) are not recognised yet, nor the oblong (slot) that Oblong, Center and Oblong, 2-Point draw; oblongs take no line width, and their width has no remembered default. RECTANGLE still makes a `Rectangle` object when the rectangle is level, square-cornered and hairline; DXF writes it as a polyline, so it comes back as a rectangular polyline.
 - Colours: the Color Books tab, recent colours kept across sessions, greys 250 to 255 that follow the background.
 - Freeze in the Model tab only: no command for it (only the Layers panel and the ribbon's layer list), and Home-page thumbnails still draw those layers.
 
