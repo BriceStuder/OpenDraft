@@ -19,6 +19,9 @@ pub struct Changes {
     pub layouts: bool,
     /// The block table changed (a block defined, redefined or purged).
     pub blocks: bool,
+    /// The dynamic schema the Block Editor is drafting changed. It is not
+    /// drawing data: the drawing's block table is untouched until BSAVE.
+    pub dynamic_blocks: bool,
     /// The linetype table or `LTSCALE` changed.
     pub linetypes: bool,
     /// The text-style table or the current text style changed.
@@ -95,6 +98,13 @@ impl Changes {
         }
     }
 
+    pub fn dynamic_blocks() -> Self {
+        Self {
+            dynamic_blocks: true,
+            ..Self::default()
+        }
+    }
+
     pub fn linetypes() -> Self {
         Self {
             linetypes: true,
@@ -139,6 +149,7 @@ impl Changes {
             && !self.dim_style
             && !self.layouts
             && !self.blocks
+            && !self.dynamic_blocks
             && !self.linetypes
             && !self.text_styles
             && !self.mleader_styles
@@ -160,6 +171,7 @@ impl Changes {
             all.dim_style |= part.dim_style;
             all.layouts |= part.layouts;
             all.blocks |= part.blocks;
+            all.dynamic_blocks |= part.dynamic_blocks;
             all.linetypes |= part.linetypes;
             all.text_styles |= part.text_styles;
             all.mleader_styles |= part.mleader_styles;
@@ -228,5 +240,13 @@ mod tests {
         assert!(!Changes::layers().is_empty());
         assert!(!Changes::units().is_empty());
         assert!(!Changes::layouts().is_empty());
+        assert!(!Changes::dynamic_blocks().is_empty());
+    }
+
+    #[test]
+    fn a_schema_change_survives_merging_and_inverting() {
+        let merged = Changes::merged([Changes::blocks(), Changes::dynamic_blocks()]);
+        assert!(merged.blocks && merged.dynamic_blocks);
+        assert!(merged.inverted().dynamic_blocks);
     }
 }

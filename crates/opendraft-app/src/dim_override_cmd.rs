@@ -225,11 +225,9 @@ pub fn dim_override(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut changes: Vec<(String, String)> = Vec::new();
     let mut scratch = ed.read(|doc| doc.dim_style().clone())?;
     loop {
-        let options = Options::<String>::new(key!(
-            "Enter dimension variable name to override or [Clear overrides]"
-        ))
-        .keyword("Clear overrides", "C")
-        .allow_empty();
+        let options = Options::<String>::new(key!("Enter dimension variable name to override"))
+            .keyword("Clear overrides", "C")
+            .allow_empty();
         match ed.ask_string(options)? {
             Answer::Keyword(_) => {
                 let ids = ed.pickset_or_select(key!("Select objects"))?;

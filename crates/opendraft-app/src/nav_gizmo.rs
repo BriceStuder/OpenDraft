@@ -21,6 +21,8 @@ const SHIFT_STEP: f64 = 15.0;
 const GAP: f64 = 5.0;
 /// The size of the house on the home button.
 const HOME_ICON: f32 = 18.0;
+/// The size of the spirit level on the level button.
+const LEVEL_ICON: f32 = 14.0;
 
 /// Show the gizmo in the active drawing's canvas, if the setting is on and
 /// its space can turn. Returns `canvas` less the strip the gizmo takes along
@@ -34,11 +36,15 @@ pub fn show_in(
     if !state.settings.show_nav_gizmo {
         return canvas;
     }
+    let busy = state.command_running();
     let doc = &mut state.docs[state.active];
     if !turns(doc.session.document(), doc.view.space()) {
         return canvas;
     }
-    show(ctx, canvas, theme, &mut doc.view);
+    let level = show(ctx, canvas, theme, &mut doc.view, busy);
+    if level {
+        state.start_level_view();
+    }
     canvas.with_max_x(canvas.right() - 2.0 * (RADIUS + MARGIN))
 }
 
@@ -75,7 +81,16 @@ fn fill(theme: &Theme, hovered: bool, current: bool) -> Color32 {
 
 /// Paint the gizmo, and turn the view as the pointer asks. `canvas` is the
 /// drawing's rectangle.
-pub fn show(ctx: &egui::Context, canvas: egui::Rect, theme: &Theme, view: &mut View) {
+/// The level button cannot start while a command runs (it asks for points).
+/// Returns whether the level button was pressed.
+pub fn show(
+    ctx: &egui::Context,
+    canvas: egui::Rect,
+    theme: &Theme,
+    view: &mut View,
+    busy: bool,
+) -> bool {
+    let mut level = false;
     let gizmo = Gizmo::in_corner(canvas, MARGIN);
     let id = Id::new("nav_gizmo");
     let twist = view.twist();
@@ -84,8 +99,7 @@ pub fn show(ctx: &egui::Context, canvas: egui::Rect, theme: &Theme, view: &mut V
         .fixed_pos(gizmo.centre - egui::Vec2::splat(RADIUS))
         .constrain(false)
         .show(ctx, |ui| {
-            let size = egui::Vec2::splat(2.0 * RADIUS);
-            let (_, response) = ui.allocate_exact_size(size, Sense::click_and_drag());
+            let (_, response) = ui.allocate_exact_size(Gizmo::size(), Sense::click_and_drag());
             // Whether the arrow was pressed, kept from the press to the release.
             let mut grabbed: bool = ui.data(|d| d.get_temp(id)).unwrap_or(false);
             if response.drag_started() {
@@ -114,6 +128,7 @@ pub fn show(ctx: &egui::Context, canvas: egui::Rect, theme: &Theme, view: &mut V
                 match at.and_then(|p| gizmo.part_at(p, twist)) {
                     Some(Part::Home) => view.request_plan(0.0),
                     Some(Part::Sector(k)) => view.request_twist(sector_twist(k)),
+                    Some(Part::Level) => level = !busy,
                     _ => {}
                 }
             }
@@ -123,6 +138,16 @@ pub fn show(ctx: &egui::Context, canvas: egui::Rect, theme: &Theme, view: &mut V
             } else {
                 response.hover_pos().and_then(|p| gizmo.part_at(p, twist))
             };
+            // A level button that cannot be used does not answer the pointer.
+            let hot = hot.filter(|p| !(busy && *p == Part::Level));
+            if response.hovered() && over_level(&response, &gizmo, ui) {
+                let tip = if busy {
+                    "Finish the running command to level the view"
+                } else {
+                    "Level the view on two points"
+                };
+                response.clone().on_hover_text(tip);
+            }
             match hot {
                 Some(Part::Arrow) if grabbed => {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing)
@@ -131,12 +156,21 @@ pub fn show(ctx: &egui::Context, canvas: egui::Rect, theme: &Theme, view: &mut V
                 Some(_) => ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand),
                 None => {}
             }
-            paint(ui, theme, &gizmo, twist, hot);
+            paint(ui, theme, &gizmo, twist, hot, busy);
         });
+    level
+}
+
+/// Whether the pointer is over the level button.
+fn over_level(response: &egui::Response, gizmo: &Gizmo, ui: &egui::Ui) -> bool {
+    let at = response
+        .hover_pos()
+        .or_else(|| ui.input(|i| i.pointer.latest_pos()));
+    at.is_some_and(|p| (p - gizmo.level_centre()).length() <= gizmo.level_radius())
 }
 
 /// Draw the sectors, the home button and the arrow.
-fn paint(ui: &egui::Ui, theme: &Theme, gizmo: &Gizmo, twist: f64, hot: Option<Part>) {
+fn paint(ui: &egui::Ui, theme: &Theme, gizmo: &Gizmo, twist: f64, hot: Option<Part>, busy: bool) {
     let painter = ui.painter();
     let colors = &theme.colors;
     let outline = Stroke::new(1.0_f32, colors.border);
@@ -160,6 +194,20 @@ fn paint(ui: &egui::Ui, theme: &Theme, gizmo: &Gizmo, twist: f64, hot: Option<Pa
         icons::NAV_GIZMO_HOME,
         HOME_ICON,
         colors.text,
+    );
+    let level = fill(theme, hot == Some(Part::Level), false);
+    painter.circle(gizmo.level_centre(), gizmo.level_radius(), level, outline);
+    icon_set::paint(
+        painter,
+        gizmo.level_centre(),
+        egui::Align2::CENTER_CENTER,
+        icons::NAV_GIZMO_LEVEL,
+        LEVEL_ICON,
+        if busy {
+            colors.text_disabled
+        } else {
+            colors.text
+        },
     );
     let arrow = if hot == Some(Part::Arrow) {
         colors.text

@@ -1,5 +1,6 @@
-//! The Circle and Arc commands of the Draw panel's lists, one per type
-//! (`draw.circle_2p`, `draw.arc_sce`...), each starting at its own prompt.
+//! The Circle, Arc, Rectangle and Oblong commands of the Draw panel's lists,
+//! one per type (`draw.circle_2p`, `draw.arc_sce`, `draw.rectangle_3p`...),
+//! each starting at its own prompt.
 
 use opendraft_commands::Command;
 
@@ -7,6 +8,9 @@ use crate::arc_cmd::{draw_arc, draw_arc_sce};
 use crate::circle::{
     draw_circle, draw_circle_2p, draw_circle_3p, draw_circle_3t, draw_circle_diameter,
     draw_circle_ttr,
+};
+use crate::rect_variants::{
+    draw_oblong_2p, draw_oblong_center, draw_rectangle_3p, draw_rectangle_center,
 };
 use crate::state::AppState;
 
@@ -65,6 +69,30 @@ pub fn commands() -> Vec<Command<AppState>> {
             "Arc, Start, Center, End",
             "Arc",
             draw_arc_sce
+        ),
+        editor!(
+            "draw.rectangle_center",
+            "Rectangle, Center",
+            "Rectangle",
+            draw_rectangle_center
+        ),
+        editor!(
+            "draw.rectangle_3p",
+            "Rectangle, 3-Point",
+            "Rectangle",
+            draw_rectangle_3p
+        ),
+        editor!(
+            "draw.oblong_center",
+            "Oblong, Center",
+            "Oblong",
+            draw_oblong_center
+        ),
+        editor!(
+            "draw.oblong_2p",
+            "Oblong, 2-Point",
+            "Oblong",
+            draw_oblong_2p
         ),
     ]
 }

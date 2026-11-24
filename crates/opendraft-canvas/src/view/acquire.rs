@@ -1,15 +1,16 @@
 //! Pausing the pointer over a snap point, an end or a segment keeps it: the
 //! snap point as the start of tracking paths, an end for Extension, a segment
 //! for Parallel. Pause again over something kept and it is let go. What is
-//! kept lasts until a point is placed or the prompt ends.
+//! kept lasts until a point is placed or the prompt ends. What a command has
+//! drawn but not yet added (a polyline in progress) can be kept too.
 
 use egui::{vec2, Painter, Rect, Shape, Stroke};
-use opendraft_core::{Document, Point};
+use opendraft_core::Point;
 
 use super::{CanvasStyle, View};
 use crate::snap::{
-    candidates, geometric_center, resolve, Acquired, Geom, Guide, Origin, SnapId, SnapKind,
-    SnapPoint, Track,
+    candidates, geometric_center, resolve, Acquired, Drawing, Geom, Guide, Origin, SnapId,
+    SnapKind, SnapPoint, Track,
 };
 
 /// How long the pointer has to rest on something to keep it, in seconds.
@@ -40,15 +41,15 @@ pub(super) struct Acquire {
     starts: Vec<Origin>,
 }
 
-/// Whether the snap point `id` is still at `at` in `document`.
-fn still_there(document: &Document, id: SnapId, at: Point) -> bool {
+/// Whether the snap point `id` is still at `at` in `drawing`.
+fn still_there(drawing: Drawing, id: SnapId, at: Point) -> bool {
     let near = |p: &Point| (p.x - at.x).hypot(p.y - at.y) < 1e-6 * (1.0 + at.x.abs() + at.y.abs());
     match id.sources() {
-        [Some(a), Some(b)] => match (document.get(a), document.get(b)) {
+        [Some(a), Some(b)] => match (drawing.get(a), drawing.get(b)) {
             (Some(a), Some(b)) => a.intersections(b).iter().any(near),
             _ => false,
         },
-        [Some(a), None] => document.get(a).is_some_and(|e| match id.kind() {
+        [Some(a), None] => drawing.get(a).is_some_and(|e| match id.kind() {
             SnapKind::GeometricCenter => geometric_center(e).is_some_and(|p| near(&p)),
             // Where one object crosses itself: it is there while it is.
             SnapKind::Intersection | SnapKind::ApparentIntersection => true,
@@ -130,13 +131,13 @@ impl Acquire {
             .copied()
     }
 
-    /// Work out the paths of what is kept in `document`, dropping what has
+    /// Work out the paths of what is kept in `drawing`, dropping what has
     /// gone, and leaving out Parallel when `parallel` is false (ortho holds
     /// the point, or there is no last point).
-    pub fn paths(&mut self, document: &Document, parallel: bool) -> &[Track] {
+    pub fn paths(&mut self, drawing: Drawing, parallel: bool) -> &[Track] {
         self.kept.retain(|(k, at)| match k {
-            Acquired::Origin(id) => still_there(document, *id, *at),
-            _ => resolve(document, *k).is_some(),
+            Acquired::Origin(id) => still_there(drawing, *id, *at),
+            _ => resolve(drawing, *k).is_some(),
         });
         self.starts = self
             .kept
@@ -154,7 +155,7 @@ impl Acquire {
             .iter()
             .filter(|(k, _)| parallel || matches!(k, Acquired::End { .. }))
             .filter_map(|(k, at)| {
-                let track = resolve(document, *k)?;
+                let track = resolve(drawing, *k)?;
                 // The "+" of a direction sits where the pause was.
                 let mark = if matches!(k, Acquired::Along { .. }) {
                     *at
@@ -264,7 +265,7 @@ impl View {
 
 #[cfg(test)]
 mod tests {
-    use opendraft_core::EntityId;
+    use opendraft_core::{Document, EntityId};
 
     use super::*;
 
@@ -362,13 +363,46 @@ mod tests {
         let target = [(Acquired::Origin(snap.id()), snap.point)];
         a.update(0.0, &target);
         a.update(0.4, &target);
-        a.paths(&doc, false);
+        a.paths(Drawing::from(&doc), false);
         assert_eq!(a.origins().len(), 1);
         assert!(a.kept_near(Point::new(10.5, 0.2), 1.0).is_some());
         assert!(a.kept_near(Point::new(14.0, 0.0), 1.0).is_none());
         // The line goes: so does the point.
         doc.remove(EntityId(0));
-        a.paths(&doc, false);
+        a.paths(Drawing::from(&doc), false);
         assert!(a.origins().is_empty() && a.kept.is_empty());
+    }
+
+    #[test]
+    fn a_segment_the_command_has_drawn_is_kept_while_the_prompt_offers_it() {
+        // PLINE's first segment, not yet in the drawing.
+        let doc = Document::default();
+        let segment = opendraft_core::Entity::Line {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(10.0, 0.0),
+        };
+        let attrs = opendraft_core::Attributes::on_layer(opendraft_core::LayerId::DEFAULT);
+        let extra = [opendraft_core::Object::new(
+            EntityId(u64::MAX),
+            segment,
+            attrs,
+            None,
+        )];
+        let drawing = Drawing {
+            document: &doc,
+            extra: &extra,
+        };
+        let along = Acquired::Along {
+            object: EntityId(u64::MAX),
+            curve: 0,
+        };
+        let mut a = Acquire::default();
+        let target = [(along, Point::new(5.0, 0.0))];
+        a.update(0.0, &target);
+        a.update(0.4, &target);
+        assert_eq!(a.paths(drawing, true).len(), 1);
+        // The next prompt no longer offers it: it goes.
+        assert!(a.paths(Drawing::from(&doc), true).is_empty());
+        assert!(a.kept.is_empty());
     }
 }

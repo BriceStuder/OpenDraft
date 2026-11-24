@@ -57,6 +57,7 @@ fn a_block_with_the_largest_id_is_refused() {
         base: Point::new(0.0, 0.0),
         description: String::new(),
         entities: Vec::new(),
+        dynamic: None,
     }));
     refused(&document);
 }

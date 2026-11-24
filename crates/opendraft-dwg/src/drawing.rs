@@ -6,6 +6,7 @@
 
 use std::sync::atomic::AtomicBool;
 
+use crate::anonymous;
 use crate::attrib;
 use crate::database::{Database, Visit};
 use crate::entities::{self, InsertData, Vertex2dData};
@@ -18,7 +19,7 @@ use crate::pass::{Look, Pass, Record, Stored};
 use crate::report::{Degradation, ImportReport, Skipped};
 use crate::shapes::{self, DwgAttribute, Shape, MAX_ABS_COORDINATE};
 use crate::spline;
-use crate::tables::{self, BlockData, DwgLinetypeDef};
+use crate::tables::{self, DwgLinetypeDef};
 use crate::text::{self, DwgTextStyle};
 use crate::types::{FixedType, ObjectKind};
 use crate::version::DwgVersion;
@@ -65,8 +66,10 @@ pub struct DwgEntity {
     pub shape: Shape,
 }
 
-/// A named block definition. Anonymous blocks (the pictures of dimensions,
-/// hatches and dynamic blocks) and external references are not read.
+/// A block definition: a named one, or an anonymous one (a modified dynamic
+/// block's `*U`) that a reference places. The anonymous pictures of
+/// dimensions and hatches that nothing places, and external references, are
+/// not read.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DwgBlock {
     pub handle: DwgHandle,
@@ -258,24 +261,20 @@ fn shape_of(record: &Record, pass: &Pass, report: &mut ImportReport) -> Result<S
         Stored::Attdef(d) => attrib::definition(d, report),
         Stored::MText(d) => text::mtext(d, report),
         Stored::Insert(d) => match d.block.and_then(|h| Some((h, pass.blocks.get(&h)?))) {
-            Some((h, b)) if is_named(b) => {
+            Some((h, b)) if anonymous::is_importable(b) => {
                 let mut shape = shapes::insert(d, h, report)?;
+                if anonymous::is_anonymous(b) {
+                    report.degrade(Degradation::AnonymousBlock);
+                }
                 if let Shape::Insert { attributes, .. } = &mut shape {
                     *attributes = owned_attributes(d, pass, report);
                 }
                 Ok(shape)
             }
             Some((_, b)) if b.is_xref => Err(Skipped::ExternalReference),
-            Some((_, b)) if b.anonymous => Err(Skipped::AnonymousBlockReference),
             _ => Err(Skipped::InvalidGeometry),
         },
     }
-}
-
-/// Whether a block record is a named block the importer reads: not a space,
-/// not anonymous, not an external reference.
-fn is_named(block: &BlockData) -> bool {
-    !block.is_xref && !block.anonymous && !block.name.starts_with('*')
 }
 
 /// The attributes a reference owns, in order. One that cannot be read is
@@ -363,6 +362,13 @@ impl Drawing {
 
         let entities = entities_of(&model.entities, &pass, &mut report)?;
         let mut blocks = Vec::new();
+        let roots = std::iter::once(&model.entities).chain(
+            pass.blocks
+                .values()
+                .filter(|b| anonymous::is_importable(b) && !anonymous::is_anonymous(b))
+                .map(|b| &b.entities),
+        );
+        let placed = anonymous::placed(&pass, roots);
         for (&block_handle, block) in &pass.blocks {
             if Some(block_handle) == db.header.model_space {
                 continue;
@@ -375,7 +381,9 @@ impl Drawing {
                 }
                 continue;
             }
-            if !is_named(block) {
+            if !anonymous::is_importable(block)
+                || (anonymous::is_anonymous(block) && !placed.contains(&block_handle))
+            {
                 continue;
             }
             let base = [block.base[0], block.base[1]];

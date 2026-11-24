@@ -22,9 +22,11 @@
 //!   references) in
 //!   drawing order, the named blocks with their shapes, the header's unit
 //!   settings, and an [`ImportReport`] of everything else. Text (TEXT and
-//!   MTEXT, with the style table) is read; anonymous blocks, paper space and
-//!   the rest are counted, not read.
+//!   MTEXT, with the style table) is read, and so are the anonymous blocks a
+//!   reference places (as ordinary blocks); paper space and the rest are
+//!   counted, not read.
 
+mod anonymous;
 mod attrib;
 mod bit;
 mod checksum;

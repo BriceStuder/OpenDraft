@@ -72,6 +72,9 @@ pub enum DynamicDimensions {
     None,
     Polar,
     Cartesian,
+    /// X and Y give the size of a box centred on the base point: twice the
+    /// pointer's offset from it (a rectangle drawn from its centre).
+    Centred,
 }
 
 /// How a prompt is worded and what it accepts. Build with

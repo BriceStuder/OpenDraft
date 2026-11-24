@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use opendraft_core::Document;
 
 pub use dwg::DwgFormat;
-pub use dxf::DxfFormat;
+pub use dxf::{dynamic, DxfFormat};
 pub use error::FileError;
 pub use native::{NativeFormat, CURRENT_VERSION, NATIVE_EXTENSION};
 pub use plot::{pdf, pdf_filter, plot_cancellable, svg, svg_filter};

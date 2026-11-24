@@ -26,6 +26,7 @@ mod explode;
 mod extend;
 mod fillet;
 mod fillet_ellipse;
+mod fillet_parallel;
 mod grip;
 pub mod hatch;
 pub mod hsl;
@@ -42,6 +43,7 @@ pub mod measure;
 pub mod mleader;
 pub mod mtext;
 pub mod name_order;
+pub mod oblong;
 mod offset;
 pub mod ortho;
 pub mod outline;
@@ -82,7 +84,7 @@ pub mod width;
 
 pub use block::{
     Affine, AttributeDefinition, AttributeDefinitionId, AttributeReference, BlockDef, BlockEntity,
-    BlockId, Insert,
+    BlockId, BlockObjectId, Insert,
 };
 pub use ccs::{Ccs, CcsSpace, NamedCcs};
 pub use corner::{Chamfer, CornerError, Joined};
@@ -278,6 +280,14 @@ impl Bounds {
         [self.min.x, self.min.y, self.max.x, self.max.y]
             .iter()
             .all(|v| v.is_finite())
+    }
+
+    /// Whether `other` lies inside this box, its edges included.
+    pub fn contains(&self, other: &Bounds) -> bool {
+        self.min.x <= other.min.x
+            && self.min.y <= other.min.y
+            && self.max.x >= other.max.x
+            && self.max.y >= other.max.y
     }
 
     pub fn intersects(&self, other: &Bounds) -> bool {

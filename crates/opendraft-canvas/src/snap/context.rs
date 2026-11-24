@@ -26,7 +26,7 @@ fn distance(a: Point, b: Point) -> f64 {
 
 /// One curve of an object.
 #[derive(Clone, Copy)]
-enum Piece<'a> {
+pub(super) enum Piece<'a> {
     Curve(Curve),
     Spline(&'a Spline),
 }
@@ -52,7 +52,7 @@ impl Piece<'_> {
     }
 
     /// Where it crosses `other`, among the part of each in `window`.
-    fn meets(&self, other: &Piece<'_>, window: &Bounds) -> Vec<Point> {
+    pub(super) fn meets(&self, other: &Piece<'_>, window: &Bounds) -> Vec<Point> {
         match (self, other) {
             (Piece::Curve(a), Piece::Curve(b)) => a.intersections(b),
             (Piece::Spline(s), Piece::Curve(c)) | (Piece::Curve(c), Piece::Spline(s)) => {
@@ -117,14 +117,14 @@ impl Drawn {
 }
 
 /// A piece with where it came from.
-struct Item<'a> {
-    object: &'a Object,
+pub(super) struct Item<'a> {
+    pub(super) object: &'a Object,
     /// Which of the object's shapes, and which curve of it.
     shape: usize,
     index: usize,
     /// Whether the curves of the shape run one into the next.
     chain: Chain,
-    piece: Piece<'a>,
+    pub(super) piece: Piece<'a>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -164,7 +164,7 @@ impl<'a> Scene<'a> {
     }
 
     /// The pieces that pass through the aperture `capture`.
-    fn items(&'a self, capture: &Bounds) -> Vec<Item<'a>> {
+    pub(super) fn items(&'a self, capture: &Bounds) -> Vec<Item<'a>> {
         let mut items = Vec::new();
         for (object, drawn) in self.near.iter().zip(&self.drawn) {
             let shapes = match drawn {

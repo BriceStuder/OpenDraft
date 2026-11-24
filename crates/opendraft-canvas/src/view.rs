@@ -24,6 +24,7 @@ mod background;
 mod builder;
 mod crosshair;
 mod dash_paint;
+mod dynamic_overlay;
 mod entity_paint;
 mod hatch_paint;
 mod image_paint;
@@ -50,6 +51,8 @@ mod text_paint;
 #[cfg(test)]
 mod text_paint_tests;
 pub(crate) mod text_raster;
+#[cfg(test)]
+mod track_drawn_tests;
 mod twist;
 pub use text_paint::paint_text;
 mod types;
@@ -384,6 +387,7 @@ impl View {
             self.paint_grips(&painter, rect, style, document, selection, marks);
         }
 
+        self.paint_block_schema(&painter, rect, document);
         if let (Some(prompt), Some(to)) = (&self.point_prompt, preview_to) {
             self.paint_prompt_preview(&painter, rect, style, prompt, to);
         }

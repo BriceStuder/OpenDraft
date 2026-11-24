@@ -42,7 +42,7 @@ impl Guide {
     }
 
     /// How far along the path `p` projects, from its origin.
-    fn along(&self, p: Point) -> f64 {
+    pub(super) fn along(&self, p: Point) -> f64 {
         (p.x - self.origin.x) * self.dir.x + (p.y - self.origin.y) * self.dir.y
     }
 }
@@ -175,9 +175,8 @@ fn distance(a: Point, b: Point) -> f64 {
     (a.x - b.x).hypot(a.y - b.y)
 }
 
-/// The snap points on the paths: where the pointer is aligned with one path,
-/// and where it is aligned with two.
-pub(super) fn candidates(input: &TrackInput, cursor: Point, tolerance: f64) -> Vec<Ranked> {
+/// The paths the pointer at `cursor` is within reach of.
+pub(super) fn guides_near(input: &TrackInput, cursor: Point, tolerance: f64) -> Vec<Guide> {
     let reach = tolerance * REACH;
     let mut near: Vec<Guide> = Vec::new();
     for o in &input.origins {
@@ -199,7 +198,13 @@ pub(super) fn candidates(input: &TrackInput, cursor: Point, tolerance: f64) -> V
         }
     }
     near.retain(|g| g.off(cursor) <= reach);
+    near
+}
 
+/// The snap points on the paths: where the pointer is aligned with one path,
+/// and where it is aligned with two.
+pub(super) fn candidates(input: &TrackInput, cursor: Point, tolerance: f64) -> Vec<Ranked> {
+    let near = guides_near(input, cursor, tolerance);
     let mut found = Vec::new();
     for g in &near {
         let t = g.along(cursor);

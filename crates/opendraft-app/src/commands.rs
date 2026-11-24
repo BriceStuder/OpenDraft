@@ -9,7 +9,7 @@ use opendraft_commands::{Command, Registry};
 
 use crate::array_cmd::{array_objects, array_polar, array_rect};
 use crate::array_path::array_path;
-use crate::break_cmd::break_object;
+use crate::break_cmd::{break_at_point, break_object};
 use crate::corners::{chamfer_objects, fillet_objects};
 use crate::draw::draw_line;
 use crate::edges::{extend_objects, trim_objects};
@@ -210,6 +210,12 @@ fn all() -> Vec<Command<AppState>> {
         editor_command!("modify.chamfer", "Chamfer", chamfer_objects),
         editor_command!("modify.explode", "Explode", explode_objects),
         editor_command!("modify.break", "Break", break_object),
+        editor_command!(
+            "modify.break_at_point",
+            "Break at Point",
+            "BREAKATPOINT",
+            break_at_point
+        ),
         editor_command!("modify.array", "Array", "ARRAY", array_objects),
         editor_command!(
             "modify.array_rect",

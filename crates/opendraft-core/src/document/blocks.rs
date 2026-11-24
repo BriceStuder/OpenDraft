@@ -115,11 +115,33 @@ impl Document {
             ccs_previous: Vec::new(),
             ..self.clone_tables()
         };
+        // The schema moves with the geometry, to the origin.
+        doc.block_editor_dynamic = block
+            .dynamic
+            .as_deref()
+            .map(|d| d.translated(-block.base.x, -block.base.y));
         for e in &block.entities {
             let entity = e.entity.translated(-block.base.x, -block.base.y);
-            doc.add_with(entity, e.attrs.clone());
+            // An object keeps its block id as its id here, and BSAVE reads it
+            // back, so an action that names it still does after an edit.
+            doc.add_with_id(EntityId(e.id.0), entity, e.attrs.clone());
         }
         Some(doc)
+    }
+
+    /// The dynamic schema a Block Editor drawing is authoring: `None` for a
+    /// drawing, and for an editor of an ordinary block.
+    pub fn block_editor_dynamic(&self) -> Option<&crate::block::DynamicBlock> {
+        self.block_editor_dynamic.as_ref()
+    }
+
+    /// Replace the authoring schema, returning the old one (the undo action
+    /// swaps them back).
+    pub fn set_block_editor_dynamic(
+        &mut self,
+        schema: Option<crate::block::DynamicBlock>,
+    ) -> Option<crate::block::DynamicBlock> {
+        std::mem::replace(&mut self.block_editor_dynamic, schema)
     }
 
     /// A copy of everything but the objects, which can be many.
@@ -158,6 +180,7 @@ impl Document {
             current_mleader_style: self.current_mleader_style,
             blocks: self.blocks.clone(),
             next_block_id: self.next_block_id,
+            block_editor_dynamic: None,
             next_attribute_definition_id: self.next_attribute_definition_id,
             linetypes: self.linetypes.clone(),
             linetype_scale: self.linetype_scale,

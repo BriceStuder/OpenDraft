@@ -110,6 +110,24 @@ pub struct DynamicInputState {
     pub request_focus: bool,
 }
 
+/// Whether the prompt's X and Y are the sides of a box.
+fn boxed(ask: &Prompt) -> bool {
+    matches!(
+        ask.dynamic_dimensions,
+        DynamicDimensions::Cartesian | DynamicDimensions::Centred
+    )
+}
+
+/// How many times the pointer's offset from the base X and Y show: twice
+/// for a box centred on the base.
+fn size_factor(ask: &Prompt) -> f64 {
+    if ask.dynamic_dimensions == DynamicDimensions::Centred {
+        2.0
+    } else {
+        1.0
+    }
+}
+
 impl DynamicInputState {
     pub fn clear(&mut self) {
         let (cursor, canvas) = (self.cursor, self.canvas);
@@ -135,15 +153,8 @@ impl DynamicInputState {
             {
                 vec![Distance, Angle]
             }
-            Wants::Point
-                if settings.pointer()
-                    || (settings.dimensions()
-                        && ask.dynamic_dimensions == DynamicDimensions::Cartesian) =>
-            {
-                if ask.base.is_some()
-                    && !settings.pointer_cartesian
-                    && ask.dynamic_dimensions != DynamicDimensions::Cartesian
-                {
+            Wants::Point if settings.pointer() || (settings.dimensions() && boxed(ask)) => {
+                if ask.base.is_some() && !settings.pointer_cartesian && !boxed(ask) {
                     vec![Distance, Angle]
                 } else {
                     vec![X, Y]
@@ -220,7 +231,9 @@ impl DynamicInputState {
         // from the base measured along the system's axes.
         let ccs = reading.ccs;
         let shown = if relative {
-            ccs.vector_from_world(Point::new(cursor.x - base.x, cursor.y - base.y))
+            let size = size_factor(ask);
+            let offset = ccs.vector_from_world(Point::new(cursor.x - base.x, cursor.y - base.y));
+            Point::new(offset.x * size, offset.y * size)
         } else {
             ccs.from_world(cursor)
         };
@@ -297,8 +310,9 @@ impl DynamicInputState {
                 );
                 if ask.base.is_some() && !settings.pointer_absolute {
                     let base = ask.base?;
+                    let size = size_factor(ask);
                     let v = reading.ccs.vector_to_world(shown);
-                    Point::new(base.x + v.x, base.y + v.y)
+                    Point::new(base.x + v.x / size, base.y + v.y / size)
                 } else {
                     reading.ccs.to_world(shown)
                 }
@@ -450,6 +464,39 @@ mod tests {
         );
         assert_eq!(state.session().document().len(), 1);
         assert!(!state.command_running());
+    }
+
+    #[test]
+    fn a_rectangle_from_its_centre_takes_its_full_width_and_height() {
+        let mut state = AppState::new();
+        let draw = crate::rect_variants::draw_rectangle_center;
+        state.start_command("Rectangle", draw);
+        state.settle_command();
+        state.answer_dynamic("100,200").unwrap();
+        state.settle_command();
+        let ask = state.waiting().unwrap().clone();
+        let settings = state.settings.dynamic_input.clone();
+        let input = &mut state.docs[0].dynamic_input;
+        input.cursor = Some(Point::new(150.0, 230.0));
+        assert_eq!(input.fields(&ask, &settings), [Field::X, Field::Y]);
+        let units = Units::default();
+        assert_eq!(input.value(Field::X, &ask, &settings, &units), Some(100.0));
+        assert_eq!(input.value(Field::Y, &ask, &settings, &units), Some(60.0));
+        input.begin(Field::X);
+        input.draft = "10".into();
+        input.cycle(&[Field::X, Field::Y], false, &units).unwrap();
+        input.draft = "20".into();
+        let text = input.submission(&ask, &settings, &units).unwrap();
+        state.answer_dynamic(&text).unwrap();
+        state.settle_command();
+        let objects = state.session().document().objects();
+        assert_eq!(
+            objects[0].entity,
+            opendraft_core::Entity::Rectangle {
+                min: Point::new(95.0, 190.0),
+                max: Point::new(105.0, 210.0),
+            }
+        );
     }
 
     #[test]

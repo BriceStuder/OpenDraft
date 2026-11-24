@@ -25,6 +25,7 @@ fn placed(
         scale_y: scale.1,
         rotation,
         attributes,
+        dynamic: None,
     }))
 }
 
