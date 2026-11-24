@@ -41,6 +41,10 @@ pub enum Field {
     /// A rectangle's width, along its first side for a polyline that traces
     /// one (`Width` is a polyline's global width and a text's wrap width).
     RectWidth,
+    /// The radius of a rectangular polyline's rounded corners.
+    CornerRadius,
+    /// How far a rectangular polyline's bevelled corners cut along each side.
+    Chamfer,
     Height,
     Area,
     /// What a dimension measures, before its scale factor and rounding.

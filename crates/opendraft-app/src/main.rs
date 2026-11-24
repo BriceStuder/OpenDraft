@@ -35,6 +35,7 @@ mod block_editor;
 mod boundary_cmd;
 mod break_cmd;
 mod build_info;
+mod cancel_settle;
 mod canvas_style;
 mod ccs_cmd;
 #[cfg(test)]
