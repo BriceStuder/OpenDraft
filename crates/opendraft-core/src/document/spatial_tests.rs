@@ -3,6 +3,7 @@
 
 use super::spatial::Config;
 use super::*;
+use crate::Bounds;
 use crate::Point;
 
 pub(super) type Space = Option<LayoutId>;
