@@ -108,7 +108,7 @@ impl DynamicBlock {
             let Some(p) = self.parameters.iter().find(|p| p.id == a.parameter) else {
                 return Err(format!("action {} names a missing parameter", a.id.0));
             };
-            let linear = matches!(p.kind, DynamicParameterKind::Linear { .. });
+            let suits = p.kind.family() == a.kind.family();
             let (selected, usable) = match &a.kind {
                 DynamicActionKind::Move {
                     objects,
@@ -116,7 +116,7 @@ impl DynamicBlock {
                     angle_offset,
                 } => (
                     objects,
-                    linear
+                    suits
                         && multiplier.is_finite()
                         && *multiplier > 0.0
                         && angle_offset.is_finite(),
@@ -130,7 +130,7 @@ impl DynamicBlock {
                     let (w, h) = (frame.max.x - frame.min.x, frame.max.y - frame.min.y);
                     (
                         objects,
-                        linear
+                        suits
                             && multiplier.is_finite()
                             && *multiplier > 0.0
                             && angle_offset.is_finite()
@@ -140,7 +140,9 @@ impl DynamicBlock {
                             && h > 0.0,
                     )
                 }
-                DynamicActionKind::Rotate { objects } => (objects, !linear),
+                DynamicActionKind::Rotate { objects } | DynamicActionKind::Flip { objects } => {
+                    (objects, suits)
+                }
             };
             if !usable {
                 return Err(format!(
@@ -209,6 +211,38 @@ pub enum DynamicParameterKind {
         /// In radians.
         value_set: DynamicValueSet,
     },
+    /// A mirror line from `base` to `end`; the value is whether the block is
+    /// flipped about it (a `Bool`, not flipped by default).
+    Flip { base: Point, end: Point },
+}
+
+/// Which parameters and actions go together.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DynamicFamily {
+    Linear,
+    Rotation,
+    Flip,
+}
+
+impl DynamicParameterKind {
+    pub fn family(&self) -> DynamicFamily {
+        match self {
+            Self::Linear { .. } => DynamicFamily::Linear,
+            Self::Rotation { .. } => DynamicFamily::Rotation,
+            Self::Flip { .. } => DynamicFamily::Flip,
+        }
+    }
+}
+
+impl DynamicActionKind {
+    /// The kind of parameter this action follows.
+    pub fn family(&self) -> DynamicFamily {
+        match self {
+            Self::Move { .. } | Self::Stretch { .. } => DynamicFamily::Linear,
+            Self::Rotate { .. } => DynamicFamily::Rotation,
+            Self::Flip { .. } => DynamicFamily::Flip,
+        }
+    }
 }
 
 /// The values a parameter may take.
@@ -254,6 +288,8 @@ pub enum DynamicActionKind {
     /// Turns the objects about its rotation parameter's base point by the
     /// parameter's value.
     Rotate { objects: Vec<BlockObjectId> },
+    /// Mirrors the objects about its flip parameter's line when flipped.
+    Flip { objects: Vec<BlockObjectId> },
 }
 
 /// The values one insert overrides. A parameter it does not list has the
@@ -270,8 +306,8 @@ pub struct DynamicValueEntry {
     pub value: DynamicValue,
 }
 
-/// A parameter's value. `Distance` and `Angle` (radians) are used so far; the
-/// rest are the types later parameters will need.
+/// A parameter's value. `Distance`, `Angle` (radians) and `Bool` (a flip) are
+/// used so far; the rest are the types later parameters will need.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DynamicValue {
     Distance(f64),

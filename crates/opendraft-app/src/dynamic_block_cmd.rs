@@ -14,8 +14,8 @@ use opendraft_commands::{
     Cancelled, Editor, ModifyEntities, NumberOptions, Options, PointOptions, SetBlockEditorDynamic,
 };
 use opendraft_core::block::{
-    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicParameter,
-    DynamicParameterKind, ParameterId,
+    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicFamily,
+    DynamicParameter, DynamicParameterKind, ParameterId,
 };
 use opendraft_core::{Bounds, Entity, EntityId};
 
@@ -38,23 +38,27 @@ fn commit(ed: &Editor, name: &'static str, schema: DynamicBlock) -> Result<(), C
     })
 }
 
-/// BPARAMETER: add a linear or rotation parameter to the block being edited.
+/// BPARAMETER: add a linear, rotation or flip parameter to the block being
+/// edited.
 pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut schema = draft(ed)?;
     if schema.parameters.len() >= DynamicBlock::MAX_PARAMETERS {
         ed.say("The block has as many parameters as it can.");
         return Ok(());
     }
-    let rotation = ed.get_keyword(
-        Options::<String>::new("Enter parameter type [Linear/Rotation] <Linear>")
-            .keyword("Linear", "L")
-            .keyword("Rotation", "R")
-            .default("Linear".to_owned()),
-    )? == "Rotation";
-    let parameter = if rotation {
-        rotation_parameter(ed, &schema)?
-    } else {
-        linear_parameter(ed, &schema)?
+    let parameter = match ed
+        .get_keyword(
+            Options::<String>::new("Enter parameter type [Linear/Rotation/Flip] <Linear>")
+                .keyword("Linear", "L")
+                .keyword("Rotation", "R")
+                .keyword("Flip", "F")
+                .default("Linear".to_owned()),
+        )?
+        .as_str()
+    {
+        "Rotation" => rotation_parameter(ed, &schema)?,
+        "Flip" => flip_parameter(ed, &schema)?,
+        _ => linear_parameter(ed, &schema)?,
     };
     let name = parameter.name.clone();
     schema.parameters.push(parameter);
@@ -119,6 +123,29 @@ fn rotation_parameter(ed: &Editor, schema: &DynamicBlock) -> Result<DynamicParam
     })
 }
 
+fn flip_parameter(ed: &Editor, schema: &DynamicBlock) -> Result<DynamicParameter, Cancelled> {
+    let base = ed.get_point(PointOptions::new("Specify base point of reflection line"))?;
+    let end = loop {
+        let end =
+            ed.get_point(PointOptions::new("Specify endpoint of reflection line").base(base))?;
+        if (end.x - base.x).hypot(end.y - base.y) > EPS {
+            break end;
+        }
+        ed.say("The reflection line has no length.");
+    };
+    let named = ask_naming(ed, schema, "Flip", "flip")?;
+    let grips = ask_grips(ed)?;
+    Ok(DynamicParameter {
+        id: ParameterId(schema.next_parameter_id),
+        name: named.name,
+        label: named.label,
+        description: named.description,
+        show: named.show,
+        grips,
+        kind: DynamicParameterKind::Flip { base, end },
+    })
+}
+
 /// The objects to act on, as ids of the block's objects: the pickset or a
 /// selection, without attribute definitions. `None` after saying why when
 /// nothing is left.
@@ -165,8 +192,8 @@ fn ask_choice(ed: &Editor, message: &str, names: &[String]) -> Result<usize, Can
     Ok(names.iter().position(|n| *n == chosen).unwrap_or(0))
 }
 
-/// BACTION: add a Move or Stretch action driven by a linear parameter, or a
-/// Rotate action driven by a rotation.
+/// BACTION: add a Move or Stretch action driven by a linear parameter, a
+/// Rotate driven by a rotation, or a Flip driven by a flip.
 pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
     let schema = draft(ed)?;
     if schema.parameters.is_empty() {
@@ -178,21 +205,26 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     }
     let chosen = ed.get_keyword(
-        Options::<String>::new("Enter action type [Move/Stretch/Rotate] <Move>")
+        Options::<String>::new("Enter action type [Move/Stretch/Rotate/Flip] <Move>")
             .keyword("Move", "M")
             .keyword("Stretch", "S")
             .keyword("Rotate", "R")
+            .keyword("Flip", "F")
             .default("Move".to_owned()),
     )?;
-    let (stretch, rotate) = (chosen == "Stretch", chosen == "Rotate");
-    // A rotate follows an angle; a move or stretch follows a distance.
+    let stretch = chosen == "Stretch";
+    // Each action follows its own kind of parameter.
+    let (family, need) = match chosen.as_str() {
+        "Rotate" => (DynamicFamily::Rotation, "rotation"),
+        "Flip" => (DynamicFamily::Flip, "flip"),
+        _ => (DynamicFamily::Linear, "linear"),
+    };
     let usable: Vec<&DynamicParameter> = schema
         .parameters
         .iter()
-        .filter(|p| p.is_angle() == rotate)
+        .filter(|p| p.kind.family() == family)
         .collect();
     if usable.is_empty() {
-        let need = if rotate { "rotation" } else { "linear" };
         ed.say(format!(
             "A {} action needs a {need} parameter.",
             chosen.to_lowercase()
@@ -204,10 +236,18 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
     let Some(objects) = select_objects(ed)? else {
         return Ok(());
     };
-    if rotate {
-        return add_action(ed, schema, "Rotate", parameter, |_| {
-            DynamicActionKind::Rotate { objects }
-        });
+    match family {
+        DynamicFamily::Rotation => {
+            return add_action(ed, schema, "Rotate", parameter, |_| {
+                DynamicActionKind::Rotate { objects }
+            })
+        }
+        DynamicFamily::Flip => {
+            return add_action(ed, schema, "Flip", parameter, |_| DynamicActionKind::Flip {
+                objects,
+            })
+        }
+        DynamicFamily::Linear => {}
     }
     let frame = if stretch {
         let first = ed.get_point(PointOptions::new("Specify first corner of stretch frame"))?;
@@ -301,7 +341,8 @@ pub fn bactionset(ed: &mut Editor) -> Result<(), Cancelled> {
     let count = chosen.len();
     let (DynamicActionKind::Move { objects, .. }
     | DynamicActionKind::Stretch { objects, .. }
-    | DynamicActionKind::Rotate { objects }) = &mut schema.actions[at].kind;
+    | DynamicActionKind::Rotate { objects }
+    | DynamicActionKind::Flip { objects }) = &mut schema.actions[at].kind;
     *objects = chosen;
     let candidate = schema.clone();
     let ok = ed.read(move |doc| {
@@ -364,3 +405,7 @@ mod tests;
 #[cfg(test)]
 #[path = "dynamic_rotation_cmd_tests.rs"]
 mod rotation_tests;
+
+#[cfg(test)]
+#[path = "dynamic_flip_cmd_tests.rs"]
+mod flip_tests;

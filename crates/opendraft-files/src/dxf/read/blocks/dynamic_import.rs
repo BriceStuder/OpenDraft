@@ -1,7 +1,7 @@
 //! Dynamic blocks of a DXF built into the drawing, from what `dynamic`
-//! decoded. A definition keeps its linear and rotation parameters and its
-//! stretch, move and rotate actions; what the app cannot represent (polar,
-//! lookup, visibility, flip, scale and the rest) is left out and named in a note. A reference to
+//! decoded. A definition keeps its linear, rotation and flip parameters and its
+//! stretch, move, rotate and flip actions; what the app cannot represent (polar,
+//! lookup, visibility, scale and the rest) is left out and named in a note. A reference to
 //! an anonymous `*U` block becomes a reference to its definition with the
 //! parameter values it recorded, but only when everything that moves geometry
 //! in the definition is understood (a lookup table changes no geometry, so it
@@ -67,7 +67,10 @@ impl Plan {
                 Some(draft) => {
                     plan.imported.push(def.name.clone());
                     plan.drafts.insert(key.clone(), draft);
-                    let exact = read.left_out.iter().all(|k| k.starts_with("lookup "));
+                    // A flip's state in a modified reference is not read, so a
+                    // definition with one cannot rebuild its references.
+                    let exact = read.left_out.iter().all(|k| k.starts_with("lookup "))
+                        && !read.parameters.values().any(|k| k.flip);
                     whole.insert(key, (read.parameters, exact));
                 }
                 None => plan.pictures.push(def.name.clone()),
@@ -163,6 +166,7 @@ impl Plan {
                         angle_offset: a.angle_offset,
                     },
                     Step::Rotate => DynamicActionKind::Rotate { objects },
+                    Step::Flip => DynamicActionKind::Flip { objects },
                 },
             });
         }
@@ -201,7 +205,7 @@ impl Plan {
             .collect();
         if !imported.is_empty() {
             let mut line = format!(
-                "Imported {} with their linear and rotation parameters and stretch, move and rotate actions: {}",
+                "Imported {} with their linear, rotation and flip parameters and stretch, move, rotate and flip actions: {}",
                 crate::plural(imported.len() as u64, "dynamic block"),
                 list(&imported)
             );

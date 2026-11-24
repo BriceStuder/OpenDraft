@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use opendraft_core::block::{
-    ActionId, DynamicParameter, DynamicParameterKind, DynamicValueSet, ParameterId,
+    ActionId, DynamicFamily, DynamicParameter, DynamicParameterKind, DynamicValueSet, ParameterId,
 };
 use opendraft_core::{Bounds, Point};
 
@@ -16,6 +16,7 @@ pub(super) enum Step {
     Move,
     Stretch(Bounds),
     Rotate,
+    Flip,
 }
 
 pub(super) struct DraftAction {
@@ -41,6 +42,8 @@ pub(super) struct Draft {
 pub(super) struct Kept {
     pub id: ParameterId,
     pub zero_angle: Option<f64>,
+    /// A flip: its state in a modified reference is not read.
+    pub flip: bool,
 }
 
 /// A definition read for what the app keeps of it.
@@ -118,22 +121,27 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
     let mut kept: HashMap<u32, Kept> = HashMap::new();
     let mut names = HashSet::new();
     for node in &def.nodes {
-        let (p, linear) = match &node.kind {
-            NodeKind::Linear(p) => (p, true),
-            NodeKind::Rotation(p) if !p.restricted => (p, false),
+        let (p, family) = match &node.kind {
+            NodeKind::Linear(p) => (p, DynamicFamily::Linear),
+            NodeKind::Rotation(p) if !p.restricted => (p, DynamicFamily::Rotation),
+            NodeKind::Flip(p) => (p, DynamicFamily::Flip),
             _ => continue,
         };
+        let linear = family == DynamicFamily::Linear;
         if !has_length(p.start, p.end) {
-            if linear {
-                left_out.push("linear parameter with no length".to_owned());
-            }
+            left_out.push(match family {
+                DynamicFamily::Linear => "linear parameter with no length".to_owned(),
+                DynamicFamily::Flip => "flip parameter with no mirror line".to_owned(),
+                DynamicFamily::Rotation => continue,
+            });
             continue;
         }
         let id = ParameterId(parameters.len() as u64 + 1);
-        let mut name = match p.name.trim() {
-            "" if linear => format!("Distance{}", id.0),
-            "" => format!("Angle{}", id.0),
-            n => n.to_owned(),
+        let mut name = match (p.name.trim(), family) {
+            ("", DynamicFamily::Linear) => format!("Distance{}", id.0),
+            ("", DynamicFamily::Rotation) => format!("Angle{}", id.0),
+            ("", DynamicFamily::Flip) => format!("Flip{}", id.0),
+            (n, _) => n.to_owned(),
         };
         if !names.insert(name.to_lowercase()) {
             name = format!("{name}{}", id.0);
@@ -153,20 +161,32 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
             .filter(|g| matches!(g.kind, NodeKind::Grip(_)) && linked(node.id, g.id))
             .count()
             .min(if linear { 2 } else { 1 }) as u8;
-        let zero_angle = (!linear).then(|| (p.end.y - p.start.y).atan2(p.end.x - p.start.x));
-        kept.insert(node.id, Kept { id, zero_angle });
-        let kind = if linear {
-            DynamicParameterKind::Linear {
+        let zero_angle = (family == DynamicFamily::Rotation)
+            .then(|| (p.end.y - p.start.y).atan2(p.end.x - p.start.x));
+        let flip = family == DynamicFamily::Flip;
+        kept.insert(
+            node.id,
+            Kept {
+                id,
+                zero_angle,
+                flip,
+            },
+        );
+        let kind = match family {
+            DynamicFamily::Linear => DynamicParameterKind::Linear {
                 start: p.start,
                 end: p.end,
                 value_set,
-            }
-        } else {
-            DynamicParameterKind::Rotation {
+            },
+            DynamicFamily::Rotation => DynamicParameterKind::Rotation {
                 base: p.start,
                 radius: distance(p.start, p.end),
                 value_set,
-            }
+            },
+            DynamicFamily::Flip => DynamicParameterKind::Flip {
+                base: p.start,
+                end: p.end,
+            },
         };
         parameters.push((
             node.id,
@@ -184,25 +204,27 @@ pub(super) fn read(def: &DynamicDefinition) -> Read {
     let mut actions: Vec<DraftAction> = Vec::new();
     let mut action_names = HashSet::new();
     for node in &def.nodes {
-        let (action, word): (&Action, &str) = match &node.kind {
-            NodeKind::Stretch(a) => (a, "Stretch"),
-            NodeKind::Move(a) => (a, "Move"),
-            NodeKind::Rotate(a) => (a, "Rotate"),
+        let (action, word, family): (&Action, &str, DynamicFamily) = match &node.kind {
+            NodeKind::Stretch(a) => (a, "Stretch", DynamicFamily::Linear),
+            NodeKind::Move(a) => (a, "Move", DynamicFamily::Linear),
+            NodeKind::Rotate(a) => (a, "Rotate", DynamicFamily::Rotation),
+            NodeKind::FlipAction(a) => (a, "Flip", DynamicFamily::Flip),
             _ => continue,
         };
-        let angular = word == "Rotate";
+        let angular = family != DynamicFamily::Linear;
         let followed = parameters
             .iter()
-            .find(|(id, p)| linked(*id, node.id) && p.is_angle() == angular);
+            .find(|(id, p)| linked(*id, node.id) && p.kind.family() == family);
         let step = match word {
             "Stretch" => bounding(&action.frame).map(Step::Stretch),
             "Move" => Some(Step::Move),
+            "Flip" => followed.map(|_| Step::Flip),
             // It turns about its parameter's base point; one about a point
             // of its own is a different action.
             _ => followed
                 .and_then(|(_, p)| match &p.kind {
                     DynamicParameterKind::Rotation { base, .. } => Some(*base),
-                    DynamicParameterKind::Linear { .. } => None,
+                    DynamicParameterKind::Linear { .. } | DynamicParameterKind::Flip { .. } => None,
                 })
                 .filter(|base| action.frame.first().is_some_and(|b| !has_length(*b, *base)))
                 .map(|_| Step::Rotate),

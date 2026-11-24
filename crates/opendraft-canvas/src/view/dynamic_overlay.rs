@@ -34,13 +34,16 @@ impl View {
                     );
                     frame.left_top()
                 }
-                DynamicActionKind::Move { .. } | DynamicActionKind::Rotate { .. } => schema
+                DynamicActionKind::Move { .. }
+                | DynamicActionKind::Rotate { .. }
+                | DynamicActionKind::Flip { .. } => schema
                     .parameters
                     .iter()
                     .find(|p| p.id == action.parameter)
                     .map_or(rect.center(), |p| {
                         let (DynamicParameterKind::Linear { start: at, .. }
-                        | DynamicParameterKind::Rotation { base: at, .. }) = &p.kind;
+                        | DynamicParameterKind::Rotation { base: at, .. }
+                        | DynamicParameterKind::Flip { base: at, .. }) = &p.kind;
                         to_screen(*at) + egui::vec2(0.0, 14.0)
                     }),
             };
@@ -54,7 +57,11 @@ impl View {
         }
         for parameter in &schema.parameters {
             let (start, end) = match &parameter.kind {
-                DynamicParameterKind::Linear { start, end, .. } => (*start, *end),
+                // The mirror line is drawn like a distance.
+                DynamicParameterKind::Linear { start, end, .. }
+                | DynamicParameterKind::Flip {
+                    base: start, end, ..
+                } => (*start, *end),
                 // A rotation: its circle, and the radius the grip starts on.
                 DynamicParameterKind::Rotation { base, radius, .. } => {
                     let end = Point::new(base.x + radius, base.y);

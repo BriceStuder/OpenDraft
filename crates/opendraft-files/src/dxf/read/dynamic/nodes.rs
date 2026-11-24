@@ -29,6 +29,8 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
         "BLOCKPOLARSTRETCHACTION" => Some(NodeKind::PolarStretch(action(object, in_block, false))),
         "BLOCKMOVEACTION" => Some(NodeKind::Move(action(object, in_block, true))),
         "BLOCKSCALEACTION" => Some(NodeKind::Scale(action(object, in_block, false))),
+        "BLOCKFLIPPARAMETER" => parameter(object).map(NodeKind::Flip),
+        "BLOCKFLIPACTION" => Some(NodeKind::FlipAction(action(object, in_block, false))),
         "BLOCKROTATEACTION" => Some(NodeKind::Rotate(action(object, in_block, false))),
         "BLOCKLOOKUPACTION" => table(object).map(NodeKind::LookupTable),
         n if n.starts_with("BLOCK") && n.ends_with("GRIP") => points(object, 1010, 1020)

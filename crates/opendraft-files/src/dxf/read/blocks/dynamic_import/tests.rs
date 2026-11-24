@@ -138,7 +138,7 @@ fn a_modified_reference_becomes_a_reference_to_the_definition_with_its_value() {
     );
     assert_eq!(
         loaded.warnings,
-        ["Imported 1 dynamic block with their linear and rotation parameters and stretch, move and rotate actions: Slide; 1 modified reference rebuilt from recorded values."]
+        ["Imported 1 dynamic block with their linear, rotation and flip parameters and stretch, move, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
     );
 }
 
@@ -343,4 +343,36 @@ fn a_rotation_with_a_list_of_angles_is_left_as_a_picture() {
         .warnings
         .iter()
         .any(|w| w.contains("rotation parameter with a list or increment of angles")));
+}
+
+#[test]
+fn a_flip_comes_in_but_its_modified_references_keep_their_pictures() {
+    let loaded = read(&dxf(false, |records| {
+        for r in records.iter_mut() {
+            match r.name.as_str() {
+                "BLOCKLINEARPARAMETER" => {
+                    r.name = "BLOCKFLIPPARAMETER".into();
+                    r.groups.retain(|g| g.code != 144);
+                }
+                "BLOCKSTRETCHACTION" => r.name = "BLOCKFLIPACTION".into(),
+                _ => {}
+            }
+        }
+    }))
+    .unwrap();
+    let slide = loaded.document.block_named("Slide").unwrap();
+    let schema = slide.dynamic.as_deref().expect("dynamic");
+    assert!(matches!(
+        schema.parameters[0].kind,
+        DynamicParameterKind::Flip { .. }
+    ));
+    assert!(matches!(
+        schema.actions[0].kind,
+        DynamicActionKind::Flip { .. }
+    ));
+    // Whether a reference is flipped is not read from the file yet.
+    let refs = inserts(&loaded.document);
+    assert_eq!(refs.len(), 1);
+    assert!(refs[0].dynamic.is_none());
+    assert!(!refs[0].block.is_dynamic(), "the anonymous block's picture");
 }

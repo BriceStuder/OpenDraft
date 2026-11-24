@@ -30,6 +30,10 @@ impl DynamicBlock {
                     *end = end.translated(dx, dy);
                 }
                 DynamicParameterKind::Rotation { base, .. } => *base = base.translated(dx, dy),
+                DynamicParameterKind::Flip { base, end } => {
+                    *base = base.translated(dx, dy);
+                    *end = end.translated(dx, dy);
+                }
             }
         }
         for a in &mut out.actions {
@@ -51,7 +55,8 @@ impl DynamicBlock {
         schema.actions.retain_mut(|a| {
             let (DynamicActionKind::Move { objects, .. }
             | DynamicActionKind::Stretch { objects, .. }
-            | DynamicActionKind::Rotate { objects }) = &mut a.kind;
+            | DynamicActionKind::Rotate { objects }
+            | DynamicActionKind::Flip { objects }) = &mut a.kind;
             let before = objects.len();
             objects.retain(|o| exists(*o));
             let lost = before - objects.len();

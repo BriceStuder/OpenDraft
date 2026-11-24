@@ -243,3 +243,30 @@ fn an_angle_row_reads_and_takes_degrees() {
     // Typing what it already is changes nothing.
     assert!(with_display_value(&insert, ParameterId(1), 0.0).is_none());
 }
+
+#[test]
+fn a_flip_row_is_a_yes_or_no_that_takes_one_or_zero() {
+    let turning = turning_line();
+    let mut block = (*turning.block).clone();
+    let schema = block.dynamic.as_mut().unwrap();
+    schema.parameters[0].kind = DynamicParameterKind::Flip {
+        base: p(0.0, 0.0),
+        end: p(0.0, 1.0),
+    };
+    schema.actions[0].kind = DynamicActionKind::Flip {
+        objects: vec![BlockObjectId(0)],
+    };
+    let insert = Insert::new(Arc::new(block), p(5.0, 5.0));
+    let shown = rows(&[&insert]);
+    assert!(shown[0].flag && !shown[0].angle);
+    assert_eq!(shown[0].value, Some(0.0));
+    let yes = with_display_value(&insert, ParameterId(1), 1.0).unwrap();
+    assert_eq!(rows(&[&yes])[0].value, Some(1.0));
+    // The line (0,0)-(2,0) mirrors about x = 0 into (0,0)-(-2,0), moved by 5.
+    assert!(
+        (yes.bounds().min.x - 3.0).abs() < 1e-9,
+        "{:?}",
+        yes.bounds()
+    );
+    assert!(with_display_value(&insert, ParameterId(1), 0.0).is_none());
+}

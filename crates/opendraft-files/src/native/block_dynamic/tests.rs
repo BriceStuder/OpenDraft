@@ -364,3 +364,41 @@ fn a_rotation_parameter_and_its_action_and_value_survive_a_round_trip() {
     assert_eq!(back.objects(), doc.objects());
     assert_eq!(back.validate(), Ok(()));
 }
+
+#[test]
+fn a_flip_parameter_and_action_and_a_flipped_value_survive_a_round_trip() {
+    let mut s = DynamicBlock::new();
+    s.parameters.push(DynamicParameter {
+        id: ParameterId(1),
+        name: "Flip1".into(),
+        label: "Flip".into(),
+        description: String::new(),
+        show: true,
+        grips: 1,
+        kind: DynamicParameterKind::Flip {
+            base: p(0.0, 0.0),
+            end: p(0.0, 3.0),
+        },
+    });
+    s.actions.push(DynamicAction {
+        id: ActionId(1),
+        name: "Flip1".into(),
+        parameter: ParameterId(1),
+        kind: DynamicActionKind::Flip {
+            objects: vec![BlockObjectId(7)],
+        },
+    });
+    s.next_parameter_id = 2;
+    s.next_action_id = 2;
+    let mut doc = Document::default();
+    let block = bar(&mut doc, Some(s));
+    doc.push_block(block.clone());
+    let flipped = Insert::new(block, p(0.0, 0.0))
+        .with_dynamic_value(ParameterId(1), DynamicValue::Bool(true))
+        .unwrap();
+    doc.add(Entity::Insert(Box::new(flipped)));
+    let back = read(&write(&doc)).unwrap();
+    assert_eq!(back.blocks(), doc.blocks());
+    assert_eq!(back.objects(), doc.objects());
+    assert_eq!(back.validate(), Ok(()));
+}

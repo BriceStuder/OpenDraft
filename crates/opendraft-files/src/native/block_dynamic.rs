@@ -48,6 +48,15 @@ struct ParameterDto {
 enum ParameterKindDto {
     Linear(LinearDto),
     Rotation(RotationDto),
+    Flip(FlipDto),
+}
+
+/// A flip parameter: its mirror line.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FlipDto {
+    base: PointDto,
+    end: PointDto,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -98,12 +107,14 @@ struct ActionDto {
 enum ActionKindDto {
     Move(ActionBodyDto),
     Stretch(ActionBodyDto),
-    Rotate(RotateDto),
+    Rotate(ObjectsDto),
+    Flip(ObjectsDto),
 }
 
+/// An action that only names its objects.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RotateDto {
+struct ObjectsDto {
     #[serde(deserialize_with = "super::limits::block_objects")]
     objects: Vec<u64>,
 }
@@ -209,6 +220,10 @@ impl ParameterDto {
                 radius: *radius,
                 values: ValueSetDto::of(value_set),
             }),
+            DynamicParameterKind::Flip { base, end } => ParameterKindDto::Flip(FlipDto {
+                base: point(*base),
+                end: point(*end),
+            }),
         };
         Self {
             id: p.id.0,
@@ -232,6 +247,10 @@ impl ParameterDto {
                 base: from_point(r.base)?,
                 radius: r.radius,
                 value_set: r.values.to_set(),
+            },
+            ParameterKindDto::Flip(f) => DynamicParameterKind::Flip {
+                base: from_point(f.base)?,
+                end: from_point(f.end)?,
             },
         };
         Ok(DynamicParameter {
@@ -297,7 +316,10 @@ impl ActionDto {
                 multiplier,
                 angle_offset,
             } => ActionKindDto::Stretch(body(objects, Some(frame), *multiplier, *angle_offset)),
-            DynamicActionKind::Rotate { objects } => ActionKindDto::Rotate(RotateDto {
+            DynamicActionKind::Rotate { objects } => ActionKindDto::Rotate(ObjectsDto {
+                objects: objects.iter().map(|o| o.0).collect(),
+            }),
+            DynamicActionKind::Flip { objects } => ActionKindDto::Flip(ObjectsDto {
                 objects: objects.iter().map(|o| o.0).collect(),
             }),
         };
@@ -338,6 +360,9 @@ impl ActionDto {
                 }
             }
             ActionKindDto::Rotate(r) => DynamicActionKind::Rotate {
+                objects: r.objects.iter().map(|&o| BlockObjectId(o)).collect(),
+            },
+            ActionKindDto::Flip(r) => DynamicActionKind::Flip {
                 objects: r.objects.iter().map(|&o| BlockObjectId(o)).collect(),
             },
         };

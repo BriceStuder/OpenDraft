@@ -24,6 +24,8 @@ pub struct Row {
     pub label: String,
     /// Whether the value is an angle, shown in degrees.
     pub angle: bool,
+    /// Whether it is a yes or no (a flip).
+    pub flag: bool,
     /// `None` when the references disagree.
     pub value: Option<f64>,
 }
@@ -55,6 +57,7 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
             Some(Row {
                 parameter: p.id,
                 angle: p.is_angle(),
+                flag: p.is_flag(),
                 label: if p.label.is_empty() {
                     p.name.clone()
                 } else {
@@ -86,7 +89,9 @@ pub fn with_display_value(insert: &Insert, parameter: ParameterId, display: f64)
 }
 
 fn unit_of(row: &Row) -> Unit {
-    if row.angle {
+    if row.flag {
+        Unit::Flag
+    } else if row.angle {
         Unit::Angle
     } else {
         Unit::Length

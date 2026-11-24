@@ -60,6 +60,8 @@ pub enum NodeKind {
     /// A rotation parameter: `start` is its base point and `end` where its
     /// grip starts.
     Rotation(Parameter),
+    /// A flip parameter: `start` and `end` are its mirror line.
+    Flip(Parameter),
     Lookup {
         name: String,
     },
@@ -69,6 +71,7 @@ pub enum NodeKind {
     Scale(Action),
     /// A rotate action: `frame` holds the point it turns about.
     Rotate(Action),
+    FlipAction(Action),
     LookupTable(Table),
     Grip(Point),
     /// An object not decoded, by its DXF name.
