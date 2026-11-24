@@ -6,7 +6,9 @@
 use std::collections::HashSet;
 
 use super::super::Record;
-use super::{points, upper, Action, Column, NodeKind, NodeState, Parameter, Table, MAX_LIST};
+use super::{
+    points, upper, Action, Column, NodeKind, NodeState, Parameter, Table, Visibility, MAX_LIST,
+};
 
 /// The decoded object, or `None` for one that is plumbing and nothing to a
 /// reader of the block (the grips' location components).
@@ -51,6 +53,7 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
                 || object.int(175).is_some_and(|n| n > 0);
             NodeKind::Rotation(p)
         }),
+        "BLOCKVISIBILITYPARAMETER" => visibility(object).map(NodeKind::Visibility),
         "BLOCKLOOKUPPARAMETER" => Some(NodeKind::Lookup {
             name: object.text(303).unwrap_or("").to_owned(),
         }),
@@ -81,6 +84,7 @@ pub(super) fn state(kind: &NodeKind, record: &Record) -> Option<NodeState> {
             })
         }
         NodeKind::Lookup { .. } => Some(NodeState::Lookup(record.text(1)?.to_owned())),
+        NodeKind::Visibility(_) => Some(NodeState::Visibility(record.text(1)?.to_owned())),
         _ => None,
     }
 }
@@ -95,6 +99,39 @@ fn parameter(object: &Record) -> Option<Parameter> {
         angle_name: String::new(),
         angle_range: None,
     })
+}
+
+/// `301` is its name and `1010` where it is; the `331` handles before the
+/// state count `92` are the objects it governs, then each state is a `303`
+/// name followed by the `332` handles of the objects it shows.
+fn visibility(object: &Record) -> Option<Visibility> {
+    let mut found = Visibility {
+        name: object.text(301).unwrap_or("").to_owned(),
+        position: *points(object, 1010, 1020).first()?,
+        governed: Vec::new(),
+        states: Vec::new(),
+    };
+    let mut in_states = false;
+    for g in &object.groups {
+        match g.code {
+            92 => in_states = true,
+            331 if !in_states && found.governed.len() < MAX_LIST => {
+                found.governed.push(g.value.clone());
+            }
+            303 if in_states && found.states.len() < MAX_LIST => {
+                found.states.push((g.value.clone(), Vec::new()));
+            }
+            332 if in_states => {
+                if let Some((_, shown)) = found.states.last_mut() {
+                    if shown.len() < MAX_LIST {
+                        shown.push(g.value.clone());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    (in_states && !found.states.is_empty()).then_some(found)
 }
 
 /// `175` is how many allowed values follow, as `144` groups.

@@ -33,6 +33,7 @@ mod dynamic_eval;
 mod dynamic_fit;
 mod dynamic_parameter;
 mod dynamic_value_set;
+mod dynamic_visibility;
 mod edit;
 mod editing;
 pub mod field;
@@ -55,7 +56,7 @@ pub use budget::MAX_EXPANSION;
 pub use dynamic::{
     ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicFamily,
     DynamicGrip, DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue,
-    DynamicValueEntry, DynamicValueSet, ParameterId,
+    DynamicValueEntry, DynamicValueSet, ParameterId, VisibilityState,
 };
 pub use dynamic_eval::{evaluate, DynamicBlockError};
 pub use dynamic_fit::Pruned;
@@ -286,6 +287,8 @@ mod dynamic_rotation_tests;
 mod dynamic_scale_tests;
 #[cfg(test)]
 mod dynamic_tests;
+#[cfg(test)]
+mod dynamic_visibility_tests;
 #[cfg(test)]
 mod dynamic_xy_tests;
 #[cfg(test)]

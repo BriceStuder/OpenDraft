@@ -24,24 +24,29 @@ use crate::dynamic_parameter_cmd::{
     flip_parameter, linear_parameter, point_parameter, polar_parameter, rotation_parameter,
     xy_parameter,
 };
+use crate::dynamic_visibility_cmd::visibility_parameter;
 use crate::text::plural;
 
 /// The schema being drafted, or an empty one.
-fn draft(ed: &Editor) -> Result<DynamicBlock, Cancelled> {
+pub(crate) fn draft(ed: &Editor) -> Result<DynamicBlock, Cancelled> {
     Ok(ed
         .read(|doc| doc.block_editor_dynamic().cloned())?
         .unwrap_or_default())
 }
 
-fn commit(ed: &Editor, name: &'static str, schema: DynamicBlock) -> Result<(), Cancelled> {
+pub(crate) fn commit(
+    ed: &Editor,
+    name: &'static str,
+    schema: DynamicBlock,
+) -> Result<(), Cancelled> {
     ed.transaction(name, move |tx| {
         tx.perform(SetBlockEditorDynamic::new(name, Some(schema)));
         Ok(())
     })
 }
 
-/// BPARAMETER: add a linear, polar, XY, point, rotation or flip parameter to
-/// the block being edited.
+/// BPARAMETER: add a linear, polar, XY, point, rotation, flip or visibility
+/// parameter to the block being edited.
 pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut schema = draft(ed)?;
     if schema.parameters.len() >= DynamicBlock::MAX_PARAMETERS {
@@ -51,7 +56,7 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     let parameter = match ed
         .get_keyword(
             Options::<String>::new(
-                "Enter parameter type [Linear/Polar/XY/Point/Rotation/Flip] <Linear>",
+                "Enter parameter type [Linear/Polar/XY/Point/Rotation/Flip/Visibility] <Linear>",
             )
             .keyword("Linear", "L")
             .keyword("Polar", "P")
@@ -59,6 +64,7 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
             .keyword("Point", "Po")
             .keyword("Rotation", "R")
             .keyword("Flip", "F")
+            .keyword("Visibility", "V")
             .default("Linear".to_owned()),
         )?
         .as_str()
@@ -68,6 +74,13 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
         "Polar" => polar_parameter(ed, &schema)?,
         "XY" => xy_parameter(ed, &schema)?,
         "Point" => point_parameter(ed, &schema)?,
+        "Visibility" => {
+            if schema.visibility().is_some() {
+                ed.say("The block has a visibility parameter already.");
+                return Ok(());
+            }
+            visibility_parameter(ed, &schema)?
+        }
         _ => linear_parameter(ed, &schema)?,
     };
     let name = parameter.name.clone();
@@ -81,7 +94,7 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
 /// The objects to act on, as ids of the block's objects: the pickset or a
 /// selection, without attribute definitions. `None` after saying why when
 /// nothing is left.
-fn select_objects(ed: &mut Editor) -> Result<Option<Vec<BlockObjectId>>, Cancelled> {
+pub(crate) fn select_objects(ed: &mut Editor) -> Result<Option<Vec<BlockObjectId>>, Cancelled> {
     let picked = ed.pickset_or_select("Select objects")?;
     let (usable, skipped) = ed.read(move |doc| {
         let mut usable = BTreeSet::new();
@@ -111,7 +124,7 @@ fn select_objects(ed: &mut Editor) -> Result<Option<Vec<BlockObjectId>>, Cancell
 }
 
 /// Which of `names` the user means.
-fn ask_choice(ed: &Editor, message: &str, names: &[String]) -> Result<usize, Cancelled> {
+pub(crate) fn ask_choice(ed: &Editor, message: &str, names: &[String]) -> Result<usize, Cancelled> {
     if names.len() == 1 {
         return Ok(0);
     }
@@ -378,3 +391,7 @@ mod polar_tests;
 #[cfg(test)]
 #[path = "dynamic_xy_cmd_tests.rs"]
 mod xy_tests;
+
+#[cfg(test)]
+#[path = "dynamic_visibility_cmd_tests.rs"]
+mod visibility_tests;

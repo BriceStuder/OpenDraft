@@ -36,7 +36,10 @@ impl DynamicBlock {
                     *base = base.translated(dx, dy);
                     *end = end.translated(dx, dy);
                 }
-                DynamicParameterKind::Point { position } => *position = position.translated(dx, dy),
+                DynamicParameterKind::Point { position }
+                | DynamicParameterKind::Visibility { position, .. } => {
+                    *position = position.translated(dx, dy);
+                }
             }
         }
         for a in &mut out.actions {
@@ -77,6 +80,13 @@ impl DynamicBlock {
             }
             true
         });
+        for p in &mut schema.parameters {
+            if let DynamicParameterKind::Visibility { states, .. } = &mut p.kind {
+                for state in states {
+                    state.hidden.retain(|o| exists(*o));
+                }
+            }
+        }
         Pruned {
             schema,
             notes,
@@ -103,6 +113,13 @@ impl DynamicBlock {
                     return Some(DynamicValueEntry {
                         parameter: e.parameter,
                         value: DynamicValue::Point(fitted),
+                    });
+                }
+                if let DynamicValue::Text(name) = &e.value {
+                    let value = p.visibility_value(name)?;
+                    return Some(DynamicValueEntry {
+                        parameter: e.parameter,
+                        value,
                     });
                 }
                 let value = p.normalize(p.number_of(&e.value)?)?;

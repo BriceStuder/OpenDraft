@@ -47,7 +47,8 @@ impl View {
                         | DynamicParameterKind::Flip { base: at, .. }
                         | DynamicParameterKind::Polar { base: at, .. }
                         | DynamicParameterKind::Xy { base: at, .. }
-                        | DynamicParameterKind::Point { position: at }) = &p.kind;
+                        | DynamicParameterKind::Point { position: at }
+                        | DynamicParameterKind::Visibility { position: at, .. }) = &p.kind;
                         to_screen(*at) + egui::vec2(0.0, 14.0)
                     }),
             };
@@ -72,8 +73,9 @@ impl View {
                 | DynamicParameterKind::Xy {
                     base: start, end, ..
                 } => (*start, *end),
-                // A point: a small circle where it is.
-                DynamicParameterKind::Point { position } => {
+                // A point or a visibility: a small circle where it is.
+                DynamicParameterKind::Point { position }
+                | DynamicParameterKind::Visibility { position, .. } => {
                     painter.circle_stroke(to_screen(*position), TICK, stroke);
                     (*position, *position)
                 }

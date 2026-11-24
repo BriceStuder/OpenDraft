@@ -11,8 +11,10 @@ use eframe::egui::{self, Ui};
 use opendraft_commands::ModifyEntities;
 use opendraft_core::block::{DynamicParameterKind, DynamicValue, ParameterId};
 use opendraft_core::{Entity, EntityKind, Insert, Units};
+use opendraft_ui::i18n::tr;
 use opendraft_ui::Theme;
 
+use crate::attr_rows::{cell_combo, VARIES};
 use crate::properties::{self, Unit};
 use crate::properties_ui::{row_frame, text_cell};
 use crate::state::AppState;
@@ -28,8 +30,12 @@ pub struct Row {
     pub angle: bool,
     /// Whether it is a yes or no (a flip).
     pub flag: bool,
-    /// `None` when the references disagree.
+    /// `None` when the references disagree. For a visibility parameter it is
+    /// the position of the state shown in `states`.
     pub value: Option<f64>,
+    /// The names of a visibility parameter's states, the choices of its
+    /// drop-down; empty for every other kind.
+    pub states: Vec<String>,
 }
 
 /// The rows for `inserts`: the shown parameters of their block, in its
@@ -79,6 +85,10 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
                     flag: p.is_flag(),
                     label,
                     value: same.then_some(first_value),
+                    states: p
+                        .visibility_states()
+                        .map(|s| s.iter().map(|s| s.name.clone()).collect())
+                        .unwrap_or_default(),
                 })
             })
         })
@@ -87,6 +97,13 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
 
 /// A value as shown: in drawing units, or in degrees for an angle.
 fn shown_value(insert: &Insert, parameter: ParameterId, part: u8) -> Option<f64> {
+    if let Some(p) = insert.block.dynamic.as_ref()?.visibility() {
+        if p.id == parameter {
+            let (_, shown) = insert.visibility_state()?;
+            let at = p.visibility_states()?.iter().position(|s| s.name == shown);
+            return at.map(|i| i as f64);
+        }
+    }
     if let Some((a, b)) = insert.dynamic_pair(parameter) {
         let polar = insert
             .block
@@ -105,7 +122,8 @@ fn shown_value(insert: &Insert, parameter: ParameterId, part: u8) -> Option<f64>
 }
 
 /// `insert` with `parameter` set to `display`, a length in drawing units (an
-/// angle in degrees), brought into the parameter's value set; `None` when
+/// angle in degrees; for a visibility parameter the position of the state
+/// picked), brought into the parameter's value set; `None` when
 /// that changes nothing
 /// or cannot be done (an unknown parameter, a flattened insert, a value that
 /// is not finite).
@@ -115,6 +133,14 @@ pub fn with_display_value(
     part: u8,
     display: f64,
 ) -> Option<Insert> {
+    if let Some(p) = insert.block.dynamic.as_ref()?.visibility() {
+        if p.id == parameter {
+            // The position of the state picked.
+            let at = (display.is_finite() && display >= 0.0).then_some(display as usize)?;
+            let name = &p.visibility_states()?.get(at)?.name;
+            return Some(insert.with_visibility_state(name)?).filter(|out| out != insert);
+        }
+    }
     let scale = insert.dynamic_scale(parameter)?;
     let p = insert
         .block
@@ -167,6 +193,19 @@ pub fn show(
             egui::Sense::hover(),
         )
         .on_hover_text(&row.label);
+        if !row.states.is_empty() {
+            // A visibility parameter: pick one of its states.
+            let current = row.value.map(|v| v as usize);
+            let varies = tr(VARIES);
+            let text = current
+                .and_then(|i| row.states.get(i))
+                .map_or(&*varies, String::as_str);
+            let id = egui::Id::new(("property_dynamic_states", row.parameter.0));
+            if let Some(picked) = cell_combo(ui, theme, id, cell, text, &row.states, current) {
+                edit = Some((row.parameter, 0, picked as f64));
+            }
+            continue;
+        }
         let shown = row
             .value
             .map(|v| properties::format(units, unit_of(row), v))

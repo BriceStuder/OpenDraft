@@ -16,7 +16,8 @@ use std::collections::HashMap;
 use std::f64::consts::TAU;
 
 use opendraft_core::block::{
-    BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicValue, ParameterId,
+    BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicParameterKind,
+    DynamicValue, ParameterId, VisibilityState,
 };
 
 use self::definition::{distance, read, upper, Draft, Kept, Step};
@@ -51,6 +52,8 @@ pub(super) struct Plan {
 mod kinds_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod visibility_tests;
 
 impl Plan {
     /// What the file's records hold of dynamic blocks.
@@ -109,6 +112,12 @@ impl Plan {
                         };
                         number.is_finite().then_some((kept.id, value))
                     }
+                    // A visibility shows the state it names, if it has it.
+                    (Some(kept), NodeState::Visibility(name))
+                        if kept.states.contains(&name.trim().to_lowercase()) =>
+                    {
+                        Some((kept.id, DynamicValue::Text(name.trim().to_owned())))
+                    }
                     _ => None,
                 })
                 .collect();
@@ -123,6 +132,15 @@ impl Plan {
             }
         }
         plan
+    }
+
+    /// Whether the visibility parameter of block `key` governs the object
+    /// with this DXF handle.
+    pub(super) fn governs(&self, key: &str, handle: &str) -> bool {
+        self.drafts
+            .get(key)
+            .and_then(|d| d.visibility.as_ref())
+            .is_some_and(|v| v.governed.contains(&upper(handle)))
     }
 
     /// The reference to the anonymous block `key`, as a reference to its
@@ -176,9 +194,44 @@ impl Plan {
                 },
             });
         }
+        if let Some(v) = &draft.visibility {
+            let object_of = |handle: &String| {
+                handles
+                    .iter()
+                    .position(|h| h.as_ref().is_some_and(|h| upper(h) == *handle))
+                    .map(|i| BlockObjectId(i as u64))
+            };
+            // An object it governs and a state does not show is hidden there.
+            let mut governed: Vec<BlockObjectId> =
+                v.governed.iter().filter_map(object_of).collect();
+            governed.sort();
+            governed.dedup();
+            let states: Vec<VisibilityState> = v
+                .states
+                .iter()
+                .map(|(name, shown)| {
+                    let shown: Vec<BlockObjectId> = shown.iter().filter_map(object_of).collect();
+                    VisibilityState {
+                        name: name.clone(),
+                        hidden: governed
+                            .iter()
+                            .copied()
+                            .filter(|o| !shown.contains(o))
+                            .collect(),
+                    }
+                })
+                .collect();
+            for p in &mut schema.parameters {
+                if p.id == v.parameter {
+                    if let DynamicParameterKind::Visibility { states: slot, .. } = &mut p.kind {
+                        *slot = states.clone();
+                    }
+                }
+            }
+        }
         schema.next_parameter_id = draft.parameters.len() as u64 + 1;
         schema.next_action_id = draft.actions.len() as u64 + 1;
-        if schema.actions.is_empty() {
+        if schema.actions.is_empty() && draft.visibility.is_none() {
             self.failed.push(key.to_owned());
             return None;
         }

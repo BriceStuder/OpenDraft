@@ -270,3 +270,53 @@ fn a_flip_row_is_a_yes_or_no_that_takes_one_or_zero() {
     );
     assert!(with_display_value(&insert, ParameterId(1), 0, 0.0).is_none());
 }
+
+/// Two lines; "Plain" hides the second and "Alt" the first.
+fn alternatives() -> Arc<BlockDef> {
+    use opendraft_core::block::VisibilityState;
+    let mut schema = DynamicBlock::new();
+    schema.parameters.push(DynamicParameter {
+        id: ParameterId(1),
+        name: "Visibility1".into(),
+        label: "Shape".into(),
+        description: String::new(),
+        show: true,
+        grips: 0,
+        kind: DynamicParameterKind::Visibility {
+            position: p(0.0, 0.0),
+            states: vec![
+                VisibilityState {
+                    name: "Plain".into(),
+                    hidden: vec![BlockObjectId(1)],
+                },
+                VisibilityState {
+                    name: "Alt".into(),
+                    hidden: vec![BlockObjectId(0)],
+                },
+            ],
+        },
+    });
+    schema.next_parameter_id = 2;
+    let mut def = (*block(9, DynamicValueSet::Any)).clone();
+    def.dynamic = Some(Box::new(schema));
+    Arc::new(def)
+}
+
+#[test]
+fn a_visibility_parameter_is_a_row_of_choices_and_picking_one_changes_the_state() {
+    let block = alternatives();
+    let plain = Insert::new(block.clone(), p(0.0, 0.0));
+    let one = rows(&[&plain]);
+    assert_eq!(one.len(), 1);
+    assert_eq!(one[0].label, "Shape");
+    assert_eq!(one[0].states, ["Plain", "Alt"]);
+    assert_eq!(one[0].value, Some(0.0));
+    // Picking the second state; picking the one already shown changes nothing.
+    let alt = with_display_value(&plain, ParameterId(1), 0, 1.0).unwrap();
+    assert_eq!(alt.visibility_state().map(|s| s.1), Some("Alt"));
+    assert!(with_display_value(&plain, ParameterId(1), 0, 0.0).is_none());
+    assert!(with_display_value(&plain, ParameterId(1), 0, 5.0).is_none());
+    // References in different states vary.
+    let both = rows(&[&plain, &alt]);
+    assert_eq!(both[0].value, None);
+}

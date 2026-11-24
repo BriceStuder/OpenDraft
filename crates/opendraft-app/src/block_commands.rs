@@ -10,6 +10,7 @@ use crate::attribute_sync_cmd::sync_attributes;
 use crate::block_cmd::define_block;
 use crate::block_dialog_cmd::define_block_dialog;
 use crate::dynamic_block_cmd::{baction, bactionset, bparameter, resetblock};
+use crate::dynamic_visibility_cmd::{bvhide, bvshow, bvstate};
 use crate::field_cmd::{insert_field, update_field};
 use crate::field_dialog_cmd::insert_field_dialog;
 use crate::insert_cmd::insert_block;
@@ -73,6 +74,10 @@ pub fn commands() -> Vec<Command<AppState>> {
             bactionset
         )
         .when(AppState::in_block_editor),
+        editor!("block.vstate", "Visibility States", "BVSTATE", bvstate)
+            .when(AppState::in_block_editor),
+        editor!("block.vhide", "Hide Objects", "BVHIDE", bvhide).when(AppState::in_block_editor),
+        editor!("block.vshow", "Show Objects", "BVSHOW", bvshow).when(AppState::in_block_editor),
         editor!("block.reset", "Reset Block", "RESETBLOCK", resetblock)
             .when(|s: &AppState| !s.in_block_editor()),
     ]

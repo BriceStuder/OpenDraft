@@ -33,6 +33,9 @@ pub(super) struct BlockReading {
     collecting: Option<Vec<(Item<String>, opendraft_core::Attributes)>>,
     /// The DXF handle of each of those objects, in the same order.
     handles: Vec<Option<String>>,
+    /// Whether each of them is marked invisible, in the same order. A
+    /// visibility parameter's hidden states are written that way.
+    hidden: Vec<bool>,
     /// What the file's dynamic blocks come to.
     plan: Plan,
     built: ImportedBlocks<String>,
@@ -142,13 +145,18 @@ impl Importer {
                         current = Some((block, anonymous));
                         self.blocks.collecting = Some(Vec::new());
                         self.blocks.handles.clear();
+                        self.blocks.hidden.clear();
                     }
                 }
                 "ENDBLK" => {
                     self.drop_open_insert();
                     if let Some((mut block, anonymous)) = current.take() {
                         block.items = self.blocks.collecting.take().unwrap_or_default();
+                        self.drop_hidden(&mut block);
                         block.dynamic = self.blocks.plan.schema(&block.key, &self.blocks.handles);
+                        if block.dynamic.is_none() {
+                            self.drop_hidden_all(&mut block);
+                        }
                         pending.push((block, anonymous));
                     }
                 }
@@ -159,6 +167,57 @@ impl Importer {
         self.blocks.collecting = None;
         let pending = self.keep_inserted(pending, records);
         self.blocks.built = ImportedBlocks::build(&mut self.document, pending);
+    }
+
+    /// Takes the objects marked invisible out of a block, except those a
+    /// visibility parameter governs, which are the objects of its other
+    /// states. (Objects marked invisible and governed by nothing stay hidden
+    /// in AutoCAD, so they are left out and counted.)
+    fn drop_hidden(&mut self, block: &mut PendingBlock<String>) {
+        let keep: Vec<bool> = self
+            .blocks
+            .hidden
+            .iter()
+            .zip(&self.blocks.handles)
+            .map(|(hidden, handle)| {
+                !hidden
+                    || handle
+                        .as_deref()
+                        .is_some_and(|h| self.blocks.plan.governs(&block.key, h))
+            })
+            .collect();
+        self.retain_objects(block, &keep);
+    }
+
+    /// Takes every object marked invisible out of a block that did not come
+    /// in as a dynamic block with a visibility parameter.
+    fn drop_hidden_all(&mut self, block: &mut PendingBlock<String>) {
+        let keep: Vec<bool> = self.blocks.hidden.iter().map(|h| !h).collect();
+        self.retain_objects(block, &keep);
+    }
+
+    fn retain_objects(&mut self, block: &mut PendingBlock<String>, keep: &[bool]) {
+        let dropped = keep.iter().filter(|k| !**k).count();
+        if dropped == 0 {
+            return;
+        }
+        self.invisible += dropped;
+        self.imported = self.imported.saturating_sub(dropped as _);
+        let mut at = 0;
+        block.items.retain(|_| {
+            at += 1;
+            keep[at - 1]
+        });
+        let mut at = 0;
+        self.blocks.handles.retain(|_| {
+            at += 1;
+            keep[at - 1]
+        });
+        let mut at = 0;
+        self.blocks.hidden.retain(|_| {
+            at += 1;
+            keep[at - 1]
+        });
     }
 
     /// The definitions to build: every named block, and the anonymous ones an
@@ -256,7 +315,8 @@ impl Importer {
     pub(super) fn add_item(&mut self, record: &Record, item: Item<String>) {
         // A hidden object (group 60 is 1, as a dynamic block's other
         // visibility states are) is left out, as the DWG reader does.
-        if record.int(60) == Some(1) {
+        let hidden = record.int(60) == Some(1);
+        if hidden && self.blocks.collecting.is_none() {
             self.invisible += 1;
             return;
         }
@@ -264,6 +324,7 @@ impl Importer {
         if let Some(items) = self.blocks.collecting.as_mut() {
             items.push((item, attrs));
             self.blocks.handles.push(record.text(5).map(str::to_owned));
+            self.blocks.hidden.push(hidden);
             self.imported += 1;
             return;
         }
