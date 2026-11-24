@@ -16,7 +16,7 @@ use opendraft_commands::{
 use opendraft_core::Point;
 use rust_i18n::t;
 
-use crate::cmdline::{CmdOption, Prompt};
+use crate::cmdline::Prompt;
 use crate::coordinates::CoordinateMode;
 use crate::prompt_reply::{
     reply_for_point, takes_clicked_points, typed_reply, typed_reply_with_mode,
@@ -227,23 +227,16 @@ impl AppState {
             text.push(' ');
             text.push_str(&t!("or"));
         }
+        let options = crate::option_language::options(&ask.keywords);
         if let Some(hint) = &ask.default_hint {
-            text.push_str(&format!(
-                " <{}>",
-                hint_text(self.reading(), ask.wants, ask.turn, hint)
-            ));
+            let hint = hint_text(self.reading(), ask.wants, ask.turn, hint);
+            let hint = crate::option_language::shown_default(&options, hint);
+            text.push_str(&format!(" <{hint}>"));
         }
         Some(Prompt {
             command: runner.name().to_uppercase().into(),
             text: text.into(),
-            options: ask
-                .keywords
-                .iter()
-                .map(|k| CmdOption {
-                    label: k.label.clone().into(),
-                    key: k.key.clone().into(),
-                })
-                .collect(),
+            options,
         })
     }
 
