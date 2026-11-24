@@ -217,6 +217,15 @@ impl Document {
         id
     }
 
+    /// Append a new object under an id the caller chose, on the active
+    /// layout, raising the counter past it. The caller keeps ids unique
+    /// (`validate` refuses a repeat). The Block Editor uses it so an object
+    /// keeps the id its block gave it.
+    pub fn add_with_id(&mut self, id: EntityId, entity: Entity, attrs: Attributes) {
+        let layout = self.active_layout;
+        self.push(Object::new(id, entity, attrs, layout));
+    }
+
     /// Append an object that already has an id (redo, undo of an erase).
     pub fn push(&mut self, object: Object) {
         self.next_id = self.next_id.max(after(object.id.0));

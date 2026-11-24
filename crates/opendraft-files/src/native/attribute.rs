@@ -500,11 +500,14 @@ mod tests {
             description: String::new(),
             entities: defs
                 .iter()
-                .map(|d| BlockEntity {
+                .enumerate()
+                .map(|(i, d)| BlockEntity {
+                    id: opendraft_core::BlockObjectId(i as u64),
                     entity: Entity::AttributeDefinition(Box::new(d.clone())),
                     attrs: Attributes::on_layer(LayerId::DEFAULT),
                 })
                 .collect(),
+            dynamic: None,
         });
         doc.push_block(block.clone());
         let mut insert = Insert::new(block.clone(), Point::new(5.0, 5.0));

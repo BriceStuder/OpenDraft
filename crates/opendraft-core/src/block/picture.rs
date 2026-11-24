@@ -10,7 +10,7 @@
 
 use crate::block::affine::Similarity;
 use crate::block::attribute::traits_of;
-use crate::block::{inherited, Affine, BlockEntity, Insert, MAX_EXPANSION, MAX_NESTING};
+use crate::block::{inherited, Affine, Insert, MAX_EXPANSION, MAX_NESTING};
 use crate::{bulge, Attributes, Bounds, Ellipse, Entity, LayerId, LayerLook, Point};
 
 /// One drawn object of an insert, with its layer and properties after
@@ -124,11 +124,7 @@ impl Insert {
     /// block's objects mapped into the drawing with their own layers and
     /// properties. A nested insert stays an insert unless the scale is
     /// uneven, when it is expanded too.
-    pub fn exploded(
-        &self,
-        attrs: &Attributes,
-        look: &dyn Fn(LayerId) -> LayerLook,
-    ) -> Vec<BlockEntity> {
+    pub fn exploded(&self, attrs: &Attributes, look: &dyn Fn(LayerId) -> LayerLook) -> Vec<Piece> {
         let map = self.transform();
         let even = map.similarity().is_some();
         let mut out = Vec::new();
@@ -158,14 +154,10 @@ impl Insert {
                 }],
             };
             for part in parts {
-                out.extend(
-                    mapped(&part.entity, &map)
-                        .into_iter()
-                        .map(|entity| BlockEntity {
-                            entity,
-                            attrs: part.attrs.clone(),
-                        }),
-                );
+                out.extend(mapped(&part.entity, &map).into_iter().map(|entity| Piece {
+                    entity,
+                    attrs: part.attrs.clone(),
+                }));
             }
         }
         for r in self.attributes.iter().filter(|r| !r.flags.invisible()) {
@@ -175,7 +167,7 @@ impl Insert {
                 ..inherited(own, attrs, look)
             };
             let text = Entity::MText(Box::new(r.view()));
-            out.extend(mapped(&text, &map).into_iter().map(|entity| BlockEntity {
+            out.extend(mapped(&text, &map).into_iter().map(|entity| Piece {
                 entity,
                 attrs: own.clone(),
             }));

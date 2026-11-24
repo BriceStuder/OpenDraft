@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use opendraft_core::block::{block_name_problem, MAX_EXPANSION, MAX_NESTING};
 use opendraft_core::{
-    Attributes, BlockDef, BlockEntity, BlockId, Color, DimStyle, Entity, LayerId, LinetypeId,
-    Lineweight,
+    Attributes, BlockDef, BlockEntity, BlockId, BlockObjectId, Color, DimStyle, Entity, LayerId,
+    LinetypeId, Lineweight,
 };
 use serde::{Deserialize, Serialize};
 
@@ -158,10 +158,13 @@ fn resolve(
             ..Attributes::on_layer(LayerId(object.layer))
         };
         object.scale.apply(&mut attrs);
-        entities.push(BlockEntity {
-            entity: object.entity.to_entity(done, dim_styles)?,
+        // The file keeps no object ids yet: they number the objects in order.
+        let id = BlockObjectId(entities.len() as u64);
+        entities.push(BlockEntity::new(
+            id,
+            object.entity.to_entity(done, dim_styles)?,
             attrs,
-        });
+        ));
     }
     let block = Arc::new(BlockDef {
         unit: opendraft_core::InsertUnits::from_code(i64::from(dto.unit)).unwrap_or_default(),
@@ -170,6 +173,7 @@ fn resolve(
         base: from_point(dto.base)?,
         description: dto.description.clone(),
         entities,
+        dynamic: None,
     });
     if block.expansion_size(sizes) > MAX_EXPANSION {
         return invalid(format!(
@@ -205,6 +209,7 @@ pub(super) fn insert_entity(
             .iter()
             .map(AttributeReferenceDto::to_reference)
             .collect::<Result<_, _>>()?,
+        dynamic: None,
     };
     if !insert.is_valid() {
         return invalid("a block insert has a zero or non-finite scale or rotation");
@@ -238,6 +243,7 @@ mod tests {
             description: "a circle".into(),
             entities: vec![
                 BlockEntity {
+                    id: opendraft_core::BlockObjectId(0),
                     entity: Entity::Circle {
                         center: p(1.0, 1.0),
                         radius: 0.5,
@@ -248,6 +254,7 @@ mod tests {
                     },
                 },
                 BlockEntity {
+                    id: opendraft_core::BlockObjectId(1),
                     entity: Entity::Ellipse(
                         opendraft_core::Ellipse::new(p(1.0, 1.0), p(0.0, 2.0), 0.5, 1.0, 4.0)
                             .unwrap(),
@@ -255,6 +262,7 @@ mod tests {
                     attrs: Attributes::on_layer(walls),
                 },
                 BlockEntity {
+                    id: opendraft_core::BlockObjectId(2),
                     entity: Entity::Spline(Box::new(
                         opendraft_core::Spline::from_fit_points(
                             vec![p(0.0, 0.0), p(1.0, 2.0), p(3.0, 1.0)],
@@ -265,6 +273,7 @@ mod tests {
                     attrs: Attributes::on_layer(walls),
                 },
             ],
+            dynamic: None,
         });
         let mut placed = Insert::new(inner.clone(), p(3.0, 0.0));
         placed.scale_x = -2.0;
@@ -276,9 +285,11 @@ mod tests {
             base: p(0.0, 0.0),
             description: String::new(),
             entities: vec![BlockEntity {
+                id: opendraft_core::BlockObjectId(0),
                 entity: Entity::Insert(Box::new(placed)),
                 attrs: Attributes::on_layer(LayerId::DEFAULT),
             }],
+            dynamic: None,
         });
         doc.push_block(inner);
         doc.push_block(outer.clone());

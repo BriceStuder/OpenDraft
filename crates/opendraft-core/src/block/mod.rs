@@ -26,6 +26,7 @@ mod attribute_sync;
 mod attribute_world;
 pub mod block_draft;
 mod budget;
+pub mod dynamic;
 mod edit;
 mod editing;
 pub mod field;
@@ -44,6 +45,11 @@ pub use attribute::{
 };
 pub use attribute_sync::{sync_references, Synced};
 pub use budget::MAX_EXPANSION;
+pub use dynamic::{
+    ActionId, BlockObjectId, DynamicAction, DynamicActionKind, DynamicBlock, DynamicGrip,
+    DynamicInstanceState, DynamicParameter, DynamicParameterKind, DynamicValue, DynamicValueEntry,
+    DynamicValueSet, ParameterId,
+};
 pub use editing::BlockEditSave;
 pub use field::{
     DataField, FieldObjectRef, FieldRun, FieldStatus, FieldText, FieldValue, MAX_FIELDS_PER_TEXT,
@@ -68,8 +74,17 @@ pub const MAX_NESTING: usize = 64;
 /// coordinates, and its layer and properties.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BlockEntity {
+    /// Stable inside this definition, so a dynamic block's actions can name
+    /// the object; not a drawing-wide `EntityId`. Unique in the definition.
+    pub id: BlockObjectId,
     pub entity: Entity,
     pub attrs: Attributes,
+}
+
+impl BlockEntity {
+    pub fn new(id: BlockObjectId, entity: Entity, attrs: Attributes) -> Self {
+        Self { id, entity, attrs }
+    }
 }
 
 /// A block definition: the record in the block table.
@@ -88,9 +103,17 @@ pub struct BlockDef {
     pub unit: InsertUnits,
     /// The objects, in draw order.
     pub entities: Vec<BlockEntity>,
+    /// `None` for an ordinary block; the parameters and actions of a dynamic
+    /// one.
+    pub dynamic: Option<Box<DynamicBlock>>,
 }
 
 impl BlockDef {
+    /// Whether the block has parameters and actions.
+    pub fn is_dynamic(&self) -> bool {
+        self.dynamic.is_some()
+    }
+
     /// The ids of the blocks this one inserts directly.
     pub fn nested_blocks(&self) -> impl Iterator<Item = BlockId> + '_ {
         self.entities.iter().filter_map(|e| match &e.entity {
@@ -143,6 +166,9 @@ pub struct Insert {
     /// One reference per non-constant attribute definition of the block, in
     /// definition order, each with this insert's own value. See [`attribute`].
     pub attributes: Vec<AttributeReference>,
+    /// The values this insert overrides, or `None` for the definition's
+    /// defaults. Only a block with a dynamic schema may have it.
+    pub dynamic: Option<Box<DynamicInstanceState>>,
 }
 
 impl Insert {
@@ -155,6 +181,15 @@ impl Insert {
             scale_y: 1.0,
             rotation: 0.0,
             attributes: Vec::new(),
+            dynamic: None,
+        }
+    }
+
+    /// This insert with every dynamic value back at the definition's default.
+    pub fn reset_dynamic(&self) -> Insert {
+        Insert {
+            dynamic: None,
+            ..self.clone()
         }
     }
 
@@ -223,5 +258,7 @@ pub fn inherited(
 
 #[cfg(test)]
 mod attribute_tests;
+#[cfg(test)]
+mod expansion_tests;
 #[cfg(test)]
 pub(crate) mod tests;

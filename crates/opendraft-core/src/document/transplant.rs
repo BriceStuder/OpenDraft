@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::Document;
-use crate::block::{BlockDef, BlockEntity, Insert};
+use crate::block::{BlockDef, BlockEntity, BlockObjectId, Insert};
 use crate::dimension::DimStyle;
 use crate::layer::{Attributes, Layer};
 use crate::layout::LayoutId;
@@ -179,9 +179,10 @@ impl Document {
                 let entities: Vec<BlockEntity> = source
                     .objects()
                     .iter()
-                    .map(|o| BlockEntity {
-                        entity: merge.entity(&o.entity),
-                        attrs: merge.attrs(&o.attrs),
+                    .enumerate()
+                    .map(|(i, o)| {
+                        let (entity, attrs) = (merge.entity(&o.entity), merge.attrs(&o.attrs));
+                        BlockEntity::new(BlockObjectId(i as u64), entity, attrs)
                     })
                     .collect();
                 let id = merge.dst.allocate_block_id();
@@ -192,6 +193,7 @@ impl Document {
                     base: *base,
                     description: String::new(),
                     entities,
+                    dynamic: None,
                 });
                 merge.dst.push_block(def.clone());
                 let attrs = Attributes::on_layer(merge.dst.current_layer);
@@ -270,9 +272,11 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: vec![BlockEntity {
+                id: crate::BlockObjectId(0),
                 entity: circle(),
                 attrs: Attributes::on_layer(LayerId::DEFAULT),
             }],
+            dynamic: None,
         });
         doc.push_block(def.clone());
         def
@@ -331,9 +335,11 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: vec![BlockEntity {
+                id: crate::BlockObjectId(1),
                 entity: Entity::Insert(Box::new(Insert::new(inner, Point::new(1.0, 1.0)))),
                 attrs: Attributes::on_layer(LayerId::DEFAULT),
             }],
+            dynamic: None,
         });
         src.push_block(outer.clone());
         let one = src.add(Entity::Insert(Box::new(Insert::new(
@@ -511,12 +517,14 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: vec![BlockEntity {
+                id: crate::BlockObjectId(2),
                 entity: circle(),
                 attrs: Attributes {
                     linetype: Attr::Set(mine),
                     ..Attributes::on_layer(LayerId::DEFAULT)
                 },
             }],
+            dynamic: None,
         });
         src.push_block(def.clone());
         let insert = src.add(Entity::Insert(Box::new(Insert::new(

@@ -12,15 +12,24 @@ fn plain() -> Attributes {
     Attributes::on_layer(LayerId::DEFAULT)
 }
 
-fn p(x: f64, y: f64) -> Point {
+pub(crate) fn p(x: f64, y: f64) -> Point {
     Point::new(x, y)
 }
 
 fn on_zero(entity: Entity) -> BlockEntity {
     BlockEntity {
+        id: crate::BlockObjectId(0),
         entity,
         attrs: Attributes::on_layer(LayerId::DEFAULT),
     }
+}
+
+/// `entities` numbered 0, 1, 2... as the objects of one definition are.
+pub(crate) fn numbered(mut entities: Vec<BlockEntity>) -> Vec<BlockEntity> {
+    for (i, e) in entities.iter_mut().enumerate() {
+        e.id = crate::BlockObjectId(i as u64);
+    }
+    entities
 }
 
 /// A unit square drawn with its corner at (10, 10), base point there, and a
@@ -32,7 +41,7 @@ pub(crate) fn square_block() -> Arc<BlockDef> {
         name: "Square".into(),
         base: p(10.0, 10.0),
         description: String::new(),
-        entities: vec![
+        entities: numbered(vec![
             on_zero(Entity::Rectangle {
                 min: p(10.0, 10.0),
                 max: p(11.0, 11.0),
@@ -41,7 +50,8 @@ pub(crate) fn square_block() -> Arc<BlockDef> {
                 center: p(10.5, 10.5),
                 radius: 0.25,
             }),
-        ],
+        ]),
+        dynamic: None,
     })
 }
 
@@ -97,13 +107,14 @@ fn nested_doc() -> (Document, Arc<BlockDef>, Arc<BlockDef>) {
         name: "Pair".into(),
         base: p(0.0, 0.0),
         description: String::new(),
-        entities: vec![
+        entities: numbered(vec![
             on_zero(Entity::Insert(Box::new(placed))),
             on_zero(Entity::Line {
                 start: p(0.0, 0.0),
                 end: p(1.0, 0.0),
             }),
-        ],
+        ]),
+        dynamic: None,
     });
     doc.push_block(outer.clone());
     (doc, inner, outer)
@@ -207,6 +218,7 @@ fn a_block_cannot_insert_itself() {
             outer,
             p(0.0, 0.0),
         )))));
+    looped.entities.last_mut().unwrap().id = crate::BlockObjectId(9);
     assert!(doc.redefined_blocks(looped).is_err());
 }
 
@@ -256,58 +268,6 @@ fn a_layer_used_inside_a_block_is_in_use() {
 
 use crate::validate::DocumentError;
 
-/// `levels` blocks above `leaf`, each inserting the one below twice.
-fn doubling_chain(leaf: Arc<BlockDef>, levels: u64) -> Arc<BlockDef> {
-    let mut below = leaf;
-    for id in 1..=levels {
-        let insert = || BlockEntity {
-            entity: Entity::Insert(Box::new(Insert::new(below.clone(), p(0.0, 0.0)))),
-            attrs: Attributes::on_layer(LayerId::DEFAULT),
-        };
-        below = Arc::new(BlockDef {
-            unit: Default::default(),
-            id: BlockId(id + 10),
-            name: format!("level{id}"),
-            base: p(0.0, 0.0),
-            description: String::new(),
-            entities: vec![insert(), insert()],
-        });
-    }
-    below
-}
-
-#[test]
-fn expansion_size_counts_nested_objects_once_per_definition() {
-    let mut memo = std::collections::HashMap::new();
-    assert_eq!(square_block().expansion_size(&mut memo), 2);
-    // Each level holds two inserts (2) and two copies of the level below.
-    let chain = doubling_chain(square_block(), 3);
-    assert_eq!(
-        chain.expansion_size(&mut memo),
-        2 + 2 * (2 + 2 * (2 + 2 * 2))
-    );
-    let huge = doubling_chain(square_block(), 60);
-    assert!(huge.expansion_size(&mut memo) > MAX_EXPANSION);
-}
-
-#[test]
-fn a_block_that_fans_out_is_cut_short_not_expanded_forever() {
-    // An empty leaf draws nothing, so only the budget stops the walk.
-    let empty = Arc::new(BlockDef {
-        unit: Default::default(),
-        id: BlockId(1),
-        name: "Empty".into(),
-        base: p(0.0, 0.0),
-        description: String::new(),
-        entities: Vec::new(),
-    });
-    let insert = Insert::new(doubling_chain(empty, 50), p(0.0, 0.0));
-    assert!(insert.picture().is_empty());
-    // One under the budget is expanded in full.
-    let pieces = Insert::new(doubling_chain(square_block(), 12), p(0.0, 0.0)).picture();
-    assert_eq!(pieces.len(), 2 << 12);
-}
-
 /// A block of one line, ByBlock in all three properties, on `layer`.
 fn by_block_line(id: u64, layer: LayerId) -> Arc<BlockDef> {
     let attrs = Attributes {
@@ -323,12 +283,14 @@ fn by_block_line(id: u64, layer: LayerId) -> Arc<BlockDef> {
         base: p(0.0, 0.0),
         description: String::new(),
         entities: vec![BlockEntity {
+            id: crate::BlockObjectId(2),
             entity: Entity::Line {
                 start: p(0.0, 0.0),
                 end: p(1.0, 0.0),
             },
             attrs,
         }],
+        dynamic: None,
     })
 }
 
@@ -385,12 +347,14 @@ fn by_block_passes_through_nested_inserts_to_the_outermost_setting() {
         base: p(0.0, 0.0),
         description: String::new(),
         entities: vec![BlockEntity {
+            id: crate::BlockObjectId(3),
             entity: Entity::Insert(Box::new(Insert::new(inner, p(0.0, 0.0)))),
             attrs: Attributes {
                 color: Attr::ByBlock,
                 ..plain()
             },
         }],
+        dynamic: None,
     });
     let outer = Insert::new(middle, p(0.0, 0.0));
     let pieces = outer.picture_with(&red_dashed_heavy(LayerId::DEFAULT), &|l| doc.layer_look(l));

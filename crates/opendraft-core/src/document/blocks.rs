@@ -117,7 +117,9 @@ impl Document {
         };
         for e in &block.entities {
             let entity = e.entity.translated(-block.base.x, -block.base.y);
-            doc.add_with(entity, e.attrs.clone());
+            // An object keeps its block id as its id here, and BSAVE reads it
+            // back, so an action that names it still does after an edit.
+            doc.add_with_id(EntityId(e.id.0), entity, e.attrs.clone());
         }
         Some(doc)
     }

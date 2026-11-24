@@ -157,10 +157,7 @@ impl Merge<'_> {
                 let entities = def
                     .entities
                     .iter()
-                    .map(|e| BlockEntity {
-                        entity: self.entity(&e.entity),
-                        attrs: self.attrs(&e.attrs),
-                    })
+                    .map(|e| BlockEntity::new(e.id, self.entity(&e.entity), self.attrs(&e.attrs)))
                     .collect();
                 let copy = Arc::new(BlockDef {
                     unit: def.unit,
@@ -169,6 +166,7 @@ impl Merge<'_> {
                     base: def.base,
                     description: def.description.clone(),
                     entities,
+                    dynamic: def.dynamic.clone(),
                 });
                 self.dst.push_block(copy.clone());
                 copy

@@ -62,6 +62,7 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: Vec::new(),
+            dynamic: None,
         });
         let mut action = SetBlocks::new("Block", vec![block]);
         action.apply(&mut doc);

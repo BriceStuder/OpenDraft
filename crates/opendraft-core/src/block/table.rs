@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::block::{BlockDef, BlockEntity, BlockId, Insert};
+use crate::block::{BlockDef, BlockEntity, BlockId, BlockObjectId, Insert};
 use crate::validate::DocumentError;
 use crate::{Document, Entity, EntityId, Object};
 
@@ -47,11 +47,12 @@ impl BlockDef {
             description: String::new(),
             entities: objects
                 .into_iter()
-                .map(|o| BlockEntity {
-                    entity: o.entity.clone(),
-                    attrs: o.attrs.clone(),
+                .enumerate()
+                .map(|(i, o)| {
+                    BlockEntity::new(BlockObjectId(i as u64), o.entity.clone(), o.attrs.clone())
                 })
                 .collect(),
+            dynamic: None,
         }
     }
 }
@@ -149,7 +150,7 @@ impl Document {
     }
 
     /// Unique ids and names, valid names, every object of every definition
-    /// on a real layer, and every insert (in the drawing or in a block)
+    /// with an id of its own in the block and on a real layer, and every insert (in the drawing or in a block)
     /// pointing at the table's own record for its block.
     pub(crate) fn validate_blocks(&self) -> Result<(), DocumentError> {
         let bad = |b: &BlockDef| Err(DocumentError::BadBlock(b.name.clone()));
@@ -163,7 +164,11 @@ impl Document {
             if block.id.0 >= self.next_block_id() {
                 return Err(DocumentError::CounterBehind);
             }
+            let mut object_ids = HashSet::new();
             for child in &block.entities {
+                if !object_ids.insert(child.id) {
+                    return bad(block);
+                }
                 let layer_ok = self.layer(child.attrs.layer).is_some();
                 let shape_ok = match &child.entity {
                     Entity::Insert(i) => i.block.id != block.id && self.is_current(i),
