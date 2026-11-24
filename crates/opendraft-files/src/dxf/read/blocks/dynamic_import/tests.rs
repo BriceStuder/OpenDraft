@@ -233,3 +233,21 @@ fn a_file_with_no_dynamic_block_has_no_note() {
     let loaded = read(b"0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n").unwrap();
     assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
 }
+
+#[test]
+fn an_imported_drawing_survives_being_saved_and_opened_again() {
+    use crate::{FileFormat, NativeFormat};
+    let doc = read(&dxf(false, |_| {})).unwrap().document;
+    let bytes = NativeFormat.write(&doc).unwrap().bytes;
+    let back = NativeFormat.read(&bytes).unwrap().document;
+    assert_eq!(back.blocks(), doc.blocks());
+    assert_eq!(back.objects(), doc.objects());
+    back.validate().unwrap();
+    let refs = inserts(&back);
+    assert_eq!(refs.len(), 1);
+    assert_eq!(
+        refs[0].dynamic.as_deref().unwrap().values[0].value,
+        DynamicValue::Distance(10.0)
+    );
+    assert!((refs[0].bounds().max.x - 13.0).abs() < 1e-9);
+}
