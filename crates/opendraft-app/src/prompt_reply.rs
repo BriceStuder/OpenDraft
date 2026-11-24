@@ -131,14 +131,9 @@ pub(crate) fn typed_reply_with_mode(
     answer.or_else(|| keyword_reply(ask, text))
 }
 
-/// The keyword `text` picks, by its key or the start of its label.
+/// The keyword `text` picks, by its key or the start of its label, in the
+/// language of the interface, or in English after `_`.
 pub(crate) fn keyword_reply(ask: &Ask, text: &str) -> Option<Result<Reply, &'static str>> {
-    let t = text.to_uppercase();
-    if t.is_empty() {
-        return None;
-    }
-    ask.keywords
-        .iter()
-        .find(|k| k.key.to_uppercase() == t || k.label.to_uppercase().starts_with(&t))
-        .map(|k| Ok(Reply::Keyword(k.label.clone())))
+    let options = crate::option_language::options(&ask.keywords);
+    crate::option_language::pick(&options, text).map(|o| Ok(Reply::Keyword(o.value.to_string())))
 }

@@ -151,9 +151,14 @@ pub fn echo_name<'a>(id: &str, label: &'a str) -> &'a str {
 /// A keyword the user can type, or click, at the current prompt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CmdOption {
+    /// As shown, in the language of the interface.
     pub label: Cow<'static, str>,
     /// Letters that pick it when typed (shown highlighted).
     pub key: Cow<'static, str>,
+    /// The English label the command is answered with.
+    pub value: Cow<'static, str>,
+    /// The English shortcut, typed after `_` in any language.
+    pub english_key: Cow<'static, str>,
 }
 
 /// The line shown next to the input: `COMMAND text [Option/Option]:`.
@@ -281,14 +286,8 @@ impl AppState {
 
     /// The option `text` picks at the current prompt, by key or name.
     pub fn cmd_option_for(&mut self, text: &str) -> Option<CmdOption> {
-        let t = text.trim().to_uppercase();
-        if t.is_empty() {
-            return None;
-        }
-        self.cmd_prompt()
-            .options
-            .into_iter()
-            .find(|o| o.key.to_uppercase() == t || o.label.to_uppercase().starts_with(&t))
+        let options = self.cmd_prompt().options;
+        crate::option_language::pick(&options, text).cloned()
     }
 
     /// Commands to suggest for `text`: only while it looks like a command
@@ -310,7 +309,7 @@ impl AppState {
         let line = format!("{} {}", self.cmd_prompt().plain(), option.label);
         self.cmdline.say(line);
         if self.command_running() {
-            self.answer_keyword(&option.label);
+            self.answer_keyword(&option.value);
         }
     }
 
