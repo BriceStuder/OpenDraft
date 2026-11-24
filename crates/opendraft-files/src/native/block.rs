@@ -6,7 +6,7 @@
 //! one), so reading resolves them by id, refusing a block that inserts
 //! itself, however indirectly, or nests deeper than the core's limit.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use opendraft_core::block::{block_name_problem, MAX_EXPANSION, MAX_NESTING};
@@ -17,6 +17,7 @@ use opendraft_core::{
 use serde::{Deserialize, Serialize};
 
 use super::attribute::AttributeReferenceDto;
+use super::block_dynamic::{DynamicBlockDto, DynamicStateDto};
 use super::dimension_style::StylePool;
 use super::entity::{from_point, invalid, point, EntityDto, PointDto};
 use super::{attr_from_dto, attr_to_dto, AttrDto, ColorDto};
@@ -38,10 +39,17 @@ pub(super) struct BlockDto {
     /// In draw order.
     #[serde(deserialize_with = "super::limits::block_objects")]
     objects: Vec<BlockObjectDto>,
+    /// The parameters and actions of a dynamic block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dynamic: Option<DynamicBlockDto>,
 }
 
 #[derive(Serialize, Deserialize)]
 struct BlockObjectDto {
+    /// Names the object inside its block. A block with no schema may leave
+    /// it out (older files); then the objects are numbered in order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    id: Option<u64>,
     layer: u64,
     color: AttrDto<ColorDto>,
     linetype: AttrDto<u64>,
@@ -62,6 +70,7 @@ impl BlockDto {
             .iter()
             .map(|e| {
                 Ok(BlockObjectDto {
+                    id: Some(e.id.0),
                     layer: e.attrs.layer.0,
                     color: attr_to_dto(&e.attrs.color, |c| (*c).into()),
                     linetype: attr_to_dto(&e.attrs.linetype, |id| id.0),
@@ -71,6 +80,13 @@ impl BlockDto {
                 })
             })
             .collect::<Result<_, FileError>>()?;
+        let dynamic = match &block.dynamic {
+            Some(schema) => {
+                let ids = block.entities.iter().map(|e| e.id).collect();
+                Some(DynamicBlockDto::of(schema, &ids)?)
+            }
+            None => None,
+        };
         Ok(Self {
             id: block.id.0,
             name: block.name.clone(),
@@ -78,7 +94,22 @@ impl BlockDto {
             description: block.description.clone(),
             unit: block.unit.code() as u8,
             objects,
+            dynamic,
         })
+    }
+
+    /// The ids of the block's objects: as written, or (a block with no
+    /// schema, in a file that has none) their order. Never a mixture.
+    fn object_ids(&self) -> Result<Vec<BlockObjectId>, FileError> {
+        let given = self.objects.iter().filter(|o| o.id.is_some()).count();
+        if given == self.objects.len() {
+            let ids: Vec<_> = self.objects.iter().flat_map(|o| o.id).collect();
+            Ok(ids.into_iter().map(BlockObjectId).collect())
+        } else if given == 0 && self.dynamic.is_none() {
+            Ok((0..self.objects.len() as u64).map(BlockObjectId).collect())
+        } else {
+            invalid(format!("block \"{}\" has objects without ids", self.name))
+        }
     }
 }
 
@@ -143,7 +174,24 @@ fn resolve(
     }
     path.pop();
     let mut entities = Vec::with_capacity(dto.objects.len());
-    for object in &dto.objects {
+    let object_ids = dto.object_ids()?;
+    let unique: HashSet<BlockObjectId> = object_ids.iter().copied().collect();
+    if unique.len() != object_ids.len() {
+        return invalid(format!(
+            "block \"{}\" has two objects with one id",
+            dto.name
+        ));
+    }
+    let dynamic = dto
+        .dynamic
+        .as_ref()
+        .map(|d| d.to_schema(&unique).map(Box::new))
+        .transpose()
+        .or_else(|e| match e {
+            FileError::Invalid(why) => invalid(format!("block \"{}\": {why}", dto.name)),
+            other => Err(other),
+        })?;
+    for (object, object_id) in dto.objects.iter().zip(object_ids) {
         if !layer_ok(object.layer) {
             return invalid(format!(
                 "block \"{}\" has an object on layer {}, which does not exist",
@@ -158,10 +206,8 @@ fn resolve(
             ..Attributes::on_layer(LayerId(object.layer))
         };
         object.scale.apply(&mut attrs);
-        // The file keeps no object ids yet: they number the objects in order.
-        let id = BlockObjectId(entities.len() as u64);
         entities.push(BlockEntity::new(
-            id,
+            object_id,
             object.entity.to_entity(done, dim_styles)?,
             attrs,
         ));
@@ -173,7 +219,7 @@ fn resolve(
         base: from_point(dto.base)?,
         description: dto.description.clone(),
         entities,
-        dynamic: None,
+        dynamic,
     });
     if block.expansion_size(sizes) > MAX_EXPANSION {
         return invalid(format!(
@@ -193,6 +239,7 @@ pub(super) fn insert_entity(
     scale: [f64; 2],
     rotation: f64,
     attributes: &[AttributeReferenceDto],
+    dynamic: Option<&DynamicStateDto>,
 ) -> Result<Entity, FileError> {
     let Some(def) = blocks.get(&block) else {
         return invalid(format!(
@@ -209,8 +256,17 @@ pub(super) fn insert_entity(
             .iter()
             .map(AttributeReferenceDto::to_reference)
             .collect::<Result<_, _>>()?,
-        dynamic: None,
+        dynamic: dynamic.map(|d| d.to_state().map(Box::new)).transpose()?,
     };
+    if let Some(state) = insert.dynamic.as_deref() {
+        let held = match &def.dynamic {
+            Some(schema) => schema.check_state(state),
+            None => Err("the block has no parameters".to_owned()),
+        };
+        if let Err(why) = held {
+            return invalid(format!("an insert of block {block}: {why}"));
+        }
+    }
     if !insert.is_valid() {
         return invalid("a block insert has a zero or non-finite scale or rotation");
     }
@@ -365,7 +421,10 @@ mod tests {
         for id in 1..=levels {
             let mut insert = template.clone();
             insert["entity"]["block"] = serde_json::json!(id - 1);
-            blocks.push(block(id, vec![insert.clone(), insert]));
+            let mut second = insert.clone();
+            second["id"] = serde_json::json!(1);
+            insert["id"] = serde_json::json!(0);
+            blocks.push(block(id, vec![insert, second]));
         }
         f["drawing"]["blocks"] = serde_json::json!(blocks);
         f["drawing"]["next_block_id"] = serde_json::json!(levels + 1);
