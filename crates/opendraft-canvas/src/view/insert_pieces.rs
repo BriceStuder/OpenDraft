@@ -65,12 +65,14 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: vec![BlockEntity {
+                id: opendraft_core::BlockObjectId(0),
                 entity: Entity::Line {
                     start: Point::new(0.0, 0.0),
                     end: Point::new(10.0, 0.0),
                 },
                 attrs: Attributes::on_layer(LayerId::DEFAULT),
             }],
+            dynamic: None,
         };
         let mut doc = Document::default();
         let insert = Insert::new(Arc::new(block), Point::new(0.0, 20.0));

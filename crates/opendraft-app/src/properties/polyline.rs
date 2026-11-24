@@ -1,14 +1,15 @@
 //! The Properties rows of a polyline: Closed and Global width can be typed
 //! over (the same edits as PEDIT's Close/Open and Width); the rest is derived.
 //! A polyline that traces a rectangle also shows its width, height and angle,
-//! which can be typed over with the first vertex staying put.
+//! and the radius or chamfer of rounded or bevelled corners, which can be
+//! typed over with the first corner staying put.
 
 use opendraft_core::pedit::PolyData;
-use opendraft_core::rect_shape::{self, Frame};
+use opendraft_core::rect_shape::{self, Cut, Frame};
 use opendraft_core::{bulge, Entity};
 use opendraft_ui::key;
 
-use super::{row, Field, Row, Unit};
+use super::{oblong, row, Field, Row, Unit};
 
 const ROWS: &[Row] = &[
     row(Field::Vertices, key!("Vertices"), Unit::Count, false),
@@ -29,6 +30,30 @@ const RECTANGLE_ROWS: &[Row] = &[
     row(Field::Area, key!("Area"), Unit::Area, false),
 ];
 
+const ROUNDED_ROWS: &[Row] = &[
+    row(Field::Vertices, key!("Vertices"), Unit::Count, false),
+    row(Field::Closed, key!("Closed"), Unit::Flag, true),
+    row(Field::Width, key!("Global width"), Unit::Length, true),
+    row(Field::RectWidth, key!("Width"), Unit::Length, true),
+    row(Field::Height, key!("Height"), Unit::Length, true),
+    row(Field::Angle, key!("Angle"), Unit::Angle, true),
+    row(Field::CornerRadius, key!("Radius"), Unit::Length, true),
+    row(Field::Length, key!("Length"), Unit::Length, false),
+    row(Field::Area, key!("Area"), Unit::Area, false),
+];
+
+const BEVELLED_ROWS: &[Row] = &[
+    row(Field::Vertices, key!("Vertices"), Unit::Count, false),
+    row(Field::Closed, key!("Closed"), Unit::Flag, true),
+    row(Field::Width, key!("Global width"), Unit::Length, true),
+    row(Field::RectWidth, key!("Width"), Unit::Length, true),
+    row(Field::Height, key!("Height"), Unit::Length, true),
+    row(Field::Angle, key!("Angle"), Unit::Angle, true),
+    row(Field::Chamfer, key!("Chamfer"), Unit::Length, true),
+    row(Field::Length, key!("Length"), Unit::Length, false),
+    row(Field::Area, key!("Area"), Unit::Area, false),
+];
+
 /// The rectangle the polyline traces, if it is one.
 pub(super) fn rectangle(entity: &Entity) -> Option<Frame> {
     match entity {
@@ -43,10 +68,14 @@ pub(super) fn rectangle(entity: &Entity) -> Option<Frame> {
 }
 
 pub(super) fn rows(entity: &Entity) -> &'static [Row] {
-    if rectangle(entity).is_some() {
-        RECTANGLE_ROWS
-    } else {
-        ROWS
+    if oblong::slot(entity).is_some() {
+        return oblong::ROWS;
+    }
+    match rectangle(entity).map(|f| f.cut) {
+        Some(Cut::Square) => RECTANGLE_ROWS,
+        Some(Cut::Round(_)) => ROUNDED_ROWS,
+        Some(Cut::Bevel(_)) => BEVELLED_ROWS,
+        None => ROWS,
     }
 }
 
@@ -59,6 +88,9 @@ fn global_width(widths: &[(f64, f64)]) -> Option<f64> {
 /// A field's value; not a number when the polyline has none (segments of
 /// different widths have no global width).
 pub(super) fn value(entity: &Entity, field: Field) -> f64 {
+    if let Some(value) = oblong::value(entity, field) {
+        return value;
+    }
     let Entity::Polyline {
         points,
         closed,
@@ -82,12 +114,26 @@ pub(super) fn value(entity: &Entity, field: Field) -> f64 {
         }
         Field::Length => bulge::path_length(points, bulges, *closed),
         Field::Area => bulge::path_area(points, bulges),
-        Field::RectWidth | Field::Height | Field::Angle => match rectangle(entity) {
-            Some(f) if field == Field::RectWidth => f.width,
-            Some(f) if field == Field::Height => f.height,
-            Some(f) => degrees(f.angle),
-            None => f64::NAN,
-        },
+        Field::RectWidth | Field::Height | Field::Angle | Field::CornerRadius | Field::Chamfer => {
+            match (rectangle(entity), field) {
+                (Some(f), Field::RectWidth) => f.width,
+                (Some(f), Field::Height) => f.height,
+                (Some(f), Field::Angle) => degrees(f.angle),
+                (
+                    Some(Frame {
+                        cut: Cut::Round(r), ..
+                    }),
+                    Field::CornerRadius,
+                ) => r,
+                (
+                    Some(Frame {
+                        cut: Cut::Bevel(d), ..
+                    }),
+                    Field::Chamfer,
+                ) => d,
+                _ => f64::NAN,
+            }
+        }
         _ => f64::NAN,
     }
 }
@@ -95,19 +141,25 @@ pub(super) fn value(entity: &Entity, field: Field) -> f64 {
 /// The polyline with `field` set to `new`, or `None` when it is derived or
 /// the value is not allowed.
 pub(super) fn with_value(entity: &Entity, field: Field, new: f64) -> Option<Entity> {
+    if let Some(changed) = oblong::with_value(entity, field, new) {
+        return changed;
+    }
     let data = PolyData::of(entity)?;
     match field {
         Field::Closed => Some(data.with_closed(new != 0.0).into_entity()),
         Field::Width if new >= 0.0 => Some(data.with_width(new).into_entity()),
-        Field::RectWidth | Field::Height | Field::Angle => {
+        Field::RectWidth | Field::Height | Field::Angle | Field::CornerRadius | Field::Chamfer => {
             let mut frame = rectangle(entity)?;
-            match field {
-                Field::RectWidth if new > 0.0 => frame.width = new,
-                Field::Height if new > 0.0 => frame.height = new,
-                Field::Angle => frame.angle = new.to_radians(),
+            match (field, frame.cut) {
+                (Field::RectWidth, _) => frame.width = new,
+                (Field::Height, _) => frame.height = new,
+                (Field::Angle, _) => frame.angle = new.to_radians(),
+                (Field::CornerRadius, Cut::Round(_)) => frame.cut = Cut::Round(new),
+                (Field::Chamfer, Cut::Bevel(_)) => frame.cut = Cut::Bevel(new),
                 _ => return None,
             }
-            Some(moved_corners(entity, &frame))
+            // The sides must stay longer than the corners take.
+            frame.fits().then(|| moved_corners(entity, &frame))
         }
         _ => None,
     }
@@ -115,7 +167,7 @@ pub(super) fn with_value(entity: &Entity, field: Field, new: f64) -> Option<Enti
 
 /// An angle in degrees from 0 up to 360, with a side a hair below east read
 /// as 0 rather than 360.
-fn degrees(angle: f64) -> f64 {
+pub(super) fn degrees(angle: f64) -> f64 {
     let d = angle.to_degrees().rem_euclid(360.0);
     if 360.0 - d < 1e-9 {
         0.0
@@ -124,14 +176,14 @@ fn degrees(angle: f64) -> f64 {
     }
 }
 
-/// The polyline with its corners moved to `frame`'s, keeping its vertex
-/// order, widths and a fifth vertex back on the first.
+/// The polyline with its vertices moved to `frame`'s, keeping their order,
+/// the widths, the arcs and a last vertex back on the first.
 fn moved_corners(entity: &Entity, frame: &Frame) -> Entity {
     let mut out = entity.clone();
     if let Entity::Polyline { points, .. } = &mut out {
-        let corners = frame.corners();
+        let vertices = frame.vertices();
         for (i, p) in points.iter_mut().enumerate() {
-            *p = corners[i % 4];
+            *p = vertices[i % vertices.len()];
         }
     }
     out
@@ -140,6 +192,7 @@ fn moved_corners(entity: &Entity, frame: &Frame) -> Entity {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use opendraft_core::rect::{self, Corners};
     use opendraft_core::Point;
 
     fn polyline(widths: Vec<(f64, f64)>) -> Entity {
@@ -263,6 +316,52 @@ mod tests {
             corners(&turned),
             [(0.0, 0.0), (0.0, 5.0), (-2.0, 5.0), (-2.0, 0.0), (0.0, 0.0)]
         );
+    }
+
+    fn cut(dx: f64, corners: Corners) -> Entity {
+        let at = Point::new(0.0, 0.0);
+        rect::outline(at, 0.0, dx, 4.0, corners, 0.25)
+    }
+
+    #[test]
+    fn rounded_corners_show_their_radius_and_keep_it_when_the_sides_change() {
+        let r = cut(10.0, Corners::Fillet(1.0));
+        assert_eq!(rows(&r).len(), 9);
+        assert!(rows(&r).iter().any(|row| row.field == Field::CornerRadius));
+        assert!((value(&r, Field::CornerRadius) - 1.0).abs() < 1e-9);
+        assert!((value(&r, Field::RectWidth) - 10.0).abs() < 1e-9);
+        assert!(value(&r, Field::Chamfer).is_nan());
+        let wider = with_value(&r, Field::RectWidth, 12.0).unwrap();
+        assert_eq!(corners(&wider), corners(&cut(12.0, Corners::Fillet(1.0))));
+        let rounder = with_value(&r, Field::CornerRadius, 1.5).unwrap();
+        assert_eq!(corners(&rounder), corners(&cut(10.0, Corners::Fillet(1.5))));
+        assert!(matches!(&rounder, Entity::Polyline { bulges, widths, .. }
+            if bulges.iter().filter(|b| **b != 0.0).count() == 4 && widths[0] == (0.25, 0.25)));
+        assert_eq!(
+            with_value(&r, Field::CornerRadius, 2.0),
+            None,
+            "no straight part left"
+        );
+        assert_eq!(with_value(&r, Field::CornerRadius, 0.0), None);
+        assert_eq!(with_value(&r, Field::Height, 2.0), None);
+        assert_eq!(with_value(&r, Field::Chamfer, 1.0), None);
+    }
+
+    #[test]
+    fn bevelled_corners_show_their_chamfer() {
+        let b = cut(10.0, Corners::Chamfer(0.5, 0.5));
+        assert!(rows(&b).iter().any(|row| row.field == Field::Chamfer));
+        assert!(!rows(&b).iter().any(|row| row.field == Field::CornerRadius));
+        assert!((value(&b, Field::Chamfer) - 0.5).abs() < 1e-9);
+        let deeper = with_value(&b, Field::Chamfer, 1.0).unwrap();
+        assert_eq!(
+            corners(&deeper),
+            corners(&cut(10.0, Corners::Chamfer(1.0, 1.0)))
+        );
+        assert_eq!(with_value(&b, Field::CornerRadius, 1.0), None);
+        let square = rectangle(&[(0.0, 0.0), (5.0, 0.0), (5.0, 2.0), (0.0, 2.0)], true);
+        assert!(value(&square, Field::Chamfer).is_nan());
+        assert_eq!(with_value(&square, Field::Chamfer, 1.0), None);
     }
 
     #[test]

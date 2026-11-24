@@ -481,6 +481,30 @@ mod tests {
     }
 
     #[test]
+    fn parallel_lines_are_joined_by_a_half_circle_whatever_the_radius() {
+        let lines = vec![
+            line(p(0.0, 10.0), p(20.0, 10.0)),
+            line(p(-8.0, 0.0), p(25.0, 0.0)),
+        ];
+        let mut state = started(&lines, fillet_objects, &["r", "2"]);
+        click(&mut state, 0, p(2.0, 10.0));
+        click(&mut state, 1, p(5.0, 0.0));
+        let all = entities(&state);
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0], lines[0], "the first line is the reference");
+        assert_eq!(all[1], line(p(0.0, 0.0), p(25.0, 0.0)));
+        let Entity::Arc { center, radius, .. } = all[2] else {
+            panic!("a half circle, got {:?}", all[2]);
+        };
+        assert!((center.x).abs() < 1e-9 && (center.y - 5.0).abs() < 1e-9);
+        assert!(
+            (radius - 5.0).abs() < 1e-9,
+            "half the gap, not the radius 2"
+        );
+        assert_eq!(state.defaults().corner.get().radius, 2.0);
+    }
+
+    #[test]
     fn an_ellipse_is_filleted_but_not_chamfered() {
         let half =
             opendraft_core::Ellipse::new(p(0.0, 0.0), p(4.0, 0.0), 0.5, 0.0, std::f64::consts::PI);

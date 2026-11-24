@@ -202,6 +202,41 @@ mod tests {
     }
 
     #[test]
+    fn fit_and_center_are_options_that_can_be_clicked() {
+        let mut run = run_in_layout();
+        let file = run.dir.join("fit.pdf");
+        run.state.start_plot_line();
+        for reply in ["Yes", "", "PDF", "A3", "", "Landscape", "", "Extents"] {
+            answer(&mut run.state, reply);
+        }
+        let prompt = run.state.runner_prompt().unwrap().plain();
+        assert!(prompt.contains("[Fit]"), "{prompt}");
+        run.state.answer_keyword("Fit");
+        run.state.settle_command();
+        assert!(run.state.command_running(), "Fit was taken");
+        let prompt = run.state.runner_prompt().unwrap().plain();
+        assert!(prompt.contains("[Center]"), "{prompt}");
+        run.state.answer_keyword("Center");
+        run.state.settle_command();
+        for reply in ["", "", "", "", file.to_str().unwrap(), "Yes", ""] {
+            answer(&mut run.state, reply);
+        }
+        let plot = run.state.session().document().layouts()[0].plot.clone();
+        assert!(matches!(
+            plot.scale,
+            opendraft_core::PlotScale::Standard {
+                kind: opendraft_core::StandardScale::Fit,
+                ..
+            }
+        ));
+        assert_ne!(
+            plot.flags & opendraft_core::plot_settings::flags::PLOT_CENTERED,
+            0
+        );
+        let _ = std::fs::remove_dir_all(&run.dir);
+    }
+
+    #[test]
     fn a_detailed_plot_with_save_changes_writes_the_setup_in_one_undo_step() {
         let mut run = run_in_layout();
         let file = run.dir.join("d.pdf");

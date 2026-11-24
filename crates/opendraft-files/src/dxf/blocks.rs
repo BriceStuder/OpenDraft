@@ -63,9 +63,11 @@ mod tests {
             base: Point::new(0.0, 0.0),
             description: String::new(),
             entities: vec![BlockEntity {
+                id: opendraft_core::BlockObjectId(0),
                 entity: Entity::AttributeDefinition(Box::new(def)),
                 attrs: Attributes::on_layer(LayerId::DEFAULT),
             }],
+            dynamic: None,
         });
         doc.push_block(block.clone());
         let mut insert = Insert::new(block.clone(), Point::new(5.0, 5.0));

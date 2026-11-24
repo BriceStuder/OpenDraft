@@ -135,7 +135,21 @@ fn yes_no(ed: &Editor, message: &str, default: bool) -> Result<bool, Cancelled> 
 
 /// A line of text, its default taken on a bare Enter.
 fn text(ed: &Editor, message: &str, default: &str) -> Result<String, Cancelled> {
-    let options = Options::<String>::new(message).default(default.to_owned());
+    text_or(ed, message, default, None)
+}
+
+/// A line of text or the one option `keyword` (label, key), which can then be
+/// clicked as well as typed; the option comes back as its label.
+fn text_or(
+    ed: &Editor,
+    message: &str,
+    default: &str,
+    keyword: Option<(&str, &str)>,
+) -> Result<String, Cancelled> {
+    let mut options = Options::<String>::new(message).default(default.to_owned());
+    if let Some((label, key)) = keyword {
+        options = options.keyword(label, key);
+    }
     Ok(match ed.ask_string(options)? {
         Answer::Value(t) | Answer::Keyword(t) => t,
         Answer::Enter => default.to_owned(),
@@ -266,10 +280,11 @@ fn area(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
 fn scale_and_offset(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled> {
     loop {
         let shown = scale_text(&draft.plot.scale);
-        let answer = text(
+        let answer = text_or(
             ed,
-            "Enter plot scale (plotted millimeters=drawing units) or [Fit]",
+            "Enter plot scale (plotted millimeters=drawing units)",
             &shown,
+            Some(("Fit", "F")),
         )?;
         match parse_scale(&answer) {
             Some(scale) => {
@@ -291,7 +306,7 @@ fn scale_and_offset(ed: &Editor, draft: &mut PageDraft) -> Result<(), Cancelled>
     }
     loop {
         let shown = format!("{},{}", draft.plot.origin_mm.x, draft.plot.origin_mm.y);
-        let answer = text(ed, "Enter plot offset (x,y) or [Center]", &shown)?;
+        let answer = text_or(ed, "Enter plot offset (x,y)", &shown, Some(("Center", "C")))?;
         if answer.eq_ignore_ascii_case("center") || answer.eq_ignore_ascii_case("c") {
             set_flag(&mut draft.plot, flags::PLOT_CENTERED, true);
             return Ok(());

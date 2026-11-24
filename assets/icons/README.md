@@ -52,6 +52,8 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](assistant-new-chat.svg) | `assistant-new-chat.svg` | message-square-plus | assistant/panel/mod.rs |
 | ![](assistant-send.svg) | `assistant-send.svg` | arrow-up | assistant/panel/composer.rs |
 | ![](assistant-stop.svg) | `assistant-stop.svg` | square | assistant/panel/composer.rs |
+| ![](block-action.svg) | `block-action.svg` | move-horizontal | Action |
+| ![](block-actionset.svg) | `block-actionset.svg` | sliders-horizontal | Action Objects |
 | ![](block-attdef.svg) | `block-attdef.svg` | tag | Define Attributes |
 | ![](block-attedit.svg) | `block-attedit.svg` | pen-line | Edit Attributes, Single |
 | ![](block-attsync.svg) | `block-attsync.svg` | refresh-cw | Synchronize |
@@ -60,7 +62,9 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](block-eattedit.svg) | `block-eattedit.svg` | list | Multiple |
 | ![](block-edit.svg) | `block-edit.svg` | pencil | Edit |
 | ![](block-insert.svg) | `block-insert.svg` | box | Insert |
+| ![](block-parameter.svg) | `block-parameter.svg` | ruler | Parameter |
 | ![](block-purge.svg) | `block-purge.svg` | eraser | Purge |
+| ![](block-reset.svg) | `block-reset.svg` | rotate-ccw | Reset |
 | ![](block-save.svg) | `block-save.svg` | save | Save Block |
 | ![](combo-arrow.svg) | `combo-arrow.svg` | chevron-down | menu.rs |
 | ![](command-line-collapse.svg) | `command-line-collapse.svg` | chevron-down | app/command_line.rs |
@@ -206,6 +210,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](modify-array-rect.svg) | `modify-array-rect.svg` | grid-2x2 | Rectangular Array |
 | ![](modify-blend.svg) | `modify-blend.svg` | spline | Blend Curves |
 | ![](modify-break.svg) | `modify-break.svg` | scissors-line-dashed | Break |
+| ![](modify-break-at-point.svg) | `modify-break-at-point.svg` | scissors-line-dashed | Break at Point |
 | ![](modify-chamfer.svg) | `modify-chamfer.svg` | triangle-right | Chamfer |
 | ![](modify-copy.svg) | `modify-copy.svg` | copy | Copy, app/context_menu.rs |
 | ![](modify-erase.svg) | `modify-erase.svg` | eraser | Erase |

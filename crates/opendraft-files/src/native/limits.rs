@@ -19,6 +19,10 @@ pub(super) const BLOCK_OBJECTS: usize = 1_000_000;
 pub(super) const VERTICES: usize = 1_000_000;
 /// Runs, fields, children and references in the text of one attribute.
 pub(super) const FIELD_ITEMS: usize = 4096;
+/// Parameters, actions and values of one dynamic block or insert.
+pub(super) const SCHEMA_ITEMS: usize = 4096;
+/// Entries of one parameter's list of allowed values.
+pub(super) const VALUE_LIST: usize = 65_536;
 /// Bytes of data a field has cached.
 pub(super) const CACHED_BYTES: usize = 1024 * 1024;
 
@@ -79,6 +83,18 @@ pub(super) fn block_objects<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
     d: D,
 ) -> Result<Vec<T>, D::Error> {
     bounded(d, BLOCK_OBJECTS, "objects in a block")
+}
+
+pub(super) fn schema_items<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> Result<Vec<T>, D::Error> {
+    bounded(d, SCHEMA_ITEMS, "parameters, actions or values")
+}
+
+pub(super) fn value_list<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> Result<Vec<T>, D::Error> {
+    bounded(d, VALUE_LIST, "allowed values")
 }
 
 pub(super) fn vertices<'de, D: Deserializer<'de>, T: Deserialize<'de>>(

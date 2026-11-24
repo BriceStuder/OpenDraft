@@ -68,6 +68,8 @@ icons! {
     ASSISTANT_NEW_CHAT = '\u{e410}';
     ASSISTANT_SEND = '\u{e04e}';
     ASSISTANT_STOP = '\u{e16a}';
+    BLOCK_ACTION = '\u{e1c5}';
+    BLOCK_ACTIONSET = '\u{e299}';
     BLOCK_ATTDEF = '\u{e182}';
     BLOCK_ATTEDIT = '\u{e133}';
     BLOCK_ATTSYNC = '\u{e148}';
@@ -76,7 +78,9 @@ icons! {
     BLOCK_EATTEDIT = '\u{e10b}';
     BLOCK_EDIT = '\u{e1f8}';
     BLOCK_INSERT = '\u{e065}';
+    BLOCK_PARAMETER = '\u{e14e}';
     BLOCK_PURGE = '\u{e28e}';
+    BLOCK_RESET = '\u{e14b}';
     BLOCK_SAVE = '\u{e150}';
     COMBO_ARROW = '\u{e071}';
     COMMAND_LINE_COLLAPSE = '\u{e071}';
@@ -232,6 +236,7 @@ icons! {
     MODIFY_ARRAY_RECT = '\u{e503}';
     MODIFY_BLEND = '\u{e38e}';
     MODIFY_BREAK = '\u{e4ed}';
+    MODIFY_BREAK_AT_POINT = '\u{e4ed}';
     MODIFY_CHAMFER = '\u{e4f1}';
     MODIFY_COPY = '\u{e0a2}';
     MODIFY_ERASE = '\u{e28e}';

@@ -130,6 +130,14 @@ pub(crate) fn make_block(ed: &Editor, made: Made) -> Result<Option<BlockId>, Can
         description,
         unit,
     } = made;
+    if let Some(id) = existing {
+        if ed.read(move |doc| doc.block(id).is_some_and(|b| b.is_dynamic()))? {
+            ed.say(format!(
+                "Block \"{name}\" is a dynamic block: change it in the Block Editor (BEDIT)."
+            ));
+            return Ok(None);
+        }
+    }
     let redefining = existing.is_some();
     let label = name.clone();
     let result = ed.transaction("Block", move |tx| {

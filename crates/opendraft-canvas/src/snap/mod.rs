@@ -18,6 +18,7 @@ mod engine_tests;
 mod fixed;
 mod otrack;
 mod overrides;
+mod path_meets;
 #[cfg(test)]
 mod reach_tests;
 #[cfg(test)]
@@ -203,9 +204,21 @@ impl SnapPoint {
                 let angle = if angle >= 359.5 { 0.0 } else { angle };
                 format!("{name}: {:.4} < {angle:.0}\u{b0}", dx.hypot(dy))
             };
-            return match second {
+            let paths = match second {
                 Some(second) => format!("{} | {}", part(&first), part(&second)),
                 None => part(&first),
+            };
+            // A snap found on a path (an intersection with an object) is
+            // named before it, unless the path is named after it already.
+            let named = matches!(self.kind, SnapKind::Tracking | SnapKind::Polar)
+                || self
+                    .guides
+                    .iter()
+                    .flatten()
+                    .any(|g| g.kind == Some(self.kind));
+            return match named {
+                true => paths,
+                false => format!("{} | {paths}", self.kind.label()),
             };
         }
         match self.deferred {
@@ -451,6 +464,11 @@ pub fn snap_all<'a>(
             found.extend(context::intersections(
                 &scene, &capture, cursor, tolerance, kind,
             ));
+            if let Some(track) = probe.track {
+                found.extend(path_meets::crossings(
+                    &scene, &capture, track, cursor, tolerance, kind,
+                ));
+            }
         }
         if modes.extended_intersection {
             found.extend(context::extended(
