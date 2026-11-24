@@ -134,7 +134,7 @@ pub fn centred(centre: Point, angle: f64, half: (f64, f64)) -> (Point, f64, f64)
 pub fn by_three_points(first: Point, second: Point, third: Point) -> Option<(f64, f64, f64)> {
     let (dx, dy) = (second.x - first.x, second.y - first.y);
     let length = dx.hypot(dy);
-    if !(length > 0.0) {
+    if length.is_nan() || length <= 0.0 {
         return None;
     }
     let (tx, ty) = (third.x - first.x, third.y - first.y);
