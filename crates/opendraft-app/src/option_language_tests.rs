@@ -162,6 +162,7 @@ const JOINED: &[&[&str]] = &[
     ],
     &["Parameter", "Included angle"],
     &["Angle", "Included angle"],
+    &["Move", "Stretch", "Scale", "Rotate", "Flip"],
 ];
 
 /// In every language, no two options of one prompt share a shortcut.
@@ -233,6 +234,8 @@ fn every_option_translation_is_still_offered() {
             .iter()
             .flat_map(|labels| labels.iter().map(|l| format!("[{l}]"))),
     );
+    // Offered through a helper the scan cannot follow (`plot_line::text_or`).
+    offered.extend(["[plot: Fit]".to_owned(), "[plot: Center]".to_owned()]);
     let backend = crate::_rust_i18n_backend();
     let mut stale = Vec::new();
     for locale in backend.available_locales() {

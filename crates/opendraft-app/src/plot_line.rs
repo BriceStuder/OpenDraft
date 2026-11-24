@@ -149,7 +149,8 @@ fn text_or(
 ) -> Result<String, Cancelled> {
     let mut options = Options::<String>::new(message).default(default.to_owned());
     if let Some((label, key)) = keyword {
-        options = options.keyword(label, key);
+        // -PLOT's Fit (to the paper) and Center are not TEXT's or a circle's.
+        options = options.keyword_in("plot", label, key);
     }
     Ok(match ed.ask_string(options)? {
         Answer::Value(t) | Answer::Keyword(t) => t,
