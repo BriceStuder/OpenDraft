@@ -1099,7 +1099,8 @@ centre or on an edge, for POLYGON), `array` (where array items go:
   rectangles take RECTANGLE's remembered corners and line width and its
   Chamfer/Fillet/Width options at their first prompt; from the centre, Area,
   Dimensions (full sizes) and Rotation (about the centre) work as in
-  RECTANGLE. By three points, the third is a point on the opposite side or a
+  RECTANGLE, and dynamic input shows the full width and height
+  (`DynamicDimensions::Centred`: X and Y are twice the pointer's offset). By three points, the third is a point on the opposite side or a
   typed height (positive on the left of the first side). An oblong is given
   by the centres of its two ends (or its centre and one end's centre, the
   other end mirrored), then its width, typed or as a point on a side. Oblongs
