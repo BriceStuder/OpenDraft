@@ -28,6 +28,23 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
                 || object.int(176).is_some_and(|n| n > 0);
             NodeKind::Polar(p)
         }),
+        "BLOCKXYPARAMETER" => parameter(object).map(|mut p| {
+            // `306` names the X distance and `305` the Y distance; the
+            // increments are `144` (X) and `148` (Y), and `175` and `176`
+            // count listed values.
+            p.name = object.text(306).unwrap_or("").to_owned();
+            p.angle_name = object.text(305).unwrap_or("").to_owned();
+            p.restricted = object.number(144).is_some_and(|i| i > 0.0)
+                || object.number(148).is_some_and(|i| i > 0.0)
+                || object.int(175).is_some_and(|n| n > 0)
+                || object.int(176).is_some_and(|n| n > 0);
+            NodeKind::Xy(p)
+        }),
+        "BLOCKPOINTPARAMETER" => parameter(object).map(|mut p| {
+            // The location is `1010`; `1011` is only where its label goes.
+            p.end = p.start;
+            NodeKind::Point(p)
+        }),
         "BLOCKROTATIONPARAMETER" => parameter(object).map(|mut p| {
             // `143` is an angle increment and `175` how many listed angles.
             p.restricted = object.number(143).is_some_and(|i| i > 0.0)
@@ -56,7 +73,7 @@ pub(super) fn kind(object: &Record, in_block: Option<&HashSet<String>>) -> Optio
 /// The state a modified instance records for a node of this kind.
 pub(super) fn state(kind: &NodeKind, record: &Record) -> Option<NodeState> {
     match kind {
-        NodeKind::Linear(_) | NodeKind::Polar(_) | NodeKind::Rotation(_) => {
+        NodeKind::Linear(_) | NodeKind::Polar(_) | NodeKind::Xy(_) | NodeKind::Rotation(_) => {
             let at = points(record, 10, 20);
             Some(NodeState::Parameter {
                 start: *at.first()?,

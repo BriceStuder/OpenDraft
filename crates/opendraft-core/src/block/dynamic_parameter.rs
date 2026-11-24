@@ -51,6 +51,15 @@ impl DynamicParameter {
                 !(end.x - base.x).hypot(end.y - base.y).is_finite()
                     || (end.x - base.x).hypot(end.y - base.y) <= EPS
             }
+            DynamicParameterKind::Xy { base, end, .. } => {
+                !(base.x.is_finite()
+                    && base.y.is_finite()
+                    && end.x.is_finite()
+                    && end.y.is_finite())
+            }
+            DynamicParameterKind::Point { position } => {
+                !(position.x.is_finite() && position.y.is_finite())
+            }
         }
     }
 
@@ -69,6 +78,8 @@ impl DynamicParameter {
             DynamicParameterKind::Rotation { .. } | DynamicParameterKind::Flip { .. } => {
                 (!self.is_degenerate()).then_some(0.0)
             }
+            // These have a point, not a number.
+            DynamicParameterKind::Xy { .. } | DynamicParameterKind::Point { .. } => None,
         }
     }
 
@@ -80,6 +91,7 @@ impl DynamicParameter {
     /// The values it may take.
     pub fn value_set(&self) -> &DynamicValueSet {
         /// A flip is not flipped (0) or flipped (1).
+        static ANY: DynamicValueSet = DynamicValueSet::Any;
         static FLAG: DynamicValueSet = DynamicValueSet::Range {
             min: 0.0,
             max: 1.0,
@@ -89,6 +101,8 @@ impl DynamicParameter {
             DynamicParameterKind::Linear { value_set, .. }
             | DynamicParameterKind::Rotation { value_set, .. } => value_set,
             DynamicParameterKind::Polar { distance_set, .. } => distance_set,
+            DynamicParameterKind::Xy { x_set, .. } => x_set,
+            DynamicParameterKind::Point { .. } => &ANY,
             DynamicParameterKind::Flip { .. } => &FLAG,
         }
     }
@@ -116,9 +130,61 @@ impl DynamicParameter {
         }
     }
 
-    /// Whether its value is a point: a polar parameter's end.
+    pub fn is_xy(&self) -> bool {
+        matches!(self.kind, DynamicParameterKind::Xy { .. })
+    }
+
     pub fn is_polar(&self) -> bool {
         matches!(self.kind, DynamicParameterKind::Polar { .. })
+    }
+
+    /// Whether its value is a point: the end of a polar or XY parameter, or
+    /// a point parameter's location.
+    pub fn has_point(&self) -> bool {
+        matches!(
+            self.kind,
+            DynamicParameterKind::Polar { .. }
+                | DynamicParameterKind::Xy { .. }
+                | DynamicParameterKind::Point { .. }
+        )
+    }
+
+    /// Where the point of a polar, XY or point parameter is as drawn.
+    pub fn drawn_end(&self) -> Option<Point> {
+        match &self.kind {
+            DynamicParameterKind::Polar { end, .. } | DynamicParameterKind::Xy { end, .. } => {
+                Some(*end)
+            }
+            DynamicParameterKind::Point { position } => Some(*position),
+            _ => None,
+        }
+    }
+
+    /// The two numbers a point is shown as: a polar parameter's distance and
+    /// angle (radians), an XY parameter's distances, a point's coordinates.
+    pub fn parts_of(&self, end: Point) -> Option<(f64, f64)> {
+        match &self.kind {
+            DynamicParameterKind::Polar { base, .. } => {
+                let (dx, dy) = (end.x - base.x, end.y - base.y);
+                Some((dx.hypot(dy), dy.atan2(dx)))
+            }
+            DynamicParameterKind::Xy { base, .. } => Some((end.x - base.x, end.y - base.y)),
+            DynamicParameterKind::Point { .. } => Some((end.x, end.y)),
+            _ => None,
+        }
+    }
+
+    /// The point whose numbers are `a` and `b` (the inverse of
+    /// [`parts_of`](Self::parts_of)).
+    pub fn point_of(&self, a: f64, b: f64) -> Option<Point> {
+        match &self.kind {
+            DynamicParameterKind::Polar { base, .. } => {
+                Some(Point::new(base.x + a * b.cos(), base.y + a * b.sin()))
+            }
+            DynamicParameterKind::Xy { base, .. } => Some(Point::new(base.x + a, base.y + b)),
+            DynamicParameterKind::Point { .. } => Some(Point::new(a, b)),
+            _ => None,
+        }
     }
 
     /// Whether the value sets it holds are all usable.
@@ -129,42 +195,53 @@ impl DynamicParameter {
                 angle_set,
                 ..
             } => distance_set.is_valid() && angle_set.is_valid(),
+            DynamicParameterKind::Xy { x_set, y_set, .. } => x_set.is_valid() && y_set.is_valid(),
             _ => self.value_set().is_valid(),
         }
     }
 
-    /// Where a polar parameter's end is in an insert with `state`.
-    pub fn polar_end(
+    /// Where the point of a polar, XY or point parameter is in an insert
+    /// with `state`.
+    pub fn end_point(
         &self,
         state: Option<&DynamicInstanceState>,
     ) -> Result<Point, DynamicBlockError> {
-        let DynamicParameterKind::Polar { end, .. } = &self.kind else {
-            return Err(DynamicBlockError::BadValue(self.id));
-        };
+        let drawn = self
+            .drawn_end()
+            .ok_or(DynamicBlockError::BadValue(self.id))?;
         match state.and_then(|s| s.get(self.id)) {
-            None => Ok(*end),
+            None => Ok(drawn),
             Some(DynamicValue::Point(p)) if p.x.is_finite() && p.y.is_finite() => Ok(*p),
             Some(_) => Err(DynamicBlockError::BadValue(self.id)),
         }
     }
 
-    /// `end` brought into a polar parameter's sets: its distance from the
-    /// base into the distance set and its angle into the angle set (the
-    /// nearest turn in a list). `None` for a point that is not finite, or
-    /// one that comes to no distance.
+    /// `end` brought into the sets of a polar or XY parameter (a polar
+    /// parameter's distance and angle, the nearest turn in a list; an XY
+    /// parameter's two distances). `None` for a point that is not finite, or
+    /// a polar one that comes to no distance.
     pub fn fit_end(&self, end: Point) -> Option<Point> {
-        let DynamicParameterKind::Polar {
-            base,
-            distance_set,
-            angle_set,
-            ..
-        } = &self.kind
-        else {
-            return None;
-        };
         if !(end.x.is_finite() && end.y.is_finite()) {
             return None;
         }
+        let (base, distance_set, angle_set) = match &self.kind {
+            DynamicParameterKind::Polar {
+                base,
+                distance_set,
+                angle_set,
+                ..
+            } => (base, distance_set, angle_set),
+            // Each distance of an XY parameter is brought into its own set.
+            DynamicParameterKind::Xy {
+                base, x_set, y_set, ..
+            } => {
+                let x = x_set.normalize(end.x - base.x)?;
+                let y = y_set.normalize(end.y - base.y)?;
+                return Some(Point::new(base.x + x, base.y + y));
+            }
+            DynamicParameterKind::Point { .. } => return Some(end),
+            _ => return None,
+        };
         let (dx, dy) = (end.x - base.x, end.y - base.y);
         let distance = distance_set.normalize(dx.hypot(dy))?;
         let angle = normalize_angle(angle_set, dy.atan2(dx), false)?;

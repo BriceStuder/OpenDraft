@@ -134,3 +134,54 @@ pub(super) fn flip_parameter(
         kind: DynamicParameterKind::Flip { base, end },
     })
 }
+
+pub(super) fn xy_parameter(
+    ed: &Editor,
+    schema: &DynamicBlock,
+) -> Result<DynamicParameter, Cancelled> {
+    let base = ed.get_point(PointOptions::new("Specify base point"))?;
+    let end = ed.get_point(PointOptions::new("Specify opposite corner").base(base))?;
+    let named = ask_naming(ed, schema, "Distance", "horizontal distance")?;
+    let polar_like = schema.parameters.iter().filter(|p| p.is_xy()).count() + 1;
+    let y_label = ask_line(
+        ed,
+        "Enter vertical distance label",
+        &format!("Y Distance{polar_like}"),
+    )?;
+    let grips = ask_grips(ed)?;
+    let x_set = ask_value_set(ed, Quantity::Distance, end.x - base.x)?;
+    let y_set = ask_value_set(ed, Quantity::Distance, end.y - base.y)?;
+    Ok(DynamicParameter {
+        id: ParameterId(schema.next_parameter_id),
+        name: named.name,
+        label: named.label,
+        description: named.description,
+        show: named.show,
+        grips,
+        kind: DynamicParameterKind::Xy {
+            base,
+            end,
+            x_set,
+            y_set,
+            y_label,
+        },
+    })
+}
+
+pub(super) fn point_parameter(
+    ed: &Editor,
+    schema: &DynamicBlock,
+) -> Result<DynamicParameter, Cancelled> {
+    let position = ed.get_point(PointOptions::new("Specify parameter location"))?;
+    let named = ask_naming(ed, schema, "Position", "position")?;
+    let grips = ask_grips(ed)?;
+    Ok(DynamicParameter {
+        id: ParameterId(schema.next_parameter_id),
+        name: named.name,
+        label: named.label,
+        description: named.description,
+        show: named.show,
+        grips,
+        kind: DynamicParameterKind::Point { position },
+    })
+}

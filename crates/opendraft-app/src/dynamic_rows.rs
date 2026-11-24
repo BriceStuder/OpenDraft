@@ -10,7 +10,7 @@
 use eframe::egui::{self, Ui};
 use opendraft_commands::ModifyEntities;
 use opendraft_core::block::{DynamicParameterKind, DynamicValue, ParameterId};
-use opendraft_core::{Entity, EntityKind, Insert, Point, Units};
+use opendraft_core::{Entity, EntityKind, Insert, Units};
 use opendraft_ui::Theme;
 
 use crate::properties::{self, Unit};
@@ -49,8 +49,9 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
         .iter()
         .filter(|p| p.show)
         .flat_map(|p| {
-            // A polar parameter has two values, the distance and the angle.
-            let parts: &[u8] = if p.is_polar() { &[0, 1] } else { &[0] };
+            // A polar, XY or point parameter has two values: the distance and
+            // the angle, the two distances, or the two coordinates.
+            let parts: &[u8] = if p.has_point() { &[0, 1] } else { &[0] };
             parts.iter().filter_map(move |&part| {
                 let shown = |i: &Insert| shown_value(i, p.id, part);
                 let first_value = shown(first)?;
@@ -59,15 +60,22 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
                     let v = shown(insert)?;
                     same &= (v - first_value).abs() <= 1e-9 * first_value.abs().max(1.0);
                 }
+                let first_label = if p.label.is_empty() {
+                    &p.name
+                } else {
+                    &p.label
+                };
                 let label = match (&p.kind, part) {
-                    (DynamicParameterKind::Polar { angle_label, .. }, 1) => angle_label.clone(),
-                    _ if p.label.is_empty() => p.name.clone(),
-                    _ => p.label.clone(),
+                    (DynamicParameterKind::Polar { angle_label: l, .. }, 1)
+                    | (DynamicParameterKind::Xy { y_label: l, .. }, 1) => l.clone(),
+                    (DynamicParameterKind::Point { .. }, 0) => format!("{first_label} X"),
+                    (DynamicParameterKind::Point { .. }, _) => format!("{first_label} Y"),
+                    _ => first_label.clone(),
                 };
                 Some(Row {
                     parameter: p.id,
                     part,
-                    angle: p.is_angle() || part == 1,
+                    angle: p.is_angle() || (p.is_polar() && part == 1),
                     flag: p.is_flag(),
                     label,
                     value: same.then_some(first_value),
@@ -79,11 +87,18 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
 
 /// A value as shown: in drawing units, or in degrees for an angle.
 fn shown_value(insert: &Insert, parameter: ParameterId, part: u8) -> Option<f64> {
-    if let Some((distance, angle)) = insert.dynamic_polar(parameter) {
-        return Some(if part == 1 {
-            angle.to_degrees().rem_euclid(360.0)
-        } else {
-            distance * insert.dynamic_scale(parameter)?
+    if let Some((a, b)) = insert.dynamic_pair(parameter) {
+        let polar = insert
+            .block
+            .dynamic
+            .as_ref()?
+            .parameters
+            .iter()
+            .any(|p| p.id == parameter && p.is_polar());
+        return Some(match (part, polar) {
+            (1, true) => b.to_degrees().rem_euclid(360.0),
+            (1, false) => b * insert.dynamic_scale(parameter)?,
+            _ => a * insert.dynamic_scale(parameter)?,
         });
     }
     Some(insert.dynamic_value(parameter)? * insert.dynamic_scale(parameter)?)
@@ -108,17 +123,15 @@ pub fn with_display_value(
         .parameters
         .iter()
         .find(|p| p.id == parameter)?;
-    if let DynamicParameterKind::Polar { base, .. } = &p.kind {
-        // Change the distance or the angle and keep the other.
-        let (distance, angle) = insert.dynamic_polar(parameter)?;
-        let (distance, angle) = match part {
-            1 => (distance, display.to_radians()),
-            _ => (display / scale, angle),
+    if p.has_point() {
+        // Change one of the two numbers and keep the other.
+        let (a, b) = insert.dynamic_pair(parameter)?;
+        let (a, b) = match (part, p.is_polar()) {
+            (1, true) => (a, display.to_radians()),
+            (1, false) => (a, display / scale),
+            _ => (display / scale, b),
         };
-        let end = p.fit_end(Point::new(
-            base.x + distance * angle.cos(),
-            base.y + distance * angle.sin(),
-        ))?;
+        let end = p.fit_end(p.point_of(a, b)?)?;
         let out = insert.with_dynamic_value(parameter, DynamicValue::Point(end))?;
         return (out != *insert).then_some(out);
     }

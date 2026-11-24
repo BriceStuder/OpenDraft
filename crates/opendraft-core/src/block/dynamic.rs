@@ -120,6 +120,20 @@ pub enum DynamicParameterKind {
         /// What the Properties palette calls the angle.
         angle_label: String,
     },
+    /// A point `end` at a horizontal and a vertical distance from `base`.
+    /// Its value is where `end` is (a `Point`); each distance has a value
+    /// set.
+    Xy {
+        base: Point,
+        end: Point,
+        x_set: DynamicValueSet,
+        y_set: DynamicValueSet,
+        /// What the Properties palette calls the vertical distance.
+        y_label: String,
+    },
+    /// A location in the block. Its value is where it is (a `Point`),
+    /// `position` by default; it has no value set.
+    Point { position: Point },
 }
 
 /// Which parameters and actions go together.
@@ -129,6 +143,8 @@ pub enum DynamicFamily {
     Rotation,
     Flip,
     Polar,
+    Xy,
+    Point,
 }
 
 impl DynamicParameterKind {
@@ -138,20 +154,23 @@ impl DynamicParameterKind {
             Self::Rotation { .. } => DynamicFamily::Rotation,
             Self::Flip { .. } => DynamicFamily::Flip,
             Self::Polar { .. } => DynamicFamily::Polar,
+            Self::Xy { .. } => DynamicFamily::Xy,
+            Self::Point { .. } => DynamicFamily::Point,
         }
     }
 }
 
 impl DynamicActionKind {
-    /// Whether this action can follow a parameter of `family`: a move,
-    /// stretch or scale follows a distance or a polar point, a rotate an
-    /// angle or a polar point, a flip a flip.
+    /// Whether this action can follow a parameter of `family`: a move or
+    /// stretch follows a distance or any point, a scale a distance or a
+    /// polar point, a rotate an angle or a polar point, a flip a flip.
     pub fn follows(&self, family: DynamicFamily) -> bool {
-        use DynamicFamily::{Flip, Linear, Polar, Rotation};
+        use DynamicFamily::{Flip, Linear, Point, Polar, Rotation, Xy};
         match self {
-            Self::Move { .. } | Self::Stretch { .. } | Self::Scale { .. } => {
-                matches!(family, Linear | Polar)
+            Self::Move { .. } | Self::Stretch { .. } => {
+                matches!(family, Linear | Polar | Xy | Point)
             }
+            Self::Scale { .. } => matches!(family, Linear | Polar),
             Self::Rotate { .. } => matches!(family, Rotation | Polar),
             Self::Flip { .. } => family == Flip,
         }

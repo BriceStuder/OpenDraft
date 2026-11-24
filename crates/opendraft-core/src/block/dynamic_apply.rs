@@ -54,7 +54,7 @@ impl Polar {
         Ok(Polar {
             base: *base,
             was: *end,
-            now: parameter.polar_end(Some(state))?,
+            now: parameter.end_point(Some(state))?,
         })
     }
 
@@ -142,14 +142,12 @@ pub(super) fn apply(
             ..
         } => {
             let (dx, dy) = match &parameter.kind {
-                DynamicParameterKind::Polar { .. } => {
-                    let p = Polar::of(parameter, state)?;
-                    shifted(
-                        p.now.x - p.was.x,
-                        p.now.y - p.was.y,
-                        *multiplier,
-                        *angle_offset,
-                    )
+                DynamicParameterKind::Polar { .. }
+                | DynamicParameterKind::Xy { .. }
+                | DynamicParameterKind::Point { .. } => {
+                    let was = parameter.drawn_end().ok_or_else(bad)?;
+                    let now = parameter.end_point(Some(state))?;
+                    shifted(now.x - was.x, now.y - was.y, *multiplier, *angle_offset)
                 }
                 _ => {
                     let (current, axis) = parameter.current(Some(state))?;

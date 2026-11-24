@@ -49,6 +49,26 @@ enum ParameterKindDto {
     Rotation(RotationDto),
     Flip(FlipDto),
     Polar(PolarDto),
+    Xy(XyDto),
+    Point(LocationDto),
+}
+
+/// An XY parameter: the base, the end and the sets of each distance.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XyDto {
+    base: PointDto,
+    end: PointDto,
+    xs: ValueSetDto,
+    ys: ValueSetDto,
+    y_label: String,
+}
+
+/// A point parameter: where it is.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LocationDto {
+    position: PointDto,
 }
 
 /// A polar parameter: the base, the end and the sets of each.
@@ -210,6 +230,22 @@ impl ParameterDto {
                 base: point(*base),
                 end: point(*end),
             }),
+            DynamicParameterKind::Xy {
+                base,
+                end,
+                x_set,
+                y_set,
+                y_label,
+            } => ParameterKindDto::Xy(XyDto {
+                base: point(*base),
+                end: point(*end),
+                xs: ValueSetDto::of(x_set),
+                ys: ValueSetDto::of(y_set),
+                y_label: y_label.clone(),
+            }),
+            DynamicParameterKind::Point { position } => ParameterKindDto::Point(LocationDto {
+                position: point(*position),
+            }),
             DynamicParameterKind::Polar {
                 base,
                 end,
@@ -250,6 +286,16 @@ impl ParameterDto {
             ParameterKindDto::Flip(f) => DynamicParameterKind::Flip {
                 base: from_point(f.base)?,
                 end: from_point(f.end)?,
+            },
+            ParameterKindDto::Xy(x) => DynamicParameterKind::Xy {
+                base: from_point(x.base)?,
+                end: from_point(x.end)?,
+                x_set: x.xs.to_set(),
+                y_set: x.ys.to_set(),
+                y_label: x.y_label.clone(),
+            },
+            ParameterKindDto::Point(l) => DynamicParameterKind::Point {
+                position: from_point(l.position)?,
             },
             ParameterKindDto::Polar(p) => DynamicParameterKind::Polar {
                 base: from_point(p.base)?,

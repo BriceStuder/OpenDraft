@@ -210,7 +210,7 @@ fn the_grip_is_at_the_end_and_dragging_it_sets_the_point() {
     let moved = insert
         .with_dynamic_grip_moved(grips[0].0, p(10.0, 7.0))
         .unwrap();
-    let (distance, angle) = moved.dynamic_polar(ParameterId(1)).unwrap();
+    let (distance, angle) = moved.dynamic_pair(ParameterId(1)).unwrap();
     assert!((distance - 7.0).abs() < 1e-9 && (angle - FRAC_PI_2).abs() < 1e-9);
     assert!(near(moved.dynamic_grips()[0].1, p(10.0, 7.0)));
     // Back where it was: no state.
@@ -224,7 +224,7 @@ fn the_grip_is_at_the_end_and_dragging_it_sets_the_point() {
 fn the_polar_row_values_come_from_the_end() {
     let block = arm(any(), any(), vec![stretch()]);
     let insert = with_end(&block, p(3.0, 4.0));
-    let (distance, angle) = insert.dynamic_polar(ParameterId(1)).unwrap();
+    let (distance, angle) = insert.dynamic_pair(ParameterId(1)).unwrap();
     assert!((distance - 5.0).abs() < 1e-9);
     assert!((angle - (4.0f64).atan2(3.0)).abs() < 1e-9);
     // A distance is measured along the line as drawn.

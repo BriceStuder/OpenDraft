@@ -100,5 +100,5 @@ fn an_action_needs_the_kind_of_parameter_it_follows() {
     state.start_command("BACTION", baction);
     state.settle_command();
     submit_all(&mut state, &["Stretch"]);
-    assert!(said(&state, "needs a linear or polar parameter"));
+    assert!(said(&state, "needs a linear, polar, XY or point parameter"));
 }

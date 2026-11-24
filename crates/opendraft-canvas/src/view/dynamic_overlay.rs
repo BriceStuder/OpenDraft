@@ -45,7 +45,9 @@ impl View {
                         let (DynamicParameterKind::Linear { start: at, .. }
                         | DynamicParameterKind::Rotation { base: at, .. }
                         | DynamicParameterKind::Flip { base: at, .. }
-                        | DynamicParameterKind::Polar { base: at, .. }) = &p.kind;
+                        | DynamicParameterKind::Polar { base: at, .. }
+                        | DynamicParameterKind::Xy { base: at, .. }
+                        | DynamicParameterKind::Point { position: at }) = &p.kind;
                         to_screen(*at) + egui::vec2(0.0, 14.0)
                     }),
             };
@@ -66,7 +68,15 @@ impl View {
                 }
                 | DynamicParameterKind::Polar {
                     base: start, end, ..
+                }
+                | DynamicParameterKind::Xy {
+                    base: start, end, ..
                 } => (*start, *end),
+                // A point: a small circle where it is.
+                DynamicParameterKind::Point { position } => {
+                    painter.circle_stroke(to_screen(*position), TICK, stroke);
+                    (*position, *position)
+                }
                 // A rotation: its circle, and the radius the grip starts on.
                 DynamicParameterKind::Rotation { base, radius, .. } => {
                     let end = Point::new(base.x + radius, base.y);

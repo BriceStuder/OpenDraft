@@ -31,10 +31,12 @@ impl DynamicBlock {
                 }
                 DynamicParameterKind::Rotation { base, .. } => *base = base.translated(dx, dy),
                 DynamicParameterKind::Flip { base, end }
-                | DynamicParameterKind::Polar { base, end, .. } => {
+                | DynamicParameterKind::Polar { base, end, .. }
+                | DynamicParameterKind::Xy { base, end, .. } => {
                     *base = base.translated(dx, dy);
                     *end = end.translated(dx, dy);
                 }
+                DynamicParameterKind::Point { position } => *position = position.translated(dx, dy),
             }
         }
         for a in &mut out.actions {
@@ -92,11 +94,9 @@ impl DynamicBlock {
             .iter()
             .filter_map(|e| {
                 let p = self.parameters.iter().find(|p| p.id == e.parameter)?;
-                if let (true, DynamicValue::Point(end)) = (p.is_polar(), &e.value) {
+                if let (true, DynamicValue::Point(end)) = (p.has_point(), &e.value) {
                     let fitted = p.fit_end(*end)?;
-                    let DynamicParameterKind::Polar { end: drawn, .. } = &p.kind else {
-                        return None;
-                    };
+                    let drawn = &p.drawn_end()?;
                     if (fitted.x - drawn.x).abs() <= 1e-12 && (fitted.y - drawn.y).abs() <= 1e-12 {
                         return None;
                     }

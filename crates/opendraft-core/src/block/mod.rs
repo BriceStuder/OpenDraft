@@ -287,6 +287,8 @@ mod dynamic_scale_tests;
 #[cfg(test)]
 mod dynamic_tests;
 #[cfg(test)]
+mod dynamic_xy_tests;
+#[cfg(test)]
 mod expansion_tests;
 #[cfg(test)]
 pub(crate) mod tests;

@@ -59,7 +59,7 @@ impl DynamicBlock {
                 return Err(format!("parameter {} does not exist", entry.parameter.0));
             };
             let held = match &entry.value {
-                DynamicValue::Point(end) if p.is_polar() => p.fit_end(*end).is_some_and(|n| {
+                DynamicValue::Point(end) if p.has_point() => p.fit_end(*end).is_some_and(|n| {
                     (n.x - end.x).abs() <= 1e-9 * end.x.abs().max(1.0)
                         && (n.y - end.y).abs() <= 1e-9 * end.y.abs().max(1.0)
                 }),
@@ -118,16 +118,12 @@ impl Insert {
             .unwrap_or(Cow::Borrowed(&self.block.entities))
     }
 
-    /// A polar parameter's distance from its base and its angle (radians
-    /// from +X) on this insert, in the block's units.
-    pub fn dynamic_polar(&self, parameter: ParameterId) -> Option<(f64, f64)> {
+    /// The two numbers of a polar, XY or point parameter on this insert, in
+    /// the block's units: a polar parameter's distance and angle (radians
+    /// from +X), an XY parameter's distances, a point's coordinates.
+    pub fn dynamic_pair(&self, parameter: ParameterId) -> Option<(f64, f64)> {
         let p = self.parameter(parameter)?;
-        let DynamicParameterKind::Polar { base, .. } = &p.kind else {
-            return None;
-        };
-        let end = p.polar_end(self.dynamic.as_deref()).ok()?;
-        let (dx, dy) = (end.x - base.x, end.y - base.y);
-        Some((dx.hypot(dy), dy.atan2(dx)))
+        p.parts_of(p.end_point(self.dynamic.as_deref()).ok()?)
     }
 
     /// The value of `parameter` on this insert, in the block's units.
@@ -150,7 +146,16 @@ impl Insert {
         if p.is_flag() {
             return Some(1.0);
         }
-        let axis = p.axis()?;
+        let Some(axis) = p.axis() else {
+            // An XY distance or a point's coordinate: along the block's X.
+            let map = self.transform();
+            let (a, b) = (
+                map.apply(Point::new(0.0, 0.0)),
+                map.apply(Point::new(1.0, 0.0)),
+            );
+            let scale = (b.x - a.x).hypot(b.y - a.y);
+            return (p.has_point() && scale.is_finite() && scale > EPS).then_some(scale);
+        };
         let map = self.transform();
         let a = map.apply(axis.start);
         let b = map.apply(Point::new(
@@ -181,9 +186,8 @@ impl Insert {
     ) -> Option<Insert> {
         let p = self.parameter(parameter)?;
         let mut state = self.dynamic.as_deref().cloned().unwrap_or_default();
-        if let (DynamicValue::Point(end), DynamicParameterKind::Polar { end: drawn, .. }) =
-            (&value, &p.kind)
-        {
+        if let (DynamicValue::Point(end), Some(drawn)) = (&value, p.drawn_end()) {
+            let drawn = &drawn;
             if !(end.x.is_finite() && end.y.is_finite()) {
                 return None;
             }
@@ -227,8 +231,8 @@ impl Insert {
             .iter()
             .filter(|p| p.grips >= 1)
             .filter_map(|p| {
-                if p.is_polar() {
-                    let end = p.polar_end(self.dynamic.as_deref()).ok()?;
+                if p.has_point() {
+                    let end = p.end_point(self.dynamic.as_deref()).ok()?;
                     let grip = DynamicGrip {
                         parameter: p.id,
                         index: 0,
@@ -251,7 +255,9 @@ impl Insert {
                     DynamicParameterKind::Flip { base, end } => {
                         Point::new((base.x + end.x) / 2.0, (base.y + end.y) / 2.0)
                     }
-                    DynamicParameterKind::Polar { .. } => return None,
+                    DynamicParameterKind::Polar { .. }
+                    | DynamicParameterKind::Xy { .. }
+                    | DynamicParameterKind::Point { .. } => return None,
                 };
                 let at = map.apply(at);
                 let grip = DynamicGrip {
@@ -274,8 +280,8 @@ impl Insert {
         }
         let p = self.parameter(grip.parameter)?;
         let at = self.transform().inverse()?.apply(to_drawing);
-        if p.is_polar() {
-            let now = p.polar_end(self.dynamic.as_deref()).ok()?;
+        if p.has_point() {
+            let now = p.end_point(self.dynamic.as_deref()).ok()?;
             let end = p.fit_end(at)?;
             if (end.x - now.x).abs() <= 1e-12 && (end.y - now.y).abs() <= 1e-12 {
                 return None;
@@ -289,7 +295,9 @@ impl Insert {
                 (at.x - axis.start.x) * axis.dir.0 + (at.y - axis.start.y) * axis.dir.1
             }
             DynamicParameterKind::Rotation { base, .. } => (at.y - base.y).atan2(at.x - base.x),
-            DynamicParameterKind::Polar { .. } => return None,
+            DynamicParameterKind::Polar { .. }
+            | DynamicParameterKind::Xy { .. }
+            | DynamicParameterKind::Point { .. } => return None,
             // Flipped when the point is left of the line from its base to its end.
             DynamicParameterKind::Flip { base, end } => {
                 let side = (end.x - base.x) * (at.y - base.y) - (end.y - base.y) * (at.x - base.x);

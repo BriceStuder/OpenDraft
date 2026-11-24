@@ -21,7 +21,8 @@ use opendraft_core::{Bounds, Entity, EntityId};
 
 use crate::dynamic_block_prompts::{ask_name, free_name, EPS};
 use crate::dynamic_parameter_cmd::{
-    flip_parameter, linear_parameter, polar_parameter, rotation_parameter,
+    flip_parameter, linear_parameter, point_parameter, polar_parameter, rotation_parameter,
+    xy_parameter,
 };
 use crate::text::plural;
 
@@ -39,8 +40,8 @@ fn commit(ed: &Editor, name: &'static str, schema: DynamicBlock) -> Result<(), C
     })
 }
 
-/// BPARAMETER: add a linear, polar, rotation or flip parameter to the block
-/// being edited.
+/// BPARAMETER: add a linear, polar, XY, point, rotation or flip parameter to
+/// the block being edited.
 pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     let mut schema = draft(ed)?;
     if schema.parameters.len() >= DynamicBlock::MAX_PARAMETERS {
@@ -49,18 +50,24 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     }
     let parameter = match ed
         .get_keyword(
-            Options::<String>::new("Enter parameter type [Linear/Polar/Rotation/Flip] <Linear>")
-                .keyword("Linear", "L")
-                .keyword("Polar", "P")
-                .keyword("Rotation", "R")
-                .keyword("Flip", "F")
-                .default("Linear".to_owned()),
+            Options::<String>::new(
+                "Enter parameter type [Linear/Polar/XY/Point/Rotation/Flip] <Linear>",
+            )
+            .keyword("Linear", "L")
+            .keyword("Polar", "P")
+            .keyword("XY", "X")
+            .keyword("Point", "Po")
+            .keyword("Rotation", "R")
+            .keyword("Flip", "F")
+            .default("Linear".to_owned()),
         )?
         .as_str()
     {
         "Rotation" => rotation_parameter(ed, &schema)?,
         "Flip" => flip_parameter(ed, &schema)?,
         "Polar" => polar_parameter(ed, &schema)?,
+        "XY" => xy_parameter(ed, &schema)?,
+        "Point" => point_parameter(ed, &schema)?,
         _ => linear_parameter(ed, &schema)?,
     };
     let name = parameter.name.clone();
@@ -141,6 +148,18 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
     let stretch = chosen == "Stretch";
     // Each action follows its own kinds of parameter.
     let (follows, need): (fn(DynamicFamily) -> bool, &str) = match chosen.as_str() {
+        "Move" | "Stretch" => (
+            |f| {
+                matches!(
+                    f,
+                    DynamicFamily::Linear
+                        | DynamicFamily::Polar
+                        | DynamicFamily::Xy
+                        | DynamicFamily::Point
+                )
+            },
+            "linear, polar, XY or point",
+        ),
         "Rotate" => (
             |f| matches!(f, DynamicFamily::Rotation | DynamicFamily::Polar),
             "rotation or polar",
@@ -355,3 +374,7 @@ mod scale_tests;
 #[cfg(test)]
 #[path = "dynamic_polar_cmd_tests.rs"]
 mod polar_tests;
+
+#[cfg(test)]
+#[path = "dynamic_xy_cmd_tests.rs"]
+mod xy_tests;

@@ -138,7 +138,7 @@ fn a_modified_reference_becomes_a_reference_to_the_definition_with_its_value() {
     );
     assert_eq!(
         loaded.warnings,
-        ["Imported 1 dynamic block with their linear, polar, rotation and flip parameters and stretch, move, scale, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
+        ["Imported 1 dynamic block with their linear, polar, XY, point, rotation and flip parameters and stretch, move, scale, rotate and flip actions: Slide; 1 modified reference rebuilt from recorded values."]
     );
 }
 

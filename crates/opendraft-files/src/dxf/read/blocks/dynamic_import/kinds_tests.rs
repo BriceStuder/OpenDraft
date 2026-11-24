@@ -255,3 +255,54 @@ fn a_polar_angle_increment_comes_in_and_a_list_of_angles_is_left_out() {
         .iter()
         .any(|w| w.contains("polar parameter with a list of distances or angles")));
 }
+
+/// The fixture with its linear record turned into `record`, with no listed values.
+fn renamed(record: &str) -> opendraft_core::Document {
+    read(&dxf(false, |records| {
+        for r in records.iter_mut() {
+            if r.name == "BLOCKLINEARPARAMETER" {
+                r.name = record.into();
+                r.groups.retain(|g| g.code != 144);
+                for g in &mut r.groups {
+                    if g.code == 175 {
+                        g.value = "0".into();
+                    }
+                }
+            }
+        }
+    }))
+    .unwrap()
+    .document
+}
+
+#[test]
+fn an_xy_parameter_comes_in_and_a_reference_to_it_keeps_where_its_corner_was() {
+    let doc = renamed("BLOCKXYPARAMETER");
+    let slide = doc.block_named("Slide").unwrap();
+    assert!(matches!(
+        slide.dynamic.as_deref().unwrap().parameters[0].kind,
+        DynamicParameterKind::Xy { .. }
+    ));
+    let refs = inserts(&doc);
+    let state = refs[0].dynamic.as_deref().expect("a state");
+    assert_eq!(
+        state.values[0].value,
+        DynamicValue::Point(opendraft_core::Point::new(10.0, 0.0))
+    );
+    let b = refs[0].bounds();
+    assert!((b.max.x - b.min.x - 10.0).abs() < 1e-9, "{b:?}");
+}
+
+#[test]
+fn a_point_parameter_comes_in_but_its_modified_references_keep_their_pictures() {
+    let doc = renamed("BLOCKPOINTPARAMETER");
+    let slide = doc.block_named("Slide").unwrap();
+    assert!(matches!(
+        slide.dynamic.as_deref().unwrap().parameters[0].kind,
+        DynamicParameterKind::Point { .. }
+    ));
+    // Where a point was moved to is not read from the file yet.
+    let refs = inserts(&doc);
+    assert!(refs[0].dynamic.is_none());
+    assert!(!refs[0].block.is_dynamic());
+}

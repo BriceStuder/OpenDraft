@@ -57,6 +57,11 @@ pub struct Node {
 pub enum NodeKind {
     Linear(Parameter),
     Polar(Parameter),
+    /// An XY parameter: `start` is its base and `end` its corner; `name` is
+    /// the X distance's and `angle_name` the Y distance's.
+    Xy(Parameter),
+    /// A point parameter: `start` and `end` are its location.
+    Point(Parameter),
     /// A rotation parameter: `start` is its base point and `end` where its
     /// grip starts.
     Rotation(Parameter),
