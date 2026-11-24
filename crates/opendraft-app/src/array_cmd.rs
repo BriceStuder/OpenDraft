@@ -124,9 +124,8 @@ pub(crate) fn edit_prompt(
     keywords: &[(&str, &str)],
     ghost: impl Fn(Point) -> Vec<Entity> + Send + Sync + 'static,
 ) -> Result<Option<String>, Cancelled> {
-    let names: Vec<&str> = keywords.iter().map(|(label, _)| *label).collect();
-    let message = format!("Select grip to edit array or [{}/eXit]", names.join("/"));
-    let mut options = PointOptions::new(message).ghost(ghost);
+    // The command line lists the options after the message.
+    let mut options = PointOptions::new("Select grip to edit array").ghost(ghost);
     for (label, key) in keywords {
         options = options.keyword(*label, *key);
     }
@@ -452,6 +451,16 @@ mod tests {
         );
         state.undo();
         assert_eq!(state.session().document().len(), 1, "one undo step");
+    }
+
+    #[test]
+    fn the_edit_prompt_leaves_its_options_to_the_command_line() {
+        let mut state = with_square();
+        state.start_command("ARRAYRECT", array_rect);
+        state.settle_command();
+        let ask = state.waiting().unwrap();
+        assert_eq!(ask.message, "Select grip to edit array");
+        assert_eq!(ask.keywords.len(), 5, "COUnt, Spacing, COLumns, Rows, eXit");
     }
 
     #[test]
