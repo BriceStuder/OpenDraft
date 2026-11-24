@@ -126,7 +126,7 @@ What to build next, roughly in order, beside the phases above. The details of ea
 8. Linetypes from `.lin` files (a self-contained plan in `docs/parking_lot.md`).
 9. Layouts: non-rectangular viewport clips (planned in `docs/parking_lot.md`); open the R2000 export in AutoCAD.
 10. Properties panel parity with AutoCAD (`private_material/properties_gap.md`, cheap rows first).
-11. Dynamic blocks, in stages (plan in `private_material/dynamic_blocks_specification.md`, milestones M0 to M10): M0, the data slots (ids on a definition's objects, a schema on a definition, values on an insert), is built (24-11-2026). Next is M1, evaluating a linear parameter with Move and Stretch. Nothing shows in the app until the authoring commands, grips and Properties rows (M3 and M4) and DXF export (M5) are in.
+11. Dynamic blocks, in stages (plan in `private_material/dynamic_blocks_specification.md`, milestones M0 to M10): M0, the data slots (ids on a definition's objects, a schema on a definition, values on an insert), is built (24-11-2026), and so is M1, evaluating a linear parameter with Move and Stretch and its end grip (core only; 24-11-2026). Next is M2, saving in `.odraft`. Nothing shows in the app until the authoring commands, grips and Properties rows (M3 and M4) and DXF export (M5) are in.
 12. Housekeeping: split `dxf/read.rs`, make the Document mutators return `Result`, a progress bar for large files.
 
 ## Not now

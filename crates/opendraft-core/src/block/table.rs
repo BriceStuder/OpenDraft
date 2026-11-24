@@ -204,9 +204,12 @@ impl Document {
                 if !self.is_current(i) {
                     return Err(DocumentError::BadInsert(object.id));
                 }
-                if i.dynamic.is_some() && i.block.dynamic.is_none() {
-                    let why = "the block has no parameters".to_owned();
-                    return Err(DocumentError::BadDynamicState(object.id, why));
+                if let Some(state) = &i.dynamic {
+                    let checked = match &i.block.dynamic {
+                        Some(schema) => schema.check_state(state),
+                        None => Err("the block has no parameters".to_owned()),
+                    };
+                    checked.map_err(|why| DocumentError::BadDynamicState(object.id, why))?;
                 }
             }
         }
