@@ -429,20 +429,8 @@ impl PanelViewer<'_> {
     }
 
     fn properties(&mut self, ui: &mut egui::Ui) {
-        use crate::properties_ui::Edit;
-        match crate::properties_ui::show(ui, self.theme, self.state) {
-            Some(Edit::Value {
-                field,
-                label,
-                value,
-                kind,
-            }) => self.state.set_property(field, label, value, kind),
-            Some(Edit::Attr { edit, kind }) => self.state.set_attrs(&edit, kind),
-            Some(Edit::Style(edit)) => self.state.set_object_style(&edit),
-            Some(Edit::Attribute { tag, value, kind }) => {
-                self.state.set_attribute_value(&tag, &value, kind);
-            }
-            None => {}
+        if let Some(edit) = crate::properties_ui::show(ui, self.theme, self.state) {
+            self.state.apply_property_edit(edit);
         }
     }
 }

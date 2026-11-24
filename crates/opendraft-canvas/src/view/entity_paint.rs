@@ -163,8 +163,25 @@ impl View {
             self.paint_insert_pieces(painter, rect, style, document, &pieces, frozen);
             return;
         }
+        // A selected or hovered reference is stroked from the same kept
+        // pieces as a plain one, so it is not expanded (and a dynamic block
+        // not evaluated) again every frame.
+        let kept = matches!(entity, Entity::Insert(_)).then(|| {
+            let mut kept = self.insert_pieces.borrow_mut();
+            kept.of(self.document_token, document, object)
+        });
+        let visible = self.camera.visible_world(rect);
         // A linetype cuts the line into dashes; the glow follows them.
-        let draw = |stroke: Stroke| self.stroke_object(painter, rect, document, object, stroke);
+        let draw = |stroke: Stroke| match kept.as_ref().and_then(|k| k.as_ref()) {
+            Some(pieces) => {
+                for piece in pieces.iter().filter(|p| !frozen.contains(&p.attrs.layer)) {
+                    if !self.negligible(&piece.entity, &visible) {
+                        self.stroke_entity(painter, rect, &piece.entity, stroke);
+                    }
+                }
+            }
+            None => self.stroke_object(painter, rect, document, object, stroke),
+        };
         // Selected and hovered entities get a wide translucent overlay
         // under a thicker, brighter line.
         if selection.contains(id) {
