@@ -101,6 +101,23 @@ fn block_editor() -> Tab {
                 ..Default::default()
             },
             Panel {
+                title: "Dynamic",
+                columns: vec![
+                    Column::Large(Item::new(
+                        "block.parameter",
+                        "Parameter",
+                        icons::BLOCK_PARAMETER,
+                    )),
+                    Column::Large(Item::new("block.action", "Action", icons::BLOCK_ACTION)),
+                    Column::Large(Item::new(
+                        "block.actionset",
+                        "Action Objects",
+                        icons::BLOCK_ACTIONSET,
+                    )),
+                ],
+                ..Default::default()
+            },
+            Panel {
                 title: "Close",
                 columns: vec![Column::Large(Item::new(
                     "block.close",
@@ -125,6 +142,7 @@ fn insert() -> Tab {
                     Column::Large(Item::new("block.create", "Create", icons::BLOCK_CREATE)),
                     Column::Large(Item::new("block.edit", "Edit", icons::BLOCK_EDIT)),
                     Column::Large(Item::new("block.purge", "Purge", icons::BLOCK_PURGE)),
+                    Column::Large(Item::new("block.reset", "Reset", icons::BLOCK_RESET)),
                 ],
                 ..Default::default()
             },

@@ -72,6 +72,7 @@ mod divide_cmd;
 mod dock;
 mod donut_cmd;
 mod draw;
+mod dynamic_block_cmd;
 mod dynamic_input;
 mod dynamic_settings;
 mod edges;

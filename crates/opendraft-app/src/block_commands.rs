@@ -9,6 +9,7 @@ use crate::attribute_edit::edit_attributes;
 use crate::attribute_sync_cmd::sync_attributes;
 use crate::block_cmd::define_block;
 use crate::block_dialog_cmd::define_block_dialog;
+use crate::dynamic_block_cmd::{baction, bactionset, bparameter, resetblock};
 use crate::field_cmd::{insert_field, update_field};
 use crate::field_dialog_cmd::insert_field_dialog;
 use crate::insert_cmd::insert_block;
@@ -57,5 +58,22 @@ pub fn commands() -> Vec<Command<AppState>> {
             "UPDATEFIELD",
             update_field
         ),
+        editor!(
+            "block.parameter",
+            "Block Parameter",
+            "BPARAMETER",
+            bparameter
+        )
+        .when(AppState::in_block_editor),
+        editor!("block.action", "Block Action", "BACTION", baction).when(AppState::in_block_editor),
+        editor!(
+            "block.actionset",
+            "Action Objects",
+            "BACTIONSET",
+            bactionset
+        )
+        .when(AppState::in_block_editor),
+        editor!("block.reset", "Reset Block", "RESETBLOCK", resetblock)
+            .when(|s: &AppState| !s.in_block_editor()),
     ]
 }

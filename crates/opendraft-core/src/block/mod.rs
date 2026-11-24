@@ -28,6 +28,7 @@ pub mod block_draft;
 mod budget;
 pub mod dynamic;
 mod dynamic_eval;
+mod dynamic_fit;
 mod edit;
 mod editing;
 pub mod field;
@@ -52,6 +53,7 @@ pub use dynamic::{
     DynamicValueSet, ParameterId,
 };
 pub use dynamic_eval::{evaluate, DynamicBlockError};
+pub use dynamic_fit::Pruned;
 pub use editing::BlockEditSave;
 pub use field::{
     DataField, FieldObjectRef, FieldRun, FieldStatus, FieldText, FieldValue, MAX_FIELDS_PER_TEXT,
@@ -262,6 +264,8 @@ pub fn inherited(
 
 #[cfg(test)]
 mod attribute_tests;
+#[cfg(test)]
+mod dynamic_edit_tests;
 #[cfg(test)]
 mod dynamic_eval_tests;
 #[cfg(test)]
