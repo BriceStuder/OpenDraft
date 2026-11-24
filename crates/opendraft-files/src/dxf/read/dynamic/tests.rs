@@ -65,6 +65,7 @@ pub(in crate::dxf::read) fn file() -> Vec<Record> {
     }
     graph.extend(edge("0", "0", "3"));
     graph.extend(edge("1", "1", "0"));
+    graph.extend(edge("2", "4", "5"));
     let graph: Vec<(i32, &str)> = graph.iter().map(|(c, v)| (*c, v.as_str())).collect();
     vec![
         rec("SECTION", &[(2, "TABLES")]),
@@ -280,7 +281,7 @@ fn a_definition_is_found_by_its_xdata_and_its_nodes_read() {
             ("Lookup2", 16)
         ]
     );
-    assert_eq!(slide.links, [(6, 10), (7, 6)]);
+    assert_eq!(slide.links, [(6, 10), (7, 6), (12, 16)]);
     let NodeKind::Linear(distance) = &slide.nodes[0].kind else {
         panic!("a linear parameter");
     };
@@ -294,7 +295,8 @@ fn a_definition_is_found_by_its_xdata_and_its_nodes_read() {
     assert_eq!(
         slide.nodes[3].kind,
         NodeKind::Lookup {
-            name: "Lookup1".into()
+            name: "Lookup1".into(),
+            position: Point::new(0.0, 0.0)
         }
     );
 }

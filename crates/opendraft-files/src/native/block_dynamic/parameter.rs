@@ -2,7 +2,7 @@
 //! the value sets they hold.
 
 use opendraft_core::block::{
-    BlockObjectId, DynamicParameter, DynamicParameterKind, DynamicValueSet, ParameterId,
+    BlockObjectId, DynamicParameter, DynamicParameterKind, DynamicValueSet, LookupRow, ParameterId,
     VisibilityState,
 };
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,23 @@ enum ParameterKindDto {
     Xy(XyDto),
     Point(LocationDto),
     Visibility(VisibilityDto),
+    Lookup(LookupDto),
+}
+
+/// A lookup parameter: where it is, its inputs and its rows.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LookupDto {
+    position: PointDto,
+    inputs: Vec<u64>,
+    rows: Vec<LookupRowDto>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LookupRowDto {
+    label: String,
+    values: Vec<f64>,
 }
 
 /// An XY parameter: the base, the end and the sets of each distance.
@@ -164,6 +181,21 @@ impl ParameterDto {
             DynamicParameterKind::Point { position } => ParameterKindDto::Point(LocationDto {
                 position: point(*position),
             }),
+            DynamicParameterKind::Lookup {
+                position,
+                inputs,
+                rows,
+            } => ParameterKindDto::Lookup(LookupDto {
+                position: point(*position),
+                inputs: inputs.iter().map(|i| i.0).collect(),
+                rows: rows
+                    .iter()
+                    .map(|r| LookupRowDto {
+                        label: r.label.clone(),
+                        values: r.values.clone(),
+                    })
+                    .collect(),
+            }),
             DynamicParameterKind::Visibility { position, states } => {
                 ParameterKindDto::Visibility(VisibilityDto {
                     position: point(*position),
@@ -226,6 +258,18 @@ impl ParameterDto {
             },
             ParameterKindDto::Point(l) => DynamicParameterKind::Point {
                 position: from_point(l.position)?,
+            },
+            ParameterKindDto::Lookup(l) => DynamicParameterKind::Lookup {
+                position: from_point(l.position)?,
+                inputs: l.inputs.iter().map(|i| ParameterId(*i)).collect(),
+                rows: l
+                    .rows
+                    .iter()
+                    .map(|r| LookupRow {
+                        label: r.label.clone(),
+                        values: r.values.clone(),
+                    })
+                    .collect(),
             },
             ParameterKindDto::Visibility(v) => DynamicParameterKind::Visibility {
                 position: from_point(v.position)?,

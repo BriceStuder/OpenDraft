@@ -1,5 +1,5 @@
 //! Dynamic blocks of a DXF built into the drawing, from what `dynamic`
-//! decoded. A definition keeps its linear, polar, XY, point, rotation and flip parameters and its
+//! decoded. A definition keeps its linear, polar, XY, point, rotation, flip, visibility and lookup parameters and its
 //! stretch, move, scale, rotate and flip actions; what the app cannot represent (polar,
 //! lookup, visibility, scale and the rest) is left out and named in a note. A reference to
 //! an anonymous `*U` block becomes a reference to its definition with the
@@ -264,7 +264,7 @@ impl Plan {
             .collect();
         if !imported.is_empty() {
             let mut line = format!(
-                "Imported {} with their linear, polar, XY, point, rotation and flip parameters and stretch, move, scale, rotate and flip actions: {}",
+                "Imported {} with their linear, polar, XY, point, rotation, flip, visibility and lookup parameters and stretch, move, scale, rotate and flip actions: {}",
                 crate::plural(imported.len() as u64, "dynamic block"),
                 list(&imported)
             );

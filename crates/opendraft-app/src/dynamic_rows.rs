@@ -30,11 +30,11 @@ pub struct Row {
     pub angle: bool,
     /// Whether it is a yes or no (a flip).
     pub flag: bool,
-    /// `None` when the references disagree. For a visibility parameter it is
-    /// the position of the state shown in `states`.
+    /// `None` when the references disagree. For a visibility or lookup parameter it
+    /// is the position of the choice shown in `states`.
     pub value: Option<f64>,
-    /// The names of a visibility parameter's states, the choices of its
-    /// drop-down; empty for every other kind.
+    /// The choices of a visibility or lookup parameter's drop-down (state
+    /// names, or row labels and "Custom"); empty for every other kind.
     pub states: Vec<String>,
 }
 
@@ -85,9 +85,9 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
                     flag: p.is_flag(),
                     label,
                     value: same.then_some(first_value),
-                    states: p
-                        .visibility_states()
-                        .map(|s| s.iter().map(|s| s.name.clone()).collect())
+                    states: first
+                        .choice(p.id)
+                        .map(|(names, _)| names)
                         .unwrap_or_default(),
                 })
             })
@@ -97,12 +97,8 @@ pub fn rows(inserts: &[&Insert]) -> Vec<Row> {
 
 /// A value as shown: in drawing units, or in degrees for an angle.
 fn shown_value(insert: &Insert, parameter: ParameterId, part: u8) -> Option<f64> {
-    if let Some(p) = insert.block.dynamic.as_ref()?.visibility() {
-        if p.id == parameter {
-            let (_, shown) = insert.visibility_state()?;
-            let at = p.visibility_states()?.iter().position(|s| s.name == shown);
-            return at.map(|i| i as f64);
-        }
+    if let Some((_, at)) = insert.choice(parameter) {
+        return Some(at as f64);
     }
     if let Some((a, b)) = insert.dynamic_pair(parameter) {
         let polar = insert
@@ -133,13 +129,10 @@ pub fn with_display_value(
     part: u8,
     display: f64,
 ) -> Option<Insert> {
-    if let Some(p) = insert.block.dynamic.as_ref()?.visibility() {
-        if p.id == parameter {
-            // The position of the state picked.
-            let at = (display.is_finite() && display >= 0.0).then_some(display as usize)?;
-            let name = &p.visibility_states()?.get(at)?.name;
-            return Some(insert.with_visibility_state(name)?).filter(|out| out != insert);
-        }
+    if insert.choice(parameter).is_some() {
+        // The position of the choice picked.
+        let at = (display.is_finite() && display >= 0.0).then_some(display as usize)?;
+        return insert.with_choice(parameter, at);
     }
     let scale = insert.dynamic_scale(parameter)?;
     let p = insert

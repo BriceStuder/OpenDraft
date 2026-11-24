@@ -35,6 +35,7 @@ impl DynamicBlock {
             }
         }
         self.check_visibility(objects)?;
+        self.check_lookups()?;
         let mut actions = HashSet::new();
         for a in &self.actions {
             if a.id.0 == 0 || a.id.0 >= self.next_action_id || !actions.insert(a.id) {

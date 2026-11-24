@@ -58,7 +58,8 @@ impl DynamicParameter {
                     && end.y.is_finite())
             }
             DynamicParameterKind::Point { position }
-            | DynamicParameterKind::Visibility { position, .. } => {
+            | DynamicParameterKind::Visibility { position, .. }
+            | DynamicParameterKind::Lookup { position, .. } => {
                 !(position.x.is_finite() && position.y.is_finite())
             }
         }
@@ -82,7 +83,8 @@ impl DynamicParameter {
             // These have a point, not a number.
             DynamicParameterKind::Xy { .. }
             | DynamicParameterKind::Point { .. }
-            | DynamicParameterKind::Visibility { .. } => None,
+            | DynamicParameterKind::Visibility { .. }
+            | DynamicParameterKind::Lookup { .. } => None,
         }
     }
 
@@ -105,7 +107,9 @@ impl DynamicParameter {
             | DynamicParameterKind::Rotation { value_set, .. } => value_set,
             DynamicParameterKind::Polar { distance_set, .. } => distance_set,
             DynamicParameterKind::Xy { x_set, .. } => x_set,
-            DynamicParameterKind::Point { .. } | DynamicParameterKind::Visibility { .. } => &ANY,
+            DynamicParameterKind::Point { .. }
+            | DynamicParameterKind::Visibility { .. }
+            | DynamicParameterKind::Lookup { .. } => &ANY,
             DynamicParameterKind::Flip { .. } => &FLAG,
         }
     }
