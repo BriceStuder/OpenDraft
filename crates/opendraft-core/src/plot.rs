@@ -189,13 +189,12 @@ fn add_viewports(
             vp.model_bounds(),
             TOLERANCE_MM / vp.scale,
         );
+        let plotted = |layer| !vp.is_frozen(layer) && document.plots(layer);
         let objects = document
             .visible_in(None)
-            .filter(|o| !vp.is_frozen(o.attrs.layer) && o.bounds().intersects(&shown));
+            .filter(|o| plotted(o.attrs.layer) && o.bounds().intersects(&shown));
         let pieces = objects.flat_map(|o| document.drawn(o));
-        for object in
-            pieces.filter(|o| !vp.is_frozen(o.attrs.layer) && document.plots(o.attrs.layer))
-        {
+        for object in pieces.filter(|o| plotted(o.attrs.layer)) {
             let to_paper = |p: Point| vp.model_to_paper(p);
             add_viewed(
                 sheet,
@@ -229,12 +228,12 @@ fn add_paper(
     let window = Bounds::from_points(Point::new(0.0, 0.0), Point::new(sheet.width, sheet.height));
     let frame = Bounds::from_points(Point::new(-1e12, -1e12), Point::new(1e12, 1e12));
     let same = |p: Point| p;
-    let shown = |layer| !layout.is_paper_frozen(layer);
+    let shown = |layer| !layout.is_paper_frozen(layer) && document.plots(layer);
     for object in document
         .visible_in(Some(layout.id))
         .filter(|o| shown(o.attrs.layer))
         .flat_map(|o| document.drawn(o))
-        .filter(|o| shown(o.attrs.layer) && document.plots(o.attrs.layer))
+        .filter(|o| shown(o.attrs.layer))
     {
         add_viewed(
             sheet,
