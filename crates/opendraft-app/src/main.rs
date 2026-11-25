@@ -46,6 +46,7 @@ mod clipboard;
 mod cmd_aliases;
 mod cmdline;
 mod colour_ui;
+mod command_language;
 mod command_record;
 mod commands;
 mod coordinates;

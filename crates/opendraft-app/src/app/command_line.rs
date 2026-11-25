@@ -257,7 +257,7 @@ impl PanelViewer<'_> {
 
         if accept_tab {
             if let Some(s) = suggestions.get(selected) {
-                input = s.alias.to_owned();
+                input = s.alias.to_string();
             }
         }
         if escape {
