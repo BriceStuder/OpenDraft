@@ -153,6 +153,18 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 - Drawing audit: standards beyond layer names (linetype, colour, text style and height), a "show me" action that selects findings.
 - Rendering for the model: the canvas's own look, a layout sheet at a chosen DPI, a picture cache keyed by revision.
 
+## Content Manager (`docs/openhub-specification.md`, local-only work on `feat/content-manager`)
+
+Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), the local library's store, capture, organise, search and Trash (`opendraft-content`), and `Document::bring_block` in core. Not built:
+
+- The app side: `Location::Library`, `LIBADD`, `LIBINSERT` (ghost, pick a point, one undo step), the Content Manager window, its Insert-tab button and light-palette thumbnails, import from `.odraft`, DXF and DWG, the drawing-open notice.
+- Replacing a block of a drawing from the library (`bring_block` adds and renames only; replace needs `redefined_blocks` and the drawing's objects), and `BlockDef::origin`.
+- Whether a restored component is matched by its id: restoring uses the name and shape of the block already there, so a component renamed meanwhile is added again under its old name.
+- Attribute prompts are not yet checked as shown text; block text, layer, linetype and font names are.
+- A library whose block is too big or too many for publishing (5 MB, 500 blocks): the personal package is exempt by design, the publish limits are not built.
+- `index.cache` and search over tens of thousands of blocks are not measured; thumbnails of blocks.
+- Packages, versions, the hub client and everything in slices 2 to 5 of the specification.
+
 ## Releases and platforms
 
 - Linux on real machines, Flathub and the AUR: `docs/ROADMAP.md`, Phase 1, and `docs/linux.md`.

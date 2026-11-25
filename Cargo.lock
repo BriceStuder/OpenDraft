@@ -2856,10 +2856,14 @@ dependencies = [
 name = "opendraft-content"
 version = "0.4.2"
 dependencies = [
+ "opendraft-core",
+ "opendraft-files",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "unicode-normalization",
+ "uuid",
 ]
 
 [[package]]

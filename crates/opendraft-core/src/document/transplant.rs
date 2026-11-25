@@ -7,6 +7,9 @@
 //! target lacks. What the target already has by a name wins, as in
 //! AutoCAD. The change can be undone and redone exactly with
 //! [`Document::unabsorb`] and [`Document::reabsorb`].
+//!
+//! [`Document::bring_block`] (in `library.rs`) is the other way in: one block
+//! at a time, with the caller deciding what happens when a name is taken.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -172,6 +175,7 @@ impl Document {
             linetypes: HashMap::new(),
             warnings: Vec::new(),
             blocks: HashMap::new(),
+            choices: None,
         };
         let mut objects = Vec::new();
         match placement {
@@ -244,6 +248,8 @@ impl Document {
 
 mod attributes;
 
+mod library;
+pub use library::{BlockClash, BlockNameClash, Brought};
 mod merge;
 use merge::Merge;
 

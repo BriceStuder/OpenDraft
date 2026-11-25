@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::super::{after, Document};
+use super::library::BlockClash;
 use super::TransferWarning;
 use crate::block::{BlockDef, BlockEntity, BlockId};
 use crate::dimension::DimStyle;
@@ -25,6 +26,10 @@ pub(super) struct Merge<'a> {
     pub(super) linetypes: HashMap<LinetypeId, LinetypeId>,
     pub(super) warnings: Vec<TransferWarning>,
     pub(super) blocks: HashMap<BlockId, Arc<BlockDef>>,
+    /// `None` matches blocks by name, as a paste does. `Some` is the caller's
+    /// choice for each source block whose name the target has (see
+    /// `transplant/library.rs`); a block with no choice is renamed.
+    pub(super) choices: Option<&'a HashMap<BlockId, BlockClash>>,
 }
 
 impl Merge<'_> {
@@ -151,30 +156,42 @@ impl Merge<'_> {
         if let Some(done) = self.blocks.get(&def.id) {
             return done.clone();
         }
-        let found = match self.dst.block_named(&def.name) {
-            Some(same) => same.clone(),
-            None => {
-                let entities = def
-                    .entities
-                    .iter()
-                    .map(|e| BlockEntity::new(e.id, self.entity(&e.entity), self.attrs(&e.attrs)))
-                    .collect();
-                let copy = Arc::new(BlockDef {
-                    unit: def.unit,
-                    id: self.dst.allocate_block_id(),
-                    name: def.name.clone(),
-                    base: def.base,
-                    description: def.description.clone(),
-                    entities,
-                    dynamic: def.dynamic.clone(),
-                });
-                self.dst.push_block(copy.clone());
-                copy
-            }
+        let existing = self.dst.block_named(&def.name).cloned();
+        let found = match (existing, self.choices) {
+            (Some(same), None) => same,
+            (None, _) => self.copy_block(def, def.name.clone()),
+            (Some(same), Some(choices)) => match choices.get(&def.id) {
+                Some(BlockClash::UseExisting) => same,
+                _ => {
+                    let name = self.dst.unused_block_name_like(&def.name);
+                    self.copy_block(def, name)
+                }
+            },
         };
         self.blocks.insert(def.id, found.clone());
         found
     }
+
+    /// A new block in the target, a copy of `def` called `name`.
+    fn copy_block(&mut self, def: &Arc<BlockDef>, name: String) -> Arc<BlockDef> {
+        let entities = def
+            .entities
+            .iter()
+            .map(|e| BlockEntity::new(e.id, self.entity(&e.entity), self.attrs(&e.attrs)))
+            .collect();
+        let copy = Arc::new(BlockDef {
+            unit: def.unit,
+            id: self.dst.allocate_block_id(),
+            name,
+            base: def.base,
+            description: def.description.clone(),
+            entities,
+            dynamic: def.dynamic.clone(),
+        });
+        self.dst.push_block(copy.clone());
+        copy
+    }
+
     pub(super) fn entity(&mut self, entity: &Entity) -> Entity {
         match entity {
             Entity::MText(m) => {
