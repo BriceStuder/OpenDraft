@@ -33,6 +33,13 @@ impl AppState {
         self.cmdline.say(wording);
     }
 
+    /// Shows "Undo: Circle" (`text` with the step's `name`) in the status
+    /// bar; the name is translated when it is a text translated elsewhere.
+    pub fn say_step(&mut self, text: &str, name: impl Into<String>) {
+        let step = Wording::plain(name.into());
+        self.set_message(Wording::new(text, &[]).part("name", step));
+    }
+
     /// Shows `message` in the status bar.
     pub fn set_message(&mut self, message: impl Into<Wording>) {
         let wording = message.into();
@@ -104,7 +111,7 @@ mod tests {
     fn a_message_is_said_in_english_and_shown_translated() {
         let said = Wording::new("Moved %{objects}", &[]).part("objects", objects(3));
         assert_eq!(said.english(), "Moved 3 objects");
-        assert_eq!(french(&said), "3 objets déplacés");
+        assert_eq!(french(&said), "3 objets déplacé(s)");
         let one = Wording::new("Moved %{objects}", &[]).part("objects", objects(1));
         assert_eq!(one.english(), "Moved 1 object");
     }

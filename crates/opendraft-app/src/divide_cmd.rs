@@ -115,7 +115,10 @@ pub fn divide_object(ed: &mut Editor) -> Result<(), Cancelled> {
                     Some(marks) => return place(ed, marks, what, "Divide"),
                     None => ed.say(Wording::new(
                         key!("Requires an integer between %{least} and %{most}."),
-                        &[("least", "2"), ("most", &MAX_SEGMENTS.to_string())],
+                        &[
+                            ("least", &2.to_string()),
+                            ("most", &MAX_SEGMENTS.to_string()),
+                        ],
                     )),
                 }
             }
