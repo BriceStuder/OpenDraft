@@ -4,6 +4,9 @@
 /// shown in suggestions.
 pub const ALIASES: &[(&str, &str, &str)] = &[
     ("L", "LINE", "draw.line"),
+    // Lines that do not chain (AutoCAD has neither).
+    ("SL", "LINE SINGLE", "draw.line_single"),
+    ("ML", "LINE MIDDLE", "draw.line_middle"),
     ("C", "CIRCLE", "draw.circle"),
     // The ribbon's circle types, which AutoCAD reaches only by options or
     // button macros.

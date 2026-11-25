@@ -9,6 +9,7 @@ use crate::circle::{
     draw_circle, draw_circle_2p, draw_circle_3p, draw_circle_3t, draw_circle_diameter,
     draw_circle_ttr,
 };
+use crate::line_modes::{draw_line_middle, draw_line_single};
 use crate::rect_variants::{
     draw_oblong_2p, draw_oblong_center, draw_rectangle_3p, draw_rectangle_center,
 };
@@ -94,5 +95,7 @@ pub fn commands() -> Vec<Command<AppState>> {
             "Oblong",
             draw_oblong_2p
         ),
+        editor!("draw.line_single", "Line, Single", "Line", draw_line_single),
+        editor!("draw.line_middle", "Line, Middle", "Line", draw_line_middle),
     ]
 }

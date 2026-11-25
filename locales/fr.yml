@@ -518,6 +518,8 @@
 "Specify second point": "Spécifiez le deuxième point"
 "Specify third point": "Spécifiez le troisième point"
 "Specify next point": "Spécifiez le point suivant"
+"Specify midpoint of line": "Spécifiez le milieu de la ligne"
+"Specify endpoint of line": "Spécifiez une extrémité de la ligne"
 "Specify a point": "Spécifiez un point"
 "Specify start point": "Spécifiez le point de départ"
 "Specify opposite corner": "Spécifiez le coin opposé"
@@ -1133,6 +1135,7 @@
 "[Select objects]": "SÉlectionner des objets"
 "[SHapes]": "Formes"
 "[Single]": "Simple"
+"[line: Single]": "Uniques"
 "[Space]": "eSpacer"
 "[Spacing]": "eSPacement"
 "[spline: Fit]": "Lissage"
@@ -1191,6 +1194,8 @@
 # Noms de commandes (étape 6) : le nom, puis les alias, séparés par des virgules.
 # Taper le nom anglais avec _ devant marche toujours (_LINE, _L).
 "$LINE": "LIGNE, L"
+"$LINE SINGLE": "LIGNE UNIQUE, LU"
+"$LINE MIDDLE": "LIGNE MILIEU, LM"
 "$CIRCLE": "CERCLE, C"
 "$CIRCLE DIAMETER": "CERCLE DIAMETRE, CD"
 "$CIRCLE 2P": "CERCLE 2P, C2"

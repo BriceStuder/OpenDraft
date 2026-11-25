@@ -120,6 +120,7 @@ mod layout_tabs;
 mod layouts;
 mod leader_cmd;
 mod lengthen;
+mod line_modes;
 mod linetype_ui;
 mod linetype_vars;
 mod locations;
