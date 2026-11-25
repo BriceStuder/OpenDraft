@@ -20,11 +20,13 @@ use crate::zoom_cmd::{start_view_command, ZoomTo};
 /// Why the view of the space being worked in cannot turn, if it cannot.
 fn refusal(doc: &Document) -> Option<&'static str> {
     if doc.active_layout().is_some() {
-        return Some("A layout's sheet does not turn: work in the Model tab or inside a viewport.");
+        return Some(key!(
+            "A layout's sheet does not turn: work in the Model tab or inside a viewport."
+        ));
     }
     let (layout, viewport) = doc.active_viewport()?;
     let locked = doc.layout(layout)?.viewport(viewport)?.locked;
-    locked.then_some("This viewport is locked; unlock it to turn its view.")
+    locked.then_some(key!("This viewport is locked; unlock it to turn its view."))
 }
 
 /// The view's twist, or why it cannot turn.
@@ -59,7 +61,7 @@ fn object_twist(ed: &Editor) -> Result<Option<f64>, Cancelled> {
             ed.read(move |doc| doc.object(picked.id).map(|o| (o.entity.clone(), doc.ccs())))?;
         match found.and_then(|(entity, ccs)| aligned_to(&entity, picked.at, ccs)) {
             Some(ccs) => return Ok(Some(-ccs.angle)),
-            None => ed.say("That object has no direction to read level."),
+            None => ed.say(key!("That object has no direction to read level.")),
         }
     }
 }
@@ -78,7 +80,7 @@ fn points_twist(ed: &Editor) -> Result<Option<f64>, Cancelled> {
     let second = ed.get_point(options)?;
     let twist = level_twist(first, second);
     if twist.is_none() {
-        ed.say("The points are the same.");
+        ed.say(key!("The points are the same."));
     }
     Ok(twist)
 }
@@ -139,7 +141,7 @@ fn plan(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
             };
             let named = ed.read(move |doc| doc.named_ccs_called(&name).map(|n| n.ccs.angle))?;
             let Some(angle) = named else {
-                ed.say("No coordinate system is saved under that name.");
+                ed.say(key!("No coordinate system is saved under that name."));
                 return Ok(None);
             };
             angle

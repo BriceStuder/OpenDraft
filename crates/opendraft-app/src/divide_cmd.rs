@@ -14,7 +14,7 @@ use opendraft_core::divide::{divide, measure, Mark, MAX_SEGMENTS};
 use opendraft_core::{BlockDef, Entity, Insert, Point};
 
 use crate::insert_cmd::choose_block;
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// What goes at each mark: a point, or a block, turned with the object or not.
 enum Placed {
@@ -56,7 +56,7 @@ fn ask_block(ed: &Editor) -> Result<Option<Placed>, Cancelled> {
 /// Add a point or a block at each mark.
 fn place(ed: &Editor, marks: Vec<Mark>, what: Placed, name: &'static str) -> Result<(), Cancelled> {
     if marks.is_empty() {
-        ed.say("Nothing to mark: the object is shorter than that.");
+        ed.say(key!("Nothing to mark: the object is shorter than that."));
         return Ok(());
     }
     let count = marks.len();
@@ -75,7 +75,12 @@ fn place(ed: &Editor, marks: Vec<Mark>, what: Placed, name: &'static str) -> Res
         }
         Ok(())
     })?;
-    ed.say(format!("{} placed.", plural(count, "mark")));
+    let marks = Wording::count(
+        count,
+        key!("%{count} mark placed."),
+        key!("%{count} marks placed."),
+    );
+    ed.say(marks);
     Ok(())
 }
 
@@ -134,7 +139,9 @@ pub fn measure_object(ed: &mut Editor) -> Result<(), Cancelled> {
             },
             Answer::Value(d) => match measure(&path, d) {
                 Some(marks) => return place(ed, marks, what, "Measure"),
-                None => ed.say("Requires a length above zero that makes at most 100,000 marks."),
+                None => ed.say(key!(
+                    "Requires a length above zero that makes at most 100,000 marks."
+                )),
             },
             Answer::Enter => return Ok(()),
         }

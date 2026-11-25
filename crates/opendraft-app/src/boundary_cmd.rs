@@ -14,7 +14,7 @@ use opendraft_core::loop_polyline::loop_polyline;
 use opendraft_core::{Bounds, Entity, Point};
 use opendraft_ui::key;
 
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// The polylines round the area `at` is in, outer boundary first.
 fn around(ed: &Editor, at: Point, islands: bool) -> Result<Vec<Entity>, Cancelled> {
@@ -81,14 +81,19 @@ pub fn draw_boundary(ed: &mut Editor) -> Result<(), Cancelled> {
                     }
                     Ok(())
                 })?;
-                ed.say(format!("{} created.", plural(count, "polyline")));
+                ed.say(Wording::count(
+                    count,
+                    key!("%{count} polyline created."),
+                    key!("%{count} polylines created."),
+                ));
             }
             Ok(Answer::Keyword(_)) => {
                 islands = !islands;
-                ed.say(format!(
-                    "Island detection is {}.",
-                    if islands { "on" } else { "off" }
-                ));
+                ed.say(if islands {
+                    key!("Island detection is on.")
+                } else {
+                    key!("Island detection is off.")
+                });
             }
             Ok(Answer::Enter) | Err(Cancelled) => return Ok(()),
         }

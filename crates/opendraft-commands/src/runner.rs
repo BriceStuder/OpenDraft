@@ -38,7 +38,7 @@ pub struct Runner {
     /// Dropped to cancel: the command's next wait then fails with `Cancelled`.
     replies: Option<Sender<Reply>>,
     state: State,
-    said: Vec<String>,
+    said: Vec<crate::Wording>,
     selections: Vec<(Vec<EntityId>, bool)>,
     thread: Option<JoinHandle<()>>,
 }
@@ -115,7 +115,7 @@ impl Runner {
     }
 
     /// Feedback the command has said since the last call.
-    pub fn take_said(&mut self) -> Vec<String> {
+    pub fn take_said(&mut self) -> Vec<crate::Wording> {
         std::mem::take(&mut self.said)
     }
 
@@ -262,7 +262,7 @@ pub fn run_scripted(
     let mut said = Vec::new();
     loop {
         runner.wait(session);
-        said.extend(runner.take_said());
+        said.extend(runner.take_said().iter().map(crate::Wording::english));
         if let Some(outcome) = runner.outcome() {
             return Transcript {
                 outcome,

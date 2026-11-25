@@ -7,7 +7,7 @@ use opendraft_commands::{Cancelled, Editor};
 use opendraft_core::{join, Entity, EntityId};
 use opendraft_ui::key;
 
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// Ends closer than this count as meeting.
 const GAP: f64 = 1e-6;
@@ -26,12 +26,12 @@ pub fn join_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     let entities: Vec<Entity> = found.iter().map(|(_, e)| e.clone()).collect();
     // Nothing changes when any is refused, so the selection stays as it was.
     if entities.iter().any(|e| matches!(e, Entity::Spline(_))) {
-        ed.say("JOIN does not support splines yet.");
+        ed.say(key!("JOIN does not support splines yet."));
         return Ok(());
     }
     let merged = join(&entities, GAP);
     if merged.is_empty() {
-        ed.say("Nothing to join: the objects do not meet end to end.");
+        ed.say(key!("Nothing to join: the objects do not meet end to end."));
         return Ok(());
     }
     let gone: usize = merged.iter().map(|m| m.used.len()).sum();
@@ -48,11 +48,9 @@ pub fn join_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
         Ok(())
     })?;
-    ed.say(format!(
-        "Joined {} into {}.",
-        plural(gone, "object"),
-        plural(groups, "object")
-    ));
+    let said = Wording::new(key!("Joined %{objects} into %{into}."), &[]);
+    let said = said.part("objects", crate::text::objects(gone));
+    ed.say(said.part("into", crate::text::objects(groups)));
     Ok(())
 }
 

@@ -59,7 +59,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
             Answer::Keyword(key) => key,
             Answer::Enter => "Next".to_owned(),
             Answer::Value(_) => {
-                ed.say("Invalid option keyword.");
+                ed.say(key!("Invalid option keyword."));
                 continue;
             }
         };
@@ -70,7 +70,9 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
             "eXit" => return Ok(steps),
             "Insert" => {
                 if !has_segment(&data, v) {
-                    ed.say("There is no segment after the last vertex to insert into.");
+                    ed.say(key!(
+                        "There is no segment after the last vertex to insert into."
+                    ));
                     continue;
                 }
                 let options =
@@ -82,7 +84,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                         v += 1;
                         steps += 1;
                     }
-                    None => ed.say("That point is at the end of the arc segment."),
+                    None => ed.say(key!("That point is at the end of the arc segment.")),
                 }
             }
             "Move" => {
@@ -94,7 +96,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
             }
             "Width" => {
                 if !has_segment(&data, v) {
-                    ed.say("There is no segment after the last vertex to widen.");
+                    ed.say(key!("There is no segment after the last vertex to widen."));
                     continue;
                 }
                 let (start, _) = opendraft_core::width::at(&data.widths, v);
@@ -105,7 +107,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                     NumberOptions::new(key!("Specify ending width for next segment")).default(w0);
                 let w1 = ed.get_distance(last)?;
                 if w0 < 0.0 || w1 < 0.0 {
-                    ed.say("Requires a value of zero or more.");
+                    ed.say(key!("Requires a value of zero or more."));
                     continue;
                 }
                 store(ed, id, data.with_segment_width(v, w0, w1))?;
@@ -120,7 +122,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                             steps += 1;
                             v = i;
                         }
-                        None => ed.say("Pick a second vertex to straighten to."),
+                        None => ed.say(key!("Pick a second vertex to straighten to.")),
                     }
                 }
             }
@@ -154,7 +156,7 @@ fn other_vertex(ed: &Editor, data: &PolyData, from: usize) -> Result<Option<usiz
                 _ => return Ok(None),
             },
             Answer::Enter => w = (w + 1).min(n - 1),
-            Answer::Value(_) => ed.say("Invalid option keyword."),
+            Answer::Value(_) => ed.say(key!("Invalid option keyword.")),
         }
     }
 }
@@ -170,7 +172,7 @@ fn break_at(
     b: usize,
 ) -> Result<bool, Cancelled> {
     let Some(mut pieces) = data.broken(a, b) else {
-        ed.say("Nothing to break there.");
+        ed.say(key!("Nothing to break there."));
         return Ok(false);
     };
     let attrs = ed.read(move |doc| doc.object(id).map(|o| o.attrs.clone()))?;

@@ -6,7 +6,7 @@ use opendraft_commands::{Answer, Cancelled, Editor, GhostStyle, PointOptions};
 use opendraft_core::{Entity, EntityId, Point};
 use opendraft_ui::key;
 
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// Ask for the region: two corners of a crossing window, or the CPolygon
 /// option for a polygon of any number of points (Enter closes it).
@@ -62,7 +62,7 @@ fn ask_polygon(ed: &Editor) -> Result<Vec<Point>, Cancelled> {
                 }
             }
             Answer::Enter if points.len() >= 3 => return Ok(points),
-            _ => ed.say("Specify more points first."),
+            _ => ed.say(key!("Specify more points first.")),
         }
     }
 }
@@ -91,7 +91,9 @@ pub fn stretch_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             .collect()
     };
     if moves(0.0, 0.0).is_empty() {
-        ed.say("Nothing to stretch: no object has a point inside the window.");
+        ed.say(key!(
+            "Nothing to stretch: no object has a point inside the window."
+        ));
         return Ok(());
     }
     let base = ed.get_point(key!("Specify base point"))?;
@@ -119,7 +121,10 @@ pub fn stretch_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
         Ok(())
     })?;
-    ed.say(format!("Stretched {}", plural(count, "object")));
+    ed.say(
+        Wording::new(key!("Stretched %{objects}"), &[])
+            .part("objects", crate::text::objects(count)),
+    );
     Ok(())
 }
 

@@ -41,6 +41,8 @@ use crate::stretch::stretch_objects;
 
 use crate::dock::{LayoutRequest, PanelTab};
 use crate::state::AppState;
+use opendraft_commands::Wording;
+use opendraft_ui::key;
 
 pub fn build_registry() -> Registry<AppState> {
     let mut registry = Registry::default();
@@ -145,14 +147,18 @@ fn all() -> Vec<Command<AppState>> {
             .global(),
         cmd("edit.undo", "Undo", |s| {
             if let Some(name) = s.undo() {
-                s.message = format!("Undo: {name}");
+                s.set_message(
+                    Wording::new(key!("Undo: %{name}"), &[]).part("name", Wording::plain(name)),
+                );
             }
         })
         .key("Ctrl+Z")
         .when(|s| s.session().history().can_undo()),
         cmd("edit.redo", "Redo", |s| {
             if let Some(name) = s.redo() {
-                s.message = format!("Redo: {name}");
+                s.set_message(
+                    Wording::new(key!("Redo: %{name}"), &[]).part("name", Wording::plain(name)),
+                );
             }
         })
         .key("Ctrl+Y")

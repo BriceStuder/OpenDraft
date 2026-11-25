@@ -106,8 +106,10 @@ pub struct AppState {
     pub active: usize,
     /// The Home tab is the one showing (see `home.rs`).
     pub home: bool,
-    /// Feedback line for the status bar.
+    /// Feedback line for the status bar, in English.
     pub message: String,
+    /// Its wording when it has values, to show it translated.
+    pub message_wording: Option<opendraft_commands::Wording>,
     /// World position under the pointer on the last frame, if over the canvas.
     pub cursor: Option<Point>,
     /// Whether the Settings window is open.
@@ -217,6 +219,7 @@ impl AppState {
             active: 0,
             home: false,
             message: String::new(),
+            message_wording: None,
             cursor: None,
             show_settings: false,
             show_units: false,

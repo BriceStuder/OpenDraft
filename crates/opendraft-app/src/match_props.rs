@@ -9,6 +9,7 @@ use opendraft_core::{Attributes, Document, Entity, EntityId, MText, Object};
 use opendraft_ui::key;
 
 use crate::layers::has_outline;
+use opendraft_commands::Wording;
 
 /// The properties matched, worded as AutoCAD's "Current active settings".
 pub const SETTINGS: &str =
@@ -107,7 +108,10 @@ pub fn match_properties(ed: &mut Editor) -> Result<(), Cancelled> {
             }
         }
     };
-    ed.say(format!("Current active settings: {SETTINGS}"));
+    ed.say(Wording::new(
+        key!("Current active settings: %{settings}"),
+        &[("settings", SETTINGS)],
+    ));
     loop {
         let options = Options::<Picked>::new(key!("Select destination object(s)")).allow_empty();
         let Answer::Value(Picked { id, .. }) = ed.ask_object(options)? else {

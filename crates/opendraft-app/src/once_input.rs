@@ -2,25 +2,43 @@
 //! `END`, `FRO`... at a point prompt, and a point that is only one part of a
 //! `FRO` or `M2P`.
 
-use opendraft_canvas::SnapPoint;
+use opendraft_canvas::{SnapKind, SnapOverride, SnapPoint};
 use opendraft_commands::{Prompt as Ask, Reply, Wants};
 use opendraft_core::units::parse_length;
 use opendraft_core::Point;
-use opendraft_ui::i18n::tr;
 
 use crate::prompt_reply::{keyword_reply, takes_clicked_points};
 use crate::snap_once::{parse, Deferred, Step, Wish};
 use crate::state::AppState;
+use opendraft_commands::Wording;
+use opendraft_ui::key;
+
+/// The snaps an override names ("Midpoint, Center"), each translated where
+/// it is shown.
+fn snap_names(over: &SnapOverride) -> Wording {
+    let kinds = match over {
+        SnapOverride::None => return Wording::plain(key!("None")),
+        SnapOverride::Only(kinds) => kinds,
+    };
+    let fields: Vec<String> = (0..kinds.len()).map(|i| format!("%{{{i}}}")).collect();
+    let mut names = Wording::plain(fields.join(", "));
+    for (i, kind) in kinds.iter().enumerate() {
+        names = names.part(&i.to_string(), Wording::plain(kind.label()));
+    }
+    names
+}
 
 impl AppState {
     /// Start a one-shot snap, and say so in the command line.
     pub fn begin_one_shot(&mut self, wish: Wish) {
         let said = match &wish {
-            Wish::Snap(over) => format!("{} of", over.label()),
-            Wish::Chain(_) => String::new(),
+            Wish::Snap(over) => {
+                Wording::new(key!("%{snap} of"), &[]).part("snap", snap_names(over))
+            }
+            Wish::Chain(_) => Wording::default(),
         };
         self.once.begin(wish);
-        let said = self.once.asking().map_or(said, |ask| tr(ask).into_owned());
+        let said = self.once.asking().map_or(said, Wording::plain);
         self.cmdline.say(said);
     }
 
@@ -37,8 +55,9 @@ impl AppState {
             .waiting()
             .is_some_and(|a| a.wants == Wants::Point && a.base.is_none());
         if !first_point {
+            let said = Wording::new(key!("%{snap} needs a point to work from."), &[]);
             self.cmdline
-                .say(format!("{} needs a point to work from.", snap.kind.label()));
+                .say(said.part("snap", Wording::plain(snap.kind.label())));
             return true;
         }
         let kind = snap.kind;
@@ -47,10 +66,11 @@ impl AppState {
             object,
             near: snap.point,
         });
-        self.cmdline.say(format!(
-            "Deferred {}: specify the other point.",
-            kind.label().to_lowercase()
-        ));
+        self.cmdline.say(if kind == SnapKind::Tangent {
+            key!("Deferred tangent: specify the other point.")
+        } else {
+            key!("Deferred perpendicular: specify the other point.")
+        });
         true
     }
 
@@ -97,8 +117,8 @@ impl AppState {
     /// instead of leaving the prompt stuck.
     pub fn refuse_one_shot(&mut self) {
         if let Some(over) = self.once.drop_override() {
-            let said = format!("No {} snap found. Specify the point again.", over.label());
-            self.cmdline.say(said);
+            let said = Wording::new(key!("No %{snap} snap found. Specify the point again."), &[]);
+            self.cmdline.say(said.part("snap", snap_names(&over)));
         }
     }
 
@@ -140,10 +160,11 @@ impl AppState {
                     Some(Reply::Point(at))
                 }
                 None => {
-                    self.cmdline.say(format!(
-                        "No {} from that point. Specify another point.",
-                        d.kind.label().to_lowercase()
-                    ));
+                    self.cmdline.say(if d.kind == SnapKind::Tangent {
+                        key!("No tangent from that point. Specify another point.")
+                    } else {
+                        key!("No perpendicular from that point. Specify another point.")
+                    });
                     None
                 }
             };

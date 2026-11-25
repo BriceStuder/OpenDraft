@@ -53,9 +53,9 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
 fn refuse(ed: &Editor, id: EntityId) -> Result<(), Cancelled> {
     let spline = ed.read(move |doc| matches!(doc.get(id), Some(Entity::Spline(_))))?;
     ed.say(if spline {
-        "Spline-to-polyline conversion is not yet supported; object was not changed."
+        key!("Spline-to-polyline conversion is not yet supported; object was not changed.")
     } else {
-        "Object is not a polyline."
+        key!("Object is not a polyline.")
     });
     Ok(())
 }
@@ -142,7 +142,7 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
             }
             "Join" => {
                 if data.closed {
-                    ed.say("A closed polyline cannot be joined to.");
+                    ed.say(key!("A closed polyline cannot be joined to."));
                     continue;
                 }
                 let others =
@@ -168,7 +168,7 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
             }
             _ => {
                 if steps == 0 {
-                    ed.say("Nothing to undo.");
+                    ed.say(key!("Nothing to undo."));
                 } else {
                     ed.undo()?;
                     steps -= 1;
@@ -184,7 +184,7 @@ fn ask_width(ed: &Editor) -> Result<Option<f64>, Cancelled> {
         "Specify new width for all segments"
     )))?;
     if w < 0.0 {
-        ed.say("Requires a value of zero or more.");
+        ed.say(key!("Requires a value of zero or more."));
         return Ok(None);
     }
     Ok(Some(w))
@@ -245,7 +245,9 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
         .filter(|(_, e)| PolyData::of(e).is_some() && !matches!(e, Entity::Polyline { .. }))
         .count();
     if ids.is_empty() {
-        ed.say("No polylines or objects that can become polylines were selected.");
+        ed.say(key!(
+            "No polylines or objects that can become polylines were selected."
+        ));
         return Ok(());
     }
     if others > 0 && !ed.defaults().pedit.get().accept {
@@ -299,7 +301,7 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
             }
             _ => {
                 if steps == 0 {
-                    ed.say("Nothing to undo.");
+                    ed.say(key!("Nothing to undo."));
                 } else {
                     ed.undo()?;
                     steps -= 1;

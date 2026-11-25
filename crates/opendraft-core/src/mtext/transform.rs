@@ -45,7 +45,7 @@ impl MText {
     /// Why this text cannot be mirrored, if it cannot. The text must not be
     /// reversed, and the drawing has no MIRRTEXT setting to decide it by.
     pub fn mirror_refusal(&self) -> Option<&'static str> {
-        Some("multiline text cannot be mirrored yet")
+        Some(crate::key!("multiline text cannot be mirrored yet"))
     }
     /// Why this text cannot be scaled, if it cannot: a paragraph control
     /// this build cannot decode holds distances that could not be scaled.
@@ -56,7 +56,9 @@ impl MText {
             .nodes
             .iter()
             .any(|n| n.kind == opaque)
-            .then_some("multiline text with paragraph formatting cannot be scaled yet")
+            .then_some(crate::key!(
+                "multiline text with paragraph formatting cannot be scaled yet"
+            ))
     }
 }
 

@@ -30,7 +30,7 @@ pub(crate) fn shown(arc: Option<Entity>, from: Point, to: Point) -> Vec<Entity> 
 /// `arc`, or a message and `None` so the caller asks again.
 fn or_say(ed: &Editor, arc: Option<Entity>) -> Option<Entity> {
     if arc.is_none() {
-        ed.say("Those values make no arc.");
+        ed.say(key!("Those values make no arc."));
     }
     arc
 }
@@ -70,7 +70,7 @@ fn from_start(ed: &Editor, start: Point) -> Result<Entity, Cancelled> {
             let end = ed.get_point(options)?;
             match arc_through(start, second, end) {
                 Some(arc) => return Ok(arc),
-                None => ed.say("The three points are in a line."),
+                None => ed.say(key!("The three points are in a line.")),
             }
         },
         Answer::Keyword(k) if k == "Center" => {
@@ -86,7 +86,7 @@ fn from_start(ed: &Editor, start: Point) -> Result<Entity, Cancelled> {
                 if distance(start, end) > MIN_SIZE {
                     break end;
                 }
-                ed.say("Requires a non-zero value.");
+                ed.say(key!("Requires a non-zero value."));
             };
             to_centre_angle_direction_radius(ed, start, end)
         }
@@ -110,7 +110,7 @@ pub(crate) fn centre_after(
         if distance(center, start) > MIN_SIZE {
             return Ok(center);
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     }
 }
 
@@ -206,7 +206,7 @@ fn from_centre(ed: &Editor) -> Result<Entity, Cancelled> {
         if distance(center, start) > MIN_SIZE {
             break start;
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     };
     to_end_from_centre(ed, center, start, &[])
 }

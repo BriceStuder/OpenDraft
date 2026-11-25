@@ -8,6 +8,7 @@ use opendraft_core::{Entity, PointStyle};
 use opendraft_ui::key;
 
 use crate::draw::add;
+use opendraft_commands::Wording;
 
 fn ask(ed: &Editor) -> Result<Answer<opendraft_core::Point>, Cancelled> {
     ed.ask_point(PointOptions::new(key!("Specify a point")).ghost(|at| vec![Entity::Point { at }]))
@@ -16,7 +17,10 @@ fn ask(ed: &Editor) -> Result<Answer<opendraft_core::Point>, Cancelled> {
 /// The reminder AutoCAD prints when POINT starts.
 fn say_modes(ed: &Editor) -> Result<(), Cancelled> {
     let PointStyle { mode, size } = ed.read(|doc| doc.point_style())?;
-    ed.say(format!("Current point modes: PDMODE={mode} PDSIZE={size}"));
+    ed.say(Wording::new(
+        key!("Current point modes: PDMODE=%{mode} PDSIZE=%{size}"),
+        &[("mode", &mode.to_string()), ("size", &size.to_string())],
+    ));
     Ok(())
 }
 

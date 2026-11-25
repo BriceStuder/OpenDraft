@@ -1,6 +1,16 @@
 //! Drawing document model. No UI dependencies: this crate must build and be
 //! testable without a window.
 
+/// Marks an English message that the interface translates where it shows
+/// it (issue #138): it gives the text unchanged, and the app's translation
+/// test reads it as a key that is still in use.
+#[macro_export]
+macro_rules! key {
+    ($text:literal) => {
+        $text
+    };
+}
+
 pub mod aci;
 pub mod arc;
 pub mod arc_make;
