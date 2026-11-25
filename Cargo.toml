@@ -11,6 +11,7 @@ members = [
     "crates/opendraft-api",
     "crates/opendraft-mcp",
     "crates/opendraft-agent",
+    "crates/opendraft-content",
 ]
 
 [workspace.lints.rust]
