@@ -87,7 +87,7 @@ pub(super) fn trash_one(
     let mut doc = Document::default();
     let brought = doc
         .bring_block(&edit.package.drawing, entry.block, &HashMap::new())
-        .ok_or(LibraryError::NotFound)?;
+        .map_err(|e| LibraryError::Refused(e.to_string()))?;
     let entries = brought
         .blocks
         .iter()

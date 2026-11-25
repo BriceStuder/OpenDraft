@@ -5,7 +5,6 @@ use opendraft_ui::widgets;
 use opendraft_ui::Theme;
 
 use super::OpenDraftApp;
-use crate::locations::Location;
 use crate::settings::Settings;
 use crate::settings_ui::{self, FolderRequest};
 
@@ -196,7 +195,7 @@ impl OpenDraftApp {
         if new.language != self.state.settings.language {
             crate::language::apply(new.language.as_deref());
         }
-        self.state.templates_dir = Location::Templates.resolve(&new);
+        self.state.use_folders_of(&new);
         self.state.set_settings(new);
     }
 }

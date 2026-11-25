@@ -139,6 +139,9 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("block.create", InteractiveInApp, Mutation),
     ("block.create_line", InteractiveInApp, Mutation),
     ("block.insert", InteractiveInApp, Mutation),
+    // The library is the user's own; no automation reaches it yet.
+    ("block.library_add", Denied, Ui),
+    ("block.library_insert", Denied, Mutation),
     ("block.attdef", InteractiveInApp, Mutation),
     ("block.attdef_line", InteractiveInApp, Mutation),
     ("block.attedit", InteractiveInApp, Mutation),

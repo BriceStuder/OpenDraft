@@ -176,6 +176,8 @@ impl Document {
             warnings: Vec::new(),
             blocks: HashMap::new(),
             choices: None,
+            replaced: Vec::new(),
+            refused: None,
         };
         let mut objects = Vec::new();
         match placement {
@@ -249,7 +251,9 @@ impl Document {
 mod attributes;
 
 mod library;
-pub use library::{BlockClash, BlockNameClash, Brought};
+#[cfg(test)]
+mod library_insert_tests;
+pub use library::{BlockClash, BlockNameClash, BringError, Brought, LibraryPlacement, Placed};
 mod merge;
 use merge::Merge;
 

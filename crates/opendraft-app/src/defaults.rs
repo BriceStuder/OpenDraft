@@ -52,6 +52,8 @@ pub struct CommandDefaults {
     /// The margin of every side of a new layout, in mm: the user setting
     /// `plot_margins_mm`, kept here for the LAYOUT command (not saved here).
     pub plot_margins: Slot<f64>,
+    /// The block library of the Content Manager, opened on first use.
+    pub library: crate::content_library::LibraryHandle,
 }
 
 impl CommandDefaults {
@@ -71,6 +73,7 @@ impl CommandDefaults {
             text: Slot::new(text_memory::load(storage)),
             trim: Slot::new(trim_memory::load(storage)),
             plot_margins: Slot::default(),
+            library: Default::default(),
         }
     }
 

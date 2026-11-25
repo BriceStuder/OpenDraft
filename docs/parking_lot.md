@@ -155,10 +155,13 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 ## Content Manager (`docs/openhub-specification.md`, local-only work on `feat/content-manager`)
 
-Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), the local library's store, capture, organise, search and Trash (`opendraft-content`), and `Document::bring_block` in core. Not built:
+Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), the local library's store, capture, organise, search and Trash (`opendraft-content`), `Document::bring_block` and `insert_from` in core (use the drawing's block, add as new, or replace its definition), `Location::Library`, and the command-line `LIBADD` and `LIBINSERT`. Not built:
 
-- The app side: `Location::Library`, `LIBADD`, `LIBINSERT` (ghost, pick a point, one undo step), the Content Manager window, its Insert-tab button and light-palette thumbnails, import from `.odraft`, DXF and DWG, the drawing-open notice.
-- Replacing a block of a drawing from the library (`bring_block` adds and renames only; replace needs `redefined_blocks` and the drawing's objects), and `BlockDef::origin`.
+- The Content Manager window, its Insert-tab button, the ribbon items and icons for `LIBADD` and `LIBINSERT`, light-palette thumbnails, import from `.odraft`, DXF and DWG, the drawing-open notice, and `BlockDef::origin`.
+- `LIBADD` asks no description, tags or folder (the window will), and `LIBINSERT` settles every taken name with one answer; a choice for each block needs the window's dialog.
+- The `LIBINSERT` ghost is drawn with the library's layers, so colours that follow a layer can differ from what is placed.
+- Both commands are denied to automation (`block.library_add`, `block.library_insert`) until the model's access to the library is designed (specification 13.4).
+- A replaced definition keeps the references' attribute values (`Insert::rebound`) but dynamic block values are not re-fitted to a changed schema.
 - Whether a restored component is matched by its id: restoring uses the name and shape of the block already there, so a component renamed meanwhile is added again under its old name.
 - Attribute prompts are not yet checked as shown text; block text, layer, linetype and font names are.
 - A library whose block is too big or too many for publishing (5 MB, 500 blocks): the personal package is exempt by design, the publish limits are not built.
@@ -184,6 +187,7 @@ Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), 
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
+- **LIBADD and LIBINSERT in the running app:** driven by tests through `AppState` only. Not yet tried by hand: the ghost while moving the mouse, a real library folder on a synced drive, and a library damaged on disk (the app should say so on the command line and leave the files alone).
 - **BEDIT and BSAVE by hand:** the Block Editor now keeps each object's block id as its id (`Document::add_with_id`) and BSAVE reads it back. Tests drive BEDIT, BSAVE and BCLOSE through `AppState` and check the ids, but nobody has used it in the running app since the change.
 - **Dynamic block authoring by hand:** tried 24-11-2026 in the running app (Windows, dark theme): -BLOCK of a bar and a post, BEDIT, BPARAMETER and BACTION (Stretch) by typing, the schema overlay (orange parameter line with ticks and name, the Stretch1 label and its frame), the Dynamic ribbon panel and its icons, BSAVE and BCLOSE, selecting the reference (two grips: the insertion grip and the parameter's end grip, both drawn as an ordinary grip), dragging the end grip with the mouse (the ghost and the result shortened the bar and carried the post), undo, save as `.odraft` and reopen (the stretched reference came back stretched), and RESETBLOCK from the Insert tab. Tried again after M4: the Custom section in Properties (the reopened file showed 2.0000; typing 3.5 stretched the bar and said "Changed Distance1") and the diamond grip. Not tried: the light theme, a list or increment value set, a rotated, mirrored or scaled insert, a typed point for the grip (a typed point at a grip stretch is relative to the grip, as for any grip), Move actions, several inserts, BEDIT of a dynamic block that already has values, and a large drawing.
 - **Dynamic block evaluation and export against AutoCAD:** evaluation, the grip and the DXF export were tried in the running app (see the authoring and imported-block lines), and a DXF written from a dynamic block was reopened in OpenDraft only, not opened in AutoCAD (the same owed check as the other DXF notes). Evaluated pictures were compared with AutoCAD's own anonymous blocks only for the three linear-stretch instances in `dyn_blocks_2`; other kinds of parameter and action are not built, so they are not compared.

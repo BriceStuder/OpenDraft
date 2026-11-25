@@ -172,7 +172,7 @@ pub(super) fn add_from(
         .package
         .drawing
         .bring_block(source, root, &choices)
-        .ok_or(LibraryError::NotFound)?;
+        .map_err(|e| LibraryError::Refused(e.to_string()))?;
 
     let wanted_name = (brought.block.name != name).then(|| name.clone());
     if wanted_name.is_some() || plan.description.is_some() {

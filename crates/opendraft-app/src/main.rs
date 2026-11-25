@@ -48,6 +48,7 @@ mod cmdline;
 mod colour_ui;
 mod command_record;
 mod commands;
+mod content_library;
 mod coordinates;
 mod corner_memory;
 mod corners;
@@ -119,6 +120,10 @@ mod layout_tabs;
 mod layouts;
 mod leader_cmd;
 mod lengthen;
+mod library_add_cmd;
+#[cfg(test)]
+mod library_cmd_tests;
+mod library_insert_cmd;
 mod linetype_ui;
 mod linetype_vars;
 mod locations;

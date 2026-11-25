@@ -165,6 +165,8 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("-BLOCK", "-BLOCK", "block.create_line"),
     ("I", "INSERT", "block.insert"),
     ("-I", "INSERT", "block.insert"),
+    ("LIBADD", "LIBADD", "block.library_add"),
+    ("LIBINSERT", "LIBINSERT", "block.library_insert"),
     ("ATT", "ATTDEF", "block.attdef"),
     ("-ATT", "-ATTDEF", "block.attdef_line"),
     ("ATTDEF", "ATTDEF", "block.attdef"),

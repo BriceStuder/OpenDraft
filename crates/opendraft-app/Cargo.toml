@@ -21,6 +21,7 @@ opendraft-canvas.workspace = true
 opendraft-files.workspace = true
 opendraft-api.workspace = true
 opendraft-agent.workspace = true
+opendraft-content.workspace = true
 # Carries a PNG picture in JSON (MIT OR Apache-2.0; 0.23 is already in the lock file).
 base64 = "0.23"
 keyring = "4"
@@ -52,6 +53,9 @@ semver = "1"
 rust-i18n.workspace = true
 # The system's language, the default choice in Settings (MIT OR Apache-2.0).
 sys-locale = "0.3.2"
+
+[dev-dependencies]
+tempfile = "3"
 
 [target.'cfg(windows)'.build-dependencies]
 # The program's icon and version information in the Windows exe (MIT).

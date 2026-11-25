@@ -143,7 +143,7 @@ impl OpenDraftApp {
         // Read fresh each launch, so redrawn icons show without a rebuild.
         crate::icon_library::load(&mut state.cmdline);
         state.recent = recent;
-        state.templates_dir = Location::Templates.resolve(&settings);
+        state.use_folders_of(&settings);
         let recovery = Location::Recovery.resolve(&settings);
         state.set_settings(settings);
         let home_previews = crate::preview_textures::PreviewTextures::start(&mut state.previews);

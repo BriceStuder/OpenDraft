@@ -6,14 +6,20 @@
 //! another shape from the drawing's `valve`. [`Document::bring_block`] copies
 //! the block with the same merging of layers, linetypes and text styles (by
 //! name, ignoring case; what the target has wins, what it lacks is added), and
-//! for each block whose name the target has it either uses the target's or adds
-//! the copy under a new name.
+//! for each block whose name the target has it uses the target's, adds the copy
+//! under a new name, or replaces the target's definition (every reference
+//! follows, keeping its place and its attribute values).
+//! [`Document::insert_from`] does that and adds a reference, and the whole is
+//! undone and done again with [`Document::unplace`] and [`Document::replace_placed`].
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{Document, Merge, TransferWarning};
-use crate::block::{BlockDef, BlockId};
+use super::{Document, Merge, Tables, TransferWarning};
+use crate::block::{BlockDef, BlockId, FieldText, Insert};
+use crate::layer::Attributes;
+use crate::layout::LayoutId;
+use crate::{Entity, EntityId, Object, Point};
 
 /// What to do with a block of the source whose name the target already has.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -23,6 +29,9 @@ pub enum BlockClash {
     /// Add the source's block under a new name (`Name_2`).
     #[default]
     Rename,
+    /// Give the target's block the source's definition. It keeps its id and
+    /// name, and every reference to it follows.
+    Replace,
 }
 
 /// A block of the source whose name the target has.
@@ -34,7 +43,27 @@ pub struct BlockNameClash {
     pub existing: BlockId,
 }
 
-/// What `bring_block` added.
+/// Why a block could not be brought.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BringError {
+    /// The source has no such block.
+    NoSuchBlock,
+    /// The drawing's rules refused it (a block that would hold itself).
+    Refused(&'static str),
+}
+
+impl std::fmt::Display for BringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BringError::NoSuchBlock => write!(f, "There is no such block."),
+            BringError::Refused(why) => write!(f, "{why}"),
+        }
+    }
+}
+
+impl std::error::Error for BringError {}
+
+/// What `bring_block` did, so it can be undone and done again.
 #[derive(Clone, Debug)]
 pub struct Brought {
     /// The target's block that stands for the one asked for.
@@ -43,6 +72,40 @@ pub struct Brought {
     /// for it: the block asked for and each block it nests, at any depth.
     pub blocks: Vec<(BlockId, Arc<BlockDef>)>,
     pub warnings: Vec<TransferWarning>,
+    /// How many references were changed to follow a replaced definition.
+    pub rebound: usize,
+    before: Tables,
+    after: Tables,
+    /// The objects `Replace` changed: as they were, and as they are.
+    old: Vec<(EntityId, Entity)>,
+    new: Vec<(EntityId, Entity)>,
+}
+
+impl Brought {
+    /// The objects whose reference followed a replaced definition.
+    pub fn changed(&self) -> Vec<EntityId> {
+        self.old.iter().map(|(id, _)| *id).collect()
+    }
+}
+
+/// Where and how a block is placed by [`Document::insert_from`].
+#[derive(Clone, Debug)]
+pub struct LibraryPlacement {
+    pub insertion: Point,
+    pub scale_x: f64,
+    pub scale_y: f64,
+    /// Radians counter-clockwise.
+    pub rotation: f64,
+    /// A value for each non-constant attribute definition, in order. `None`
+    /// uses the definitions' defaults.
+    pub values: Option<Vec<FieldText>>,
+}
+
+/// An insert made by `insert_from`, with what it took to make it.
+#[derive(Clone, Debug)]
+pub struct Placed {
+    pub brought: Brought,
+    pub object: Object,
 }
 
 impl Document {
@@ -80,17 +143,17 @@ impl Document {
 
     /// Copies block `root` of `src` into this drawing, with the blocks it
     /// nests. `choices` says, for each source block whose name this drawing
-    /// has (`block_clashes` lists them), whether to use the drawing's block;
-    /// a clash with no choice is renamed. Layers, linetypes and text styles
-    /// the blocks use are matched by name or added. Nothing is replaced.
-    /// `None` when `src` has no such block.
+    /// has (`block_clashes` lists them), what to do; a clash with no choice is
+    /// renamed. Layers, linetypes and text styles the blocks use are matched
+    /// by name or added. On an error the drawing is as it was.
     pub fn bring_block(
         &mut self,
         src: &Document,
         root: BlockId,
         choices: &HashMap<BlockId, BlockClash>,
-    ) -> Option<Brought> {
-        let def = src.block(root)?.clone();
+    ) -> Result<Brought, BringError> {
+        let def = src.block(root).ok_or(BringError::NoSuchBlock)?.clone();
+        let before = self.tables();
         let mut merge = Merge {
             dst: self,
             src,
@@ -100,17 +163,102 @@ impl Document {
             warnings: Vec::new(),
             blocks: HashMap::new(),
             choices: Some(choices),
+            replaced: Vec::new(),
+            refused: None,
         };
         let block = merge.block(&def);
         let blocks = blocks_below(&def)
             .into_iter()
             .filter_map(|d| merge.blocks.get(&d.id).map(|b| (d.id, b.clone())))
             .collect();
-        Some(Brought {
+        let (warnings, old, refused) = (merge.warnings, merge.replaced, merge.refused);
+        if let Some(why) = refused {
+            self.replace_many(old);
+            self.restore_tables(&before);
+            return Err(BringError::Refused(why));
+        }
+        let new: Vec<(EntityId, Entity)> = old
+            .iter()
+            .filter_map(|(id, _)| self.object(*id).map(|o| (*id, o.entity.clone())))
+            .collect();
+        Ok(Brought {
             block,
             blocks,
-            warnings: merge.warnings,
+            warnings,
+            rebound: new.len(),
+            after: self.tables(),
+            before,
+            old,
+            new,
         })
+    }
+
+    /// Takes back what `bring_block` did.
+    pub fn unbring(&mut self, brought: &Brought) {
+        self.replace_many(brought.old.clone());
+        self.restore_tables(&brought.before);
+    }
+
+    /// Does again what `unbring` took back.
+    pub fn rebring(&mut self, brought: &Brought) {
+        self.restore_tables(&brought.after);
+        self.replace_many(brought.new.clone());
+    }
+
+    /// Brings block `root` of `src` (see `bring_block`) and adds a reference to
+    /// it, on the current layer of `layout` (`None` for model space).
+    pub fn insert_from(
+        &mut self,
+        src: &Document,
+        root: BlockId,
+        choices: &HashMap<BlockId, BlockClash>,
+        placement: &LibraryPlacement,
+        layout: Option<LayoutId>,
+    ) -> Result<Placed, BringError> {
+        let brought = self.bring_block(src, root, choices)?;
+        let block = brought.block.clone();
+        let attributes = match &placement.values {
+            None => block.new_references(|d| d.default_value.clone()),
+            Some(values) => {
+                let mut values = values.iter();
+                block.new_references(|d| {
+                    values
+                        .next()
+                        .cloned()
+                        .unwrap_or_else(|| d.default_value.clone())
+                })
+            }
+        };
+        let insert = Insert {
+            block,
+            insertion: placement.insertion,
+            scale_x: placement.scale_x,
+            scale_y: placement.scale_y,
+            rotation: placement.rotation,
+            attributes,
+            dynamic: None,
+        };
+        let attrs = Attributes::on_layer(self.current_layer);
+        let object = Object::new(
+            self.allocate_id(),
+            Entity::Insert(Box::new(insert)),
+            attrs,
+            layout,
+        );
+        self.push_many(vec![object.clone()]);
+        Ok(Placed { brought, object })
+    }
+
+    /// Takes back an `insert_from`: the reference, then the blocks.
+    pub fn unplace(&mut self, placed: &Placed) {
+        self.remove_many(&[placed.object.id]);
+        self.unbring(&placed.brought);
+    }
+
+    /// Does again what `unplace` took back.
+    pub fn replace_placed(&mut self, placed: &Placed) {
+        self.rebring(&placed.brought);
+        self.push_many(vec![placed.object.clone()]);
     }
 }
 
@@ -124,7 +272,7 @@ fn blocks_below(root: &Arc<BlockDef>) -> Vec<Arc<BlockDef>> {
             continue;
         }
         for e in def.entities.iter().rev() {
-            if let crate::Entity::Insert(i) = &e.entity {
+            if let Entity::Insert(i) = &e.entity {
                 stack.push(i.block.clone());
             }
         }
@@ -296,9 +444,10 @@ mod tests {
         let src = Document::default();
         let mut dst = Document::default();
         assert!(dst.block_clashes(&src, BlockId(99)).is_none());
-        assert!(dst
-            .bring_block(&src, BlockId(99), &HashMap::new())
-            .is_none());
+        assert_eq!(
+            dst.bring_block(&src, BlockId(99), &HashMap::new()).err(),
+            Some(BringError::NoSuchBlock)
+        );
     }
 
     #[test]
@@ -306,8 +455,10 @@ mod tests {
         let mut src = Document::default();
         let valve = make(&mut src, "valve", "L", 1.0, &[]);
         let mut dst = Document::default();
-        dst.bring_block(&src, valve.id, &HashMap::new());
-        dst.bring_block(&src, valve.id, &HashMap::new());
+        dst.bring_block(&src, valve.id, &HashMap::new())
+            .expect("brings");
+        dst.bring_block(&src, valve.id, &HashMap::new())
+            .expect("brings");
         let names: Vec<_> = dst.blocks().iter().map(|b| b.name.as_str()).collect();
         assert_eq!(names, ["valve", "valve_2"]);
     }

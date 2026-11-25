@@ -91,8 +91,8 @@ pub use corner::{Chamfer, CornerError, Joined};
 pub use corner_infinite::{chamfer_lines, fillet};
 pub use dimension::{Arrow, DimKind, DimStyle, DimText, Dimension};
 pub use document::{
-    Absorbed, BlockClash, BlockNameClash, Brought, Document, EntityId, LinetypeUse, Object,
-    Placement, SpatialStats, TransferWarning,
+    Absorbed, BlockClash, BlockNameClash, BringError, Brought, Document, EntityId,
+    LibraryPlacement, LinetypeUse, Object, Placed, Placement, SpatialStats, TransferWarning,
 };
 pub use ellipse::{Ellipse, EllipseError};
 pub use entity_kind::EntityKind;

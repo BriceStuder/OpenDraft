@@ -15,6 +15,8 @@ use crate::dynamic_visibility_cmd::{bvhide, bvshow, bvstate};
 use crate::field_cmd::{insert_field, update_field};
 use crate::field_dialog_cmd::insert_field_dialog;
 use crate::insert_cmd::insert_block;
+use crate::library_add_cmd::library_add;
+use crate::library_insert_cmd::library_insert;
 use crate::state::AppState;
 
 /// As `editor_command!` in `commands.rs`.
@@ -32,6 +34,13 @@ pub fn commands() -> Vec<Command<AppState>> {
         editor!("block.create", "Create Block", "BLOCK", define_block_dialog),
         editor!("block.create_line", "-BLOCK", "-BLOCK", define_block),
         editor!("block.insert", "Insert Block", "INSERT", insert_block),
+        editor!("block.library_add", "Add to Library", "LIBADD", library_add),
+        editor!(
+            "block.library_insert",
+            "Insert from Library",
+            "LIBINSERT",
+            library_insert
+        ),
         editor!("block.attdef", "Define Attributes", "ATTDEF", attdef_dialog),
         editor!("block.attdef_line", "-ATTDEF", "-ATTDEF", define_attribute),
         editor!(

@@ -2819,6 +2819,7 @@ dependencies = [
  "opendraft-api",
  "opendraft-canvas",
  "opendraft-commands",
+ "opendraft-content",
  "opendraft-core",
  "opendraft-files",
  "opendraft-ui",
@@ -2831,6 +2832,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sys-locale",
+ "tempfile",
  "ureq",
  "winresource",
 ]

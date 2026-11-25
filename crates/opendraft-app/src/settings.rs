@@ -97,6 +97,7 @@ pub struct Settings {
     /// `locations.rs`).
     pub templates_dir: Option<std::path::PathBuf>,
     pub recovery_dir: Option<std::path::PathBuf>,
+    pub library_dir: Option<std::path::PathBuf>,
     /// May the program ask GitHub, once a day, whether a newer version
     /// exists? `None` until the user has answered (see `updates`).
     pub update_checks: Option<bool>,
@@ -138,6 +139,7 @@ impl Default for Settings {
             automation_roots: Vec::new(),
             templates_dir: None,
             recovery_dir: None,
+            library_dir: None,
             update_checks: None,
             performance: Default::default(),
             language: None,
@@ -227,7 +229,11 @@ impl Settings {
         // such folder must not cost the user every other setting.
         let mut saved = self.clone();
         saved.automation_roots.retain(|p| p.to_str().is_some());
-        for folder in [&mut saved.templates_dir, &mut saved.recovery_dir] {
+        for folder in [
+            &mut saved.templates_dir,
+            &mut saved.recovery_dir,
+            &mut saved.library_dir,
+        ] {
             if folder.as_ref().is_some_and(|p| p.to_str().is_none()) {
                 *folder = None;
             }
@@ -279,7 +285,11 @@ impl Settings {
         if !AUTOSAVE_CHOICES.contains(&self.autosave_minutes) {
             self.autosave_minutes = Self::default().autosave_minutes;
         }
-        for folder in [&mut self.templates_dir, &mut self.recovery_dir] {
+        for folder in [
+            &mut self.templates_dir,
+            &mut self.recovery_dir,
+            &mut self.library_dir,
+        ] {
             if folder.as_ref().is_some_and(|p| p.as_os_str().is_empty()) {
                 *folder = None;
             }
@@ -406,6 +416,7 @@ mod tests {
             automation_roots: vec!["/tmp/a".into(), "C:\\Plans".into()],
             templates_dir: Some("D:\\Templates".into()),
             recovery_dir: Some("D:\\Recovery".into()),
+            library_dir: Some("D:\\Library".into()),
             update_checks: Some(true),
             performance: crate::performance_settings::PerformanceSettings {
                 drawing_cache: opendraft_canvas::CacheMode::Off,
