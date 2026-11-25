@@ -14,6 +14,7 @@ mod grips_at_select_objects;
 mod home_keyboard;
 mod home_layout;
 mod idle_at_prompt;
+mod line_middle;
 mod linetypes;
 mod mleader_styles;
 mod object_prompt_typing;
