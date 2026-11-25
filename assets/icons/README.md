@@ -117,6 +117,8 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](draw-gradient.svg) | `draw-gradient.svg` | blend | Gradient |
 | ![](draw-hatch.svg) | `draw-hatch.svg` | square-slash | Hatch (A square with a diagonal: the nearest Lucide has to hatching.) |
 | ![](draw-line.svg) | `draw-line.svg` | minus | Line |
+| ![](draw-line-middle.svg) | `draw-line-middle.svg` | minus | Line, Middle |
+| ![](draw-line-single.svg) | `draw-line-single.svg` | minus | Line, Single |
 | ![](draw-measure.svg) | `draw-measure.svg` | between-horizontal-start | Measure (Lucide's marks between two ends.) |
 | ![](draw-oblong-2p.svg) | `draw-oblong-2p.svg` | square | Oblong, 2-Point |
 | ![](draw-oblong-center.svg) | `draw-oblong-center.svg` | square | Oblong, Center |
