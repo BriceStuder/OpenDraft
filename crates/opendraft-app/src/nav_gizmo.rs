@@ -1,5 +1,5 @@
 //! The navigation gizmo in the top right corner of the drawing: a home button
-//! (PLAN, World), a ring of eight sectors that turn the view to the four
+//! (PLAN, Current), a ring of eight sectors that turn the view to the four
 //! directions and the four between, and an arrow outside the ring showing where
 //! the drawing's up lies, which can be dragged round to turn the view freely.
 //! The geometry is `opendraft_canvas::nav_gizmo`; this paints it and acts on
@@ -41,11 +41,19 @@ pub fn show_in(
     if !turns(doc.session.document(), doc.view.space()) {
         return canvas;
     }
-    let level = show(ctx, canvas, theme, &mut doc.view, busy);
+    let home = home_twist(doc.session.document());
+    let level = show(ctx, canvas, theme, &mut doc.view, home, busy);
     if level {
         state.start_level_view();
     }
     canvas.with_max_x(canvas.right() - 2.0 * (RADIUS + MARGIN))
+}
+
+/// The twist the home button asks for: the one that lays the X axis of the
+/// coordinate system in force level, as PLAN's default (Current) does. Zero
+/// for the world system.
+fn home_twist(document: &Document) -> f64 {
+    -document.ccs().angle
 }
 
 /// Whether the space being worked in can turn: not a layout's sheet, nor a
@@ -81,6 +89,7 @@ fn fill(theme: &Theme, hovered: bool, current: bool) -> Color32 {
 
 /// Paint the gizmo, and turn the view as the pointer asks. `canvas` is the
 /// drawing's rectangle.
+/// `home` is the twist the home button turns the view to (see `home_twist`).
 /// The level button cannot start while a command runs (it asks for points).
 /// Returns whether the level button was pressed.
 pub fn show(
@@ -88,6 +97,7 @@ pub fn show(
     canvas: egui::Rect,
     theme: &Theme,
     view: &mut View,
+    home: f64,
     busy: bool,
 ) -> bool {
     let mut level = false;
@@ -126,7 +136,7 @@ pub fn show(
             if response.clicked() {
                 let at = ui.input(|i| i.pointer.interact_pos());
                 match at.and_then(|p| gizmo.part_at(p, twist)) {
-                    Some(Part::Home) => view.request_plan(0.0),
+                    Some(Part::Home) => view.request_plan(home),
                     Some(Part::Sector(k)) => view.request_twist(sector_twist(k)),
                     Some(Part::Level) => level = !busy,
                     _ => {}
@@ -140,6 +150,11 @@ pub fn show(
             };
             // A level button that cannot be used does not answer the pointer.
             let hot = hot.filter(|p| !(busy && *p == Part::Level));
+            if response.hovered() && over_home(&response, &gizmo, ui) {
+                response
+                    .clone()
+                    .on_hover_text("Plan view of the current coordinate system");
+            }
             if response.hovered() && over_level(&response, &gizmo, ui) {
                 let tip = if busy {
                     "Finish the running command to level the view"
@@ -159,6 +174,14 @@ pub fn show(
             paint(ui, theme, &gizmo, twist, hot, busy);
         });
     level
+}
+
+/// Whether the pointer is over the home button.
+fn over_home(response: &egui::Response, gizmo: &Gizmo, ui: &egui::Ui) -> bool {
+    let at = response
+        .hover_pos()
+        .or_else(|| ui.input(|i| i.pointer.latest_pos()));
+    at.is_some_and(|p| (p - gizmo.centre).length() <= gizmo.home_radius())
 }
 
 /// Whether the pointer is over the level button.
@@ -246,6 +269,22 @@ mod tests {
     fn a_held_turn_goes_to_the_nearest_step() {
         let held = held_to(20.0_f64.to_radians(), SHIFT_STEP);
         assert!((held - 15.0_f64.to_radians()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn home_lays_the_current_coordinate_system_level() {
+        use opendraft_core::{Ccs, CcsSpace, Point};
+        let mut doc = Document::default();
+        assert_eq!(home_twist(&doc), 0.0);
+        let angle = 0.5;
+        doc.set_ccs_of(
+            CcsSpace::Model,
+            Ccs {
+                origin: Point::new(1.0, 2.0),
+                angle,
+            },
+        );
+        assert!((home_twist(&doc) + angle).abs() < 1e-12);
     }
 
     #[test]

@@ -726,7 +726,7 @@ only the camera turns.
   toggle, `NAVGIZMO` and Settings > Display > Navigation turn it off;
   `Settings::show_nav_gizmo`), shown in the Model tab and
   in an unlocked viewport, never on a layout's sheet. A home button in the middle
-  (PLAN, World: twist 0 and the extents, `View::request_plan(0.0)`), a ring of eight
+  (PLAN, Current: the X axis of the coordinate system in force laid level, then the extents, `View::request_plan(-ccs.angle)`, so the same as the world's twist 0 until the system is turned; in a viewport it is the viewport's system; tooltip "Plan view of the current coordinate system"), a ring of eight
   45 degree sectors, and an arrow outside the ring that marks where the drawing's up
   lies on the screen (screen angle 90 degrees plus the twist), so it reads at the
   top while the view is unturned and follows every other way of turning it. A
