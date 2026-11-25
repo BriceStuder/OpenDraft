@@ -213,7 +213,8 @@ impl AppState {
         let runner = self.runner.as_ref()?;
         let Some(ask) = runner.prompt() else {
             return Some(Prompt {
-                command: runner.name().to_uppercase().into(),
+                command: crate::command_language::prompt_name(runner.name(), &rust_i18n::locale())
+                    .into(),
                 text: Cow::Borrowed(""),
                 options: Vec::new(),
             });
@@ -234,7 +235,8 @@ impl AppState {
             text.push_str(&format!(" <{hint}>"));
         }
         Some(Prompt {
-            command: runner.name().to_uppercase().into(),
+            command: crate::command_language::prompt_name(runner.name(), &rust_i18n::locale())
+                .into(),
             text: text.into(),
             options,
         })

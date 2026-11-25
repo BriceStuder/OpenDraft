@@ -92,14 +92,16 @@ impl CommandLine {
 
     /// Echo a launched command, like AutoCAD's "Command: LINE".
     pub fn echo_command(&mut self, label: &str) {
-        self.say(format!("Command: {}", label.to_uppercase()));
+        let name = label.to_uppercase();
+        self.say(rust_i18n::t!("Command: %{name}", name = name));
     }
 
     /// A command was run: echo it and remember it. One run inside another
     /// command (a zoom inside LINE) is not the one Enter repeats next.
     pub fn note_run(&mut self, id: &'static str, label: &str, transparent: bool) {
-        let name = echo_name(id, label);
-        self.echo_command(name);
+        let locale = rust_i18n::locale();
+        let name = crate::command_language::shown_name(id, echo_name(id, label), &locale);
+        self.echo_command(&name);
         if !transparent {
             self.note_last(id);
         }
@@ -200,11 +202,11 @@ pub fn parse_number(text: &str) -> Option<f64> {
     text.trim().parse::<f64>().ok().filter(|v| v.is_finite())
 }
 
-/// A command offered while typing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A command offered while typing, or one way of typing it.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Suggestion {
-    pub alias: &'static str,
-    pub name: &'static str,
+    pub alias: Cow<'static, str>,
+    pub name: Cow<'static, str>,
     pub command: &'static str,
 }
 
@@ -212,25 +214,36 @@ impl Suggestion {
     /// "L (LINE)", or just the name when there is no separate alias.
     pub fn label(&self) -> String {
         if self.alias == self.name {
-            self.name.to_owned()
+            self.name.to_string()
         } else {
             format!("{} ({})", self.alias, self.name)
         }
     }
 }
 
-/// Commands matching what has been typed, best first. `enabled` hides
-/// commands that cannot run right now.
+/// Commands matching what has been typed, best first, in the language of
+/// the interface (English after `_`). `enabled` hides commands that cannot
+/// run right now.
 pub fn suggestions(text: &str, enabled: impl Fn(&str) -> bool) -> Vec<Suggestion> {
-    let t = text.trim().to_uppercase();
+    suggestions_in(text, enabled, &rust_i18n::locale())
+}
+
+pub(crate) fn suggestions_in(
+    text: &str,
+    enabled: impl Fn(&str) -> bool,
+    locale: &str,
+) -> Vec<Suggestion> {
+    use crate::option_language::fold;
+    let (names, t, english) = crate::command_language::names_for(text, locale);
     if t.is_empty() {
         return Vec::new();
     }
-    let mut found: Vec<(u8, Suggestion)> = ALIASES
-        .iter()
-        .filter(|(_, _, command)| enabled(command))
-        .filter_map(|&(alias, name, command)| {
-            let rank = if alias == t || name.eq_ignore_ascii_case(&t) {
+    let mut found: Vec<(u8, Suggestion)> = names
+        .into_iter()
+        .filter(|s| enabled(s.command))
+        .filter_map(|s| {
+            let (alias, name) = (fold(&s.alias), fold(&s.name));
+            let rank = if alias == t || name == t {
                 0
             } else if alias.starts_with(&t) {
                 1
@@ -241,14 +254,7 @@ pub fn suggestions(text: &str, enabled: impl Fn(&str) -> bool) -> Vec<Suggestion
             } else {
                 return None;
             };
-            Some((
-                rank,
-                Suggestion {
-                    alias,
-                    name,
-                    command,
-                },
-            ))
+            Some((rank, s))
         })
         .collect();
     found.sort_by_key(|(rank, s)| (*rank, s.alias.len()));
@@ -259,16 +265,19 @@ pub fn suggestions(text: &str, enabled: impl Fn(&str) -> bool) -> Vec<Suggestion
         }
     }
     out.truncate(MAX_SUGGESTIONS);
+    if english {
+        // Typed again as offered: "_L (_LINE)".
+        for s in &mut out {
+            s.alias = Cow::Owned(format!("_{}", s.alias));
+            s.name = Cow::Owned(format!("_{}", s.name));
+        }
+    }
     out
 }
 
-/// The command a fully typed alias or name stands for.
+/// The command a fully typed name or alias stands for.
 fn command_for(text: &str) -> Option<&'static str> {
-    let t = text.trim().to_uppercase();
-    ALIASES
-        .iter()
-        .find(|(alias, name, _)| *alias == t || *name == t)
-        .map(|(_, _, command)| *command)
+    crate::command_language::command_for(text, &rust_i18n::locale())
 }
 
 impl AppState {
@@ -297,7 +306,16 @@ impl AppState {
         text: &str,
         enabled: impl Fn(&str) -> bool,
     ) -> Vec<Suggestion> {
-        let starts_alpha = text.trim().chars().next().is_some_and(char::is_alphabetic);
+        // `'`, `_` and `-` may come before a name: '_ZOOM, _-PLOT. While a
+        // command waits, only `'` (a command run inside it) opens them, so
+        // `-A` typed as an answer lists nothing.
+        let typed = text.trim();
+        let name = if self.command_running() && !typed.starts_with('\'') {
+            typed
+        } else {
+            typed.trim_start_matches(['\'', '_', '-'])
+        };
+        let starts_alpha = name.chars().next().is_some_and(char::is_alphabetic);
         if !starts_alpha || self.cmd_option_for(text).is_some() {
             return Vec::new();
         }
@@ -355,7 +373,8 @@ impl AppState {
         if self.sysvar_typed(t) {
             return None;
         }
-        self.cmdline.say(format!("Unknown command \"{t}\"."));
+        self.cmdline
+            .say(rust_i18n::t!("Unknown command \"%{name}\".", name = t));
         None
     }
 }
@@ -602,6 +621,8 @@ mod tests {
         assert!(state.cmd_suggestions("12", all).is_empty());
         assert!(state.cmd_suggestions("1,2", all).is_empty());
         assert!(!state.cmd_suggestions("l", all).is_empty());
+        assert!(!state.cmd_suggestions("-pl", all).is_empty());
+        assert!(!state.cmd_suggestions("_l", all).is_empty());
         state.start_command("Circle", crate::circle::draw_circle);
         state.settle_command();
         state.cmd_submit("0,0");
@@ -609,6 +630,10 @@ mod tests {
         // "D" is the Diameter option here, not the start of a command name.
         assert!(state.cmd_suggestions("d", all).is_empty());
         assert!(!state.cmd_suggestions("l", all).is_empty());
+        // An answer starting with `-` or `_` is not a command name.
+        assert!(state.cmd_suggestions("-a", all).is_empty());
+        assert!(state.cmd_suggestions("_a", all).is_empty());
+        assert!(!state.cmd_suggestions("'z", all).is_empty());
     }
 
     #[test]
