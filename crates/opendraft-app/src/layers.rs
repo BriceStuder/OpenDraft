@@ -15,6 +15,8 @@ pub enum LayerFlag {
     On,
     Frozen,
     Locked,
+    /// Plotted (AutoCAD's Plot / No Plot).
+    Plot,
 }
 
 impl LayerFlag {
@@ -23,6 +25,7 @@ impl LayerFlag {
             LayerFlag::On => layer.on,
             LayerFlag::Frozen => layer.frozen,
             LayerFlag::Locked => layer.locked,
+            LayerFlag::Plot => layer.plot,
         }
     }
 
@@ -31,6 +34,7 @@ impl LayerFlag {
             LayerFlag::On => layer.on = value,
             LayerFlag::Frozen => layer.frozen = value,
             LayerFlag::Locked => layer.locked = value,
+            LayerFlag::Plot => layer.plot = value,
         }
     }
 
@@ -43,6 +47,8 @@ impl LayerFlag {
             (LayerFlag::Frozen, false) => "Thaw layer",
             (LayerFlag::Locked, true) => "Lock layer",
             (LayerFlag::Locked, false) => "Unlock layer",
+            (LayerFlag::Plot, true) => "Plot layer",
+            (LayerFlag::Plot, false) => "Do not plot layer",
         }
     }
 }
@@ -391,6 +397,17 @@ mod tests {
         assert!(state.selection().is_empty());
         state.undo();
         assert!(state.session().document().layer(walls).unwrap().on);
+    }
+
+    #[test]
+    fn the_plot_switch_is_one_undo_step_on_every_chosen_layer() {
+        let mut state = AppState::new();
+        let (walls, doors) = (state.new_layer(), state.new_layer());
+        state.set_layer_flag(&[walls, doors], LayerFlag::Plot, false);
+        let plots = |state: &AppState, id| state.session().document().layer(id).unwrap().plot;
+        assert!(!plots(&state, walls) && !plots(&state, doors));
+        state.undo();
+        assert!(plots(&state, walls) && plots(&state, doors));
     }
 
     #[test]

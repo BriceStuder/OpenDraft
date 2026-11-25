@@ -53,11 +53,12 @@ pub(super) fn model_sheet(document: &Document) -> Result<PlotSheet, PlotError> {
     };
     let same = |p: Point| p;
     let frozen = document.frozen_in_model();
+    let plotted = |layer| !frozen.contains(&layer) && document.plots(layer);
     let objects = document
         .visible_in(None)
-        .filter(|o| !frozen.contains(&o.attrs.layer) && o.bounds().intersects(&frame));
+        .filter(|o| plotted(o.attrs.layer) && o.bounds().intersects(&frame));
     let pieces = objects.flat_map(|o| document.drawn(o));
-    for object in pieces.filter(|o| !frozen.contains(&o.attrs.layer)) {
+    for object in pieces.filter(|o| plotted(o.attrs.layer)) {
         add_viewed(
             &mut sheet,
             document,
@@ -284,5 +285,62 @@ mod tests {
             };
         });
         assert!(plot_sheet(&doc, PlotSpace::Model).is_ok());
+    }
+
+    #[test]
+    fn no_plot_layers_and_defpoints_are_left_out_of_the_plot_but_not_the_extents() {
+        let mut doc = Document::default();
+        let sketch = doc.allocate_layer_id();
+        doc.push_layer(Layer {
+            plot: false,
+            ..Layer::new(sketch, "Sketch")
+        });
+        let defpoints = doc.allocate_layer_id();
+        doc.push_layer(Layer::new(defpoints, "DEFPOINTS"));
+        doc.add(line((0.0, 0.0), (100.0, 0.0)));
+        for (layer, y) in [(sketch, 900.0), (defpoints, 50.0)] {
+            doc.add_with(
+                line((0.0, y), (100.0, y)),
+                crate::Attributes::on_layer(layer),
+            );
+        }
+        assert_eq!(extents(&doc).unwrap().max.y, 900.0);
+        let sheet = plot_sheet(&doc, PlotSpace::Model).unwrap();
+        assert_eq!(sheet.paths.len(), 1);
+    }
+
+    #[test]
+    fn a_block_on_a_no_plot_layer_leaves_the_plot_whole() {
+        use crate::{BlockDef, BlockEntity, BlockObjectId, Entity, Insert, LayerId};
+        let mut doc = Document::default();
+        let (sketch, walls) = (doc.allocate_layer_id(), doc.allocate_layer_id());
+        doc.push_layer(Layer {
+            plot: false,
+            ..Layer::new(sketch, "Sketch")
+        });
+        doc.push_layer(Layer::new(walls, "Walls"));
+        let piece = |layer: LayerId, y: f64| BlockEntity {
+            id: BlockObjectId(y as u64 + 1),
+            entity: line((0.0, y), (100.0, y)),
+            attrs: crate::Attributes::on_layer(layer),
+        };
+        let id = doc.allocate_block_id();
+        let block = std::sync::Arc::new(BlockDef {
+            unit: Default::default(),
+            id,
+            name: "Desk".into(),
+            base: crate::Point::new(0.0, 0.0),
+            description: String::new(),
+            entities: vec![piece(LayerId::DEFAULT, 10.0), piece(walls, 20.0)],
+            dynamic: None,
+        });
+        doc.push_block(block.clone());
+        doc.add(line((0.0, 0.0), (100.0, 0.0)));
+        doc.add_with(
+            Entity::Insert(Box::new(Insert::new(block, crate::Point::new(0.0, 0.0)))),
+            crate::Attributes::on_layer(sketch),
+        );
+        let sheet = plot_sheet(&doc, PlotSpace::Model).unwrap();
+        assert_eq!(sheet.paths.len(), 1);
     }
 }

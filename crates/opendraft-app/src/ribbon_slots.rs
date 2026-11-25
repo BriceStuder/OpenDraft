@@ -331,7 +331,7 @@ fn corner_marks(square: Rect, pixel: f32, arm: f32) -> [[Pos2; 3]; 4] {
     ]
 }
 
-fn switch_tip(layer: &Layer, flag: LayerFlag) -> Cow<'static, str> {
+pub(crate) fn switch_tip(layer: &Layer, flag: LayerFlag) -> Cow<'static, str> {
     match flag {
         LayerFlag::On if layer.on => rust_i18n::t!("On: click to turn off"),
         LayerFlag::On => rust_i18n::t!("Off: click to turn on"),
@@ -339,6 +339,9 @@ fn switch_tip(layer: &Layer, flag: LayerFlag) -> Cow<'static, str> {
         LayerFlag::Frozen => rust_i18n::t!("Thawed: click to freeze"),
         LayerFlag::Locked if layer.locked => rust_i18n::t!("Locked: click to unlock"),
         LayerFlag::Locked => rust_i18n::t!("Unlocked: click to lock"),
+        LayerFlag::Plot if layer.is_defpoints() => rust_i18n::t!("Defpoints never plots"),
+        LayerFlag::Plot if layer.plot => rust_i18n::t!("Plotted: click to leave out of plots"),
+        LayerFlag::Plot => rust_i18n::t!("Not plotted: click to plot"),
     }
 }
 
@@ -388,6 +391,7 @@ fn layer_row_contents(
             Toggle::Flag(LayerFlag::On) => on,
             Toggle::Flag(LayerFlag::Frozen) => thaw,
             Toggle::Flag(LayerFlag::Locked) => lock,
+            Toggle::Flag(LayerFlag::Plot) => (icons::FILE_PLOT, c.text_weak),
             Toggle::Viewport => {
                 let frozen = vp_frozen.is_some_and(|s| s.frozen);
                 paint_vp_switch(painter, at, 13.0, vp_glyph(frozen, c.text_weak));
