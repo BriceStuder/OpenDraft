@@ -18,6 +18,8 @@ pub(crate) struct LayerData {
     pub locked: bool,
     /// The "on" bit; see `read_layer` for how it is read.
     pub on: bool,
+    /// The plot bit (16).
+    pub plot: bool,
     /// The lineweight code (0 to 23 standard, 29 ByBlock, 30 ByLayer, 31 default).
     pub lineweight: u8,
     pub color: TableColor,
@@ -59,6 +61,7 @@ pub(crate) fn read_layer(
         frozen: flags & 1 != 0,
         locked: flags & 8 != 0,
         on: flags & 2 == 0 && (color.index as i16) >= 0,
+        plot: flags & 16 != 0,
         lineweight: ((flags & 0x03E0) >> 5) as u8,
         color,
         linetype,
@@ -253,6 +256,18 @@ mod tests {
         assert_eq!(l.color.aci(), Some(3));
         assert_eq!(l.color.true_color(), None);
         assert_eq!(l.linetype, Some(DwgHandle(0x14)));
+    }
+
+    #[test]
+    fn a_layer_plots_by_its_bit() {
+        let read = |flags| {
+            let b = layer_streams(flags, 3, 0);
+            read_layer(&mut b.streams(), BASE, &DwgLimits::default())
+                .unwrap()
+                .plot
+        };
+        assert!(read(16));
+        assert!(!read(1 | 8));
     }
 
     #[test]

@@ -160,6 +160,9 @@ pub struct Layer {
     /// still show it and plot it. An OpenDraft extension (AutoCAD has no
     /// such switch), kept in DXF as XDATA on the layer.
     pub frozen_in_model: bool,
+    /// Plotted (AutoCAD's Plot column, DXF group 290). Defpoints never
+    /// plots, whatever this says (see `plots`).
+    pub plot: bool,
 }
 
 impl Layer {
@@ -182,7 +185,24 @@ impl Layer {
             frozen: false,
             locked: false,
             frozen_in_model: false,
+            plot: true,
         }
+    }
+
+    /// Defpoints, the layer AutoCAD keeps dimension definition points on
+    /// and never plots.
+    pub fn is_defpoints(&self) -> bool {
+        self.name.eq_ignore_ascii_case("Defpoints")
+    }
+
+    /// Switched to No Plot (Defpoints is left out of plots without it).
+    pub fn no_plot(&self) -> bool {
+        !self.plot && !self.is_defpoints()
+    }
+
+    /// Whether objects on this layer reach a plot.
+    pub fn plots(&self) -> bool {
+        self.plot && !self.is_defpoints()
     }
 
     pub fn is_visible(&self) -> bool {

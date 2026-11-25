@@ -15,7 +15,7 @@ const WEIGHT_W: f32 = 78.0;
 /// Columns every row has (and the VP Freeze one while a viewport is the target);
 /// linetype and weight only appear when there is room.
 pub fn core_width(vp: bool) -> f32 {
-    STATUS_W + SWITCH_W * if vp { 4.0 } else { 3.0 } + COLOR_W
+    STATUS_W + SWITCH_W * if vp { 5.0 } else { 4.0 } + COLOR_W
 }
 pub const EXTRA_W: f32 = LINETYPE_W + WEIGHT_W;
 
@@ -37,6 +37,7 @@ pub struct Columns {
     /// Zero width unless a viewport is the target.
     pub vp_freeze: Rect,
     pub lock: Rect,
+    pub plot: Rect,
     pub color: Rect,
     pub linetype: Rect,
     pub weight: Rect,
@@ -59,6 +60,7 @@ impl Columns {
             freeze: next(SWITCH_W),
             vp_freeze: next(if layout.vp { SWITCH_W } else { 0.0 }),
             lock: next(SWITCH_W),
+            plot: next(SWITCH_W),
             color: next(COLOR_W),
             linetype: next(if layout.wide { LINETYPE_W } else { 0.0 }),
             weight: next(if layout.wide { WEIGHT_W } else { 0.0 }),
@@ -105,6 +107,7 @@ pub fn header(ui: &mut Ui, theme: &Theme, shape: Layout) {
         );
     }
     glyph(cols.lock, icons::LAYER_LIST_UNLOCKED);
+    glyph(cols.plot, icons::FILE_PLOT);
     text(cols.color, &t!("Color"));
     if wide {
         text(cols.linetype, &t!("Linetype"));
@@ -115,6 +118,29 @@ pub fn header(ui: &mut Ui, theme: &Theme, shape: Layout) {
         rect.bottom(),
         Stroke::new(1.0_f32, c.divider),
     );
+}
+
+/// The Plot switch: a yellow printer for a plotted layer, a grey one struck
+/// through for a layer left out of plots (Defpoints always is).
+pub fn paint_plot_switch(painter: &egui::Painter, cell: Rect, plots: bool, weak: egui::Color32) {
+    let color = if plots {
+        crate::ribbon_slots::SWITCH_ON
+    } else {
+        weak
+    };
+    let at = cell.center();
+    let icon = opendraft_ui::icon_set::paint(
+        painter,
+        at,
+        Align2::CENTER_CENTER,
+        icons::FILE_PLOT,
+        14.0,
+        color,
+    );
+    if !plots {
+        let (a, b) = (icon.left_bottom(), icon.right_top());
+        painter.line_segment([a, b], Stroke::new(1.5_f32, color));
+    }
 }
 
 #[cfg(test)]

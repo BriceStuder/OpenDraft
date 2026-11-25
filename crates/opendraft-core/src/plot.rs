@@ -193,7 +193,9 @@ fn add_viewports(
             .visible_in(None)
             .filter(|o| !vp.is_frozen(o.attrs.layer) && o.bounds().intersects(&shown));
         let pieces = objects.flat_map(|o| document.drawn(o));
-        for object in pieces.filter(|o| !vp.is_frozen(o.attrs.layer)) {
+        for object in
+            pieces.filter(|o| !vp.is_frozen(o.attrs.layer) && document.plots(o.attrs.layer))
+        {
             let to_paper = |p: Point| vp.model_to_paper(p);
             add_viewed(
                 sheet,
@@ -232,7 +234,7 @@ fn add_paper(
         .visible_in(Some(layout.id))
         .filter(|o| shown(o.attrs.layer))
         .flat_map(|o| document.drawn(o))
-        .filter(|o| shown(o.attrs.layer))
+        .filter(|o| shown(o.attrs.layer) && document.plots(o.attrs.layer))
     {
         add_viewed(
             sheet,
@@ -1094,5 +1096,25 @@ mod tests {
         let huge = crate::Ellipse::full(Point::new(5000.0, 4000.0), Point::new(1e10, 0.0), 0.5);
         let (doc, id) = plotted(&[Entity::Ellipse(huge.unwrap())]);
         assert_eq!(plot_layout(&doc, id), Err(PlotError::TooDetailed));
+    }
+
+    #[test]
+    fn a_no_plot_layer_leaves_both_the_viewports_and_the_sheet() {
+        let (mut doc, id) = plotted(&[line((4500.0, 4000.0), (5500.0, 4000.0))]);
+        let layer = doc.allocate_layer_id();
+        doc.push_layer(Layer {
+            plot: false,
+            ..Layer::new(layer, "Sketch")
+        });
+        doc.add_with(
+            line((4600.0, 4100.0), (5400.0, 4100.0)),
+            Attributes::on_layer(layer),
+        );
+        doc.set_active_layout(Some(id));
+        doc.add_with(
+            line((10.0, 10.0), (20.0, 10.0)),
+            Attributes::on_layer(layer),
+        );
+        assert_eq!(plot_layout(&doc, id).unwrap().paths.len(), 1);
     }
 }

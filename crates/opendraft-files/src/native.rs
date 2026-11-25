@@ -296,6 +296,9 @@ struct LayerDto {
     /// Frozen in the Model tab only (layout viewports still show it).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     frozen_in_model: bool,
+    /// Left out of plots (AutoCAD's No Plot).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    no_plot: bool,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -378,6 +381,7 @@ impl DrawingDto {
                 frozen: l.frozen,
                 locked: l.locked,
                 frozen_in_model: l.frozen_in_model,
+                no_plot: !l.plot,
             })
             .collect();
         let mut styles = StylePool::new();
@@ -563,6 +567,7 @@ mod tests {
             frozen: false,
             locked: true,
             frozen_in_model: true,
+            plot: false,
         });
         let hidden = document.allocate_layer_id();
         document.push_layer(Layer {
