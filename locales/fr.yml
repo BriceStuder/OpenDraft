@@ -47,6 +47,8 @@
 
 # Draw
 "Line": "Ligne"
+"Single Lines": "Lignes uniques"
+"From Middle": "Depuis le milieu"
 "Polyline": "Polyligne"
 "Circle": "Cercle"
 "Center, Radius": "Centre, rayon"

@@ -297,7 +297,7 @@ Mirror (`opendraft-app/src/modify.rs`), Scale and Rotate with Copy and Reference
 which run LINE SINGLE (SL: lines that do not chain, each given by its two ends) and LINE MIDDLE
 (ML: each line given by its middle, then one end, the other mirrored), in `line_modes.rs`; at
 LINE MIDDLE's end, dynamic input shows the half length, then on Tab the whole length (`Field::Length`,
-`DynamicDimensions::Mirrored`), and a bare number is the half length), Circle (`circle.rs`), Arc (`arc_cmd.rs`),
+`DynamicDimensions::Mirrored`), and a bare number is the half length; both are in the ribbon's Line list), Circle (`circle.rs`), Arc (`arc_cmd.rs`),
 Rectangle (`rectangle.rs`, settings in `rect_memory.rs`; from the centre, by
 three points and the oblongs in `rect_variants.rs`), Polyline
 (`polyline_cmd.rs`, arc options in `polyline_arc.rs`), the window polygon, crossing polygon and fence

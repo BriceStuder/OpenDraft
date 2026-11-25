@@ -137,6 +137,8 @@ icons! {
     /// A square with a diagonal: the nearest Lucide has to hatching.
     DRAW_HATCH = '\u{e177}';
     DRAW_LINE = '\u{e11f}';
+    DRAW_LINE_MIDDLE = '\u{e11f}';
+    DRAW_LINE_SINGLE = '\u{e11f}';
     DRAW_OBLONG_2P = '\u{e16a}';
     DRAW_OBLONG_CENTER = '\u{e16a}';
     /// Lucide's marks between two ends.
