@@ -108,6 +108,7 @@ mod language;
 mod large_file;
 mod layer_cells;
 mod layer_cmd;
+mod layer_column_resize;
 mod layer_columns;
 mod layer_menu;
 mod layer_selection;

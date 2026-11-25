@@ -9,7 +9,7 @@ use rust_i18n::t;
 
 use crate::colour_ui::{self, Pick};
 use crate::layer_cells::{cell_text, fit_text, layers_in_use};
-use crate::layer_columns::{core_width, header, Columns, Layout, EXTRA_W, NAME_MIN, ROW_HEIGHT};
+use crate::layer_columns::{header, Columns, Layout, ROW_HEIGHT};
 use crate::layer_menu::{self, MenuPick};
 use crate::layer_selection::LayerSelection;
 use crate::layers::{LayerEdit, LayerFlag};
@@ -65,16 +65,17 @@ pub fn show(
     egui::ScrollArea::both()
         .auto_shrink([false, false])
         .show(ui, |ui| {
-            let core = core_width(target.is_some());
-            let wide = ui.available_width() >= NAME_MIN + core + EXTRA_W;
-            let width = ui.available_width().max(NAME_MIN + core);
-            let shape = Layout {
-                width,
-                wide,
-                vp: target.is_some(),
-            };
+            let mut widths = crate::layer_column_resize::load(ui.ctx());
+            let shape = Layout::fit(ui.available_width(), target.is_some(), widths);
+            let width = shape.width;
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-            header(ui, theme, shape);
+            let header_rect = header(ui, theme, shape);
+            let fit =
+                |column| crate::layer_column_resize::content_width(ui, theme, document, column);
+            if crate::layer_column_resize::handles(ui, theme, header_rect, shape, &mut widths, fit)
+            {
+                crate::layer_column_resize::store(ui.ctx(), widths);
+            }
             for layer in document.layers_by_name() {
                 let picked = row(
                     ui,
