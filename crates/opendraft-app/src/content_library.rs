@@ -89,6 +89,24 @@ impl LibraryHandle {
 impl crate::state::AppState {
     /// Use the folders `settings` names (or their defaults) for templates and
     /// the block library.
+    /// Asks for a drawing file and offers its blocks to the Content Manager
+    /// for import. The file is read here, before the window is shown, so a
+    /// big DWG holds the app for as long as opening it would.
+    pub(crate) fn pick_blocks_to_import(&mut self) {
+        let Some(path) = self.picker.open(None) else {
+            return;
+        };
+        let file = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let content = &mut self.command_dialogs.content;
+        match opendraft_files::load(&path) {
+            Ok(loaded) => content.start_import(&file, loaded.document, loaded.warnings),
+            Err(error) => content.say(format!("Could not read {file}: {error}")),
+        }
+    }
+
     pub(crate) fn use_folders_of(&mut self, settings: &crate::settings::Settings) {
         use crate::locations::Location;
         self.templates_dir = Location::Templates.resolve(settings);

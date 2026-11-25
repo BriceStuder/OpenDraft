@@ -36,6 +36,7 @@ impl OpenDraftApp {
                     self.state.start_command("LIBINSERT", library_insert);
                 }
                 Request::AddObjects => self.state.start_command("LIBADD", library_add),
+                Request::PickImport => self.state.pick_blocks_to_import(),
             }
         }
     }

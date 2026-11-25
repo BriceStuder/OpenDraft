@@ -20,6 +20,7 @@ use crate::blocks_payload::{BlockUuid, BlocksPackage};
 
 mod capture;
 mod error;
+mod import;
 mod info;
 mod organise;
 mod search;
@@ -29,6 +30,7 @@ mod trash;
 
 pub use capture::{CaptureRequest, Captured, NameTaken};
 pub use error::LibraryError;
+pub use import::{importable, Candidate, ImportReport};
 pub use info::BlockInfo;
 pub use search::Query;
 pub use state::{TrashRecord, MAX_RECENTS, TRASH_DAYS};

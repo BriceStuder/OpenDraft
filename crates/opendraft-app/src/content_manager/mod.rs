@@ -19,6 +19,8 @@ use crate::content_library::LibraryHandle;
 mod actions;
 mod contents;
 mod details;
+mod filter;
+mod import;
 mod snapshot;
 mod thumbnails;
 mod tree;
@@ -76,6 +78,8 @@ pub enum Request {
     Insert(BlockUuid),
     /// Start LIBADD (on the selected objects, if any).
     AddObjects,
+    /// Ask for a drawing file and offer its blocks for import.
+    PickImport,
 }
 
 /// What the window reads of the app.
@@ -102,9 +106,17 @@ pub struct Window {
     taken: Option<String>,
     thumbs: thumbnails::Thumbnails,
     details: details::Buffers,
+    filter: filter::Filter,
+    import: Option<import::ImportDraft>,
 }
 
 impl Window {
+    /// Puts a line in the status bar.
+    pub fn say(&mut self, text: String) {
+        self.status = text;
+        self.open = true;
+    }
+
     /// Opens the window on `place`.
     pub fn open_on(&mut self, place: Place) {
         self.open = true;
@@ -158,7 +170,7 @@ impl Window {
         actions: &mut Vec<Action>,
     ) {
         egui::TopBottomPanel::top("cm_toolbar").show_inside(ui, |ui| {
-            self.toolbar(ui, theme, actions);
+            self.toolbar(ui, theme, &snap.units, actions);
         });
         egui::TopBottomPanel::bottom("cm_status").show_inside(ui, |ui| {
             self.status_bar(ui, snap, actions);
@@ -182,7 +194,13 @@ impl Window {
         });
     }
 
-    fn toolbar(&mut self, ui: &mut egui::Ui, theme: &Theme, actions: &mut Vec<Action>) {
+    fn toolbar(
+        &mut self,
+        ui: &mut egui::Ui,
+        theme: &Theme,
+        units: &[opendraft_core::InsertUnits],
+        actions: &mut Vec<Action>,
+    ) {
         ui.horizontal(|ui| {
             let back = !self.back.is_empty();
             let forward = !self.forward.is_empty();
@@ -213,6 +231,7 @@ impl Window {
                 opendraft_ui::widgets::text_field(ui, theme, &mut self.search, "Search blocks");
             });
             ui.add_space(6.0);
+            self.filter.menu(ui, units);
             ui.selectable_value(&mut self.view, View::Grid, "Thumbnails");
             ui.selectable_value(&mut self.view, View::List, "List");
             ui.add_space(6.0);
@@ -222,6 +241,13 @@ impl Window {
                 .clicked()
             {
                 actions.push(Action::AddObjects);
+            }
+            if ui
+                .button("Import")
+                .on_hover_text("Add blocks from a drawing file: .odraft, DXF or DWG")
+                .clicked()
+            {
+                actions.push(Action::ImportFile);
             }
         });
     }
@@ -254,5 +280,7 @@ impl Window {
     }
 }
 
+#[cfg(test)]
+mod import_tests;
 #[cfg(test)]
 mod tests;

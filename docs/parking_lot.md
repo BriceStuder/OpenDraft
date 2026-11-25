@@ -155,9 +155,9 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 ## Content Manager (`docs/openhub-specification.md`, local-only work on `feat/content-manager`)
 
-Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), the local library's store, capture, organise, search and Trash (`opendraft-content`), `Document::bring_block` and `insert_from` in core (use the drawing's block, add as new, or replace its definition), `Location::Library`, the command-line `LIBADD` and `LIBINSERT`, and the Content Manager window (`CONTENTMANAGER`, `CONTENT`, the Insert tab's Block panel): My blocks with folders, This drawing, Favourites, Recent and Trash, thumbnails or a list, search, details with an editable description and tags, drag a block onto a folder, rename, favourite, delete and restore. Not built:
+Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), the local library's store, capture, organise, search and Trash (`opendraft-content`), `Document::bring_block` and `insert_from` in core (use the drawing's block, add as new, or replace its definition), `Location::Library`, the command-line `LIBADD` and `LIBINSERT`, and the Content Manager window (`CONTENTMANAGER`, `CONTENT`, the Insert tab's Block panel): My blocks with folders, This drawing, Favourites, Recent and Trash, thumbnails or a list, search, details with an editable description and tags, drag a block onto a folder, rename, favourite, delete and restore, a Filter menu (favourites, unit, dynamic, attributes), and Import of blocks from an `.odraft`, DXF or DWG file (tick the blocks, name the folder, choose what a taken name does). Not built:
 
-- In the window: import from `.odraft`, DXF and DWG, the Author > Package tree and the Flat list (they need packages), a per-block choice for taken names, "Arrange by", the filter menu (unit, dynamic, attributes: `Library::search` has them, the window does not), "Repeat placement", multi-select, French for its text, and thumbnails at a size chosen by the view. Ribbon items for `LIBADD` and `LIBINSERT` (only the window has one). The drawing-open notice, and `BlockDef::origin`.
+- In the window: the Author > Package tree and the Flat list (they need packages), a per-block choice for taken names, "Arrange by", "Repeat placement", multi-select, sorting by relevance, name or last used, French for its text, and thumbnails at a size chosen by the view. Ribbon items for `LIBADD` and `LIBINSERT` (only the window has one). The drawing-open notice, and `BlockDef::origin`.
 - The window is not in `modal_open`, so keys typed while it has focus can reach the drawing's command line; whether that is right for a modeless window has to be tried by hand.
 - `opendraft_canvas::preview::Palette::Light` draws thumbnails for a light background, but no palette is light yet, so the window uses the dark one.
 - `LIBADD` asks no description, tags or folder (the window will), and `LIBINSERT` settles every taken name with one answer; a choice for each block needs the window's dialog.
@@ -169,6 +169,8 @@ Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), 
 - A library whose block is too big or too many for publishing (5 MB, 500 blocks): the personal package is exempt by design, the publish limits are not built.
 - `index.cache` and search over tens of thousands of blocks are not measured; thumbnails of blocks.
 - Packages, versions, the hub client and everything in slices 2 to 5 of the specification.
+- Import reads the whole file before showing the list, on the UI thread, so a big DWG holds the app for as long as opening it does; it does not use the large-file prompt or the cancellable reader. Importing is tested with an `.odraft` and the ezdxf DXF fixture with attributes, not with a DWG (the samples are private).
+- Import takes a block's objects as the importer made them; what the DXF and DWG readers skip (hatches in DWG blocks, dimensions in DWG) is reported as notes, not blocked.
 
 ## Releases and platforms
 

@@ -30,6 +30,10 @@ impl Window {
             });
             return;
         }
+        if self.import.is_some() {
+            self.import_panel(ui, actions);
+            return;
+        }
         ui.horizontal(|ui| {
             ui.strong(self.title(snap));
         });
@@ -50,7 +54,10 @@ impl Window {
 
     fn title(&self, snap: &Snapshot) -> String {
         if snap.searching {
-            return format!("Search results for \"{}\"", self.search.trim());
+            return match self.search.trim() {
+                "" => "Blocks that match the filters".to_owned(),
+                words => format!("Search results for \"{words}\""),
+            };
         }
         match &self.place {
             Place::Mine(path) if path.is_empty() => "My blocks".to_owned(),

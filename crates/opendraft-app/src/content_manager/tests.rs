@@ -7,12 +7,12 @@ use super::*;
 use crate::library_cmd_tests::{app_with_library, drawing_with_box, stocked};
 use crate::state::AppState;
 
-fn theme() -> Theme {
+pub(super) fn theme() -> Theme {
     Theme::default()
 }
 
 /// Runs the window for one frame, as the app would.
-fn frame(win: &mut Window, state: &AppState) -> Vec<Request> {
+pub(super) fn frame(win: &mut Window, state: &AppState) -> Vec<Request> {
     let ctx = egui::Context::default();
     let theme = theme();
     let mut requests = Vec::new();
@@ -38,7 +38,7 @@ fn frame(win: &mut Window, state: &AppState) -> Vec<Request> {
 
 /// A window on a drawing that has block "Box", with "Box" and "Other" in the
 /// library.
-fn setup(dir: &std::path::Path) -> (AppState, Window) {
+pub(super) fn setup(dir: &std::path::Path) -> (AppState, Window) {
     stocked(dir, 2.0);
     let state = drawing_with_box(dir, 5.0);
     let mut win = Window::default();
@@ -46,7 +46,7 @@ fn setup(dir: &std::path::Path) -> (AppState, Window) {
     (state, win)
 }
 
-fn names(state: &AppState) -> Vec<String> {
+pub(super) fn names(state: &AppState) -> Vec<String> {
     state
         .defaults()
         .library
@@ -54,7 +54,7 @@ fn names(state: &AppState) -> Vec<String> {
         .expect("opens")
 }
 
-fn apply(win: &mut Window, state: &AppState, actions: Vec<Action>) -> Vec<Request> {
+pub(super) fn apply(win: &mut Window, state: &AppState, actions: Vec<Action>) -> Vec<Request> {
     let defaults = std::sync::Arc::clone(state.defaults());
     let session = state.session();
     let env = Env {

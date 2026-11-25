@@ -1,7 +1,7 @@
 //! What the window shows in one frame, read from the library and the drawing
 //! once, so drawing the window never touches either.
 
-use opendraft_content::library::{BlockInfo, Query, TrashRecord};
+use opendraft_content::library::{BlockInfo, TrashRecord};
 use opendraft_core::BlockId;
 
 use super::{Env, Place, Selected, Window};
@@ -32,20 +32,22 @@ pub struct Snapshot {
     pub selected: Option<BlockInfo>,
     /// Tells pictures of the library's blocks whether they are stale.
     pub stamp: u64,
-    /// The search box has words in it.
+    /// What is listed is a search's or a filter's result.
     pub searching: bool,
+    /// The units the library's blocks are in.
+    pub units: Vec<opendraft_core::InsertUnits>,
 }
 
 impl Snapshot {
     pub fn take(win: &Window, env: &Env) -> Snapshot {
         let mut snap = Snapshot {
-            searching: !win.search.trim().is_empty(),
+            searching: !win.search.trim().is_empty() || win.filter.active(),
             drawing: Vec::new(),
             ..Snapshot::default()
         };
         let place = win.place.clone();
         let selected = win.selected.clone();
-        let search = win.search.clone();
+        let query = win.filter.query(&win.search);
         let searching = snap.searching;
         let read = env.library.with(|lib| {
             let mut s = Snapshot::default();
@@ -54,10 +56,7 @@ impl Snapshot {
             s.favourites = lib.favourites().len();
             s.recents = lib.recents().len();
             s.shown = if searching {
-                lib.search(&Query {
-                    text: search,
-                    ..Query::default()
-                })
+                lib.search(&query)
             } else {
                 match &place {
                     Place::Mine(folder) => {
@@ -72,11 +71,18 @@ impl Snapshot {
             if let Selected::Block(id) = selected {
                 s.selected = lib.block(id);
             }
-            let names: Vec<String> = lib.blocks().into_iter().map(|b| b.name).collect();
+            let all = lib.blocks();
+            let names: Vec<String> = all.iter().map(|b| b.name.clone()).collect();
+            for b in &all {
+                if !s.units.iter().any(|u| u.code() == b.unit.code()) {
+                    s.units.push(b.unit);
+                }
+            }
             (s, names)
         });
         match read {
             Ok((read, names)) => {
+                snap.units = read.units;
                 snap.folders = read.folders;
                 snap.subfolders = read.subfolders;
                 snap.shown = read.shown;
