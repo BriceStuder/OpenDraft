@@ -921,6 +921,15 @@
 "Press Enter or click to accept the hatch": "Appuyez sur Entrée ou clic droit pour accepter les hachures"
 "Enter an option <accept>": "Entrez une option <accepter>"
 
+# Blocs dynamiques
+"Enter parameter type": "Entrez le type de paramètre"
+"Enter action type": "Entrez le type d'action"
+"Enter distance value set type": "Entrez le type de jeu de valeurs de distance"
+"Enter angle value set type": "Entrez le type de jeu de valeurs d'angle"
+"Show the parameter in the Properties palette?": "Afficher le paramètre dans la palette Propriétés ?"
+"Visibility of the objects in the new state": "Visibilité des objets dans le nouvel état"
+"Enter number of grips [0/1]": "Entrez le nombre de poignées [0/1]"
+
 # Accrochage ponctuel (De, Milieu entre 2 points, Repérage)
 "Base point:": "Point de base :"
 "<Offset>:": "<Décalage> :"
