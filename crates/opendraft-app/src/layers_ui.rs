@@ -358,7 +358,7 @@ fn row(
     }
 
     // Linetype and lineweight: flat text cells that open a list.
-    if !layout.wide {
+    if !layout.show_linetype {
         return result;
     }
     let cell = ui.interact(cols.linetype, id.with("linetype"), Sense::click());
@@ -370,6 +370,9 @@ fn row(
     let menu_id = id.with("linetype_menu");
     if let Some(linetype) = linetype_ui::pick(ui, theme, menu_id, &cell, document, layer.linetype) {
         result.edit = Some(LayerEdit::SetLinetype(targets.clone(), linetype));
+    }
+    if !layout.show_weight {
+        return result;
     }
 
     let weights: Vec<String> = Lineweight::STANDARD

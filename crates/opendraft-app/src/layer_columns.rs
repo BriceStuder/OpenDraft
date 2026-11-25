@@ -17,7 +17,7 @@ const WEIGHT_W: f32 = 78.0;
 /// The narrowest a resized column can be.
 pub const MIN_W: f32 = 40.0;
 /// Columns every row has (and the VP Freeze one while a viewport is the target);
-/// linetype and weight only appear when there is room.
+/// linetype and weight only appear when there is room, weight leaving first.
 pub fn core_width(vp: bool) -> f32 {
     STATUS_W + SWITCH_W * if vp { 5.0 } else { 4.0 } + COLOR_W
 }
@@ -41,12 +41,13 @@ impl Default for Widths {
     }
 }
 
-/// How wide a row and its resizable columns are, and whether the extra
+/// How wide a row and its resizable columns are, and which of the extra
 /// columns fit.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Layout {
     pub width: f32,
-    pub wide: bool,
+    pub show_linetype: bool,
+    pub show_weight: bool,
     /// The VP Freeze column is shown.
     pub vp: bool,
     pub name: f32,
@@ -55,20 +56,27 @@ pub struct Layout {
 }
 
 impl Layout {
-    /// The row for a panel `available` wide. Linetype and lineweight show
-    /// when the name (at its width, or its minimum when it fills) leaves room
-    /// for them; the row is never narrower than the panel, and wider ones
-    /// scroll.
+    /// The row for a panel `available` wide. Linetype, then lineweight,
+    /// show when the name (at its width, or its minimum when it fills) leaves
+    /// room for them, so the lineweight is the first to go; the row is never
+    /// narrower than the panel, and wider ones scroll.
     pub fn fit(available: f32, vp: bool, widths: Widths) -> Self {
         let core = core_width(vp);
         let (linetype, weight) = (widths.linetype.max(MIN_W), widths.weight.max(MIN_W));
         let set_name = widths.name.map(|w| w.max(MIN_W));
-        let wide = available >= set_name.unwrap_or(NAME_MIN) + core + linetype + weight;
-        let extra = if wide { linetype + weight } else { 0.0 };
+        let room = available - set_name.unwrap_or(NAME_MIN) - core;
+        let show_linetype = room >= linetype;
+        let show_weight = room >= linetype + weight;
+        let extra = match (show_linetype, show_weight) {
+            (true, true) => linetype + weight,
+            (true, false) => linetype,
+            _ => 0.0,
+        };
         let name = set_name.unwrap_or((available - core - extra).max(NAME_MIN));
         Self {
             width: available.max(name + core + extra),
-            wide,
+            show_linetype,
+            show_weight,
             vp,
             name,
             linetype,
@@ -109,15 +117,23 @@ impl Columns {
             lock: next(SWITCH_W),
             plot: next(SWITCH_W),
             color: next(COLOR_W),
-            linetype: next(if layout.wide { layout.linetype } else { 0.0 }),
-            weight: next(if layout.wide { layout.weight } else { 0.0 }),
+            linetype: next(if layout.show_linetype {
+                layout.linetype
+            } else {
+                0.0
+            }),
+            weight: next(if layout.show_weight {
+                layout.weight
+            } else {
+                0.0
+            }),
         }
     }
 }
 
 /// Paints the header row and returns where it is.
 pub fn header(ui: &mut Ui, theme: &Theme, shape: Layout) -> Rect {
-    let (width, wide) = (shape.width, shape.wide);
+    let width = shape.width;
     let c = &theme.colors;
     let (rect, _) = ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), Sense::hover());
     ui.painter().rect_filled(rect, 0.0, c.panel_raised);
@@ -157,8 +173,10 @@ pub fn header(ui: &mut Ui, theme: &Theme, shape: Layout) -> Rect {
     glyph(cols.lock, icons::LAYER_LIST_UNLOCKED);
     glyph(cols.plot, icons::FILE_PLOT);
     text(cols.color, &t!("Color"));
-    if wide {
+    if shape.show_linetype {
         text(cols.linetype, &t!("Linetype"));
+    }
+    if shape.show_weight {
         text(cols.weight, &t!("Weight"));
     }
     ui.painter().hline(
@@ -200,7 +218,7 @@ mod tests {
     fn columns_tile_the_row_without_gaps() {
         let width = 480.0;
         let layout = Layout::fit(width, true, Widths::default());
-        assert!(layout.wide);
+        assert!(layout.show_linetype && layout.show_weight);
         let cols = Columns::new(egui::pos2(10.0, 0.0), layout);
         assert_eq!(cols.status.left(), 10.0);
         assert_eq!(cols.status.right(), cols.name.left());
@@ -213,7 +231,7 @@ mod tests {
     #[test]
     fn narrow_rows_drop_the_extra_columns() {
         let layout = Layout::fit(260.0, false, Widths::default());
-        assert!(!layout.wide);
+        assert!(!layout.show_linetype && !layout.show_weight);
         let cols = Columns::new(egui::pos2(0.0, 0.0), layout);
         assert_eq!(cols.vp_freeze.width(), 0.0, "hidden without a viewport");
         assert_eq!(cols.linetype.width(), 0.0);
@@ -229,7 +247,7 @@ mod tests {
             weight: 50.0,
         };
         let roomy = Layout::fit(600.0, false, widths);
-        assert!(roomy.wide);
+        assert!(roomy.show_linetype && roomy.show_weight);
         assert_eq!((roomy.name, roomy.width), (120.0, 600.0));
         let cols = Columns::new(egui::pos2(0.0, 0.0), roomy);
         assert_eq!(cols.name.width(), 120.0);
@@ -241,8 +259,24 @@ mod tests {
             ..widths
         };
         let narrow = Layout::fit(300.0, false, wide_name);
-        assert!(!narrow.wide);
+        assert!(!narrow.show_linetype && !narrow.show_weight);
         assert_eq!(narrow.width, 500.0 + core_width(false));
+    }
+
+    #[test]
+    fn the_lineweight_leaves_before_the_linetype() {
+        let widths = Widths {
+            name: Some(100.0),
+            linetype: 80.0,
+            weight: 70.0,
+        };
+        let core = core_width(false);
+        let middle = Layout::fit(100.0 + core + 80.0 + 30.0, false, widths);
+        assert!(middle.show_linetype && !middle.show_weight);
+        let cols = Columns::new(egui::pos2(0.0, 0.0), middle);
+        assert_eq!((cols.linetype.width(), cols.weight.width()), (80.0, 0.0));
+        let full = Layout::fit(100.0 + core + 150.0, false, widths);
+        assert!(full.show_linetype && full.show_weight);
     }
 
     #[test]
