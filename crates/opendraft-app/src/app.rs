@@ -210,7 +210,10 @@ impl OpenDraftApp {
             }
             Err(ExecuteError::Disabled(_)) => {}
             Err(ExecuteError::Unknown(id)) => {
-                self.state.message = format!("Not implemented yet: {id}");
+                self.state.set_message(opendraft_commands::Wording::new(
+                    opendraft_ui::key!("Not implemented yet: %{id}"),
+                    &[("id", &id)],
+                ));
             }
         }
     }
@@ -311,7 +314,8 @@ impl OpenDraftApp {
         } else if closing {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             if self.state.exit_ok && self.state.io_busy() {
-                self.state.message = "Closing when the files are written...".into();
+                self.state.message =
+                    opendraft_ui::key!("Closing when the files are written...").into();
             }
         }
     }
