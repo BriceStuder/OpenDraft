@@ -83,8 +83,10 @@ pub fn handles(
 ) -> bool {
     let cols = Columns::new(header.min, layout);
     let mut edges = vec![(Column::Name, cols.name.right(), layout.name)];
-    if layout.wide {
+    if layout.show_linetype {
         edges.push((Column::Linetype, cols.linetype.right(), layout.linetype));
+    }
+    if layout.show_weight {
         edges.push((Column::Weight, cols.weight.right(), layout.weight));
     }
     let mut changed = false;
