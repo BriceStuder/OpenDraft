@@ -5,6 +5,7 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options};
 use opendraft_core::block::{DynamicBlock, DynamicValueSet};
+use opendraft_ui::key;
 
 pub(super) const EPS: f64 = 1e-9;
 
@@ -72,9 +73,10 @@ pub(super) fn ask_name(
     }
 }
 
+/// Asks `message` (a `key!` of the caller) with Yes and No as its options.
 pub(super) fn ask_yes_no(ed: &Editor, message: &str, default_yes: bool) -> Result<bool, Cancelled> {
     let default = if default_yes { "Yes" } else { "No" };
-    let options = Options::<String>::new(format!("{message} [Yes/No] <{default}>"))
+    let options = Options::<String>::new(message)
         .keyword("Yes", "Y")
         .keyword("No", "N")
         .default(default.to_owned());
@@ -108,13 +110,15 @@ pub(super) fn ask_value_set(
     default: f64,
 ) -> Result<DynamicValueSet, Cancelled> {
     let word = quantity.word();
-    let options = Options::<String>::new(format!(
-        "Enter {word} value set type [None/List/Increment] <None>"
-    ))
-    .keyword("None", "N")
-    .keyword("List", "L")
-    .keyword("Increment", "I")
-    .default("None".to_owned());
+    let question = match quantity {
+        Quantity::Distance => key!("Enter distance value set type"),
+        Quantity::Angle => key!("Enter angle value set type"),
+    };
+    let options = Options::<String>::new(question)
+        .keyword("None", "N")
+        .keyword("List", "L")
+        .keyword("Increment", "I")
+        .default("None".to_owned());
     match ed.get_keyword(options)?.as_str() {
         "List" => loop {
             let text = ed.get_string(Options::<String>::new(format!(
@@ -156,7 +160,7 @@ pub(super) fn ask_value_set(
 pub(super) fn ask_grips(ed: &Editor) -> Result<u8, Cancelled> {
     loop {
         let n = ed
-            .get_number(NumberOptions::new("Enter number of grips [0/1] <1>").default(1.0))?
+            .get_number(NumberOptions::new(key!("Enter number of grips [0/1]")).default(1.0))?
             .round();
         if n == 0.0 || n == 1.0 {
             return Ok(n as u8);
@@ -189,7 +193,11 @@ pub(super) fn ask_naming(
     )?;
     let label = ask_line(ed, &format!("Enter {label_word} label"), &name)?;
     let description = ask_line(ed, "Enter parameter description", "")?;
-    let show = ask_yes_no(ed, "Show the parameter in the Properties palette?", true)?;
+    let show = ask_yes_no(
+        ed,
+        key!("Show the parameter in the Properties palette?"),
+        true,
+    )?;
     Ok(Naming {
         name,
         label,
