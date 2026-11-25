@@ -4,6 +4,8 @@ use eframe::egui;
 use opendraft_ui::widgets;
 use opendraft_ui::Theme;
 
+mod content_manager_window;
+
 use super::OpenDraftApp;
 use crate::settings::Settings;
 use crate::settings_ui::{self, FolderRequest};
@@ -37,6 +39,7 @@ impl OpenDraftApp {
         self.mleader_windows(ctx);
         self.page_setup_window(ctx);
         self.plot_dialog_window(ctx);
+        self.content_manager_window(ctx);
     }
 
     /// Settings dialog, opened by `manage.settings`. Edits a draft copy;

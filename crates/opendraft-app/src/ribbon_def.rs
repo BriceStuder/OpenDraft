@@ -142,6 +142,11 @@ fn insert() -> Tab {
                     Column::Large(Item::new("block.create", "Create", icons::BLOCK_CREATE)),
                     Column::Large(Item::new("block.edit", "Edit", icons::BLOCK_EDIT)),
                     Column::Large(Item::new("block.purge", "Purge", icons::BLOCK_PURGE)),
+                    Column::Large(Item::new(
+                        "block.content_manager",
+                        "Content Manager",
+                        icons::BLOCK_LIBRARY,
+                    )),
                     Column::Large(Item::new("block.reset", "Reset", icons::BLOCK_RESET)),
                 ],
                 ..Default::default()

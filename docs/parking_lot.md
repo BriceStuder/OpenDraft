@@ -155,9 +155,11 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 ## Content Manager (`docs/openhub-specification.md`, local-only work on `feat/content-manager`)
 
-Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), the local library's store, capture, organise, search and Trash (`opendraft-content`), `Document::bring_block` and `insert_from` in core (use the drawing's block, add as new, or replace its definition), `Location::Library`, and the command-line `LIBADD` and `LIBINSERT`. Not built:
+Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), the local library's store, capture, organise, search and Trash (`opendraft-content`), `Document::bring_block` and `insert_from` in core (use the drawing's block, add as new, or replace its definition), `Location::Library`, the command-line `LIBADD` and `LIBINSERT`, and the Content Manager window (`CONTENTMANAGER`, `CONTENT`, the Insert tab's Block panel): My blocks with folders, This drawing, Favourites, Recent and Trash, thumbnails or a list, search, details with an editable description and tags, drag a block onto a folder, rename, favourite, delete and restore. Not built:
 
-- The Content Manager window, its Insert-tab button, the ribbon items and icons for `LIBADD` and `LIBINSERT`, light-palette thumbnails, import from `.odraft`, DXF and DWG, the drawing-open notice, and `BlockDef::origin`.
+- In the window: import from `.odraft`, DXF and DWG, the Author > Package tree and the Flat list (they need packages), a per-block choice for taken names, "Arrange by", the filter menu (unit, dynamic, attributes: `Library::search` has them, the window does not), "Repeat placement", multi-select, French for its text, and thumbnails at a size chosen by the view. Ribbon items for `LIBADD` and `LIBINSERT` (only the window has one). The drawing-open notice, and `BlockDef::origin`.
+- The window is not in `modal_open`, so keys typed while it has focus can reach the drawing's command line; whether that is right for a modeless window has to be tried by hand.
+- `opendraft_canvas::preview::Palette::Light` draws thumbnails for a light background, but no palette is light yet, so the window uses the dark one.
 - `LIBADD` asks no description, tags or folder (the window will), and `LIBINSERT` settles every taken name with one answer; a choice for each block needs the window's dialog.
 - The `LIBINSERT` ghost is drawn with the library's layers, so colours that follow a layer can differ from what is placed.
 - Both commands are denied to automation (`block.library_add`, `block.library_insert`) until the model's access to the library is designed (specification 13.4).

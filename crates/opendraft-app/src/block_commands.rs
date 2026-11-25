@@ -9,6 +9,7 @@ use crate::attribute_edit::edit_attributes;
 use crate::attribute_sync_cmd::sync_attributes;
 use crate::block_cmd::define_block;
 use crate::block_dialog_cmd::define_block_dialog;
+use crate::content_manager::Place;
 use crate::dynamic_block_cmd::{baction, bactionset, bparameter, resetblock};
 use crate::dynamic_lookup_cmd::blookuptable;
 use crate::dynamic_visibility_cmd::{bvhide, bvshow, bvstate};
@@ -34,6 +35,13 @@ pub fn commands() -> Vec<Command<AppState>> {
         editor!("block.create", "Create Block", "BLOCK", define_block_dialog),
         editor!("block.create_line", "-BLOCK", "-BLOCK", define_block),
         editor!("block.insert", "Insert Block", "INSERT", insert_block),
+        Command::new(
+            "block.content_manager",
+            "Content Manager",
+            |s: &mut AppState| {
+                s.command_dialogs.content.open_on(Place::default());
+            },
+        ),
         editor!("block.library_add", "Add to Library", "LIBADD", library_add),
         editor!(
             "block.library_insert",

@@ -115,8 +115,17 @@ pub fn library_insert(ed: &mut Editor) -> Result<(), Cancelled> {
         ed.say("The library has no blocks. Add one with LIBADD first.");
         return Ok(());
     }
-    let Some(chosen) = choose(ed, &blocks, newest.as_deref())? else {
-        return Ok(());
+    // The Content Manager names the block when it starts the command.
+    let picked = defaults
+        .library
+        .take_pick()
+        .and_then(|id| blocks.iter().find(|b| b.id == id).cloned());
+    let chosen = match picked {
+        Some(block) => block,
+        None => match choose(ed, &blocks, newest.as_deref())? {
+            Some(block) => block,
+            None => return Ok(()),
+        },
     };
     let id = chosen.id;
     let found = defaults.library.with(|lib| {

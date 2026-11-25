@@ -13,6 +13,11 @@ struct Inner {
     library: Option<Library>,
     /// What opening said that the user has not been told yet.
     notices: Vec<String>,
+    /// Counts the times the library was let go, so what is kept about one
+    /// library is not taken for another's.
+    generation: u32,
+    /// A block the window has chosen for the next LIBINSERT.
+    pick: Option<opendraft_content::blocks_payload::BlockUuid>,
 }
 
 #[derive(Default)]
@@ -28,7 +33,28 @@ impl LibraryHandle {
         if inner.folder != folder {
             inner.library = None;
             inner.folder = folder;
+            inner.generation += 1;
         }
+    }
+
+    /// Tells a picture of the library's blocks whether it is out of date.
+    pub fn stamp(&self) -> u64 {
+        let inner = self.lock();
+        let generation = u64::from(inner.generation);
+        let revision = inner
+            .library
+            .as_ref()
+            .map_or(0, |l| u64::from(l.revision()));
+        generation << 32 | revision
+    }
+
+    /// The next LIBINSERT places this block without asking for a name.
+    pub fn queue_pick(&self, id: opendraft_content::blocks_payload::BlockUuid) {
+        self.lock().pick = Some(id);
+    }
+
+    pub fn take_pick(&self) -> Option<opendraft_content::blocks_payload::BlockUuid> {
+        self.lock().pick.take()
     }
 
     /// Runs `f` on the library, opening it first if need be. An error means it

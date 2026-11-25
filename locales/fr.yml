@@ -1177,3 +1177,4 @@
 "Enter library block name": "Entrez le nom du bloc de la bibliothèque"
 "The library already has a block called \"%{name}\". Keep both or replace it?": "La bibliothèque a déjà un bloc nommé \"%{name}\". Garder les deux ou le remplacer ?"
 "This drawing already has: %{names}. Add as new, use the drawing's, or replace them?": "Ce dessin a déjà : %{names}. Ajouter comme nouveau, utiliser ceux du dessin ou les remplacer ?"
+"Content Manager": "Gestionnaire de contenu"

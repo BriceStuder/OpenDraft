@@ -62,6 +62,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](block-eattedit.svg) | `block-eattedit.svg` | list | Multiple |
 | ![](block-edit.svg) | `block-edit.svg` | pencil | Edit |
 | ![](block-insert.svg) | `block-insert.svg` | box | Insert |
+| ![](block-library.svg) | `block-library.svg` | library | Content Manager |
 | ![](block-parameter.svg) | `block-parameter.svg` | ruler | Parameter |
 | ![](block-purge.svg) | `block-purge.svg` | eraser | Purge |
 | ![](block-reset.svg) | `block-reset.svg` | rotate-ccw | Reset |
@@ -117,9 +118,9 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](draw-gradient.svg) | `draw-gradient.svg` | blend | Gradient |
 | ![](draw-hatch.svg) | `draw-hatch.svg` | square-slash | Hatch (A square with a diagonal: the nearest Lucide has to hatching.) |
 | ![](draw-line.svg) | `draw-line.svg` | minus | Line |
-| ![](draw-measure.svg) | `draw-measure.svg` | between-horizontal-start | Measure (Lucide's marks between two ends.) |
 | ![](draw-oblong-2p.svg) | `draw-oblong-2p.svg` | square | Oblong, 2-Point |
 | ![](draw-oblong-center.svg) | `draw-oblong-center.svg` | square | Oblong, Center |
+| ![](draw-measure.svg) | `draw-measure.svg` | between-horizontal-start | Measure (Lucide's marks between two ends.) |
 | ![](draw-point.svg) | `draw-point.svg` | dot | Multiple Point, Point Style..., Single Point (Lucide's dot.) |
 | ![](draw-polygon.svg) | `draw-polygon.svg` | hexagon | Polygon |
 | ![](draw-polyline.svg) | `draw-polyline.svg` | spline | Polyline |

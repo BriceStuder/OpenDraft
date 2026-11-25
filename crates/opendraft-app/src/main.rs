@@ -49,6 +49,7 @@ mod colour_ui;
 mod command_record;
 mod commands;
 mod content_library;
+mod content_manager;
 mod coordinates;
 mod corner_memory;
 mod corners;

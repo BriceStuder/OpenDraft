@@ -19,7 +19,7 @@ fn submit_all(state: &mut AppState, answers: &[&str]) {
 }
 
 /// An app whose library is in `folder`.
-fn app_with_library(folder: &std::path::Path) -> AppState {
+pub(crate) fn app_with_library(folder: &std::path::Path) -> AppState {
     let state = AppState::new();
     state.defaults.library.set_folder(Some(folder.to_owned()));
     state
@@ -27,7 +27,7 @@ fn app_with_library(folder: &std::path::Path) -> AppState {
 
 /// A drawing with block "Box": a rectangle of the given width, base at its
 /// lower left corner.
-fn drawing_with_box(folder: &std::path::Path, width: f64) -> AppState {
+pub(crate) fn drawing_with_box(folder: &std::path::Path, width: f64) -> AppState {
     let mut state = app_with_library(folder);
     state.add_entity(Entity::Rectangle {
         min: p(10.0, 10.0),
@@ -160,7 +160,7 @@ fn no_library_folder_says_so_and_does_not_fail() {
 }
 
 /// Adds "Box" (width `width`) to the library in `dir`.
-fn stocked(dir: &std::path::Path, width: f64) {
+pub(crate) fn stocked(dir: &std::path::Path, width: f64) {
     let mut state = drawing_with_box(dir, width);
     state.start_command("LIBADD", library_add);
     state.settle_command();

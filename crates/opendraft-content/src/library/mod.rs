@@ -76,6 +76,12 @@ impl Library {
         })
     }
 
+    /// Rises with every change to the blocks themselves (not to favourites,
+    /// recents or folders), so a picture of a block can be kept until it does.
+    pub fn revision(&self) -> u32 {
+        self.revision
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }

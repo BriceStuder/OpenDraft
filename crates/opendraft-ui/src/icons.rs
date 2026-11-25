@@ -78,6 +78,7 @@ icons! {
     BLOCK_EATTEDIT = '\u{e10b}';
     BLOCK_EDIT = '\u{e1f8}';
     BLOCK_INSERT = '\u{e065}';
+    BLOCK_LIBRARY = '\u{e105}';
     BLOCK_PARAMETER = '\u{e14e}';
     BLOCK_PURGE = '\u{e28e}';
     BLOCK_RESET = '\u{e14b}';
