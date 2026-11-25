@@ -46,9 +46,6 @@ pub struct Settings {
     /// The colour of light paper (white unless chosen).
     pub layout_paper_colour: crate::paper_colour::PaperColour,
     pub show_grid: bool,
-    /// The `[-][Top][2D Wireframe]` label in the drawing's top-left corner
-    /// (`VPCONTROL`).
-    pub show_viewport_controls: bool,
     /// The navigation gizmo in the top right corner of the drawing.
     pub show_nav_gizmo: bool,
     /// The `[-][Top][2D Wireframe]` label in the drawing's top-left corner
@@ -121,7 +118,6 @@ impl Default for Settings {
             layout_paper: LayoutPaper::default(),
             layout_paper_colour: Default::default(),
             show_grid: true,
-            show_viewport_controls: true,
             show_nav_gizmo: true,
             show_viewport_controls: true,
             grid_spacing: 10.0,
@@ -367,7 +363,6 @@ mod tests {
             layout_paper: LayoutPaper::Dark,
             layout_paper_colour: crate::paper_colour::PaperColour::Cream,
             show_grid: false,
-            show_viewport_controls: false,
             show_nav_gizmo: false,
             show_viewport_controls: false,
             grid_spacing: 2.5,
