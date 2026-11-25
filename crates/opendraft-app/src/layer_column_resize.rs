@@ -82,13 +82,11 @@ pub fn handles(
     fit: impl Fn(Column) -> f32,
 ) -> bool {
     let cols = Columns::new(header.min, layout);
-    let mut edges = vec![(Column::Name, cols.name.right(), layout.name)];
-    if layout.show_linetype {
-        edges.push((Column::Linetype, cols.linetype.right(), layout.linetype));
-    }
-    if layout.show_weight {
-        edges.push((Column::Weight, cols.weight.right(), layout.weight));
-    }
+    let edges = [
+        (Column::Name, cols.name.right(), layout.name),
+        (Column::Linetype, cols.linetype.right(), layout.linetype),
+        (Column::Weight, cols.weight.right(), layout.weight),
+    ];
     let mut changed = false;
     for (column, x, width) in edges {
         let grip = Rect::from_x_y_ranges(x - 3.0..=x + 3.0, header.y_range());
