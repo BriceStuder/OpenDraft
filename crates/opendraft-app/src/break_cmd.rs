@@ -22,7 +22,7 @@ pub fn break_object(ed: &mut Editor) -> Result<(), Cancelled> {
     };
     let target = object.entity.clone();
     if matches!(target, opendraft_core::Entity::Spline(_)) {
-        ed.say("BREAK does not support splines yet.");
+        ed.say(key!("BREAK does not support splines yet."));
         return Ok(());
     }
     let mut first = at;
@@ -39,11 +39,11 @@ pub fn break_object(ed: &mut Editor) -> Result<(), Cancelled> {
         }
     };
     let Some(left) = target.break_between(first, second) else {
-        ed.say("Object cannot be broken.");
+        ed.say(key!("Object cannot be broken."));
         return Ok(());
     };
     if left.len() == 1 && left[0] == target {
-        ed.say("Nothing to break there.");
+        ed.say(key!("Nothing to break there."));
         return Ok(());
     }
     record(ed, "Break", id, object.attrs.clone(), left)
@@ -65,19 +65,19 @@ pub fn break_at_point(ed: &mut Editor) -> Result<(), Cancelled> {
     };
     let target = object.entity.clone();
     if matches!(target, opendraft_core::Entity::Spline(_)) {
-        ed.say("BREAKATPOINT does not support splines yet.");
+        ed.say(key!("BREAKATPOINT does not support splines yet."));
         return Ok(());
     }
     let at = ed.get_point(PointOptions::new(key!("Specify break point")))?;
     let Some(pieces) = target.break_between(at, at) else {
-        ed.say("Object cannot be broken.");
+        ed.say(key!("Object cannot be broken."));
         return Ok(());
     };
     if pieces.len() < 2 {
         ed.say(if pieces.first() == Some(&target) && is_closed(&target) {
-            "A closed object cannot be broken at a single point."
+            key!("A closed object cannot be broken at a single point.")
         } else {
-            "Nothing to break there: the point is at an end of the object."
+            key!("Nothing to break there: the point is at an end of the object.")
         });
         return Ok(());
     }

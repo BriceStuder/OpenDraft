@@ -13,7 +13,7 @@ use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::edges_sweep::{ask_fence, ask_window, change_swept, edges_for, put_back};
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// What is left of `target` when the piece nearest `at` is trimmed away
 /// where `cutters` cross it. An empty list means the whole object goes (it
@@ -25,7 +25,7 @@ pub fn trim_plan(
     at: Point,
 ) -> Result<Vec<Entity>, &'static str> {
     if matches!(target, Entity::Spline(_)) {
-        return Err("TRIM does not support splines yet.");
+        return Err(key!("TRIM does not support splines yet."));
     }
     let crossings: Vec<Point> = cutters
         .iter()
@@ -37,7 +37,7 @@ pub fn trim_plan(
             .iter()
             .any(|c| matches!(c, Entity::Spline(_)) && c.bounds().intersects(&near))
         {
-            return Err("Splines cannot be cutting edges yet.");
+            return Err(key!("Splines cannot be cutting edges yet."));
         }
         return Err(NO_EDGE);
     }
@@ -45,9 +45,9 @@ pub fn trim_plan(
     // One piece means the cuts did not divide it (a circle cut once, a
     // closed shape cut once, a cut at an end): there is nothing to remove.
     if pieces.len() < 2 {
-        return Err("Object cannot be trimmed there.");
+        return Err(key!("Object cannot be trimmed there."));
     }
-    let nearest = nearest_piece(&pieces, at).ok_or("Object cannot be trimmed there.")?;
+    let nearest = nearest_piece(&pieces, at).ok_or(key!("Object cannot be trimmed there."))?;
     // Cut again only at the crossings that bound the clicked piece, so the
     // rest stays whole: a line trimmed at one end is shortened, not broken
     // at every other crossing as well (and can be trimmed there next).
@@ -60,9 +60,9 @@ pub fn trim_plan(
     // If rounding left the clicked piece's ends out of `bounds`, the object
     // comes back whole and trimming it would erase it.
     if pieces.len() < 2 {
-        return Err("Object cannot be trimmed there.");
+        return Err(key!("Object cannot be trimmed there."));
     }
-    let nearest = nearest_piece(&pieces, at).ok_or("Object cannot be trimmed there.")?;
+    let nearest = nearest_piece(&pieces, at).ok_or(key!("Object cannot be trimmed there."))?;
     Ok(pieces
         .into_iter()
         .enumerate()
@@ -72,7 +72,7 @@ pub fn trim_plan(
 }
 
 /// Why `trim_plan` cannot trim an object that no edge crosses.
-const NO_EDGE: &str = "Object does not intersect an edge.";
+const NO_EDGE: &str = key!("Object does not intersect an edge.");
 
 /// What TRIM (or EXTEND) leaves of `target`. With `erase` (Quick mode with
 /// every object as an edge), trimming an object that no edge divides erases
@@ -125,7 +125,7 @@ pub fn extend_plan(
     at: Point,
 ) -> Result<Vec<Entity>, &'static str> {
     if matches!(target, Entity::Spline(_)) {
-        return Err("EXTEND does not support splines yet.");
+        return Err(key!("EXTEND does not support splines yet."));
     }
     let ends = match target {
         Entity::Line { start, end } => Some((*start, *end)),
@@ -147,7 +147,7 @@ pub fn extend_plan(
         _ => None,
     };
     let Some((first, last)) = ends else {
-        return Err("Object cannot be extended.");
+        return Err(key!("Object cannot be extended."));
     };
     let gap = |p: Point| (p.x - at.x).hypot(p.y - at.y);
     let end = if gap(first) <= gap(last) {
@@ -160,9 +160,9 @@ pub fn extend_plan(
         .extended_to(end, boundaries)
         .map(|longer| vec![longer])
         .ok_or(if splines {
-            "No boundary in the way (splines cannot be boundary edges yet)."
+            key!("No boundary in the way (splines cannot be boundary edges yet).")
         } else {
-            "No boundary in the way."
+            key!("No boundary in the way.")
         })
 }
 
@@ -295,13 +295,11 @@ fn choose_edges(
         }
     }
     if chosen.is_empty() {
-        ed.say("Using every object as an edge.");
+        ed.say(key!("Using every object as an edge."));
         return Ok(None);
     }
-    ed.say(format!(
-        "Using the {} selected as edges.",
-        plural(chosen.len(), "object")
-    ));
+    let said = Wording::new(key!("Using the %{objects} selected as edges."), &[]);
+    ed.say(said.part("objects", crate::text::objects(chosen.len())));
     Ok(Some(chosen))
 }
 

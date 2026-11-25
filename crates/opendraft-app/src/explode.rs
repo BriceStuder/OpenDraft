@@ -6,7 +6,7 @@ use opendraft_commands::{Cancelled, Editor};
 use opendraft_core::{Attributes, Document, Entity, EntityId, Object};
 use opendraft_ui::key;
 
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// EXPLODE: select the objects (or use those already selected). Each
 /// rectangle or polyline is replaced by its lines and arcs, which keep its
@@ -30,9 +30,9 @@ pub fn explode_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         parts.extend(pieces);
     }
     if gone.is_empty() {
-        ed.say(
-            "Nothing to explode: lines, circles, arcs, ellipses and splines are already simple.",
-        );
+        ed.say(key!(
+            "Nothing to explode: lines, circles, arcs, ellipses and splines are already simple."
+        ));
         return Ok(());
     }
     let (from, to) = (gone.len(), parts.len());
@@ -48,11 +48,9 @@ pub fn explode_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     })?;
     // As in AutoCAD, the pieces end up selected.
     ed.select(made);
-    ed.say(format!(
-        "Exploded {} into {}.",
-        plural(from, "object"),
-        plural(to, "object")
-    ));
+    let said = Wording::new(key!("Exploded %{objects} into %{into}."), &[]);
+    let said = said.part("objects", crate::text::objects(from));
+    ed.say(said.part("into", crate::text::objects(to)));
     Ok(())
 }
 

@@ -16,6 +16,7 @@ use opendraft_ui::key;
 use crate::defaults::EditorDefaults;
 use crate::draw::{add, distance, MIN_SIZE};
 use crate::spline_memory::{Method, DEGREE_RANGE};
+use opendraft_commands::Wording;
 
 /// Most points one spline may be given.
 const MAX_POINTS: usize = 10_000;
@@ -37,14 +38,17 @@ pub fn draw_spline(ed: &mut Editor) -> Result<(), Cancelled> {
         let options = PointOptions::new(key!("Specify first point")).keyword("Method", "M");
         let options = match m.method {
             Method::Fit => {
-                ed.say(format!(
-                    "Current settings: Method=Fit   Knots={}",
-                    knots_label(m.knots)
+                ed.say(Wording::new(
+                    key!("Current settings: Method=Fit   Knots=%{knots}"),
+                    &[("knots", knots_label(m.knots))],
                 ));
                 options.keyword("Knots", "K")
             }
             Method::Cv => {
-                ed.say(format!("Current settings: Method=CV   Degree={degree}"));
+                ed.say(Wording::new(
+                    key!("Current settings: Method=CV   Degree=%{degree}"),
+                    &[("degree", &degree.to_string())],
+                ));
                 options.keyword("Degree", "D")
             }
         };
@@ -53,7 +57,9 @@ pub fn draw_spline(ed: &mut Editor) -> Result<(), Cancelled> {
             Answer::Keyword(k) if k == "Method" => ask_method(ed)?,
             Answer::Keyword(k) if k == "Knots" => ask_knots(ed)?,
             Answer::Keyword(k) if k == "Degree" => degree = ask_degree(ed, degree)?,
-            Answer::Keyword(_) => ed.say("Converting a polyline to a spline is not built yet."),
+            Answer::Keyword(_) => {
+                ed.say(key!("Converting a polyline to a spline is not built yet."))
+            }
             Answer::Enter => return Ok(()),
         }
     };
@@ -116,7 +122,10 @@ fn ask_degree(ed: &Editor, current: u8) -> Result<u8, Cancelled> {
             }
             return Ok(degree);
         }
-        ed.say(format!("Requires an integer between 1 and {most}."));
+        ed.say(Wording::new(
+            key!("Requires an integer between 1 and %{most}."),
+            &[("most", &most.to_string())],
+        ));
     }
 }
 
@@ -127,7 +136,9 @@ fn ask_tolerance(ed: &Editor) -> Result<(), Cancelled> {
         if ed.get_distance(options)? == 0.0 {
             return Ok(());
         }
-        ed.say("Positive spline fit tolerance is not implemented; enter 0.");
+        ed.say(key!(
+            "Positive spline fit tolerance is not implemented; enter 0."
+        ));
     }
 }
 
@@ -136,7 +147,10 @@ fn ask_tolerance(ed: &Editor) -> Result<(), Cancelled> {
 fn push(ed: &Editor, points: &mut Vec<Point>, at: Point) {
     let last = points.last().copied().unwrap_or(at);
     if points.len() >= MAX_POINTS {
-        ed.say(format!("A spline takes at most {MAX_POINTS} points."));
+        ed.say(Wording::new(
+            key!("A spline takes at most %{most} points."),
+            &[("most", &MAX_POINTS.to_string())],
+        ));
     } else if points.is_empty() || distance(last, at) > MIN_SIZE {
         points.push(at);
     }
@@ -207,8 +221,8 @@ fn by_fit_points(ed: &Editor, first: Point, knots: KnotParameterization) -> Resu
                 points.pop();
             }
             Answer::Keyword(k) if k == "toLerance" => ask_tolerance(ed)?,
-            Answer::Keyword(k) if k == "Close" => ed.say("Closed splines are not built yet."),
-            Answer::Keyword(_) => ed.say("Spline end tangents are not built yet."),
+            Answer::Keyword(k) if k == "Close" => ed.say(key!("Closed splines are not built yet.")),
+            Answer::Keyword(_) => ed.say(key!("Spline end tangents are not built yet.")),
             Answer::Enter => break,
         }
     }
@@ -218,7 +232,10 @@ fn by_fit_points(ed: &Editor, first: Point, knots: KnotParameterization) -> Resu
     match Spline::from_fit_points(points, knots) {
         Ok(s) => add(ed, Entity::Spline(Box::new(s)), "Spline"),
         Err(why) => {
-            ed.say(format!("Cannot fit a spline through those points: {why}."));
+            ed.say(Wording::new(
+                key!("Cannot fit a spline through those points: %{why}."),
+                &[("why", &why.to_string())],
+            ));
             Ok(())
         }
     }
@@ -254,7 +271,7 @@ fn by_control_vertices(ed: &Editor, first: Point, degree: u8) -> Result<(), Canc
             Answer::Keyword(k) if k == "Undo" => {
                 points.pop();
             }
-            Answer::Keyword(_) => ed.say("Closed splines are not built yet."),
+            Answer::Keyword(_) => ed.say(key!("Closed splines are not built yet.")),
             Answer::Enter => break,
         }
     }
@@ -263,9 +280,12 @@ fn by_control_vertices(ed: &Editor, first: Point, degree: u8) -> Result<(), Canc
         return Ok(());
     };
     if spline.degree < degree {
-        ed.say(format!(
-            "Degree lowered to {} to suit {count} control vertices.",
-            spline.degree
+        ed.say(Wording::new(
+            key!("Degree lowered to %{degree} to suit %{count} control vertices."),
+            &[
+                ("degree", &spline.degree.to_string()),
+                ("count", &count.to_string()),
+            ],
         ));
     }
     add(ed, Entity::Spline(Box::new(spline)), "Spline")

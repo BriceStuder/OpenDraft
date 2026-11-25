@@ -38,7 +38,7 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             .keyword("Erase", "E");
         match ed.ask_distance(options)? {
             Answer::Value(d) if d > MIN_DISTANCE => break Gap::Distance(d),
-            Answer::Value(_) => ed.say("Requires a positive value."),
+            Answer::Value(_) => ed.say(key!("Requires a positive value.")),
             Answer::Keyword(k) if k == "Through" => break Gap::Through,
             Answer::Keyword(_) => {
                 let answer = ed.get_keyword(
@@ -63,11 +63,11 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         };
         let target = object.entity.clone();
         if matches!(target, Entity::Ellipse(_)) {
-            ed.say("OFFSET does not support ellipses yet.");
+            ed.say(key!("OFFSET does not support ellipses yet."));
             continue;
         }
         if matches!(target, Entity::Spline(_)) {
-            ed.say("OFFSET does not support splines yet.");
+            ed.say(key!("OFFSET does not support splines yet."));
             continue;
         }
         let shown = target.clone();
@@ -83,7 +83,7 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             Err(Cancelled) => return Ok(()),
         };
         let Some(copy) = copy_for(&target, gap, at) else {
-            ed.say("Cannot offset the object that way.");
+            ed.say(key!("Cannot offset the object that way."));
             continue;
         };
         let attrs = object.attrs.clone();

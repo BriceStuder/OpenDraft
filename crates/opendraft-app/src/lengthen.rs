@@ -2,6 +2,7 @@
 //! amount, a percentage, a total or by dragging. The geometry is
 //! `Entity::lengthened` and its relatives in `opendraft_core`.
 
+use opendraft_commands::Wording;
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked, PointOptions};
 use opendraft_core::units::{format_angle, format_length};
 use opendraft_core::{End, Entity};
@@ -38,9 +39,9 @@ impl Mode {
 /// Why an object cannot be lengthened at all, if it cannot.
 fn refusal(target: &Entity) -> Option<&'static str> {
     match target {
-        Entity::Ellipse(_) => Some("LENGTHEN does not support ellipses yet."),
-        Entity::Spline(_) => Some("LENGTHEN does not support splines yet."),
-        other if other.curve_length().is_none() => Some("Object cannot be lengthened."),
+        Entity::Ellipse(_) => Some(key!("LENGTHEN does not support ellipses yet.")),
+        Entity::Spline(_) => Some(key!("LENGTHEN does not support splines yet.")),
+        other if other.curve_length().is_none() => Some(key!("Object cannot be lengthened.")),
         _ => None,
     }
 }
@@ -83,11 +84,14 @@ fn report(ed: &mut Editor, id: opendraft_core::EntityId) -> Result<(), Cancelled
     match found {
         Some((_, Some(why), ..)) => ed.say(why),
         Some((units, None, Some(length), angle)) => {
-            let mut text = format!("Current length: {}", format_length(&units, length));
-            if let Some(angle) = angle {
-                text += &format!(", included angle: {}", format_angle(&units, angle));
-            }
-            ed.say(text);
+            let length = format_length(&units, length);
+            ed.say(match angle {
+                Some(angle) => Wording::new(
+                    key!("Current length: %{length}, included angle: %{angle}"),
+                    &[("length", &length), ("angle", &format_angle(&units, angle))],
+                ),
+                None => Wording::new(key!("Current length: %{length}"), &[("length", &length)]),
+            });
         }
         _ => {}
     }
@@ -112,7 +116,7 @@ fn ask_mode(ed: &mut Editor, keyword: &str) -> Result<Option<Mode>, Cancelled> {
             match ed.ask_number(options)? {
                 Answer::Value(p) if p > 0.0 => Some(Mode::Percent(p)),
                 Answer::Value(_) => {
-                    ed.say("Requires a positive value.");
+                    ed.say(key!("Requires a positive value."));
                     None
                 }
                 _ => None,
@@ -136,7 +140,7 @@ fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Ca
     Ok(match ed.ask_distance(options)? {
         Answer::Value(v) if ok(v) => Amount::Length(v),
         Answer::Value(_) => {
-            ed.say("Requires a positive value.");
+            ed.say(key!("Requires a positive value."));
             Amount::Back
         }
         Answer::Keyword(_) => {
@@ -148,7 +152,7 @@ fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Ca
             match ed.ask_angle(NumberOptions::new(message).turn())? {
                 Answer::Value(a) if ok(a) => Amount::Angle(a),
                 Answer::Value(_) => {
-                    ed.say("Requires a positive value.");
+                    ed.say(key!("Requires a positive value."));
                     Amount::Back
                 }
                 _ => Amount::Back,
@@ -195,7 +199,7 @@ fn change_objects(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
             fixed => fixed.apply(&target, end),
         };
         let Some(changed) = changed else {
-            ed.say("Cannot lengthen the object that way.");
+            ed.say(key!("Cannot lengthen the object that way."));
             continue;
         };
         ed.transaction("Lengthen", move |tx| {

@@ -11,6 +11,7 @@ use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
 use crate::draw::add;
+use opendraft_commands::Wording;
 
 /// What POLYGON remembers between uses this session: the number of sides
 /// (`POLYSIDES`) and whether the last one was inscribed.
@@ -72,8 +73,12 @@ fn ask_sides(ed: &Editor) -> Result<usize, Cancelled> {
             ed.defaults().polygon.change(|m| m.sides = sides);
             return Ok(sides);
         }
-        ed.say(format!(
-            "Requires an integer between {MIN_SIDES} and {MAX_SIDES}."
+        ed.say(Wording::new(
+            key!("Requires an integer between %{least} and %{most}."),
+            &[
+                ("least", &MIN_SIDES.to_string()),
+                ("most", &MAX_SIDES.to_string()),
+            ],
         ));
     }
 }
@@ -108,7 +113,7 @@ fn about_center(ed: &Editor, center: Point, sides: usize) -> Result<Vec<Point>, 
         };
         match made {
             Some(points) => return Ok(points),
-            None => ed.say("Requires a non-zero value."),
+            None => ed.say(key!("Requires a non-zero value.")),
         }
     }
 }
@@ -122,7 +127,7 @@ fn by_edge(ed: &Editor, sides: usize) -> Result<Vec<Point>, Cancelled> {
         let second = ed.get_point(options)?;
         match on_edge(first, second, sides) {
             Some(points) => return Ok(points),
-            None => ed.say("The two endpoints must differ."),
+            None => ed.say(key!("The two endpoints must differ.")),
         }
     }
 }

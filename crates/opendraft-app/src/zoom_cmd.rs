@@ -75,7 +75,7 @@ fn ask_zoom(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
         if first.x != second.x || first.y != second.y {
             return Ok(Some(ZoomTo::Window(first, second)));
         }
-        ed.say("The window has no size.");
+        ed.say(key!("The window has no size."));
         prompt = first_corner(key!("Specify first corner of window"));
     }
 }
@@ -98,7 +98,7 @@ fn zoom_objects(ed: &Editor) -> Result<Option<ZoomTo>, Cancelled> {
     match found {
         Some(b) => Ok(Some(ZoomTo::Window(b.min, b.max))),
         None => {
-            ed.say("These objects have no extents to zoom to.");
+            ed.say(key!("These objects have no extents to zoom to."));
             Ok(None)
         }
     }
@@ -177,7 +177,7 @@ impl AppState {
 
     /// ZOOM Previous with nothing to go back to.
     pub(crate) fn say_no_previous_view(&mut self) {
-        let line = "No previous view saved.".to_owned();
+        let line = key!("No previous view saved.").to_owned();
         self.message.clone_from(&line);
         self.cmdline.say(line);
     }

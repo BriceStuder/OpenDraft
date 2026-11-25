@@ -83,7 +83,7 @@ pub(crate) fn positive(ed: &Editor, message: &str) -> Result<f64, Cancelled> {
         if value > MIN_SIZE {
             return Ok(value);
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     }
 }
 
@@ -94,7 +94,7 @@ pub(crate) fn size_from_area(ed: &Editor) -> Result<Size, Cancelled> {
         if area > MIN_SIZE {
             break area;
         }
-        ed.say("Requires a positive value.");
+        ed.say(key!("Requires a positive value."));
     };
     let by = ed.get_keyword(
         Options::new(key!("Calculate rectangle dimensions based on"))
@@ -171,7 +171,7 @@ pub fn draw_rectangle(ed: &mut Editor) -> Result<(), Cancelled> {
                 if dx.abs() > MIN_SIZE && dy.abs() > MIN_SIZE {
                     break (dx, dy);
                 }
-                ed.say("Requires a non-zero value.");
+                ed.say(key!("Requires a non-zero value."));
             }
             Answer::Keyword(k) if k == "Area" => size = Some(size_from_area(ed)?),
             Answer::Keyword(k) if k == "Dimensions" => {

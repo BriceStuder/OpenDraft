@@ -8,8 +8,8 @@ use opendraft_core::{Entity, Object, Point};
 use opendraft_ui::key;
 
 use crate::modify::{entities_of, objects_of};
-use crate::text::plural;
 use crate::units_state::angle_message;
+use opendraft_commands::Wording;
 
 /// Scale factors at or below this are refused.
 const MIN_FACTOR: f64 = 1e-9;
@@ -63,7 +63,7 @@ fn reference_factor(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f6
         if length > MIN_FACTOR {
             break length;
         }
-        ed.say("Requires a positive value.");
+        ed.say(key!("Requires a positive value."));
     };
     loop {
         let shown = originals.to_vec();
@@ -90,7 +90,7 @@ fn reference_factor(ed: &Editor, base: Point, originals: &[Entity]) -> Result<f6
         if length > MIN_FACTOR {
             return Ok(length / reference);
         }
-        ed.say("Requires a positive value.");
+        ed.say(key!("Requires a positive value."));
     }
 }
 
@@ -124,7 +124,7 @@ pub fn scale_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             Answer::Value(factor) => factor,
             Answer::Keyword(k) if k == "Copy" => {
                 copy = true;
-                ed.say("Scale a copy of the selected objects.");
+                ed.say(key!("Scale a copy of the selected objects."));
                 continue;
             }
             Answer::Keyword(_) => reference_factor(ed, base, &originals)?,
@@ -133,11 +133,15 @@ pub fn scale_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         if factor > MIN_FACTOR {
             break factor;
         }
-        ed.say("Requires a positive value.");
+        ed.say(key!("Requires a positive value."));
     };
-    let count = plural(objects.len(), "object");
+    let count = crate::text::objects(objects.len());
     apply(ed, "Scale", objects, copy, move |e| e.scaled(base, factor))?;
-    ed.say(format!("Scaled {count} by {factor}"));
+    let said = Wording::new(key!("Scaled %{objects} by %{factor}"), &[]);
+    ed.say(
+        said.part("objects", count)
+            .part("factor", Wording::plain(factor.to_string())),
+    );
     Ok(())
 }
 
@@ -201,16 +205,18 @@ pub fn rotate_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             Answer::Value(angle) => break angle,
             Answer::Keyword(k) if k == "Copy" => {
                 copy = true;
-                ed.say("Rotate a copy of the selected objects.");
+                ed.say(key!("Rotate a copy of the selected objects."));
             }
             Answer::Keyword(_) => break reference_angle(ed, base, &originals)?,
             Answer::Enter => return Err(Cancelled),
         }
     };
-    let count = plural(objects.len(), "object");
+    let count = crate::text::objects(objects.len());
     apply(ed, "Rotate", objects, copy, move |e| e.rotated(base, angle))?;
     let units = ed.read(|doc| *doc.units())?;
-    ed.say(format!("Rotated {count} {}", angle_message(&units, angle)));
+    let angle = angle_message(&units, angle);
+    let said = Wording::new(key!("Rotated %{objects} %{angle}"), &[("angle", &angle)]);
+    ed.say(said.part("objects", count));
     Ok(())
 }
 

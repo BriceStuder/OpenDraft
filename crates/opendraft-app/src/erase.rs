@@ -5,7 +5,7 @@ use opendraft_commands::{Cancelled, Command, Editor};
 use opendraft_ui::key;
 
 use crate::state::AppState;
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// The ERASE command for the command table. A viewport picked on the sheet
 /// is erased at once; otherwise the selection, or the objects picked at
@@ -38,7 +38,9 @@ fn erase_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         tx.remove(ids);
         Ok(())
     })?;
-    ed.say(format!("Erased {}", plural(count, "object")));
+    ed.say(
+        Wording::new(key!("Erased %{objects}"), &[]).part("objects", crate::text::objects(count)),
+    );
     Ok(())
 }
 

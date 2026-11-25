@@ -145,14 +145,14 @@ fn all() -> Vec<Command<AppState>> {
             .global(),
         cmd("edit.undo", "Undo", |s| {
             if let Some(name) = s.undo() {
-                s.message = format!("Undo: {name}");
+                s.say_step(opendraft_ui::key!("Undo: %{name}"), name);
             }
         })
         .key("Ctrl+Z")
         .when(|s| s.session().history().can_undo()),
         cmd("edit.redo", "Redo", |s| {
             if let Some(name) = s.redo() {
-                s.message = format!("Redo: {name}");
+                s.say_step(opendraft_ui::key!("Redo: %{name}"), name);
             }
         })
         .key("Ctrl+Y")

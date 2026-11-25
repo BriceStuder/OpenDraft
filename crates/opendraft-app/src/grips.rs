@@ -313,7 +313,7 @@ fn edit_grips(ed: &mut Editor, hits: &[GripHit]) -> Result<(), Cancelled> {
             .filter_map(|h| Some((h.clone(), result(mode, h, base, given)?)))
             .collect();
         if changes.is_empty() {
-            ed.say("The objects cannot be changed that way.");
+            ed.say(key!("The objects cannot be changed that way."));
             if copy {
                 continue;
             }

@@ -47,7 +47,7 @@ pub fn draw_rectangle_center(ed: &mut Editor) -> Result<(), Cancelled> {
                 if reach.0.abs() > MIN_SIZE && reach.1.abs() > MIN_SIZE {
                     break reach;
                 }
-                ed.say("Requires a non-zero value.");
+                ed.say(key!("Requires a non-zero value."));
             }
             Answer::Keyword(k) if k == "Area" => size = Some(size_from_area(ed)?),
             Answer::Keyword(k) if k == "Dimensions" => {
@@ -98,7 +98,7 @@ pub fn draw_rectangle_3p(ed: &mut Editor) -> Result<(), Cancelled> {
             let entity = outline(first, angle, length, height, style, width);
             return add(ed, entity, "Rectangle");
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     }
 }
 
@@ -109,7 +109,7 @@ fn other_point(ed: &Editor, from: Point, message: &str) -> Result<Point, Cancell
         if (at.x - from.x).hypot(at.y - from.y) > MIN_SIZE {
             return Ok(at);
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     }
 }
 
@@ -144,7 +144,7 @@ fn oblong_of_width(ed: &Editor, a: Point, b: Point) -> Result<(), Cancelled> {
         };
         match oblong::outline(a, b, width) {
             Some(entity) if width > MIN_SIZE => return add(ed, entity, "Oblong"),
-            _ => ed.say("Requires a positive value."),
+            _ => ed.say(key!("Requires a positive value.")),
         }
     }
 }

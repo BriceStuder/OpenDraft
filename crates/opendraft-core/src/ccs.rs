@@ -168,13 +168,17 @@ pub fn name_refusal(name: &str) -> Option<&'static str> {
         '<', '>', '/', '\\', '"', ':', ';', '?', '*', '|', ',', '=', '`',
     ];
     if name.trim().is_empty() {
-        Some("A name is needed.")
+        Some(key!("A name is needed."))
     } else if name.chars().count() > NAME_MAX {
-        Some("The name is longer than 255 characters.")
+        Some(key!("The name is longer than 255 characters."))
     } else if name.contains(BAD) {
-        Some("The name may not contain < > / \\ \" : ; ? * | , = or `.")
+        Some(key!(
+            "The name may not contain < > / \\ \" : ; ? * | , = or `."
+        ))
     } else if name.eq_ignore_ascii_case("World") {
-        Some("World is the world coordinate system and cannot be saved over.")
+        Some(key!(
+            "World is the world coordinate system and cannot be saved over."
+        ))
     } else {
         None
     }

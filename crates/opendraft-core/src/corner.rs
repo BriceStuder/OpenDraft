@@ -39,14 +39,14 @@ pub enum CornerError {
 impl fmt::Display for CornerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            CornerError::NotLines => "A chamfer needs lines or polyline segments.",
-            CornerError::Parallel => "The lines are parallel.",
-            CornerError::Collinear => "The lines are collinear.",
-            CornerError::TooLong => "The radius or distance is too large for these objects.",
-            CornerError::Unsupported => "Those objects cannot be joined at a corner.",
-            CornerError::NoFit => "No arc of that radius fits between those objects.",
-            CornerError::NotAdjacent => "Select two adjacent segments of the polyline.",
-            CornerError::PastTheEnd => "The second line lies beyond the end of the first.",
+            CornerError::NotLines => key!("A chamfer needs lines or polyline segments."),
+            CornerError::Parallel => key!("The lines are parallel."),
+            CornerError::Collinear => key!("The lines are collinear."),
+            CornerError::TooLong => key!("The radius or distance is too large for these objects."),
+            CornerError::Unsupported => key!("Those objects cannot be joined at a corner."),
+            CornerError::NoFit => key!("No arc of that radius fits between those objects."),
+            CornerError::NotAdjacent => key!("Select two adjacent segments of the polyline."),
+            CornerError::PastTheEnd => key!("The second line lies beyond the end of the first."),
         })
     }
 }

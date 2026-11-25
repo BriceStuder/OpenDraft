@@ -83,7 +83,9 @@ pub fn draw_ellipse(ed: &mut Editor) -> Result<(), Cancelled> {
     let whole = match axes.ellipse() {
         Ok(whole) => whole,
         Err(_) => {
-            ed.say("The minor-to-major radius ratio must be between 0.000001 and 1.");
+            ed.say(key!(
+                "The minor-to-major radius ratio must be between 0.000001 and 1."
+            ));
             return Ok(());
         }
     };
@@ -105,7 +107,7 @@ fn by_axis_ends(ed: &Editor, start: Point) -> Result<Axes, Cancelled> {
         if distance(start, end) > MIN_SIZE {
             break end;
         }
-        ed.say("Requires a non-zero axis length.");
+        ed.say(key!("Requires a non-zero axis length."));
     };
     let center = midpoint(start, end);
     let first = Point::new(start.x - center.x, start.y - center.y);
@@ -123,7 +125,7 @@ fn by_center(ed: &Editor) -> Result<Axes, Cancelled> {
         if distance(center, end) > MIN_SIZE {
             break end;
         }
-        ed.say("Requires a non-zero axis length.");
+        ed.say(key!("Requires a non-zero axis length."));
     };
     let first = Point::new(end.x - center.x, end.y - center.y);
     let mirror = Point::new(center.x - first.x, center.y - first.y);
@@ -156,7 +158,7 @@ fn other_axis(ed: &Editor, center: Point, first: Point, axis: Entity) -> Result<
                 other,
             });
         }
-        ed.say("Requires a positive other-axis distance.");
+        ed.say(key!("Requires a positive other-axis distance."));
     }
 }
 
@@ -196,7 +198,7 @@ fn rotation(ed: &Editor, center: Point, first: Point) -> Result<Axes, Cancelled>
                 other: length * tilt.cos(),
             });
         }
-        ed.say("Requires a rotation from 0 to 89.4 degrees.");
+        ed.say(key!("Requires a rotation from 0 to 89.4 degrees."));
     }
 }
 
@@ -293,7 +295,7 @@ fn arc_ends(ed: &Editor, axes: Axes, whole: Ellipse) -> Result<Ellipse, Cancelle
         };
         match made {
             Ok(e) => return Ok(e),
-            Err(_) => ed.say("Those values make no elliptical arc."),
+            Err(_) => ed.say(key!("Those values make no elliptical arc.")),
         }
     }
 }

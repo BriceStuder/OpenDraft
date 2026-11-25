@@ -190,6 +190,6 @@ fn positive(ed: &Editor, options: NumberOptions) -> Result<f64, Cancelled> {
         if value > MIN_SIZE {
             return Ok(value);
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     }
 }

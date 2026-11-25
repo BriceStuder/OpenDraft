@@ -7,6 +7,7 @@ use opendraft_core::{EntityId, Point};
 use opendraft_ui::key;
 
 use crate::array_cmd::{ask_count, edit_prompt, fits, ghost, make, read_source};
+use opendraft_commands::Wording;
 
 /// ARRAYPATH: select objects and the path curve; the items are spaced along
 /// it (Measure) or spread over it (Divide) and turn with it, changed by the
@@ -29,7 +30,7 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
     let Some(source) = read_source(ed, ids.clone())? else {
         return Ok(());
     };
-    ed.say("Type = Path  Associative = No");
+    ed.say(key!("Type = Path  Associative = No"));
     let Some(path) = ask_path(ed, ids)? else {
         return Ok(());
     };
@@ -80,18 +81,21 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
                         .default(spacing);
                 let distance = ed.get_distance(options)?;
                 if distance <= 1e-9 {
-                    ed.say("Requires a positive value.");
+                    ed.say(key!("Requires a positive value."));
                     continue;
                 }
                 let most = path.items_fitting(distance);
-                ed.say(format!("Maximum items = {most}"));
+                ed.say(Wording::new(
+                    key!("Maximum items = %{most}"),
+                    &[("most", &most.to_string())],
+                ));
                 let options = NumberOptions::new(key!("Specify number of items"))
                     .default(most as f64)
                     .keyword("Fill entire path", "F");
                 let count = match ed.ask_number(options)? {
                     Answer::Value(n) if n >= 1.0 && n.fract() == 0.0 => (n as usize).min(most),
                     Answer::Value(_) => {
-                        ed.say("Requires a positive integer.");
+                        ed.say(key!("Requires a positive integer."));
                         continue;
                     }
                     _ => most,
@@ -123,12 +127,12 @@ fn ask_path(ed: &Editor, arrayed: Vec<EntityId>) -> Result<Option<Path>, Cancell
             return Ok(None);
         };
         if arrayed.contains(&id) {
-            ed.say("The path cannot be one of the objects arrayed.");
+            ed.say(key!("The path cannot be one of the objects arrayed."));
             continue;
         }
         let path = ed.read(move |doc| doc.get(id).and_then(Path::of))?;
         let Some(path) = path else {
-            ed.say("Object is not a path curve.");
+            ed.say(key!("Object is not a path curve."));
             continue;
         };
         let near = |p: Point| (p.x - at.x).hypot(p.y - at.y);
