@@ -23,7 +23,11 @@ enum Placed {
 }
 
 /// The path of the object picked, or `None` after saying why there is none.
-fn pick_path(ed: &Editor, message: &str, verb: &str) -> Result<Option<(Path, Picked)>, Cancelled> {
+fn pick_path(
+    ed: &Editor,
+    message: &str,
+    refusal: &str,
+) -> Result<Option<(Path, Picked)>, Cancelled> {
     let picked = match ed.ask_object(Options::<Picked>::new(message))? {
         Answer::Value(picked) => picked,
         _ => return Ok(None),
@@ -33,7 +37,7 @@ fn pick_path(ed: &Editor, message: &str, verb: &str) -> Result<Option<(Path, Pic
     match entity.as_ref().and_then(Path::of) {
         Some(path) => Ok(Some((path, picked))),
         None => {
-            ed.say(format!("Cannot {verb} that object."));
+            ed.say(refusal);
             Ok(None)
         }
     }
@@ -87,7 +91,12 @@ fn place(ed: &Editor, marks: Vec<Mark>, what: Placed, name: &'static str) -> Res
 /// DIVIDE: the number of segments, or Block to place a block instead of
 /// points, then the marks between the parts.
 pub fn divide_object(ed: &mut Editor) -> Result<(), Cancelled> {
-    let Some((path, _)) = pick_path(ed, key!("Select object to divide"), "divide")? else {
+    let Some((path, _)) = pick_path(
+        ed,
+        key!("Select object to divide"),
+        key!("Cannot divide that object."),
+    )?
+    else {
         return Ok(());
     };
     let mut what = Placed::Points;
@@ -104,7 +113,10 @@ pub fn divide_object(ed: &mut Editor) -> Result<(), Cancelled> {
                 let marks = (n - whole).abs() < 1e-9 && whole >= 0.0;
                 match marks.then(|| divide(&path, whole as usize)).flatten() {
                     Some(marks) => return place(ed, marks, what, "Divide"),
-                    None => ed.say(format!("Requires an integer between 2 and {MAX_SEGMENTS}.")),
+                    None => ed.say(Wording::new(
+                        key!("Requires an integer between %{least} and %{most}."),
+                        &[("least", "2"), ("most", &MAX_SEGMENTS.to_string())],
+                    )),
                 }
             }
             Answer::Enter => return Ok(()),
@@ -125,7 +137,12 @@ fn from_nearest(path: Path, at: Point) -> Path {
 /// MEASURE: the length of a segment, or Block to place a block instead of
 /// points, then the marks from the end nearest the pick.
 pub fn measure_object(ed: &mut Editor) -> Result<(), Cancelled> {
-    let Some((path, picked)) = pick_path(ed, key!("Select object to measure"), "measure")? else {
+    let Some((path, picked)) = pick_path(
+        ed,
+        key!("Select object to measure"),
+        key!("Cannot measure that object."),
+    )?
+    else {
         return Ok(());
     };
     let path = from_nearest(path, picked.at);

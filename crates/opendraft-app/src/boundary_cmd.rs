@@ -56,7 +56,9 @@ fn around(ed: &Editor, at: Point, islands: bool) -> Result<Vec<Entity>, Cancelle
                 .collect())
         }
         Err(why) => {
-            ed.say(format!("{why}."));
+            // The reason is translated with the hatch messages.
+            let why = Wording::plain(why.to_string());
+            ed.say(Wording::new("%{why}.", &[]).part("why", why));
             Ok(Vec::new())
         }
     }
