@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use super::*;
 use crate::cmdline::suggestions_in;
@@ -141,4 +142,73 @@ fn suggestions_follow_the_language() {
     assert_eq!(english[0].command, "draw.line");
     assert_eq!(english[0].label(), "_L (_LINE)");
     assert!(suggestions_in("_", all, "fr").is_empty());
+}
+
+/// The quoted texts at the start of each `marker(` call in `source`, up to
+/// the first argument that is not a quoted text.
+fn quoted_calls(source: &str, marker: &str) -> Vec<Vec<String>> {
+    let mut calls = Vec::new();
+    for (at, _) in source.match_indices(marker) {
+        let mut texts = Vec::new();
+        for argument in source[at + marker.len()..].split(',') {
+            let argument = argument.trim();
+            match argument.strip_prefix('"').and_then(|a| a.strip_suffix('"')) {
+                Some(text) => texts.push(text.to_owned()),
+                None => break,
+            }
+        }
+        calls.push(texts);
+    }
+    calls
+}
+
+#[test]
+fn every_running_command_is_named_after_its_own_command() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let commands = std::fs::read_to_string(folder.join("commands.rs")).unwrap();
+    // editor_command!("draw.line", "Line") or ("select.fence", "Fence", "FENCE").
+    let mut checked = 0;
+    for texts in quoted_calls(&commands, "editor_command!(") {
+        let (id, name) = match texts.as_slice() {
+            [id, label] => (id, label),
+            [id, _, name] => (id, name),
+            _ => continue,
+        };
+        if let Some(command) = runner_command(name) {
+            assert_eq!(command, id, "{name}");
+            checked += 1;
+        }
+    }
+    assert!(checked > 30, "only {checked} commands read");
+
+    // The other commands name themselves with `start_command("…"`; a name
+    // found only as an alias must be that command's own alias.
+    let mut folders = vec![folder];
+    while let Some(folder) = folders.pop() {
+        for entry in std::fs::read_dir(&folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                folders.push(path);
+                continue;
+            }
+            let file = path.file_name().unwrap().to_string_lossy().into_owned();
+            if !file.ends_with(".rs") || file.contains("tests") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).unwrap();
+            for texts in quoted_calls(&source, "start_command(") {
+                let Some(name) = texts.first() else { continue };
+                let upper = name.to_uppercase();
+                let by_name = ALIASES.iter().any(|(_, n, _)| *n == upper);
+                if !by_name && runner_command(name).is_some() {
+                    assert_eq!(
+                        (name.as_str(), runner_command(name)),
+                        ("QSELECT", Some("select.power")),
+                        "{file}"
+                    );
+                }
+            }
+        }
+    }
+    assert_eq!(prompt_name("QSELECT", "fr"), "FILTRESELECTION");
 }

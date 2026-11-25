@@ -306,8 +306,15 @@ impl AppState {
         text: &str,
         enabled: impl Fn(&str) -> bool,
     ) -> Vec<Suggestion> {
-        // `'`, `_` and `-` may come before a name: '_ZOOM, _-PLOT.
-        let name = text.trim().trim_start_matches(['\'', '_', '-']);
+        // `'`, `_` and `-` may come before a name: '_ZOOM, _-PLOT. While a
+        // command waits, only `'` (a command run inside it) opens them, so
+        // `-A` typed as an answer lists nothing.
+        let typed = text.trim();
+        let name = if self.command_running() && !typed.starts_with('\'') {
+            typed
+        } else {
+            typed.trim_start_matches(['\'', '_', '-'])
+        };
         let starts_alpha = name.chars().next().is_some_and(char::is_alphabetic);
         if !starts_alpha || self.cmd_option_for(text).is_some() {
             return Vec::new();
@@ -614,6 +621,8 @@ mod tests {
         assert!(state.cmd_suggestions("12", all).is_empty());
         assert!(state.cmd_suggestions("1,2", all).is_empty());
         assert!(!state.cmd_suggestions("l", all).is_empty());
+        assert!(!state.cmd_suggestions("-pl", all).is_empty());
+        assert!(!state.cmd_suggestions("_l", all).is_empty());
         state.start_command("Circle", crate::circle::draw_circle);
         state.settle_command();
         state.cmd_submit("0,0");
@@ -621,6 +630,10 @@ mod tests {
         // "D" is the Diameter option here, not the start of a command name.
         assert!(state.cmd_suggestions("d", all).is_empty());
         assert!(!state.cmd_suggestions("l", all).is_empty());
+        // An answer starting with `-` or `_` is not a command name.
+        assert!(state.cmd_suggestions("-a", all).is_empty());
+        assert!(state.cmd_suggestions("_a", all).is_empty());
+        assert!(!state.cmd_suggestions("'z", all).is_empty());
     }
 
     #[test]

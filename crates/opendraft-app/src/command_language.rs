@@ -67,6 +67,7 @@ pub fn english_names() -> Vec<Suggestion> {
 /// Every name and alias that runs a command typed without `_` in `locale`:
 /// the translated ones, and the English ones of a command not translated.
 pub fn local_names(locale: &str) -> Vec<Suggestion> {
+    let english_names = english_names();
     let mut out = Vec::new();
     for (command, english) in commands() {
         match translated(english, locale) {
@@ -80,7 +81,12 @@ pub fn local_names(locale: &str) -> Vec<Suggestion> {
                     });
                 }
             }
-            None => out.extend(english_names().into_iter().filter(|s| s.command == command)),
+            None => out.extend(
+                english_names
+                    .iter()
+                    .filter(|s| s.command == command)
+                    .cloned(),
+            ),
         }
     }
     out
@@ -144,14 +150,22 @@ pub fn shown_name<'a>(command: &str, english: &'a str, locale: &str) -> Cow<'a, 
 /// "QSELECT"); a name that is no command's is shown as it is.
 pub fn prompt_name(runner: &str, locale: &str) -> String {
     let upper = runner.to_uppercase();
-    let command = ALIASES
-        .iter()
-        .find(|(alias, name, _)| *name == upper || *alias == upper)
-        .map(|(_, _, command)| *command);
-    match command {
+    match runner_command(runner) {
         Some(command) => shown_name(command, &upper, locale).into_owned(),
         None => upper,
     }
+}
+
+/// The command a running command's name ("Line", "QSELECT") belongs to: the
+/// command of that name, else the command of that alias (QSELECT is
+/// POWERSELECT's), else none.
+pub fn runner_command(runner: &str) -> Option<&'static str> {
+    let upper = runner.to_uppercase();
+    ALIASES
+        .iter()
+        .find(|(_, name, _)| *name == upper)
+        .or_else(|| ALIASES.iter().find(|(alias, _, _)| *alias == upper))
+        .map(|(_, _, command)| *command)
 }
 
 #[cfg(test)]
