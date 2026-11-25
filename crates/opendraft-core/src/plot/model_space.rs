@@ -57,7 +57,8 @@ pub(super) fn model_sheet(document: &Document) -> Result<PlotSheet, PlotError> {
         .visible_in(None)
         .filter(|o| !frozen.contains(&o.attrs.layer) && o.bounds().intersects(&frame));
     let pieces = objects.flat_map(|o| document.drawn(o));
-    for object in pieces.filter(|o| !frozen.contains(&o.attrs.layer)) {
+    let plotted = |layer| !frozen.contains(&layer) && document.plots(layer);
+    for object in pieces.filter(|o| plotted(o.attrs.layer)) {
         add_viewed(
             &mut sheet,
             document,
@@ -284,5 +285,27 @@ mod tests {
             };
         });
         assert!(plot_sheet(&doc, PlotSpace::Model).is_ok());
+    }
+
+    #[test]
+    fn no_plot_layers_and_defpoints_are_left_out_of_the_plot_but_not_the_extents() {
+        let mut doc = Document::default();
+        let sketch = doc.allocate_layer_id();
+        doc.push_layer(Layer {
+            plot: false,
+            ..Layer::new(sketch, "Sketch")
+        });
+        let defpoints = doc.allocate_layer_id();
+        doc.push_layer(Layer::new(defpoints, "DEFPOINTS"));
+        doc.add(line((0.0, 0.0), (100.0, 0.0)));
+        for (layer, y) in [(sketch, 900.0), (defpoints, 50.0)] {
+            doc.add_with(
+                line((0.0, y), (100.0, y)),
+                crate::Attributes::on_layer(layer),
+            );
+        }
+        assert_eq!(extents(&doc).unwrap().max.y, 900.0);
+        let sheet = plot_sheet(&doc, PlotSpace::Model).unwrap();
+        assert_eq!(sheet.paths.len(), 1);
     }
 }

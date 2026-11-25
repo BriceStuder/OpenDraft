@@ -156,6 +156,12 @@ impl Document {
         layers.map(|l| l.id).collect()
     }
 
+    /// Whether objects on this layer reach a plot: not on a layer switched
+    /// to No Plot, nor on Defpoints (see `Layer::plots`).
+    pub fn plots(&self, layer: LayerId) -> bool {
+        self.layer(layer).is_none_or(Layer::plots)
+    }
+
     /// Ids of the objects on a layout's sheet.
     pub fn objects_of_layout(&self, layout: LayoutId) -> Vec<EntityId> {
         self.objects

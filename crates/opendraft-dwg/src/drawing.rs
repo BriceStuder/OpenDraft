@@ -48,6 +48,7 @@ pub struct DwgLayer {
     pub frozen: bool,
     pub locked: bool,
     pub on: bool,
+    pub plot: bool,
     pub color: DwgColor,
     pub linetype: Option<String>,
     pub lineweight: DwgLineweight,
@@ -412,6 +413,7 @@ impl Drawing {
                 frozen: l.frozen,
                 locked: l.locked,
                 on: l.on,
+                plot: l.plot,
                 color: table_color(&l.color),
                 linetype: l
                     .linetype
@@ -468,6 +470,7 @@ mod tests {
             frozen: false,
             locked: false,
             on: true,
+            plot: true,
             lineweight: 31,
             color,
             linetype: None,

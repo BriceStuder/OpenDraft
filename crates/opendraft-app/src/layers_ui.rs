@@ -340,6 +340,13 @@ fn row(
             !layer.locked,
         ));
     }
+    if plot_switch(ui, theme, cols.plot, id.with("plot"), layer) && !layer.is_defpoints() {
+        result.edit = Some(LayerEdit::SetFlag(
+            targets.clone(),
+            LayerFlag::Plot,
+            !layer.plot,
+        ));
+    }
 
     // Colour.
     let mut color_ui = ui.new_child(egui::UiBuilder::new().max_rect(cols.color));
@@ -384,6 +391,28 @@ fn row(
         result.edit = Some(LayerEdit::SetLineweight(targets, Lineweight::STANDARD[i]));
     }
     result
+}
+
+/// The Plot cell: the printer, its frame on hover and its tip. Whether it
+/// was clicked.
+fn plot_switch(ui: &mut Ui, theme: &Theme, cell: Rect, id: egui::Id, layer: &Layer) -> bool {
+    let response = ui.interact(cell, id, Sense::click());
+    if response.hovered() && !layer.is_defpoints() {
+        ui.painter().rect_stroke(
+            cell.shrink(1.0),
+            2.0,
+            Stroke::new(1.0_f32, theme.colors.border),
+            egui::StrokeKind::Inside,
+        );
+    }
+    crate::layer_columns::paint_plot_switch(
+        ui.painter(),
+        cell,
+        layer.plots(),
+        theme.colors.text_weak,
+    );
+    let tip = crate::ribbon_slots::switch_tip(layer, LayerFlag::Plot);
+    response.on_hover_text(tip).clicked()
 }
 
 /// "0.25 mm".
