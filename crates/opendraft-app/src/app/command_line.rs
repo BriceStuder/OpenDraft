@@ -149,7 +149,7 @@ impl PanelViewer<'_> {
                 .stick_to_bottom(true)
                 .show(&mut log, |ui| {
                     ui.set_max_width((ui.available_width() - SCROLL_BAR_ROOM).max(0.0));
-                    for line in &self.state.cmdline.log {
+                    for line in self.state.cmdline.shown_log() {
                         ui.label(
                             egui::RichText::new(line)
                                 .size(theme.font_size_small)

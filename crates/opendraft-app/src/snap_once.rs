@@ -279,7 +279,9 @@ impl OneShot {
             Some(Chain::Temp) => {
                 self.chain = None;
                 self.temps.push(at);
-                Step::Consumed("Now specify the point; it tracks from the temporary point.")
+                Step::Consumed(key!(
+                    "Now specify the point; it tracks from the temporary point."
+                ))
             }
             Some(Chain::Track(_)) => {
                 self.chain = Some(Chain::Track(Some(at)));

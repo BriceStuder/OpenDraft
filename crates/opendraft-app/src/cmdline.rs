@@ -10,6 +10,7 @@ use std::borrow::Cow;
 use opendraft_core::Point;
 
 use crate::state::AppState;
+use opendraft_ui::key;
 
 pub use crate::cmd_aliases::ALIASES;
 
@@ -20,8 +21,11 @@ const MAX_SUGGESTIONS: usize = 8;
 #[derive(Default)]
 pub struct CommandLine {
     pub input: String,
-    /// Echoed commands, prompts with the answers given, and messages.
+    /// Echoed commands, prompts with the answers given, and messages, in
+    /// English (see [`CommandLine::shown_log`]).
     pub log: Vec<String>,
+    /// The wording of each line of `log` that has values.
+    wordings: Vec<Option<opendraft_commands::Wording>>,
     /// Highlighted suggestion row.
     pub selected: usize,
     /// How many suggestions were listed last frame (for arrow keys).
@@ -83,11 +87,31 @@ impl CommandLine {
         true
     }
 
-    pub fn say(&mut self, line: impl Into<String>) {
-        self.log.push(line.into());
+    pub fn say(&mut self, line: impl Into<opendraft_commands::Wording>) {
+        let wording = line.into();
+        self.log.push(wording.english());
+        let worded = !(wording.values.is_empty() && wording.parts.is_empty());
+        self.wordings.push(worded.then_some(wording));
         if self.log.len() > LOG_LIMIT {
             self.log.drain(..self.log.len() - LOG_LIMIT);
         }
+        if self.wordings.len() > LOG_LIMIT {
+            self.wordings.drain(..self.wordings.len() - LOG_LIMIT);
+        }
+    }
+
+    /// The log in the language of the interface.
+    pub fn shown_log(&self) -> impl Iterator<Item = String> + '_ {
+        // Lines added to `log` directly have no wording: align from the end.
+        let skip = self.wordings.len().saturating_sub(self.log.len());
+        let lead = self.log.len().saturating_sub(self.wordings.len());
+        self.log.iter().enumerate().map(move |(i, line)| {
+            let wording = i
+                .checked_sub(lead)
+                .and_then(|at| self.wordings.get(skip + at))
+                .and_then(Option::as_ref);
+            crate::message_language::shown_line(line, wording)
+        })
     }
 
     /// Echo a launched command, like AutoCAD's "Command: LINE".
@@ -358,7 +382,7 @@ impl AppState {
         if parse_point(t, Point::new(0.0, 0.0), &self.units()).is_some() {
             let line = format!("{} {t}", self.cmd_prompt().plain());
             self.cmdline.say(line);
-            self.cmdline.say("Start a drawing command first.");
+            self.cmdline.say(key!("Start a drawing command first."));
             return None;
         }
 

@@ -98,11 +98,6 @@ pub(crate) fn same_file(a: &Path, b: &Path) -> bool {
 }
 
 impl AppState {
-    pub(crate) fn tell(&mut self, text: String) {
-        self.cmdline.say(text.clone());
-        self.message = text;
-    }
-
     /// Where an Open, Save or Export dialog starts: the drawing's own
     /// folder, else where the last drawing was opened or saved.
     pub(crate) fn folder_for_dialogs(&self, path: Option<&Path>) -> Option<PathBuf> {

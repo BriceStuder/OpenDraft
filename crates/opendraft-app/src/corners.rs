@@ -10,7 +10,7 @@ use opendraft_ui::key;
 
 use crate::corner_memory::Memory;
 use crate::defaults::EditorDefaults;
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind {
@@ -201,7 +201,9 @@ fn plan_pair(
     second: Picked,
 ) -> Result<Plan, Option<String>> {
     if kind == Kind::Fillet && [a, b].iter().any(|e| matches!(e, Entity::Spline(_))) {
-        return Err(Some("FILLET does not support splines yet.".to_owned()));
+        return Err(Some(
+            key!("FILLET does not support splines yet.").to_owned(),
+        ));
     }
     let sharp = second.shift;
     if same {
@@ -211,12 +213,12 @@ fn plan_pair(
         };
         let (Some(i), Some(j)) = (a.segment_at(first.at), a.segment_at(second.at)) else {
             return Err(Some(
-                "Select two adjacent segments of the polyline.".to_owned(),
+                key!("Select two adjacent segments of the polyline.").to_owned(),
             ));
         };
-        let vertex = a
-            .shared_vertex(i, j)
-            .ok_or_else(|| Some("Select two adjacent segments of the polyline.".to_owned()))?;
+        let vertex = a.shared_vertex(i, j).ok_or_else(|| {
+            Some(key!("Select two adjacent segments of the polyline.").to_owned())
+        })?;
         let how = match kind {
             Kind::Fillet => Round::Fillet(if sharp { 0.0 } else { m.radius }),
             Kind::Chamfer if sharp => Round::Chamfer(Chamfer::Distances(0.0, 0.0)),
@@ -276,7 +278,7 @@ fn join_pair(ed: &Editor, kind: Kind, first: Picked, second: Picked) -> Result<O
     ) {
         Ok(plan) => plan,
         Err(None) => {
-            ed.say("Select a different object.");
+            ed.say(key!("Select a different object."));
             return Ok(Outcome::Retry);
         }
         Err(Some(why)) => {
@@ -301,7 +303,7 @@ fn apply(
     match plan {
         Plan::Pair(joined) => {
             if !trim && joined.joint.is_none() {
-                ed.say("Nothing to do: no trim and no joining piece.");
+                ed.say(key!("Nothing to do: no trim and no joining piece."));
                 return Ok(());
             }
             ed.transaction(kind.name(), move |tx| {
@@ -345,7 +347,7 @@ fn round_whole_polyline(ed: &Editor, kind: Kind) -> Result<bool, Cancelled> {
         return Ok(false);
     };
     let Some(path) = entity.polyline_path() else {
-        ed.say("That is not a polyline.");
+        ed.say(key!("That is not a polyline."));
         return Ok(false);
     };
     let m = ed.defaults().corner.get();
@@ -361,21 +363,20 @@ fn round_whole_polyline(ed: &Editor, kind: Kind) -> Result<bool, Cancelled> {
         }
     };
     if done.done == 0 {
-        ed.say("No corner could be done.");
+        ed.say(key!("No corner could be done."));
         return Ok(false);
     }
-    ed.say(format!(
-        "{} done{}.",
-        plural(done.done, "corner"),
-        if done.skipped > 0 {
-            format!(
-                ", {} left sharp (segments too short)",
-                plural(done.skipped, "corner")
-            )
-        } else {
-            String::new()
-        }
-    ));
+    let corners = |count| Wording::count(count, key!("%{count} corner"), key!("%{count} corners"));
+    let said = if done.skipped > 0 {
+        Wording::new(
+            key!("%{done} done, %{skipped} left sharp (segments too short)."),
+            &[],
+        )
+        .part("skipped", corners(done.skipped))
+    } else {
+        Wording::new(key!("%{done} done."), &[])
+    };
+    ed.say(said.part("done", corners(done.done)));
     apply(ed, kind, id, id, attrs, Plan::Replace(done.pieces))?;
     Ok(true)
 }

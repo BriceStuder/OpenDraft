@@ -174,8 +174,8 @@ pub(crate) fn change_swept(
     })?;
     if done == 0 {
         ed.say(match mode {
-            Mode::Trim => "Nothing to trim there.",
-            Mode::Extend => "Nothing to extend there.",
+            Mode::Trim => key!("Nothing to trim there."),
+            Mode::Extend => key!("Nothing to extend there."),
         });
     }
     Ok(done)

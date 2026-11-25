@@ -265,12 +265,13 @@ impl OpenDraftApp {
     fn status_message(&self, ui: &mut egui::Ui) {
         let command_status = self.state.command_status();
         let ready = t!("Ready");
+        let said = crate::message_language::shown_message(&self.state);
         let message = if let Some(status) = &command_status {
             status.as_str()
         } else if self.state.message.is_empty() {
             ready.as_ref()
         } else {
-            self.state.message.as_str()
+            said.as_str()
         };
         // Leave room for the readout and toggles on the right; a long message
         // is cut short rather than running into them.
