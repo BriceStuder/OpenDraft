@@ -13,6 +13,7 @@ use opendraft_core::block::{
     BlockObjectId, DynamicBlock, DynamicParameter, DynamicParameterKind, ParameterId,
     VisibilityState,
 };
+use opendraft_ui::key;
 
 use crate::dynamic_block_cmd::{ask_choice, commit, draft, select_objects};
 use crate::dynamic_block_prompts::{ask_line, ask_naming};
@@ -114,7 +115,7 @@ pub fn bvstate(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     };
     let chosen = ed.get_keyword(
-        Options::<String>::new("Enter an option [New/Rename/Delete/List] <List>")
+        Options::<String>::new(key!("Enter an option"))
             .keyword("New", "N")
             .keyword("Rename", "R")
             .keyword("Delete", "D")
@@ -125,12 +126,10 @@ pub fn bvstate(ed: &mut Editor) -> Result<(), Cancelled> {
         "New" => {
             let name = ask_state_name(ed, "Enter new state name", &names_of(states))?;
             let hide_all = ed.get_keyword(
-                Options::<String>::new(
-                    "Visibility of the objects in the new state [Show all/Hide all] <Show all>",
-                )
-                .keyword("Show all", "S")
-                .keyword("Hide all", "H")
-                .default("Show all".to_owned()),
+                Options::<String>::new(key!("Visibility of the objects in the new state"))
+                    .keyword("Show all", "S")
+                    .keyword("Hide all", "H")
+                    .default("Show all".to_owned()),
             )? == "Hide all";
             let hidden = if hide_all {
                 objects_of(ed)?

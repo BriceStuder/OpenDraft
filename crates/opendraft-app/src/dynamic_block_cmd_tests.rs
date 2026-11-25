@@ -376,3 +376,30 @@ fn bsave_reports_the_references_it_adjusted_and_the_actions_it_removed() {
     };
     assert_eq!(i.dynamic_value(ParameterId(1)), Some(8.0));
 }
+
+#[test]
+fn the_prompts_leave_their_options_to_the_command_line() {
+    // The command line adds a prompt's options after its text, so the text
+    // must not carry them as well (#249).
+    let mut state = editing_bar();
+    state.start_command("BPARAMETER", bparameter);
+    state.settle_command();
+    let first = state.cmd_prompt();
+    assert!(
+        first.text.starts_with("Enter parameter type"),
+        "{}",
+        first.text
+    );
+    assert!(first.options.iter().any(|o| o.value == "Lookup"));
+    for answer in ["", "0,0", "4,0", "", "", "", "", "", ""] {
+        let prompt = state.cmd_prompt();
+        // Neither an option nor the default is written twice.
+        assert!(!prompt.text.contains("> <"), "{}", prompt.text);
+        let listed = prompt.text.split('[').nth(1).unwrap_or("");
+        for option in &prompt.options {
+            assert!(!listed.contains(&*option.label), "{}", prompt.text);
+        }
+        submit_all(&mut state, &[answer]);
+    }
+    assert_eq!(drafted(&state).unwrap().parameters.len(), 1);
+}

@@ -18,6 +18,7 @@ use opendraft_core::block::{
     DynamicParameter, ParameterId,
 };
 use opendraft_core::{Bounds, Entity, EntityId};
+use opendraft_ui::key;
 
 use crate::dynamic_block_prompts::{ask_name, free_name, EPS};
 use crate::dynamic_lookup_cmd::{input_candidates, lookup_parameter};
@@ -56,18 +57,16 @@ pub fn bparameter(ed: &mut Editor) -> Result<(), Cancelled> {
     }
     let parameter = match ed
         .get_keyword(
-            Options::<String>::new(
-                "Enter parameter type [Linear/Polar/XY/Point/Rotation/Flip/Visibility/LOokup] <Linear>",
-            )
-            .keyword("Linear", "L")
-            .keyword("Polar", "P")
-            .keyword("XY", "X")
-            .keyword("Point", "Po")
-            .keyword("Rotation", "R")
-            .keyword("Flip", "F")
-            .keyword("Visibility", "V")
-            .keyword("Lookup", "Lo")
-            .default("Linear".to_owned()),
+            Options::<String>::new(key!("Enter parameter type"))
+                .keyword("Linear", "L")
+                .keyword("Polar", "P")
+                .keyword("XY", "X")
+                .keyword("Point", "Po")
+                .keyword("Rotation", "R")
+                .keyword("Flip", "F")
+                .keyword("Visibility", "V")
+                .keyword("Lookup", "Lo")
+                .default("Linear".to_owned()),
         )?
         .as_str()
     {
@@ -159,7 +158,7 @@ pub fn baction(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     }
     let chosen = ed.get_keyword(
-        Options::<String>::new("Enter action type [Move/Stretch/Scale/Rotate/Flip] <Move>")
+        Options::<String>::new(key!("Enter action type"))
             .keyword("Move", "M")
             .keyword("Stretch", "S")
             .keyword("Scale", "Sc")
