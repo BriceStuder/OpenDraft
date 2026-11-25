@@ -11,6 +11,15 @@ use opendraft_ui::Theme;
 /// Space left and right of the text in a cell.
 const CELL_PAD: f32 = 6.0;
 
+/// The width a cell needs to show `text` whole.
+pub(crate) fn text_room(ui: &Ui, theme: &Theme, text: &str) -> f32 {
+    let font = FontId::proportional(theme.font_size_body);
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.to_owned(), font, theme.colors.text);
+    galley.size().x + CELL_PAD * 2.0
+}
+
 pub(crate) fn cell_text(ui: &Ui, theme: &Theme, rect: Rect, text: &str) {
     fit_text(ui, theme, rect, text, theme.colors.text);
 }
