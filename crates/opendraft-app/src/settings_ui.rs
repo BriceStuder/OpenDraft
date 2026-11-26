@@ -110,15 +110,12 @@ fn display_left(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
 }
 
 fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
-    widgets::group_box(ui, theme, "Mouse wheel", |ui| {
+    widgets::group_box(ui, theme, "Navigation", |ui| {
         let (min, max) = ZOOM_SPEED_RANGE;
         ui.horizontal(|ui| {
-            ui.label("Zoom speed");
+            ui.label("Mouse wheel zoom speed");
             ui.add(egui::Slider::new(&mut draft.zoom_speed, min..=max).suffix(" %"));
         });
-    });
-    ui.add_space(6.0);
-    widgets::group_box(ui, theme, "Navigation", |ui| {
         ui.checkbox(&mut draft.show_nav_gizmo, "Show the navigation gizmo");
         ui.checkbox(
             &mut draft.show_viewport_controls,
@@ -130,24 +127,25 @@ fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
     selection(ui, theme, draft);
     ui.add_space(6.0);
     widgets::group_box(ui, theme, "Interface scale", |ui| {
-        widgets::field_label(ui, theme, "Scale user interface elements to");
-        let width = ui.available_width().min(160.0);
-        widgets::dropdown(
-            ui,
-            theme,
-            "ui_scale",
-            &format!("{}%", draft.ui_scale_percent),
-            width,
-            |ui| {
-                for percent in UI_SCALES {
-                    ui.selectable_value(
-                        &mut draft.ui_scale_percent,
-                        percent,
-                        format!("{percent}%"),
-                    );
-                }
-            },
-        );
+        ui.horizontal(|ui| {
+            widgets::field_label(ui, theme, "Scale user interface elements to");
+            widgets::dropdown(
+                ui,
+                theme,
+                "ui_scale",
+                &format!("{}%", draft.ui_scale_percent),
+                90.0,
+                |ui| {
+                    for percent in UI_SCALES {
+                        ui.selectable_value(
+                            &mut draft.ui_scale_percent,
+                            percent,
+                            format!("{percent}%"),
+                        );
+                    }
+                },
+            );
+        });
     });
     ui.add_space(6.0);
     crate::language::settings_group(ui, theme, draft);
