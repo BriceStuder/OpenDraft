@@ -60,6 +60,54 @@ pub(super) fn same(a: &Entity, b: &Entity, tol: f64) -> bool {
     }
 }
 
+/// Whether the loose line or arc `loose` lies wholly on one segment of the
+/// polyline `shape`: a line on a straight segment, an arc on an arc segment of
+/// the same circle, each within `tol`. Such an object adds nothing the
+/// polyline does not already draw.
+pub(super) fn lies_on_polyline(loose: &Entity, shape: &Entity, tol: f64) -> bool {
+    let Entity::Polyline {
+        points,
+        closed,
+        bulges,
+        ..
+    } = shape
+    else {
+        return false;
+    };
+    let n = points.len();
+    (0..bulge::segment_count(n, *closed)).any(|i| {
+        let (a, b, k) = (points[i], points[(i + 1) % n], bulge::at(bulges, i));
+        match (loose, bulge::arc_of(a, b, k)) {
+            (Entity::Line { start, end }, None) => {
+                let on = |p: Point| bulge::nearest(a, b, 0.0, p).0;
+                near(on(*start), *start, tol) && near(on(*end), *end, tol)
+            }
+            (
+                Entity::Arc {
+                    center,
+                    radius,
+                    start,
+                    end,
+                },
+                Some(seg),
+            ) => {
+                // The same circle, and both ends and the middle on the segment.
+                let on = |p: Point| bulge::nearest(a, b, k, p).0;
+                near(seg.center, *center, tol)
+                    && (seg.radius - radius).abs() <= tol
+                    && [
+                        arc::point_at(*center, *radius, *start),
+                        arc::point_at(*center, *radius, *end),
+                        arc::midpoint(*center, *radius, *start, *end),
+                    ]
+                    .iter()
+                    .all(|p| near(on(*p), *p, tol))
+            }
+            _ => false,
+        }
+    })
+}
+
 /// One polyline as its points and, for the segment leaving each, its bulge
 /// and its width at both ends.
 struct Path<'a> {
