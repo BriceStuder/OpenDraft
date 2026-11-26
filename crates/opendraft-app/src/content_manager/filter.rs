@@ -4,6 +4,9 @@
 use eframe::egui;
 use opendraft_content::library::Query;
 use opendraft_core::InsertUnits;
+use opendraft_ui::Theme;
+
+use super::chrome;
 
 /// A yes/no question that may be left unasked.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -50,7 +53,7 @@ impl Filter {
     }
 
     /// The menu. `units` are the units the library's blocks are in.
-    pub fn menu(&mut self, ui: &mut egui::Ui, units: &[InsertUnits]) {
+    pub fn menu(&mut self, ui: &mut egui::Ui, theme: &Theme, units: &[InsertUnits]) {
         let label = if self.active() {
             "Filter \u{2022}"
         } else {
@@ -58,20 +61,29 @@ impl Filter {
         };
         ui.menu_button(label, |ui| {
             ui.checkbox(&mut self.favourites, "Favourites only");
-            tri(ui, "Dynamic", &mut self.dynamic);
-            tri(ui, "Has attributes", &mut self.attributes);
-            ui.horizontal(|ui| {
-                ui.label("Unit");
-                let shown = self.unit.map_or("Any", InsertUnits::label);
-                egui::ComboBox::from_id_salt("cm_filter_unit")
-                    .selected_text(shown)
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.unit, None, "Any");
-                        for unit in units {
-                            ui.selectable_value(&mut self.unit, Some(*unit), unit.label());
-                        }
-                    });
-            });
+            ui.add_space(4.0);
+            egui::Grid::new("cm_filter_grid")
+                .num_columns(2)
+                .spacing([12.0, 6.0])
+                .show(ui, |ui| {
+                    ui.label("Dynamic");
+                    tri(ui, theme, &mut self.dynamic);
+                    ui.end_row();
+                    ui.label("Has attributes");
+                    tri(ui, theme, &mut self.attributes);
+                    ui.end_row();
+                    ui.label("Unit");
+                    let shown = self.unit.map_or("Any", InsertUnits::label);
+                    egui::ComboBox::from_id_salt("cm_filter_unit")
+                        .selected_text(shown)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.unit, None, "Any");
+                            for unit in units {
+                                ui.selectable_value(&mut self.unit, Some(*unit), unit.label());
+                            }
+                        });
+                    ui.end_row();
+                });
             ui.separator();
             if ui
                 .add_enabled(self.active(), egui::Button::new("Clear filters"))
@@ -83,13 +95,13 @@ impl Filter {
     }
 }
 
-fn tri(ui: &mut egui::Ui, label: &str, value: &mut Tri) {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.selectable_value(value, Tri::Any, "Any");
-        ui.selectable_value(value, Tri::Yes, "Yes");
-        ui.selectable_value(value, Tri::No, "No");
-    });
+fn tri(ui: &mut egui::Ui, theme: &Theme, value: &mut Tri) {
+    chrome::choice(
+        ui,
+        theme,
+        value,
+        &[(Tri::Any, "Any"), (Tri::Yes, "Yes"), (Tri::No, "No")],
+    );
 }
 
 #[cfg(test)]

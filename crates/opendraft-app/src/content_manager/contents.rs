@@ -4,9 +4,10 @@
 use eframe::egui;
 use opendraft_content::blocks_payload::folder;
 use opendraft_content::library::BlockInfo;
-use opendraft_ui::Theme;
+use opendraft_ui::{icons, Theme};
 
 use super::actions::{Action, Taken};
+use super::list::{empty_state, list_header, list_row, list_widths};
 use super::snapshot::Snapshot;
 use super::{Editing, Env, Place, Selected, View, Window};
 
@@ -34,8 +35,13 @@ impl Window {
             self.import_panel(ui, actions);
             return;
         }
+        ui.add_space(2.0);
         ui.horizontal(|ui| {
-            ui.strong(self.title(snap));
+            ui.label(
+                egui::RichText::new(self.title(snap))
+                    .size(theme.font_size_heading)
+                    .color(theme.colors.text),
+            );
         });
         self.edit_bar(ui, actions);
         ui.separator();
@@ -47,7 +53,7 @@ impl Window {
                 } else if self.place == Place::Drawing {
                     self.drawing_items(ui, theme, env, snap, actions);
                 } else {
-                    self.trash_items(ui, snap, actions);
+                    self.trash_items(ui, theme, snap, actions);
                 }
             });
     }
@@ -117,13 +123,13 @@ impl Window {
             &snap.subfolders
         };
         if folders.is_empty() && snap.shown.is_empty() {
-            ui.add_space(16.0);
-            ui.weak(match (&self.place, snap.searching) {
+            let text = match (&self.place, snap.searching) {
                 (_, true) => "No blocks match.",
                 (Place::Favourites, _) => "No favourites yet: pick a block and choose Favourite.",
                 (Place::Recent, _) => "Blocks you insert are listed here.",
                 _ => "Nothing here yet. Add blocks with Add to library.",
-            });
+            };
+            empty_state(ui, theme, text);
             return;
         }
         match self.view {
@@ -142,16 +148,23 @@ impl Window {
                 });
             }
             View::List => {
+                let widths = list_widths(ui);
+                list_header(ui, theme, widths, ["Name", "Folder", "Tags"]);
                 for path in folders {
-                    if ui
-                        .selectable_label(false, format!("\u{1F4C1} {}", folder::name(path)))
-                        .double_clicked()
-                    {
+                    let row = list_row(
+                        ui,
+                        theme,
+                        widths,
+                        false,
+                        [folder::name(path), "Folder", ""],
+                        Some(icons::CONTENT_FOLDER),
+                    );
+                    if row.double_clicked() {
                         actions.push(Action::Go(Place::Mine(path.clone())));
                     }
                 }
                 for block in &snap.shown {
-                    self.block_row(ui, block, actions);
+                    self.block_row(ui, theme, widths, block, actions);
                 }
             }
         }
@@ -181,20 +194,30 @@ impl Window {
         self.block_interactions(&response, block, actions);
     }
 
-    fn block_row(&mut self, ui: &mut egui::Ui, block: &BlockInfo, actions: &mut Vec<Action>) {
+    fn block_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        theme: &Theme,
+        widths: [f32; 2],
+        block: &BlockInfo,
+        actions: &mut Vec<Action>,
+    ) {
         let selected = self.selected == Selected::Block(block.id);
-        let star = if block.favourite { "\u{2605} " } else { "" };
-        let text = format!(
-            "{star}{}    {}    {}",
-            block.name,
-            if block.folder.is_empty() {
-                "My blocks"
-            } else {
-                &block.folder
-            },
-            block.tags.join(", ")
+        let folder = if block.folder.is_empty() {
+            "My blocks"
+        } else {
+            &block.folder
+        };
+        let icon = block.favourite.then_some(icons::CONTENT_FAVOURITE);
+        let tags = block.tags.join(", ");
+        let response = list_row(
+            ui,
+            theme,
+            widths,
+            selected,
+            [&block.name, folder, &tags],
+            icon,
         );
-        let response = ui.selectable_label(selected, text);
         self.block_interactions(&response, block, actions);
     }
 
@@ -254,8 +277,11 @@ impl Window {
         actions: &mut Vec<Action>,
     ) {
         if snap.drawing.is_empty() {
-            ui.add_space(16.0);
-            ui.weak("This drawing has no blocks. Make one with BLOCK.");
+            empty_state(
+                ui,
+                theme,
+                "This drawing has no blocks. Make one with BLOCK.",
+            );
             return;
         }
         ui.horizontal_wrapped(|ui| {
@@ -288,16 +314,23 @@ impl Window {
         });
     }
 
-    fn trash_items(&mut self, ui: &mut egui::Ui, snap: &Snapshot, actions: &mut Vec<Action>) {
+    fn trash_items(
+        &mut self,
+        ui: &mut egui::Ui,
+        theme: &Theme,
+        snap: &Snapshot,
+        actions: &mut Vec<Action>,
+    ) {
         if snap.trash.is_empty() {
-            ui.add_space(16.0);
-            ui.weak("The Trash is empty.");
+            empty_state(ui, theme, "The Trash is empty.");
             return;
         }
         if ui.button("Empty Trash").clicked() {
             actions.push(Action::EmptyTrash);
         }
         ui.add_space(4.0);
+        let widths = list_widths(ui);
+        list_header(ui, theme, widths, ["Name", "Deleted from", ""]);
         for item in &snap.trash {
             let selected = self.selected == Selected::Trashed(item.id);
             let from = if item.folder.is_empty() {
@@ -305,7 +338,7 @@ impl Window {
             } else {
                 &item.folder
             };
-            let response = ui.selectable_label(selected, format!("{}    from {from}", item.name));
+            let response = list_row(ui, theme, widths, selected, [&item.name, from, ""], None);
             if response.clicked() {
                 actions.push(Action::Select(Selected::Trashed(item.id)));
             }

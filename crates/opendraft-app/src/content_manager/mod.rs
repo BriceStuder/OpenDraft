@@ -12,15 +12,17 @@
 use eframe::egui;
 use opendraft_content::blocks_payload::BlockUuid;
 use opendraft_core::Document;
-use opendraft_ui::Theme;
+use opendraft_ui::{icons, Theme};
 
 use crate::content_library::LibraryHandle;
 
 mod actions;
+mod chrome;
 mod contents;
 mod details;
 mod filter;
 mod import;
+mod list;
 mod snapshot;
 mod thumbnails;
 mod tree;
@@ -184,14 +186,19 @@ impl Window {
                 });
             });
         egui::TopBottomPanel::bottom("cm_details")
-            .default_height(130.0)
-            .resizable(true)
+            .exact_height(150.0)
+            .resizable(false)
+            .frame(room(ui, 4))
             .show_inside(ui, |ui| {
-                self.details_pane(ui, theme, snap, actions);
+                self.details_pane(ui, theme, env, snap, actions);
             });
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            self.contents_pane(ui, theme, env, snap, actions);
-        });
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(8, 4)),
+            )
+            .show_inside(ui, |ui| {
+                self.contents_pane(ui, theme, env, snap, actions);
+            });
     }
 
     fn toolbar(
@@ -201,55 +208,62 @@ impl Window {
         units: &[opendraft_core::InsertUnits],
         actions: &mut Vec<Action>,
     ) {
+        ui.add_space(2.0);
         ui.horizontal(|ui| {
-            let back = !self.back.is_empty();
-            let forward = !self.forward.is_empty();
-            if ui
-                .add_enabled(back, egui::Button::new("\u{25C0}"))
-                .on_hover_text("Back")
-                .clicked()
-            {
-                actions.push(Action::Back);
-            }
-            if ui
-                .add_enabled(forward, egui::Button::new("\u{25B6}"))
-                .on_hover_text("Forward")
-                .clicked()
-            {
-                actions.push(Action::Forward);
-            }
             let up = matches!(&self.place, Place::Mine(p) if !p.is_empty());
-            if ui
-                .add_enabled(up, egui::Button::new("\u{25B2}"))
-                .on_hover_text("Up one level")
-                .clicked()
-            {
-                actions.push(Action::Up);
+            let nav = [
+                (
+                    icons::CONTENT_BACK,
+                    !self.back.is_empty(),
+                    "Back",
+                    Action::Back,
+                ),
+                (
+                    icons::CONTENT_FORWARD,
+                    !self.forward.is_empty(),
+                    "Forward",
+                    Action::Forward,
+                ),
+                (icons::CONTENT_UP, up, "Up one level", Action::Up),
+            ];
+            for (icon, enabled, tip, action) in nav {
+                if chrome::icon_button(ui, theme, icon, false, enabled, tip).clicked() {
+                    actions.push(action);
+                }
             }
             ui.add_space(6.0);
             ui.allocate_ui(egui::vec2(240.0, 24.0), |ui| {
                 opendraft_ui::widgets::text_field(ui, theme, &mut self.search, "Search blocks");
             });
-            ui.add_space(6.0);
-            self.filter.menu(ui, units);
-            ui.selectable_value(&mut self.view, View::Grid, "Thumbnails");
-            ui.selectable_value(&mut self.view, View::List, "List");
-            ui.add_space(6.0);
-            if ui
-                .button("Add to library")
-                .on_hover_text("Add the selected objects, or a block of this drawing (LIBADD)")
-                .clicked()
-            {
-                actions.push(Action::AddObjects);
-            }
-            if ui
-                .button("Import")
-                .on_hover_text("Add blocks from a drawing file: .odraft, DXF or DWG")
-                .clicked()
-            {
-                actions.push(Action::ImportFile);
-            }
+            self.filter.menu(ui, theme, units);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .button("Import")
+                    .on_hover_text("Add blocks from a drawing file: .odraft, DXF or DWG")
+                    .clicked()
+                {
+                    actions.push(Action::ImportFile);
+                }
+                if ui
+                    .button("Add to library")
+                    .on_hover_text("Add the selected objects, or a block of this drawing (LIBADD)")
+                    .clicked()
+                {
+                    actions.push(Action::AddObjects);
+                }
+                ui.add_space(6.0);
+                chrome::segmented(
+                    ui,
+                    theme,
+                    &mut self.view,
+                    &[
+                        (View::List, icons::HOME_VIEW_LIST, "List"),
+                        (View::Grid, icons::HOME_VIEW_GRID, "Thumbnails"),
+                    ],
+                );
+            });
         });
+        ui.add_space(2.0);
     }
 
     fn status_bar(&mut self, ui: &mut egui::Ui, snap: &Snapshot, actions: &mut Vec<Action>) {
@@ -278,6 +292,11 @@ impl Window {
             }
         });
     }
+}
+
+/// A panel's usual frame with a little room round what is in it.
+fn room(ui: &egui::Ui, vertical: i8) -> egui::Frame {
+    egui::Frame::side_top_panel(ui.style()).inner_margin(egui::Margin::symmetric(8, vertical))
 }
 
 #[cfg(test)]

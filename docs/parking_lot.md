@@ -159,6 +159,7 @@ Built: the `.odpack` envelope, the `opendraft.blocks` payload (kind version 0), 
 
 - In the window: the Author > Package tree and the Flat list (they need packages), a per-block choice for taken names, "Arrange by", "Repeat placement", multi-select, sorting by relevance, name or last used, French for its text, and thumbnails at a size chosen by the view. Ribbon items for `LIBADD` and `LIBINSERT` (only the window has one). The drawing-open notice, and `BlockDef::origin`.
 - The window is not in `modal_open`, so keys typed while it has focus can reach the drawing's command line; whether that is right for a modeless window has to be tried by hand.
+- The window's look (icons, neutral selection, list columns, details with a preview) was checked by hand on Windows in the dark palette only, with a few blocks, folders and one in the Trash; not the Slate palette, Linux, a library of hundreds of blocks, dragging a block onto a folder, or the rename and new-folder bar.
 - `opendraft_canvas::preview::Palette::Light` draws thumbnails for a light background, but no palette is light yet, so the window uses the dark one.
 - `LIBADD` asks no description, tags or folder (the window will), and `LIBINSERT` settles every taken name with one answer; a choice for each block needs the window's dialog.
 - The `LIBINSERT` ghost is drawn with the library's layers, so colours that follow a layer can differ from what is placed.

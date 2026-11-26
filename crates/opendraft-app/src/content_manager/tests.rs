@@ -15,6 +15,7 @@ pub(super) fn theme() -> Theme {
 pub(super) fn frame(win: &mut Window, state: &AppState) -> Vec<Request> {
     let ctx = egui::Context::default();
     let theme = theme();
+    theme.apply(&ctx);
     let mut requests = Vec::new();
     let defaults = std::sync::Arc::clone(state.defaults());
     let session = state.session();

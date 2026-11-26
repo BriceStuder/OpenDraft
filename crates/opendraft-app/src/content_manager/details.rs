@@ -8,7 +8,19 @@ use opendraft_ui::Theme;
 
 use super::actions::{Action, Taken};
 use super::snapshot::Snapshot;
-use super::{Editing, Selected, Window};
+use super::{Editing, Env, Selected, Window};
+
+/// Width of the names beside the fields.
+const LABEL: f32 = 74.0;
+
+/// A name beside a field, on the left of its own width.
+fn label(ui: &mut egui::Ui, text: &str) {
+    ui.allocate_ui_with_layout(
+        egui::vec2(LABEL, 18.0),
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| ui.label(text),
+    );
+}
 
 /// The text being edited for the chosen block.
 #[derive(Default)]
@@ -52,12 +64,14 @@ impl Window {
         &mut self,
         ui: &mut egui::Ui,
         theme: &Theme,
+        env: &Env,
         snap: &Snapshot,
         actions: &mut Vec<Action>,
     ) {
+        ui.add_space(4.0);
         match self.selected.clone() {
             Selected::Block(_) => match &snap.selected {
-                Some(block) => self.block_details(ui, theme, block, actions),
+                Some(block) => self.block_details(ui, theme, env, block, actions),
                 None => {
                     ui.weak("That block is no longer in the library.");
                 }
@@ -103,13 +117,60 @@ impl Window {
         &mut self,
         ui: &mut egui::Ui,
         theme: &Theme,
+        env: &Env,
         block: &BlockInfo,
         actions: &mut Vec<Action>,
     ) {
         let typing = ui.memory(|m| m.focused().is_some());
         self.details.follow(block, typing);
+        ui.horizontal_top(|ui| {
+            self.preview(ui, theme, env, block);
+            ui.vertical(|ui| self.block_facts(ui, theme, block, actions));
+        });
+    }
+
+    /// The block's picture, at the left of its details.
+    fn preview(&mut self, ui: &mut egui::Ui, theme: &Theme, env: &Env, block: &BlockInfo) {
+        let size = egui::vec2(120.0, 90.0);
+        let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+        ui.painter()
+            .rect_filled(rect, 4.0, theme.colors.panel_raised);
+        match self.thumbs.library_block(ui.ctx(), env, block.id) {
+            Ok(Some(texture)) => {
+                let inner = rect.shrink(4.0);
+                ui.painter().image(
+                    texture.id(),
+                    inner,
+                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                    egui::Color32::WHITE,
+                );
+            }
+            Ok(None) => {
+                ui.painter().text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "no preview",
+                    egui::FontId::proportional(theme.font_size_small),
+                    theme.colors.text_weak,
+                );
+            }
+            Err(()) => {}
+        }
+    }
+
+    fn block_facts(
+        &mut self,
+        ui: &mut egui::Ui,
+        theme: &Theme,
+        block: &BlockInfo,
+        actions: &mut Vec<Action>,
+    ) {
         ui.horizontal(|ui| {
-            ui.strong(&block.name);
+            ui.label(
+                egui::RichText::new(&block.name)
+                    .size(theme.font_size_heading)
+                    .color(theme.colors.text),
+            );
             ui.weak(format!(
                 "{}{}{}",
                 unit_text(block),
@@ -124,33 +185,35 @@ impl Window {
         if !block.components.is_empty() {
             ui.weak(format!("Contains: {}", block.components.join(", ")));
         }
-        egui::Grid::new("cm_details_grid")
-            .num_columns(2)
-            .show(ui, |ui| {
-                ui.label("Description");
-                let edit = ui.add(
-                    egui::TextEdit::multiline(&mut self.details.description)
-                        .desired_rows(2)
-                        .desired_width(ui.available_width()),
-                );
-                if edit.lost_focus() && self.details.description != block.description {
-                    actions.push(Action::SetDescription(
-                        block.id,
-                        self.details.description.clone(),
-                    ));
-                }
-                ui.end_row();
-                ui.label("Tags");
-                let edit = ui.add(
-                    egui::TextEdit::singleline(&mut self.details.tags)
-                        .hint_text("comma separated")
-                        .desired_width(ui.available_width()),
-                );
-                if edit.lost_focus() && parse_tags(&self.details.tags) != block.tags {
-                    actions.push(Action::SetTags(block.id, parse_tags(&self.details.tags)));
-                }
-                ui.end_row();
-            });
+        // Plain rows with the field width worked out here, not a grid: on its
+        // first frame a grid offers a field no width, the text wraps a letter
+        // to a line, and the window grows to hold that.
+        let field = (ui.available_width() - LABEL - ui.spacing().item_spacing.x).max(120.0);
+        ui.horizontal_top(|ui| {
+            label(ui, "Description");
+            let edit = ui.add(
+                egui::TextEdit::multiline(&mut self.details.description)
+                    .desired_rows(2)
+                    .desired_width(field),
+            );
+            if edit.lost_focus() && self.details.description != block.description {
+                actions.push(Action::SetDescription(
+                    block.id,
+                    self.details.description.clone(),
+                ));
+            }
+        });
+        ui.horizontal(|ui| {
+            label(ui, "Tags");
+            let edit = ui.add(
+                egui::TextEdit::singleline(&mut self.details.tags)
+                    .hint_text("comma separated")
+                    .desired_width(field),
+            );
+            if edit.lost_focus() && parse_tags(&self.details.tags) != block.tags {
+                actions.push(Action::SetTags(block.id, parse_tags(&self.details.tags)));
+            }
+        });
         ui.horizontal(|ui| {
             if opendraft_ui::widgets::primary_button(ui, theme, "Insert").clicked() {
                 actions.push(Action::Insert(block.id));
