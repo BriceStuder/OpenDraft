@@ -95,6 +95,7 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("MA", "MATCHPROP", "modify.matchprop"),
     ("AR", "ARRAY", "modify.array"),
     ("ARRAY", "ARRAY", "modify.array"),
+    ("ARRAYEDIT", "ARRAYEDIT", "modify.array_edit"),
     ("ARRAYRECT", "ARRAYRECT", "modify.array_rect"),
     ("ARRAYPATH", "ARRAYPATH", "modify.array_path"),
     ("ARRAYPOLAR", "ARRAYPOLAR", "modify.array_polar"),

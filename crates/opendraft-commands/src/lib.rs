@@ -6,6 +6,7 @@
 
 mod action;
 mod answer;
+mod array_action;
 mod associations;
 mod block_action;
 mod ccs_action;
@@ -36,6 +37,7 @@ mod units_action;
 mod wording;
 
 pub use action::{Action, AddCopies, AddEntity, ModifyAttributes, ModifyEntities, RemoveEntities};
+pub use array_action::SetArrays;
 pub use block_action::{SetBlockEditorDynamic, SetBlocks};
 pub use ccs_action::{SetCcs, SetNamedCcs};
 pub use changes::Changes;

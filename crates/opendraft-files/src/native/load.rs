@@ -127,6 +127,7 @@ impl DrawingDto {
             ));
         }
 
+        self.arrays.load(&mut document, &object_ids)?;
         document.reserve_ids(self.next_object_id, self.next_layer_id);
         if !layer_ids.contains(&self.current_layer) {
             return invalid(format!(

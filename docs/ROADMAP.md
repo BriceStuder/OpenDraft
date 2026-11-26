@@ -103,8 +103,8 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 - [ ] Text: TEXT/MTEXT in all import and export paths (`ByBlock` is done, 31-10-2026).
 - [x] Block attributes, done 01-11-2026 (PRs #100 and #101). What is left (multiline attributes, `ATTDISP`, BATTMAN, more data fields) is in `docs/parking_lot.md`.
 - [ ] DWG export (L).
-- [ ] Associative arrays (ARRAY makes plain copies today).
-- [ ] Spline editing (trim, extend, break, join, offset), Lengthen for splines, PEDIT's Fit and Spline.
+- [x] Associative arrays as a record beside ordinary objects, with ARRAYEDIT, done 26-11-2026. The array as one object (grips, a contextual tab) is in `docs/parking_lot.md`.
+- [ ] Spline editing: trim, break and join are done (26-11-2026); extend, join with other kinds, offset and fillet, Lengthen for splines, and PEDIT's vertex Tangent are left.
 - [ ] Dimension depth: other arrowheads, styles with colours and linetypes, `DIMBREAK`, jogged radius and `ARC_DIMENSION` as real DXF, annotative scales.
 - [ ] Multileader depth (spline leaders, block content, MLEADEREDIT).
 - [ ] A plugin system for third-party commands; an AutoLISP-compatible subset is a stretch idea, not a promise.
@@ -118,9 +118,9 @@ What to build next, roughly in order, beside the phases above. The details of ea
 
 1. The custom coordinate system (in progress, 22-11-2026): the system is built; next, turning the view (PLAN and a gesture). Plan in `docs/parking_lot.md`.
 2. PEDIT's Fit, Spline, Jointype and vertex Tangent (curve fitting of a polyline).
-3. Spline editing: exact Trim, Extend, Break and Join, then Offset and Fillet; and JOIN of arcs across gaps, with Close.
+3. Spline editing: Extend and Join with other kinds, then Offset and Fillet.
 4. The commands still dimmed on the Home tab (`NOT_BUILT` in `opendraft-app/src/ribbon_def/home.rs`): Groups, Table, Radius, Angle and ID Point, Isolate, Layer States and the rest.
-5. Associative arrays.
+5. Associative arrays as one object, with grips.
 6. Annotation: the MTEXT toolbar's font menu and symbols, then its ruler (waits for AutoCAD paragraph samples); the dimensions that are left, starting with DWG dimension import; leaders and multileaders.
 7. OD Roman: the PDF hidden text layer, the DXF round trip, and the glyphs still to draw.
 8. Layouts: non-rectangular viewport clips (planned in `docs/parking_lot.md`); open the R2000 export in AutoCAD.

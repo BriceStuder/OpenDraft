@@ -155,6 +155,17 @@ fn build() -> Vec<SysVar<AppState>> {
                 Ok(())
             },
         ),
+        SysVar::int(
+            "ARRAYASSOCIATIVITY",
+            "1 to make arrays that ARRAYEDIT can edit as a whole, 0 for plain copies",
+            (0, 1),
+            |st| Value::Int(i64::from(!st.defaults().array_plain.get())),
+            |st, v| {
+                let plain = !matches!(v, Value::Int(1));
+                st.defaults().array_plain.change(|p| *p = plain);
+                Ok(())
+            },
+        ),
         SysVar::real(
             "FILLETRAD",
             "Fillet radius",

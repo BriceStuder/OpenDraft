@@ -15,6 +15,7 @@ pub mod aci;
 pub mod arc;
 pub mod arc_make;
 pub mod array;
+mod array_record;
 pub mod block;
 mod breaking;
 pub mod bulge;
@@ -96,6 +97,7 @@ mod validate_id_tests;
 mod vertex_edit;
 pub mod width;
 
+pub use array_record::{ArrayRecord, ArrayShape};
 pub use block::{
     Affine, AttributeDefinition, AttributeDefinitionId, AttributeReference, BlockDef, BlockEntity,
     BlockId, BlockObjectId, Insert,
