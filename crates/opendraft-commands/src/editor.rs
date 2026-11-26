@@ -13,7 +13,7 @@ pub(crate) enum Request {
     /// Work on the drawing, run on the UI thread between frames.
     Run(Box<dyn FnOnce(&mut Session) + Send>),
     /// A line of feedback for the command line.
-    Say(String),
+    Say(crate::Wording),
     /// Add objects to the selection, or remove them.
     Select {
         ids: Vec<EntityId>,
@@ -51,6 +51,7 @@ pub struct Editor {
 }
 
 mod dialog_asks;
+mod steps;
 mod sweep_ask;
 
 pub use dialog_asks::{AttributeEditorAnswer, FieldAnswer};
@@ -94,8 +95,9 @@ impl Editor {
         self.get_selection(message)
     }
 
-    /// Show a line of feedback in the command line.
-    pub fn say(&self, text: impl Into<String>) {
+    /// Show a line of feedback in the command line: plain text, or a
+    /// [`Wording`](crate::Wording) with values, translated where shown.
+    pub fn say(&self, text: impl Into<crate::Wording>) {
         let _ = self.requests.send(Request::Say(text.into()));
     }
 
@@ -135,14 +137,6 @@ impl Editor {
         edit: impl FnOnce(&mut Transaction) -> Result<T, Cancelled> + Send + 'static,
     ) -> Result<T, Cancelled> {
         self.run(move |session| session.transaction(name, edit))?
-    }
-
-    /// Undo the most recent step in the drawing's history. A command uses
-    /// this only to take back a step it made itself (Line's Undo option).
-    pub fn undo(&self) -> Result<(), Cancelled> {
-        self.run(|session| {
-            session.undo();
-        })
     }
 
     fn run<R: Send + 'static>(

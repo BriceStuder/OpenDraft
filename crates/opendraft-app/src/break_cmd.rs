@@ -21,10 +21,6 @@ pub fn break_object(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     };
     let target = object.entity.clone();
-    if matches!(target, opendraft_core::Entity::Spline(_)) {
-        ed.say("BREAK does not support splines yet.");
-        return Ok(());
-    }
     let mut first = at;
     let mut options = break_options(&target, first, key!("Specify second break point"))
         .keyword("First point", "F");
@@ -39,11 +35,11 @@ pub fn break_object(ed: &mut Editor) -> Result<(), Cancelled> {
         }
     };
     let Some(left) = target.break_between(first, second) else {
-        ed.say("Object cannot be broken.");
+        ed.say(key!("Object cannot be broken."));
         return Ok(());
     };
     if left.len() == 1 && left[0] == target {
-        ed.say("Nothing to break there.");
+        ed.say(key!("Nothing to break there."));
         return Ok(());
     }
     record(ed, "Break", id, object.attrs.clone(), left)
@@ -64,20 +60,16 @@ pub fn break_at_point(ed: &mut Editor) -> Result<(), Cancelled> {
         return Ok(());
     };
     let target = object.entity.clone();
-    if matches!(target, opendraft_core::Entity::Spline(_)) {
-        ed.say("BREAKATPOINT does not support splines yet.");
-        return Ok(());
-    }
     let at = ed.get_point(PointOptions::new(key!("Specify break point")))?;
     let Some(pieces) = target.break_between(at, at) else {
-        ed.say("Object cannot be broken.");
+        ed.say(key!("Object cannot be broken."));
         return Ok(());
     };
     if pieces.len() < 2 {
         ed.say(if pieces.first() == Some(&target) && is_closed(&target) {
-            "A closed object cannot be broken at a single point."
+            key!("A closed object cannot be broken at a single point.")
         } else {
-            "Nothing to break there: the point is at an end of the object."
+            key!("Nothing to break there: the point is at an end of the object.")
         });
         return Ok(());
     }
@@ -152,24 +144,55 @@ mod tests {
         id
     }
 
+    fn hump() -> Entity {
+        Entity::Spline(Box::new(
+            opendraft_core::Spline::from_control_points(
+                3,
+                vec![p(0.0, 0.0), p(3.0, 5.0), p(7.0, 5.0), p(10.0, 0.0)],
+            )
+            .unwrap(),
+        ))
+    }
+
     #[test]
-    fn a_spline_is_refused_by_name() {
+    fn a_spline_loses_the_part_between_two_points_and_stays_two_splines() {
         let mut state = AppState::new();
-        let s = Entity::Spline(Box::new(
-            opendraft_core::Spline::from_control_points(1, vec![p(-5.0, 0.0), p(5.0, 0.0)])
-                .unwrap(),
-        ));
-        state.add_entity(s.clone());
+        state.add_entity(hump());
         let id = start(&mut state);
-        state.answer_object(p(0.0, 0.0), Some(id), false);
+        // The hump rises from (0, 0) to a crest near (5, 3.75): cut across it.
+        state.answer_object(p(2.5, 3.0), Some(id), false);
+        state.answer_point(p(7.5, 3.0));
         state.settle_command();
-        assert!(!state.command_running());
-        assert_eq!(entities(&state), [s]);
-        assert!(state
-            .cmdline
-            .log
-            .iter()
-            .any(|l| l.contains("BREAK does not support splines yet.")));
+        let now = entities(&state);
+        assert_eq!(now.len(), 2);
+        assert!(now.iter().all(|e| matches!(e, Entity::Spline(_))));
+        let (Entity::Spline(a), Entity::Spline(b)) = (&now[0], &now[1]) else {
+            panic!()
+        };
+        assert!(a.start_point().x.abs() < 1e-9 && (b.end_point().x - 10.0).abs() < 1e-9);
+        assert!(a.end_point().x < b.start_point().x);
+        state.undo();
+        assert_eq!(entities(&state), [hump()]);
+    }
+
+    #[test]
+    fn a_spline_divided_at_a_point_becomes_two_that_meet() {
+        let mut state = AppState::new();
+        state.add_entity(hump());
+        state.start_command("Break at point", break_at_point);
+        state.settle_command();
+        let id = state.session().document().objects()[0].id;
+        state.answer_object(p(5.0, 3.75), Some(id), false);
+        state.settle_command();
+        state.answer_point(p(5.0, 3.75));
+        state.settle_command();
+        let now = entities(&state);
+        assert_eq!(now.len(), 2);
+        let (Entity::Spline(a), Entity::Spline(b)) = (&now[0], &now[1]) else {
+            panic!("{now:?}")
+        };
+        let (e, s) = (a.end_point(), b.start_point());
+        assert!((e.x - s.x).hypot(e.y - s.y) < 1e-9);
     }
 
     #[test]
@@ -266,6 +289,35 @@ mod tests {
         state.answer_point(p(10.0, 0.0));
         state.settle_command();
         assert_eq!(entities(&state), [whole]);
+    }
+
+    #[test]
+    fn an_at_sign_alone_is_the_first_point_again_so_the_object_is_divided() {
+        let mut state = AppState::new();
+        state.add_entity(line(p(0.0, 0.0), p(10.0, 0.0)));
+        let id = start(&mut state);
+        state.answer_object(p(4.0, 0.0), Some(id), false);
+        state.cmd_submit("@");
+        state.settle_command();
+        assert!(!state.command_running());
+        assert_eq!(
+            entities(&state),
+            [
+                line(p(0.0, 0.0), p(4.0, 0.0)),
+                line(p(4.0, 0.0), p(10.0, 0.0))
+            ]
+        );
+    }
+
+    #[test]
+    fn at_zero_zero_still_does_the_same() {
+        let mut state = AppState::new();
+        state.add_entity(line(p(0.0, 0.0), p(10.0, 0.0)));
+        let id = start(&mut state);
+        state.answer_object(p(4.0, 0.0), Some(id), false);
+        state.cmd_submit("@0,0");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2);
     }
 
     #[test]

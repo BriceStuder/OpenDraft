@@ -100,7 +100,8 @@ fn zooming_the_sheet_moves_the_pictures_and_makes_new_ones() {
     rig.frame(&doc, &none());
     assert_eq!(rig.builds(), 2);
     // Zooming the sheet moves every viewport on it, and the sheet's own picture.
-    rig.view.request_zoom_step(true);
+    rig.view
+        .request_zoom_window(Point::new(0.0, 0.0), Point::new(100.0, 70.0));
     let mut frames = 0;
     while rig.view.cache_stats().rebuilding.is_some() || frames < 2 {
         rig.frame(&doc, &none());

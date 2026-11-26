@@ -7,7 +7,7 @@ use opendraft_core::{Attributes, Entity, EntityId, LayoutId};
 use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// An object that may take part in a join, as the drawing holds it.
 struct Item {
@@ -81,8 +81,9 @@ pub(crate) fn join_group(
     kind: JoinType,
 ) -> Result<usize, Cancelled> {
     if others.len() > MAX_JOIN_CANDIDATES {
-        ed.say(format!(
-            "Too many objects to join (the limit is {MAX_JOIN_CANDIDATES})."
+        ed.say(Wording::new(
+            key!("Too many objects to join (the limit is %{most})."),
+            &[("most", &MAX_JOIN_CANDIDATES.to_string())],
         ));
         return Ok(0);
     }
@@ -109,7 +110,7 @@ pub(crate) fn join_group(
     let plans = plan_joins(&items, count, fuzz, kind);
     let added: usize = plans.iter().map(|p| p.added).sum();
     if plans.is_empty() {
-        ed.say("0 segments added to polyline.");
+        ed.say(key!("0 segments added to polyline."));
         return Ok(0);
     }
     let attrs_of = |id: EntityId| items.iter().find(|i| i.id == id).map(|i| &i.attrs);
@@ -126,11 +127,16 @@ pub(crate) fn join_group(
         }
         Ok(())
     })?;
-    ed.say(format!("{} added to polyline.", plural(added, "segment")));
+    ed.say(Wording::count(
+        added,
+        key!("%{count} segment added to polyline."),
+        key!("%{count} segments added to polyline."),
+    ));
     if differing > 0 {
-        ed.say(format!(
-            "{} had other properties; the polyline's were kept.",
-            plural(differing, "joined object")
+        ed.say(Wording::count(
+            differing,
+            key!("%{count} joined object had other properties; the polyline's were kept."),
+            key!("%{count} joined objects had other properties; the polyline's were kept."),
         ));
     }
     Ok(added)
@@ -146,7 +152,7 @@ pub(crate) fn ask_fuzz(ed: &Editor) -> Result<(f64, JoinType), Cancelled> {
             Answer::Value(fuzz) if fuzz >= 0.0 => {
                 return Ok((fuzz, ed.defaults().pedit.get().join_type))
             }
-            Answer::Value(_) => ed.say("Requires a value of zero or more."),
+            Answer::Value(_) => ed.say(key!("Requires a value of zero or more.")),
             Answer::Keyword(_) => {
                 let current = match ed.defaults().pedit.get().join_type {
                     JoinType::Extend => "Extend",

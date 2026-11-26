@@ -1,5 +1,18 @@
 //! Small wording helpers shared by messages.
 
+use opendraft_commands::Wording;
+use opendraft_ui::key;
+
+/// "1 object", "3 objects", translated where it is shown.
+pub fn objects(count: usize) -> Wording {
+    Wording::count(count, key!("%{count} object"), key!("%{count} objects"))
+}
+
+/// "1 item", "3 items" (of an array), translated where it is shown.
+pub fn items(count: usize) -> Wording {
+    Wording::count(count, key!("%{count} item"), key!("%{count} items"))
+}
+
 /// "1 object", "3 objects".
 pub fn plural(count: usize, noun: &str) -> String {
     format!("{count} {noun}{}", if count == 1 { "" } else { "s" })

@@ -1,6 +1,16 @@
 //! Drawing document model. No UI dependencies: this crate must build and be
 //! testable without a window.
 
+/// Marks an English message that the interface translates where it shows
+/// it (issue #138): it gives the text unchanged, and the app's translation
+/// test reads it as a key that is still in use.
+#[macro_export]
+macro_rules! key {
+    ($text:literal) => {
+        $text
+    };
+}
+
 pub mod aci;
 pub mod arc;
 pub mod arc_make;
@@ -30,13 +40,16 @@ mod fillet_parallel;
 mod grip;
 pub mod hatch;
 pub mod hsl;
+pub mod implied_edge;
 pub mod infinite;
 mod intersect;
 mod join;
+mod join_gap;
 mod layer;
 pub mod layout;
 pub mod leader;
 mod lengthen;
+mod lengthen_ellipse;
 pub mod linetype;
 pub mod loop_polyline;
 pub mod measure;
@@ -80,6 +93,7 @@ pub mod units;
 mod validate;
 #[cfg(test)]
 mod validate_id_tests;
+mod vertex_edit;
 pub mod width;
 
 pub use block::{
@@ -101,6 +115,7 @@ pub use grip::{Grip, GripKind};
 pub use hatch::HatchEntity;
 pub use intersect::Curve;
 pub use join::{join, Merged};
+pub use join_gap::closed;
 pub use layer::{Attr, Attributes, Color, Layer, LayerId, LayerLook, Lineweight};
 pub use layout::{
     format_scale, paper_size, paper_size_name, parse_scale, Layout, LayoutId, Viewport, ViewportId,
@@ -126,6 +141,7 @@ pub use text_style::{
 };
 pub use units::{AngleFormat, InsertUnits, LengthFormat, Units};
 pub use validate::DocumentError;
+pub use vertex_edit::VertexGrip;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Point {

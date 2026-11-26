@@ -97,7 +97,11 @@ pub(super) fn field_box(
     let (light, grey, ink) = (look.light, look.grey, look.ink);
     let locked = input.locks.contains_key(&field);
     let live = input.live_text(field, ask, settings, *units);
-    let slot = usize::from(matches!(field, Field::Y | Field::Angle));
+    let slot = match field {
+        Field::Y | Field::Angle => 1,
+        Field::Length => 2,
+        _ => 0,
+    };
     area(ctx, (uid, slot), rect, |ui, rect| {
         box_fill(
             ui,

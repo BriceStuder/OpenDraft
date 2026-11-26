@@ -126,6 +126,8 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](draw-gradient.svg) | `draw-gradient.svg` | blend | Gradient |
 | ![](draw-hatch.svg) | `draw-hatch.svg` | square-slash | Hatch (A square with a diagonal: the nearest Lucide has to hatching.) |
 | ![](draw-line.svg) | `draw-line.svg` | minus | Line |
+| ![](draw-line-middle.svg) | `draw-line-middle.svg` | minus | From Middle |
+| ![](draw-line-single.svg) | `draw-line-single.svg` | minus | Single Lines |
 | ![](draw-oblong-2p.svg) | `draw-oblong-2p.svg` | square | Oblong, 2-Point |
 | ![](draw-oblong-center.svg) | `draw-oblong-center.svg` | square | Oblong, Center |
 | ![](draw-measure.svg) | `draw-measure.svg` | between-horizontal-start | Measure (Lucide's marks between two ends.) |
@@ -152,7 +154,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](edit-undo.svg) | `edit-undo.svg` | undo-2 | app.rs, app/context_menu.rs |
 | ![](file-new.svg) | `file-new.svg` | file | app.rs, app/home_page/start.rs |
 | ![](file-open.svg) | `file-open.svg` | folder-open | app.rs, app/home_page/start.rs |
-| ![](file-plot.svg) | `file-plot.svg` | printer | Plot, app.rs |
+| ![](file-plot.svg) | `file-plot.svg` | printer | Plot, app.rs, layer_columns.rs, ribbon_slots.rs |
 | ![](file-save.svg) | `file-save.svg` | save | app.rs, theme.rs |
 | ![](format-linetype.svg) | `format-linetype.svg` | ellipsis | Linetypes |
 | ![](format-properties.svg) | `format-properties.svg` | file-text | Properties |
@@ -233,6 +235,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](modify-mirror.svg) | `modify-mirror.svg` | flip-horizontal | Mirror |
 | ![](modify-move.svg) | `modify-move.svg` | move | Move, app/context_menu.rs |
 | ![](modify-offset.svg) | `modify-offset.svg` | stretch-horizontal | Offset |
+| ![](modify-overkill.svg) | `modify-overkill.svg` | copy-minus | Overkill |
 | ![](modify-pedit.svg) | `modify-pedit.svg` | waypoints | Edit Polyline |
 | ![](modify-rotate.svg) | `modify-rotate.svg` | rotate-cw | Rotate, app/context_menu.rs |
 | ![](modify-scale.svg) | `modify-scale.svg` | maximize | Scale, app/context_menu.rs |
@@ -299,5 +302,3 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](view-nav-gizmo.svg) | `view-nav-gizmo.svg` | compass | Gizmo |
 | ![](view-snap.svg) | `view-snap.svg` | magnet | Snap |
 | ![](view-zoom-extents.svg) | `view-zoom-extents.svg` | maximize | Zoom Extents |
-| ![](view-zoom-in.svg) | `view-zoom-in.svg` | zoom-in | Zoom In |
-| ![](view-zoom-out.svg) | `view-zoom-out.svg` | zoom-out | Zoom Out |

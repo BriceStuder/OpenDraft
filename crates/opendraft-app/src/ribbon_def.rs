@@ -292,15 +292,11 @@ fn view() -> Tab {
                 title: "Navigate",
                 columns: vec![
                     Column::Large(Item::new("view.pan", "Pan", icons::VIEW_PAN)),
-                    Column::Stack(vec![
-                        Item::new("view.zoom_in", "Zoom In", icons::VIEW_ZOOM_IN),
-                        Item::new("view.zoom_out", "Zoom Out", icons::VIEW_ZOOM_OUT),
-                        Item::new(
-                            "view.zoom_extents",
-                            "Zoom Extents",
-                            icons::VIEW_ZOOM_EXTENTS,
-                        ),
-                    ]),
+                    Column::Large(Item::new(
+                        "view.zoom_extents",
+                        "Zoom Extents",
+                        icons::VIEW_ZOOM_EXTENTS,
+                    )),
                 ],
                 ..Default::default()
             },

@@ -11,6 +11,7 @@ use opendraft_core::{Entity, Point, Units};
 use opendraft_ui::key;
 
 use crate::draw::line;
+use opendraft_commands::Wording;
 
 fn drawing_units(ed: &Editor) -> Result<Units, Cancelled> {
     ed.read(|doc| *doc.units())
@@ -19,15 +20,19 @@ fn drawing_units(ed: &Editor) -> Result<Units, Cancelled> {
 /// `Distance = 5.0000, Angle in XY Plane = 53` and the offsets under it.
 fn say_separation(ed: &Editor, units: &Units, a: Point, b: Point) {
     let s = separation(a, b);
-    ed.say(format!(
-        "Distance = {}, Angle in XY Plane = {}",
-        format_length(units, s.distance),
-        format_angle(units, s.angle)
+    ed.say(Wording::new(
+        key!("Distance = %{distance}, Angle in XY Plane = %{angle}"),
+        &[
+            ("distance", &format_length(units, s.distance)),
+            ("angle", &format_angle(units, s.angle)),
+        ],
     ));
-    ed.say(format!(
-        "Delta X = {}, Delta Y = {}",
-        format_length(units, s.dx),
-        format_length(units, s.dy)
+    ed.say(Wording::new(
+        key!("Delta X = %{dx}, Delta Y = %{dy}"),
+        &[
+            ("dx", &format_length(units, s.dx)),
+            ("dy", &format_length(units, s.dy)),
+        ],
     ));
 }
 
@@ -70,7 +75,10 @@ fn measure_path(ed: &Editor, first: Point) -> Result<(), Cancelled> {
         match ed.ask_point(options) {
             Err(Cancelled) | Ok(Answer::Enter) => {
                 let total: f64 = steps.iter().sum();
-                ed.say(format!("Total distance = {}", format_length(&units, total)));
+                ed.say(Wording::new(
+                    key!("Total distance = %{total}"),
+                    &[("total", &format_length(&units, total))],
+                ));
                 return Ok(());
             }
             Ok(Answer::Value(to)) => {
@@ -78,10 +86,12 @@ fn measure_path(ed: &Editor, first: Point) -> Result<(), Cancelled> {
                 steps.push(step);
                 points.push(to);
                 let total: f64 = steps.iter().sum();
-                ed.say(format!(
-                    "Distance = {}, total distance = {}",
-                    format_length(&units, step),
-                    format_length(&units, total)
+                ed.say(Wording::new(
+                    key!("Distance = %{distance}, total distance = %{total}"),
+                    &[
+                        ("distance", &format_length(&units, step)),
+                        ("total", &format_length(&units, total)),
+                    ],
                 ));
             }
             Ok(Answer::Keyword(_)) => {
@@ -141,7 +151,10 @@ pub fn measure_area(ed: &mut Editor) -> Result<(), Cancelled> {
             Mode::Add => total += area,
             Mode::Subtract => total -= area,
         }
-        ed.say(format!("Total area = {}", format_area(&units, total)));
+        ed.say(Wording::new(
+            key!("Total area = %{total}"),
+            &[("total", &format_area(&units, total))],
+        ));
     }
 }
 
@@ -171,14 +184,16 @@ fn corner_shape(ed: &Editor, units: &Units, first: Point) -> Result<Option<f64>,
         }
     }
     if points.len() < 3 {
-        ed.say("Give at least three corner points.");
+        ed.say(key!("Give at least three corner points."));
         return Ok(None);
     }
     let (area, perimeter) = corners(&points);
-    ed.say(format!(
-        "Area = {}, Perimeter = {}",
-        format_area(units, area),
-        format_length(units, perimeter)
+    ed.say(Wording::new(
+        key!("Area = %{area}, Perimeter = %{perimeter}"),
+        &[
+            ("area", &format_area(units, area)),
+            ("perimeter", &format_length(units, perimeter)),
+        ],
     ));
     Ok(Some(area))
 }
@@ -192,7 +207,7 @@ fn object_shape(ed: &Editor, units: &Units) -> Result<Option<f64>, Cancelled> {
     let id = picked.id;
     let measured = ed.read(move |doc| doc.get(id).and_then(Entity::measured))?;
     let Some(m) = measured else {
-        ed.say("That object has no area.");
+        ed.say(key!("That object has no area."));
         return Ok(None);
     };
     Ok(say_object(ed, units, &m))
@@ -202,17 +217,24 @@ fn object_shape(ed: &Editor, units: &Units) -> Result<Option<f64>, Cancelled> {
 /// enclose if closed, and a line or arc only a length.
 fn say_object(ed: &Editor, units: &Units, m: &Measured) -> Option<f64> {
     let length = format_length(units, m.length);
-    let name = if m.closed { "Perimeter" } else { "Length" };
     match m.area {
         Some(area) => {
-            ed.say(format!(
-                "Area = {}, {name} = {length}",
-                format_area(units, area)
-            ));
+            let text = if m.closed {
+                key!("Area = %{area}, Perimeter = %{length}")
+            } else {
+                key!("Area = %{area}, Length = %{length}")
+            };
+            let shown = format_area(units, area);
+            ed.say(Wording::new(text, &[("area", &shown), ("length", &length)]));
             Some(area)
         }
         None => {
-            ed.say(format!("{name} = {length}. It encloses no area."));
+            let text = if m.closed {
+                key!("Perimeter = %{length}. It encloses no area.")
+            } else {
+                key!("Length = %{length}. It encloses no area.")
+            };
+            ed.say(Wording::new(text, &[("length", &length)]));
             None
         }
     }

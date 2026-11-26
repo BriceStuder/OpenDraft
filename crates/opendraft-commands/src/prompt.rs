@@ -75,6 +75,10 @@ pub enum DynamicDimensions {
     /// X and Y give the size of a box centred on the base point: twice the
     /// pointer's offset from it (a rectangle drawn from its centre).
     Centred,
+    /// A length and an angle from the base point, which is the middle of a
+    /// line: the length is half the line's, and a second field takes the
+    /// whole length.
+    Mirrored,
 }
 
 /// How a prompt is worded and what it accepts. Build with

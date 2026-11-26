@@ -42,7 +42,9 @@ pub fn draw_donut(ed: &mut Editor) -> Result<(), Cancelled> {
                 .change(|m| *m = Memory { inside, outside });
             break (inside, outside);
         }
-        ed.say("Requires a non-negative inside diameter and an outside diameter above zero.");
+        ed.say(key!(
+            "Requires a non-negative inside diameter and an outside diameter above zero."
+        ));
     };
     loop {
         let options =

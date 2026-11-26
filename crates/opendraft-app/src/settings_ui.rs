@@ -80,7 +80,7 @@ fn updates(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         ui.add_space(6.0);
         ui.label(
             egui::RichText::new(
-                "The request carries OpenDraft's version number and, as any web request does,                  your internet address. No drawings or personal details are sent, and nothing                  is downloaded or installed: a newer version is only announced, and its                  release page opens when you click.",
+                "The request carries OpenDraft's version number and, as any web request does, your internet address. No drawings or personal details are sent, and nothing is downloaded or installed: a newer version is only announced, and its release page opens when you click.",
             )
             .color(theme.colors.text_weak),
         );
@@ -110,39 +110,42 @@ fn display_left(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
 }
 
 fn display_right(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
-    widgets::group_box(ui, theme, "Mouse wheel", |ui| {
+    widgets::group_box(ui, theme, "Navigation", |ui| {
         let (min, max) = ZOOM_SPEED_RANGE;
         ui.horizontal(|ui| {
-            ui.label("Zoom speed");
+            ui.label("Mouse wheel zoom speed");
             ui.add(egui::Slider::new(&mut draft.zoom_speed, min..=max).suffix(" %"));
         });
-    });
-    ui.add_space(6.0);
-    widgets::group_box(ui, theme, "Navigation", |ui| {
         ui.checkbox(&mut draft.show_nav_gizmo, "Show the navigation gizmo");
+        ui.checkbox(
+            &mut draft.show_viewport_controls,
+            "Display the viewport controls",
+        )
+        .on_hover_text("The [-][Top][2D Wireframe] label in the top-left corner (VPCONTROL)");
     });
     ui.add_space(6.0);
     selection(ui, theme, draft);
     ui.add_space(6.0);
     widgets::group_box(ui, theme, "Interface scale", |ui| {
-        widgets::field_label(ui, theme, "Scale user interface elements to");
-        let width = ui.available_width().min(160.0);
-        widgets::dropdown(
-            ui,
-            theme,
-            "ui_scale",
-            &format!("{}%", draft.ui_scale_percent),
-            width,
-            |ui| {
-                for percent in UI_SCALES {
-                    ui.selectable_value(
-                        &mut draft.ui_scale_percent,
-                        percent,
-                        format!("{percent}%"),
-                    );
-                }
-            },
-        );
+        ui.horizontal(|ui| {
+            widgets::field_label(ui, theme, "Scale user interface elements to");
+            widgets::dropdown(
+                ui,
+                theme,
+                "ui_scale",
+                &format!("{}%", draft.ui_scale_percent),
+                90.0,
+                |ui| {
+                    for percent in UI_SCALES {
+                        ui.selectable_value(
+                            &mut draft.ui_scale_percent,
+                            percent,
+                            format!("{percent}%"),
+                        );
+                    }
+                },
+            );
+        });
     });
     ui.add_space(6.0);
     crate::language::settings_group(ui, theme, draft);
@@ -408,7 +411,7 @@ fn files(
         });
         ui.label(
             egui::RichText::new(
-                "For PDF and SVG plots of a new drawing, and of a drawing whose printer is not                  on this computer.",
+                "For PDF and SVG plots of a new drawing, and of a drawing whose printer is not on this computer.",
             )
             .size(theme.font_size_small)
             .color(theme.colors.text_weak),

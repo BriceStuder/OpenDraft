@@ -289,14 +289,14 @@ fn keyword(
                 let to = Point::new(from.x + heading.x * length, from.y + heading.y * length);
                 mode.push(chain, to, 0.0);
             } else {
-                ed.say("Requires a non-zero value.");
+                ed.say(key!("Requires a non-zero value."));
             }
         }
         arc_keyword => match arc_option(ed, arc_keyword, (from, heading), &drawn)? {
             Some((to, curve)) if distance(from, to) > MIN_SIZE => {
                 mode.push(chain, to, curve);
             }
-            _ => ed.say("Those values make no arc."),
+            _ => ed.say(key!("Those values make no arc.")),
         },
     }
     Ok(Flow::Next)

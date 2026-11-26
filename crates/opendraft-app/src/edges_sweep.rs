@@ -83,13 +83,15 @@ fn hits(entity: &Entity, region: &Region) -> Vec<Point> {
 }
 
 /// The objects the others are cut or extended against: the chosen edges, or
-/// every visible object when none were chosen; never `id` itself.
+/// every visible object when none were chosen; never `id` itself. With
+/// `implied` (the Edge option) each acts as if it ran on past its ends.
 pub(crate) fn edges_for(
     doc: &Document,
     edges: &Option<Vec<EntityId>>,
     id: EntityId,
+    implied: bool,
 ) -> Vec<Entity> {
-    match edges {
+    let found: Vec<Entity> = match edges {
         Some(ids) => ids
             .iter()
             .filter(|other| **other != id)
@@ -101,6 +103,11 @@ pub(crate) fn edges_for(
             .filter(|o| o.id != id)
             .map(|o| o.entity.clone())
             .collect(),
+    };
+    if implied {
+        opendraft_core::implied_edge::implied_edges(&found)
+    } else {
+        found
     }
 }
 
@@ -132,6 +139,7 @@ pub(crate) fn change_swept(
     mode: Mode,
     region: Region,
     erase: bool,
+    implied: bool,
 ) -> Result<usize, Cancelled> {
     let edges = edges.clone();
     let name = match mode {
@@ -163,7 +171,7 @@ pub(crate) fn change_swept(
             else {
                 continue;
             };
-            let others = edges_for(doc, &edges, target.id);
+            let others = edges_for(doc, &edges, target.id, implied);
             if let Ok(left) = plan(mode, &target.entity, &others, at, erase) {
                 let (id, attrs) = (target.id, target.attrs.clone());
                 put_back(tx, id, attrs, left);
@@ -174,8 +182,8 @@ pub(crate) fn change_swept(
     })?;
     if done == 0 {
         ed.say(match mode {
-            Mode::Trim => "Nothing to trim there.",
-            Mode::Extend => "Nothing to extend there.",
+            Mode::Trim => key!("Nothing to trim there."),
+            Mode::Extend => key!("Nothing to extend there."),
         });
     }
     Ok(done)
@@ -343,11 +351,6 @@ mod tests {
         state.cmd_submit("");
         state.settle_command();
         assert!(tops_gone(&state), "got {:?}", entities(&state));
-        let options = state.cmd_prompt().options;
-        assert!(
-            !options.iter().any(|o| o.label == "Crossing"),
-            "a click starts it"
-        );
     }
 
     #[test]

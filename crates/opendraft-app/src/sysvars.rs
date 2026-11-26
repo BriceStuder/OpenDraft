@@ -48,6 +48,16 @@ fn build() -> Vec<SysVar<AppState>> {
                 Ok(())
             },
         ),
+        SysVar::int(
+            "VPCONTROL",
+            "Viewport controls in the drawing's corner: 0 hidden, 1 shown",
+            (0, 1),
+            |s| flag(s.settings.show_viewport_controls),
+            |s, v| {
+                s.settings.show_viewport_controls = int(v) == 1;
+                Ok(())
+            },
+        ),
         SysVar::real(
             "GRIDUNIT",
             "Grid spacing in drawing units",
@@ -352,6 +362,7 @@ pub fn table() -> &'static SysVarTable<AppState> {
         variables.extend(crate::spline_memory::variables());
         variables.extend(crate::hatch_memory::variables());
         variables.extend(crate::trim_memory::variables());
+        variables.extend(crate::offset_memory::variables());
         SysVarTable::new(variables).unwrap_or_else(|e| panic!("invalid system variable table: {e}"))
     })
 }
@@ -372,6 +383,17 @@ mod tests {
         assert!(!state.settings.snap.enabled && state.settings.snap.endpoint);
         table.set("SNAPMODE", "0", &mut state).unwrap();
         assert!(!state.settings.snap.grid);
+    }
+
+    #[test]
+    fn vpcontrol_shows_and_hides_the_viewport_controls() {
+        let (table, mut state) = (table(), AppState::new());
+        assert_eq!(table.get("VPCONTROL", &state), Ok(Value::Int(1)));
+        table.set("vpcontrol", "0", &mut state).unwrap();
+        assert!(!state.settings.show_viewport_controls);
+        assert!(table.set("VPCONTROL", "2", &mut state).is_err());
+        table.set("VPCONTROL", "1", &mut state).unwrap();
+        assert!(state.settings.show_viewport_controls);
     }
 
     #[test]

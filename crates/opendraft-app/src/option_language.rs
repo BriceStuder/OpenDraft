@@ -111,7 +111,7 @@ pub fn pick<'a>(options: &'a [CmdOption], text: &str) -> Option<&'a CmdOption> {
 }
 
 /// Upper case without accents, so "e" picks "Étirer" and "noeuds" "Nœuds".
-fn fold(text: &str) -> Cow<'_, str> {
+pub(crate) fn fold(text: &str) -> Cow<'_, str> {
     if text
         .chars()
         .all(|c| c.is_ascii_uppercase() || !c.is_alphabetic())

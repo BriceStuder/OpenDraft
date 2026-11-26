@@ -24,10 +24,12 @@ use std::fmt;
 
 use crate::{Bounds, Point};
 
+mod cut;
 mod eval;
 mod fit;
 mod fit_closed;
 mod flatten;
+mod join;
 mod query;
 mod snap;
 mod transform;

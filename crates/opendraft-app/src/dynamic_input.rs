@@ -20,6 +20,9 @@ pub enum Field {
     Y,
     Coordinate,
     Distance,
+    /// The whole length of a line given by its middle (where `Distance` is
+    /// half of it).
+    Length,
     Angle,
     Number,
     Text,
@@ -153,6 +156,13 @@ impl DynamicInputState {
             {
                 vec![Distance, Angle]
             }
+            Wants::Point
+                if ask.base.is_some()
+                    && settings.dimensions()
+                    && ask.dynamic_dimensions == DynamicDimensions::Mirrored =>
+            {
+                vec![Distance, Length, Angle]
+            }
             Wants::Point if settings.pointer() || (settings.dimensions() && boxed(ask)) => {
                 if ask.base.is_some() && !settings.pointer_cartesian && !boxed(ask) {
                     vec![Distance, Angle]
@@ -195,6 +205,13 @@ impl DynamicInputState {
         if !self.draft.trim().is_empty() {
             let value = parse_field(current, &self.draft, reading)
                 .ok_or("Enter a finite numeric value before locking this field.")?;
+            // Half the length and the whole length say the same thing: the
+            // one locked last counts.
+            match current {
+                Field::Distance => self.locks.remove(&Field::Length),
+                Field::Length => self.locks.remove(&Field::Distance),
+                _ => None,
+            };
             self.locks.insert(current, value);
         }
         let index = fields.iter().position(|f| *f == current).unwrap_or(0);
@@ -221,8 +238,27 @@ impl DynamicInputState {
                 return Some(value);
             }
         }
+        // The half length being typed gives the whole length, and the other
+        // way round.
+        let other = match field {
+            Field::Distance => Some((Field::Length, 0.5)),
+            Field::Length => Some((Field::Distance, 2.0)),
+            _ => None,
+        };
+        if let Some((other, factor)) = other {
+            if self.active == Some(other) && !self.draft.is_empty() {
+                if let Some(value) = parse_field(other, &self.draft, reading) {
+                    return Some(value * factor);
+                }
+            }
+        }
         if let Some(value) = self.locks.get(&field) {
             return Some(*value);
+        }
+        if let Some((other, factor)) = other {
+            if let Some(value) = self.locks.get(&other) {
+                return Some(value * factor);
+            }
         }
         let cursor = self.cursor?;
         let base = ask.base.unwrap_or(Point::new(0.0, 0.0));
@@ -241,6 +277,7 @@ impl DynamicInputState {
             Field::X => Some(shown.x),
             Field::Y => Some(shown.y),
             Field::Distance => Some((cursor.x - base.x).hypot(cursor.y - base.y)),
+            Field::Length => Some(2.0 * (cursor.x - base.x).hypot(cursor.y - base.y)),
             Field::Angle => {
                 // Half a turn either way, so 270 reads as -90.
                 let direction = (cursor.y - base.y).atan2(cursor.x - base.x);
@@ -317,7 +354,7 @@ impl DynamicInputState {
                     reading.ccs.to_world(shown)
                 }
             }
-            Field::Distance | Field::Angle => {
+            Field::Distance | Field::Length | Field::Angle => {
                 let base = ask.base?;
                 let distance = self.value(Field::Distance, ask, settings, reading)?;
                 let degrees = self.value(Field::Angle, ask, settings, reading)?;
@@ -369,9 +406,12 @@ impl DynamicInputState {
             return Ok(String::new());
         }
         if ask.wants == Wants::Point
-            && self
-                .active
-                .is_some_and(|f| matches!(f, Field::X | Field::Y | Field::Distance | Field::Angle))
+            && self.active.is_some_and(|f| {
+                matches!(
+                    f,
+                    Field::X | Field::Y | Field::Distance | Field::Length | Field::Angle
+                )
+            })
             && (self
                 .active
                 .is_some_and(|f| parse_field(f, &self.draft, reading).is_some())
@@ -495,6 +535,47 @@ mod tests {
             opendraft_core::Entity::Rectangle {
                 min: Point::new(95.0, 190.0),
                 max: Point::new(105.0, 210.0),
+            }
+        );
+    }
+
+    #[test]
+    fn a_line_from_its_middle_takes_half_its_length_or_on_tab_the_whole() {
+        let mut state = AppState::new();
+        state.start_command("Line", crate::line_modes::draw_line_middle);
+        state.settle_command();
+        state.answer_dynamic("100,200").unwrap();
+        state.settle_command();
+        let ask = state.waiting().unwrap().clone();
+        let settings = state.settings.dynamic_input.clone();
+        let units = Units::default();
+        let input = &mut state.docs[0].dynamic_input;
+        input.cursor = Some(Point::new(110.0, 200.0));
+        let fields = [Field::Distance, Field::Length, Field::Angle];
+        assert_eq!(input.fields(&ask, &settings), fields);
+        assert_eq!(
+            input.value(Field::Length, &ask, &settings, &units),
+            Some(20.0)
+        );
+        input.begin(Field::Distance);
+        input.draft = "10".into();
+        input.cycle(&fields, false, &units).unwrap();
+        input.draft = "30".into();
+        // The whole length typed last counts, not the half locked before it.
+        assert_eq!(
+            input.value(Field::Distance, &ask, &settings, &units),
+            Some(15.0)
+        );
+        input.cycle(&fields, false, &units).unwrap();
+        assert!(!input.locks.contains_key(&Field::Distance));
+        let text = input.submission(&ask, &settings, &units).unwrap();
+        state.answer_dynamic(&text).unwrap();
+        state.settle_command();
+        assert_eq!(
+            state.session().document().objects()[0].entity,
+            opendraft_core::Entity::Line {
+                start: Point::new(85.0, 200.0),
+                end: Point::new(115.0, 200.0),
             }
         );
     }

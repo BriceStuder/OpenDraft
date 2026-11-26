@@ -6,6 +6,7 @@ use opendraft_core::{Entity, EntityId, Object, Point};
 use opendraft_ui::key;
 
 use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// MOVE: shift objects by a base point and a second point, or by a typed
 /// displacement (the Displacement option, or Enter at the base point prompt).
@@ -49,7 +50,9 @@ pub fn move_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
         Ok(())
     })?;
-    ed.say(format!("Moved {}", plural(count, "object")));
+    ed.say(
+        Wording::new(key!("Moved %{objects}"), &[]).part("objects", crate::text::objects(count)),
+    );
     Ok(())
 }
 
@@ -98,7 +101,10 @@ pub fn copy_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             tx.add_with(copies);
             Ok(())
         })?;
-        ed.say(format!("Copied {}", plural(count, "object")));
+        ed.say(
+            Wording::new(key!("Copied %{objects}"), &[])
+                .part("objects", crate::text::objects(count)),
+        );
     }
 }
 
@@ -151,11 +157,12 @@ pub fn mirror_objects(ed: &mut Editor) -> Result<(), Cancelled> {
         }
         Ok(())
     })?;
-    ed.say(if erase {
-        format!("Mirrored {count}")
+    let text = if erase {
+        key!("Mirrored %{count}")
     } else {
-        format!("Mirrored {count}, originals kept")
-    });
+        key!("Mirrored %{count}, originals kept")
+    };
+    ed.say(Wording::new(text, &[("count", &count.to_string())]));
     Ok(())
 }
 

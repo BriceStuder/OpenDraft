@@ -23,6 +23,7 @@ use crate::prompt_reply::{
 };
 use crate::state::AppState;
 use crate::units_state::hint_text;
+use opendraft_ui::key;
 
 /// How long to wait, right after an answer, for the command's next prompt.
 const NEXT_PROMPT_WAIT: Duration = Duration::from_millis(5);
@@ -94,7 +95,7 @@ impl AppState {
     /// (a pick made from a dialog, which then opens again), else cancel it.
     pub(crate) fn esc_in_command(&mut self) {
         if self.waiting().is_some_and(|ask| ask.esc_backs) {
-            self.cmdline.say("*Cancel*");
+            self.cmdline.say(key!("*Cancel*"));
             self.reply(Reply::Back);
         } else {
             self.cancel_command();
@@ -105,7 +106,7 @@ impl AppState {
     pub fn cancel_command(&mut self) {
         if self.runner.is_some() {
             self.abort_command();
-            self.cmdline.say("*Cancel*");
+            self.cmdline.say(key!("*Cancel*"));
         }
     }
 
@@ -143,8 +144,8 @@ impl AppState {
                 self.note_command_end(outcome);
                 match outcome {
                     Outcome::Completed => {}
-                    Outcome::Cancelled => self.cmdline.say("*Cancel*"),
-                    Outcome::Crashed => self.cmdline.say("The command stopped unexpectedly."),
+                    Outcome::Cancelled => self.cmdline.say(key!("*Cancel*")),
+                    Outcome::Crashed => self.cmdline.say(key!("The command stopped unexpectedly.")),
                 }
             }
             None => {
@@ -186,8 +187,7 @@ impl AppState {
             }
         }
         for line in said {
-            self.message.clone_from(&line);
-            self.cmdline.say(line);
+            self.tell(line);
         }
         for (ids, remove) in selections {
             self.select_ids(ids, remove);
@@ -213,7 +213,8 @@ impl AppState {
         let runner = self.runner.as_ref()?;
         let Some(ask) = runner.prompt() else {
             return Some(Prompt {
-                command: runner.name().to_uppercase().into(),
+                command: crate::command_language::prompt_name(runner.name(), &rust_i18n::locale())
+                    .into(),
                 text: Cow::Borrowed(""),
                 options: Vec::new(),
             });
@@ -234,7 +235,8 @@ impl AppState {
             text.push_str(&format!(" <{hint}>"));
         }
         Some(Prompt {
-            command: runner.name().to_uppercase().into(),
+            command: crate::command_language::prompt_name(runner.name(), &rust_i18n::locale())
+                .into(),
             text: text.into(),
             options,
         })

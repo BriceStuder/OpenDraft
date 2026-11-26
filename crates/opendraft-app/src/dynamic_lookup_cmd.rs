@@ -10,6 +10,7 @@ use opendraft_commands::{Cancelled, Editor, NumberOptions, Options, PointOptions
 use opendraft_core::block::{
     DynamicBlock, DynamicParameter, DynamicParameterKind, LookupRow, ParameterId, CUSTOM,
 };
+use opendraft_ui::key;
 
 use crate::dynamic_block_cmd::{ask_choice, draft};
 use crate::dynamic_block_prompts::{ask_line, ask_naming};
@@ -156,7 +157,7 @@ pub fn blookuptable(ed: &mut Editor) -> Result<(), Cancelled> {
         .collect();
     let at = lookups[ask_choice(ed, "Select lookup parameter", &names)?];
     let chosen = ed.get_keyword(
-        Options::<String>::new("Enter an option [Add/Delete/List] <List>")
+        Options::<String>::new(key!("Enter an option"))
             .keyword("Add", "A")
             .keyword("Delete", "D")
             .keyword("List", "L")

@@ -69,7 +69,7 @@ impl MLeader {
     pub fn mirror_refusal(&self) -> Option<&'static str> {
         self.text()
             .and_then(|t| t.text.mirror_refusal())
-            .map(|_| "a multileader with text cannot be mirrored yet")
+            .map(|_| crate::key!("a multileader with text cannot be mirrored yet"))
     }
 
     /// Why it cannot be scaled, if it cannot.

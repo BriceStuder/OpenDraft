@@ -1,15 +1,19 @@
 //! The Linetype Manager (LINETYPE): the drawing's linetypes with a picture and
-//! description of each, Load from the stock library, Delete (never one in
+//! description of each, Load from the stock library or a `.lin` file (see
+//! `load`), Delete (never one in
 //! use) and the global scale factor. It edits a draft of the table and
 //! `LTSCALE`; OK commits them as one undo step, Cancel / Escape / X drop it.
 
 use eframe::egui::{self, Align2, FontId, Sense};
-use opendraft_core::linetype::stock;
 use opendraft_core::{LinetypeId, LinetypeTable};
 use opendraft_ui::{widgets, Theme};
 
 use super::OpenDraftApp;
 use crate::linetype_ui;
+
+mod load;
+
+use load::LoadState;
 
 const WIDTH: f32 = 580.0;
 const LOAD_WIDTH: f32 = 560.0;
@@ -24,8 +28,8 @@ pub(in crate::app) struct Draft {
     table: LinetypeTable,
     scale: f64,
     selected: Option<LinetypeId>,
-    /// While Load is open: whether each stock definition is ticked.
-    load: Option<Vec<bool>>,
+    /// While Load is open: what it offers and what is ticked.
+    load: Option<LoadState>,
 }
 
 #[derive(Clone, Copy)]
@@ -36,6 +40,10 @@ enum Choice {
     Delete(LinetypeId),
     LoadOk,
     LoadCancel,
+    /// Offer a `.lin` file's definitions.
+    LoadFile,
+    /// Offer the stock library again.
+    LoadStock,
 }
 
 impl OpenDraftApp {
@@ -118,7 +126,7 @@ impl OpenDraftApp {
             }
             Some(Choice::Cancel) => self.state.show_linetypes = false,
             Some(Choice::Load) => {
-                draft.load = Some(vec![false; stock::LIBRARY.len()]);
+                draft.load = Some(LoadState::stock());
                 self.linetype_draft = Some(draft);
             }
             Some(Choice::Delete(id)) => {
@@ -127,11 +135,17 @@ impl OpenDraftApp {
                 self.linetype_draft = Some(draft);
             }
             Some(Choice::LoadOk) => {
-                for (ticked, entry) in draft.load.take().iter().flatten().zip(stock::LIBRARY) {
-                    if *ticked {
-                        let _ = draft.table.load_stock(entry.name);
-                    }
+                if let Some(load) = draft.load.take() {
+                    self.state.message = load.apply(&mut draft);
                 }
+                self.linetype_draft = Some(draft);
+            }
+            Some(Choice::LoadFile) => {
+                load::choose_lin_file(&mut self.state, &mut draft);
+                self.linetype_draft = Some(draft);
+            }
+            Some(Choice::LoadStock) => {
+                draft.load = Some(LoadState::stock());
                 self.linetype_draft = Some(draft);
             }
             Some(Choice::LoadCancel) => {
@@ -140,63 +154,6 @@ impl OpenDraftApp {
             }
             None => self.linetype_draft = Some(draft),
         }
-    }
-
-    /// Load or Reload Linetypes: the stock library, with what the drawing has
-    /// already marked and not offered again.
-    fn load_window(&mut self, ctx: &egui::Context, draft: &mut Draft) -> Option<Choice> {
-        let (mut open, mut choice) = (true, None);
-        let theme = &self.theme;
-        widgets::dialog(ctx, theme, "Load Linetypes", &mut open, LOAD_WIDTH, |ui| {
-            egui::ScrollArea::vertical()
-                .max_height(LIST_HEIGHT + 60.0)
-                .show(ui, |ui| {
-                    let ticks = draft.load.get_or_insert_with(Vec::new);
-                    for (i, entry) in stock::LIBRARY.iter().enumerate() {
-                        let loaded = draft.table.named(entry.name).is_some();
-                        let Some(ticked) = ticks.get_mut(i) else {
-                            continue;
-                        };
-                        let (rect, response) = ui.allocate_exact_size(
-                            egui::vec2(ui.available_width(), ROW_HEIGHT),
-                            Sense::click(),
-                        );
-                        if response.clicked() && !loaded {
-                            *ticked = !*ticked;
-                        }
-                        if response.hovered() {
-                            ui.painter().rect_filled(rect, 2.0, theme.colors.hover);
-                        }
-                        let mark = if loaded {
-                            "loaded"
-                        } else if *ticked {
-                            "\u{2611}"
-                        } else {
-                            "\u{2610}"
-                        };
-                        paint_row(ui, theme, rect, entry.name, entry.description, Some(mark));
-                        let elements: Vec<_> = entry
-                            .pattern
-                            .iter()
-                            .filter_map(|v| opendraft_core::StrokeElement::from_dxf(*v))
-                            .collect();
-                        paint_sample(ui, theme, rect, &elements);
-                    }
-                });
-            ui.add_space(12.0);
-            ui.horizontal(|ui| {
-                if widgets::primary_button(ui, theme, "OK").clicked() {
-                    choice = Some(Choice::LoadOk);
-                }
-                if widgets::secondary_button(ui, theme, "Cancel").clicked() {
-                    choice = Some(Choice::LoadCancel);
-                }
-            });
-        });
-        if !open {
-            choice = Some(Choice::LoadCancel);
-        }
-        choice
     }
 }
 
@@ -245,7 +202,7 @@ fn paint_row(
     // The description stops short of the mark at the right.
     let text_painter = if mark.is_some() {
         ui.painter()
-            .with_clip_rect(rect.with_max_x(rect.right() - 64.0))
+            .with_clip_rect(rect.with_max_x(rect.right() - 96.0))
     } else {
         painter.clone()
     };

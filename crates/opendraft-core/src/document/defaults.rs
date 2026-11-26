@@ -25,6 +25,7 @@ impl Default for Document {
             next_viewport_id: 1,
             active_layout: None,
             active_frozen: Vec::new(),
+            hidden_objects: Vec::new(),
             active_viewport: None,
             view_twist: 0.0,
             model_ccs: crate::ccs::Ccs::WORLD,

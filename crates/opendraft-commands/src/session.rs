@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use opendraft_core::{Document, LayerId, Layout, LayoutId, ViewportId};
+use opendraft_core::{Document, EntityId, LayerId, Layout, LayoutId, ViewportId};
 
 use crate::transaction::Batch;
 use crate::{Action, Changes, History, ModifyEntities, Provenance, Step, StepInfo, Transaction};
@@ -105,6 +105,19 @@ impl Session {
             document.set_active_layout(layout);
             document.set_active_viewport(viewport);
             document.set_active_frozen(frozen);
+        }
+    }
+
+    /// Hide exactly these objects (isolation), or show all with none. Not an
+    /// edit: no history, and the drawing is not marked modified, but the
+    /// revision moves so that what was drawn is drawn again.
+    pub fn set_hidden_objects(&mut self, ids: Vec<EntityId>) {
+        let mut sorted = ids;
+        sorted.sort_unstable();
+        sorted.dedup();
+        if self.document.hidden_objects() != sorted {
+            self.document_mut().set_hidden_objects(sorted);
+            self.revision += 1;
         }
     }
 

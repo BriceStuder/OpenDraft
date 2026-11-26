@@ -61,7 +61,7 @@ pub fn draw_circle(ed: &mut Editor) -> Result<(), Cancelled> {
         if radius > MIN_SIZE {
             break radius;
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     };
     add(ed, circle(center, radius), "Circle")
 }
@@ -77,7 +77,7 @@ pub fn draw_circle_diameter(ed: &mut Editor) -> Result<(), Cancelled> {
         if radius > MIN_SIZE {
             break radius;
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     };
     add(ed, circle(center, radius), "Circle")
 }
@@ -111,7 +111,7 @@ pub fn draw_circle_3t(ed: &mut Editor) -> Result<(), Cancelled> {
     match circle_tangent_to_three(objects) {
         Some((center, radius)) if radius > MIN_SIZE => add(ed, circle(center, radius), "Circle"),
         _ => {
-            ed.say("Circle does not exist.");
+            ed.say(key!("Circle does not exist."));
             Ok(())
         }
     }
@@ -124,7 +124,9 @@ fn pick_touchable(ed: &Editor, message: &str) -> Result<(Entity, Point), Cancell
         if touchable_by_tangent_circle(&entity, at) {
             return Ok((entity, at));
         }
-        ed.say("Select a line, a circle, an arc, an ellipse or a spline.");
+        ed.say(key!(
+            "Select a line, a circle, an arc, an ellipse or a spline."
+        ));
     }
 }
 
@@ -143,7 +145,7 @@ fn three_points(ed: &Editor) -> Result<(), Cancelled> {
         if matches!(entity, Entity::Circle { .. }) {
             break entity;
         }
-        ed.say("The three points are in a line.");
+        ed.say(key!("The three points are in a line."));
     };
     add(ed, entity, "Circle")
 }
@@ -158,7 +160,7 @@ fn two_points(ed: &Editor) -> Result<(), Cancelled> {
         if distance(first, second) > MIN_SIZE {
             break circle(midpoint(first, second), distance(first, second) / 2.0);
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     };
     add(ed, entity, "Circle")
 }
@@ -185,12 +187,12 @@ fn tangent_tangent_radius(ed: &Editor) -> Result<(), Cancelled> {
         if radius > MIN_SIZE {
             break radius;
         }
-        ed.say("Requires a non-zero value.");
+        ed.say(key!("Requires a non-zero value."));
     };
     match tangent_circle(&first, at_first, &second, at_second, radius) {
         Some(center) => add(ed, circle(center, radius), "Circle"),
         None => {
-            ed.say("Circle does not exist.");
+            ed.say(key!("Circle does not exist."));
             Ok(())
         }
     }

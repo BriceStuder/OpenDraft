@@ -7,6 +7,7 @@ use opendraft_core::{Entity, Point};
 use opendraft_ui::key;
 
 use crate::text::plural;
+use opendraft_commands::Wording;
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -104,17 +105,23 @@ fn select_by_points(ed: &mut Editor, kind: Kind) -> Result<(), Cancelled> {
             Answer::Enter => {
                 let region = kind.region(points.clone());
                 if points.len() < region.min_points() {
-                    ed.say("Specify more points first.");
+                    ed.say(key!("Specify more points first."));
                     continue;
                 }
                 let ids = ed.read(move |doc| opendraft_canvas::select_in(doc, &region))?;
                 let count = plural(ids.len(), "object");
                 if removing {
                     ed.deselect(ids);
-                    ed.say(format!("{count} deselected"));
+                    ed.say(Wording::new(
+                        key!("%{count} deselected"),
+                        &[("count", &count.to_string())],
+                    ));
                 } else {
                     ed.select(ids);
-                    ed.say(format!("{count} selected"));
+                    ed.say(Wording::new(
+                        key!("%{count} selected"),
+                        &[("count", &count.to_string())],
+                    ));
                 }
                 return Ok(());
             }

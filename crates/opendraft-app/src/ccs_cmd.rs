@@ -17,10 +17,12 @@ use opendraft_core::units::{format_angle, format_point};
 use opendraft_core::{Ccs, CcsSpace, Document, NamedCcs, Point};
 
 use crate::state::AppState;
+use opendraft_commands::Wording;
 
 /// What the command says on a layout's sheet.
-const NO_SHEET: &str =
-    "A layout's sheet has no custom coordinate system: work in the Model tab or inside a viewport.";
+const NO_SHEET: &str = key!(
+    "A layout's sheet has no custom coordinate system: work in the Model tab or inside a viewport."
+);
 
 /// The name the current system goes by: World, a saved name it matches, or
 /// Custom.
@@ -58,7 +60,10 @@ fn ccs(ed: &mut Editor, view: Option<(Point, f64)>) -> Result<(), Cancelled> {
         ed.say(NO_SHEET);
         return Ok(());
     };
-    ed.say(format!("Current coordinate system: {name}"));
+    ed.say(Wording::new(
+        key!("Current coordinate system: %{name}"),
+        &[("name", &name)],
+    ));
     let options = PointOptions::new(key!("Specify origin of CCS (Enter for World)"))
         .keyword("Object", "OB")
         .keyword("View", "V")
@@ -75,7 +80,7 @@ fn ccs(ed: &mut Editor, view: Option<(Point, f64)>) -> Result<(), Cancelled> {
             "View" => match view {
                 Some((corner, twist)) => set(ed, space, Ccs::new(corner, -twist)),
                 None => {
-                    ed.say("The view is not known yet.");
+                    ed.say(key!("The view is not known yet."));
                     Ok(())
                 }
             },
@@ -101,7 +106,7 @@ fn by_points(ed: &Editor, space: CcsSpace, current: Ccs, origin: Point) -> Resul
         Answer::Value(on_x) => match Ccs::through(origin, on_x) {
             Some(ccs) => ccs,
             None => {
-                ed.say("The point is the origin; the direction is kept.");
+                ed.say(key!("The point is the origin; the direction is kept."));
                 current.moved_to(origin)
             }
         },
@@ -120,14 +125,14 @@ fn by_object(ed: &Editor, space: CcsSpace, current: Ccs) -> Result<(), Cancelled
         let entity = ed.read(move |doc| doc.object(picked.id).map(|o| o.entity.clone()))?;
         match entity.and_then(|e| aligned_to(&e, picked.at, current)) {
             Some(ccs) => return set(ed, space, ccs),
-            None => ed.say("That object does not set a coordinate system."),
+            None => ed.say(key!("That object does not set a coordinate system.")),
         }
     }
 }
 
 fn previous(ed: &Editor, space: CcsSpace) -> Result<(), Cancelled> {
     if ed.read(move |doc| doc.previous_ccs(space))?.is_none() {
-        ed.say("There is no previous coordinate system.");
+        ed.say(key!("There is no previous coordinate system."));
         return Ok(());
     }
     ed.transaction("CCS", move |tx| {
@@ -175,7 +180,10 @@ fn named(ed: &Editor, space: CcsSpace, current: Ccs) -> Result<(), Cancelled> {
         }
         (_, Some(at)) => set(ed, space, all[at].ccs),
         (_, None) => {
-            ed.say(format!("No coordinate system is saved as \"{name}\"."));
+            ed.say(Wording::new(
+                key!("No coordinate system is saved as \"%{name}\"."),
+                &[("name", &name)],
+            ));
             Ok(())
         }
     }
@@ -233,9 +241,9 @@ fn list(ed: &Editor) -> Result<(), Cancelled> {
         lines
     })?;
     if lines.is_empty() {
-        ed.say("No coordinate systems are saved.");
+        ed.say(key!("No coordinate systems are saved."));
     } else {
-        ed.say("Saved coordinate systems (in world coordinates):");
+        ed.say(key!("Saved coordinate systems (in world coordinates):"));
         for line in lines {
             ed.say(line);
         }
@@ -282,7 +290,7 @@ impl AppState {
             Some(space) if document.previous_ccs(space).is_some() => {
                 self.perform(SetCcs::previous(space));
             }
-            Some(_) => self.message = "There is no previous coordinate system.".to_owned(),
+            Some(_) => self.message = key!("There is no previous coordinate system.").to_owned(),
             None => self.message = NO_SHEET.to_owned(),
         }
     }

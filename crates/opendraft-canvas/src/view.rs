@@ -76,8 +76,6 @@ const WHEEL_ZOOM_RATE: f32 = 0.003;
 const HIGHLIGHT_WIDTH: f32 = 6.0;
 /// A drag shorter than this (screen points) is not a selection box.
 const BOX_MIN_PX: f32 = 4.0;
-/// Factor for the Zoom In / Zoom Out commands.
-const STEP_ZOOM: f64 = 1.5;
 
 /// Per-drawing view state.
 #[derive(Default)]
@@ -209,7 +207,6 @@ impl View {
                 Some(Request::Extents) => {
                     self.camera.fit(document.bounds(), rect);
                 }
-                Some(Request::Zoom(factor)) => self.camera.zoom_at(rect.center(), rect, factor),
                 Some(Request::Window(a, b)) => {
                     self.camera.show_window(Bounds::from_points(a, b), rect);
                 }

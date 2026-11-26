@@ -83,8 +83,8 @@ fn rules() -> HashMap<&'static str, Rule> {
             },
         ),
         (
-            // The Content Manager's data side (docs/openhub-specification.md,
-            // 13.1). Network calls and the credential token never pass
+            // The Content Manager's data side (see ARCHITECTURE.md).
+            // Network calls and the credential token never pass
             // through the document, so it never reaches the commands either.
             "opendraft-content",
             Rule {

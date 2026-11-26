@@ -50,7 +50,14 @@ fn draw() -> Panel {
     Panel {
         title: "Draw",
         columns: vec![
-            Column::Large(item("draw.line", "Line", icons::DRAW_LINE)),
+            Column::LargeSplit(Split::labelled(
+                "Line",
+                vec![
+                    item("draw.line", "Line", icons::DRAW_LINE),
+                    item("draw.line_single", "Single Lines", icons::DRAW_LINE_SINGLE),
+                    item("draw.line_middle", "From Middle", icons::DRAW_LINE_MIDDLE),
+                ],
+            )),
             Column::Large(item("draw.polyline", "Polyline", icons::DRAW_POLYLINE)),
             Column::LargeSplit(Split::labelled(
                 "Circle",

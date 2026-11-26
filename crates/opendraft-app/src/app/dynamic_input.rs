@@ -17,6 +17,7 @@ pub(super) fn owns_focus(ctx: &egui::Context, state: &AppState) -> bool {
         Field::Y,
         Field::Coordinate,
         Field::Distance,
+        Field::Length,
         Field::Angle,
         Field::Number,
         Field::Text,

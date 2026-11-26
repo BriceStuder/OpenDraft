@@ -4,6 +4,9 @@
 /// shown in suggestions.
 pub const ALIASES: &[(&str, &str, &str)] = &[
     ("L", "LINE", "draw.line"),
+    // Lines that do not chain (AutoCAD has neither).
+    ("SL", "LINE SINGLE", "draw.line_single"),
+    ("ML", "LINE MIDDLE", "draw.line_middle"),
     ("C", "CIRCLE", "draw.circle"),
     // The ribbon's circle types, which AutoCAD reaches only by options or
     // button macros.
@@ -63,7 +66,6 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("Z", "ZOOM", "view.zoom"),
     ("ZOOM", "ZOOM", "view.zoom"),
     ("ZE", "ZOOM EXTENTS", "view.zoom_extents"),
-    ("ZI", "ZOOM IN", "view.zoom_in"),
     ("ZO", "ZOOM OBJECTS", "view.zoom_objects"),
     ("ZP", "ZOOM PREVIOUS", "view.zoom_previous"),
     ("GRID", "GRID", "view.grid"),
@@ -126,6 +128,9 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("LTYPE", "LINETYPE", "format.linetype"),
     ("LINETYPE", "LINETYPE", "format.linetype"),
     ("DDLTYPE", "LINETYPE", "format.linetype"),
+    ("-LT", "-LINETYPE", "format.linetype_line"),
+    ("-LTYPE", "-LINETYPE", "format.linetype_line"),
+    ("-LINETYPE", "-LINETYPE", "format.linetype_line"),
     ("D", "DIMSTYLE", "dim.style"),
     ("DST", "DIMSTYLE", "dim.style"),
     ("DIMSTY", "DIMSTYLE", "dim.style"),
@@ -141,6 +146,10 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("TR", "TRIM", "modify.trim"),
     ("EX", "EXTEND", "modify.extend"),
     ("LEN", "LENGTHEN", "modify.lengthen"),
+    ("DR", "DRAWORDER", "modify.draw_order"),
+    ("ISOLATEOBJECTS", "ISOLATEOBJECTS", "isolate.objects"),
+    ("HIDEOBJECTS", "HIDEOBJECTS", "isolate.hide"),
+    ("UNISOLATEOBJECTS", "UNISOLATEOBJECTS", "isolate.end"),
     ("DI", "DIST", "inquiry.distance"),
     ("DIST", "DIST", "inquiry.distance"),
     ("AA", "AREA", "inquiry.area"),

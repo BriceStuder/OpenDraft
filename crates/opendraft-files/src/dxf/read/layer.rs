@@ -43,6 +43,7 @@ impl Importer {
             frozen: flags & 1 != 0,
             locked: flags & 4 != 0,
             frozen_in_model: frozen_in_model(&record.groups),
+            plot: record.int(290).is_none_or(|v| v != 0),
         };
         self.layers.insert(layer.name.to_lowercase(), id);
         self.document.replace_layer(layer);
@@ -97,5 +98,24 @@ mod tests {
         ];
         assert!(!read(&elsewhere));
         assert!(!read(&[(70, "0")]));
+    }
+
+    #[test]
+    fn the_plot_flag_survives_a_round_trip_and_forces_r2000() {
+        let mut doc = opendraft_core::Document::default();
+        for (name, plot) in [("Sketch", false), ("Walls", true)] {
+            let id = doc.allocate_layer_id();
+            doc.push_layer(Layer {
+                plot,
+                ..Layer::new(id, name)
+            });
+        }
+        let bytes = crate::dxf::write::write(&doc).unwrap().bytes;
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(text.contains("AC1015"), "R12 has no plot flag");
+        let back = crate::dxf::read::read(&bytes).unwrap().document;
+        let plots = |name: &str| back.layers().iter().find(|l| l.name == name).unwrap().plot;
+        assert!(!plots("Sketch"));
+        assert!(plots("Walls") && plots("0"));
     }
 }

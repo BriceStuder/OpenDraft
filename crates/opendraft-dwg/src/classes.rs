@@ -66,9 +66,11 @@ fn read_class(
     let was_zombie = data.bit()?;
     let item_class = data.bs()?;
     let instance_count = data.bl()?;
-    // Version, maintenance version and two longs that are normally zero.
-    data.bs()?;
-    data.bs()?;
+    // Version, maintenance version and two longs that are normally zero. All
+    // four are BL from R2004 on: AutoCAD 2027 writes maintenance versions
+    // above 255, which a BS reads short.
+    data.bl()?;
+    data.bl()?;
     data.bl()?;
     data.bl()?;
     if item_class != ENTITY_CLASS && item_class != OBJECT_CLASS {
@@ -128,4 +130,43 @@ pub(crate) fn parse_classes(
         return Err(invalid());
     }
     Ok(registry)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testkit::BitWriter;
+
+    /// One class as AutoCAD writes it: its data, then its three names in the
+    /// string stream.
+    fn class(data: &mut BitWriter, strings: &mut BitWriter, number: u16, name: &str, maint: u32) {
+        data.bs(number).bs(4095);
+        strings.text("ObjectDBX Classes").text(name).text(name);
+        data.bit(false).bs(OBJECT_CLASS).bl(2);
+        data.bl(33).bl(maint).bl(0).bl(0);
+    }
+
+    #[test]
+    fn a_maintenance_version_above_255_keeps_the_next_class_in_place() {
+        // AutoCAD LT 2027 writes 427 for MLEADERSTYLE (AutoCAD 2018 wrote 4).
+        let (mut data, mut strings) = (BitWriter::new(), BitWriter::new());
+        class(&mut data, &mut strings, 508, "MLEADERSTYLE", 427);
+        class(&mut data, &mut strings, 509, "CELLSTYLEMAP", 1);
+        let (data, strings) = (data.finish(), strings.finish());
+        let mut data = BitReader::new(&data, DwgStage::Classes);
+        let mut strings = BitReader::new(&strings, DwgStage::Classes);
+        let limits = DwgLimits::default();
+        let first = read_class(&mut data, &mut strings, &limits).unwrap();
+        let second = read_class(&mut data, &mut strings, &limits).unwrap();
+        assert_eq!(
+            (first.number, first.dxf_name.as_str()),
+            (508, "MLEADERSTYLE")
+        );
+        assert_eq!(
+            (second.number, second.dxf_name.as_str()),
+            (509, "CELLSTYLEMAP")
+        );
+        assert_eq!(second.instance_count, 2);
+        assert!(!second.is_entity);
+    }
 }

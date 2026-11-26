@@ -91,6 +91,10 @@ pub fn parse_point_with_mode(
             text,
         )
     };
+    // `@` alone is the last point (at Break's second prompt, the first).
+    if relative && text == "@" {
+        return Some(origin);
+    }
     let (ccs, body) = match body.strip_prefix('*') {
         Some(body) => (Ccs::WORLD, body),
         None => (reading.ccs, body),
@@ -117,6 +121,21 @@ mod tests {
     use opendraft_core::{AngleFormat, LengthFormat};
 
     use super::*;
+
+    #[test]
+    fn an_at_sign_alone_is_the_origin_the_prompt_measures_from() {
+        let origin = Point::new(3.0, 4.0);
+        let point = |text| {
+            parse_point_with_mode(text, origin, CoordinateMode::CommandLine, &Units::default())
+        };
+        assert_eq!(point("@"), Some(origin));
+        assert_eq!(point(" @ "), Some(origin));
+        assert_eq!(point("@0,0"), Some(origin));
+        // Only the bare sign: these are still not points.
+        assert_eq!(point("@*"), None);
+        assert_eq!(point("@x"), None);
+        assert_eq!(point("#"), None);
+    }
 
     #[test]
     fn typed_coordinates_use_the_drawings_units() {

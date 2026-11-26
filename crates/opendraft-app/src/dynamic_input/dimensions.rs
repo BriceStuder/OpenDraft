@@ -137,6 +137,17 @@ pub fn polar(base: Pos2, cursor: Pos2, zero: f32, step: f32) -> Option<Layout> {
     Some(layout)
 }
 
+/// As [`polar`] for a line whose middle is `base`: the half length and the
+/// angle, and the whole length on the other side of the line.
+pub fn mirrored(base: Pos2, cursor: Pos2, zero: f32, step: f32) -> Option<Layout> {
+    let mut layout = polar(base, cursor, zero, step)?;
+    let start = base - (cursor - base);
+    let out = -outward((cursor - base).normalized());
+    let offset = layout.dimension(start, cursor, out);
+    layout.boxes.push((Field::Length, base + out * offset));
+    Some(layout)
+}
+
 /// The two sides of the box with corners `base` and `cursor`: the width under
 /// (or over) the bottom edge, the height beside the edge the cursor is on.
 pub fn cartesian(base: Pos2, cursor: Pos2) -> Option<Layout> {

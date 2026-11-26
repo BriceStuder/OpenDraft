@@ -146,6 +146,8 @@ icons! {
     /// A square with a diagonal: the nearest Lucide has to hatching.
     DRAW_HATCH = '\u{e177}';
     DRAW_LINE = '\u{e11f}';
+    DRAW_LINE_MIDDLE = '\u{e11f}';
+    DRAW_LINE_SINGLE = '\u{e11f}';
     DRAW_OBLONG_2P = '\u{e16a}';
     DRAW_OBLONG_CENTER = '\u{e16a}';
     /// Lucide's marks between two ends.
@@ -259,6 +261,7 @@ icons! {
     MODIFY_MIRROR = '\u{e360}';
     MODIFY_MOVE = '\u{e124}';
     MODIFY_OFFSET = '\u{e27b}';
+    MODIFY_OVERKILL = '\u{e400}';
     MODIFY_PEDIT = '\u{e546}';
     MODIFY_ROTATE = '\u{e14c}';
     MODIFY_SCALE = '\u{e115}';
@@ -327,6 +330,4 @@ icons! {
     VIEW_NAV_GIZMO = '\u{e09f}';
     VIEW_SNAP = '\u{e2b4}';
     VIEW_ZOOM_EXTENTS = '\u{e115}';
-    VIEW_ZOOM_IN = '\u{e1b5}';
-    VIEW_ZOOM_OUT = '\u{e1b6}';
 }

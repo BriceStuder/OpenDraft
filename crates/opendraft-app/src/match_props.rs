@@ -2,17 +2,76 @@
 //! Properties. What a target becomes is [`matched`], kept pure so it is
 //! tested without the command.
 
+use opendraft_canvas::{select_in, Region};
 use opendraft_commands::{
-    Answer, Cancelled, Editor, ModifyAttributes, ModifyEntities, Options, Picked,
+    Answer, Cancelled, Editor, ModifyAttributes, ModifyEntities, Options, Picked, Swept,
 };
-use opendraft_core::{Attributes, Document, Entity, EntityId, MText, Object};
+use opendraft_core::{Attributes, Ccs, Document, Entity, EntityId, MText, Object, Point};
 use opendraft_ui::key;
 
+use crate::defaults::EditorDefaults;
+use crate::edges_sweep::ask_window;
 use crate::layers::has_outline;
+use opendraft_commands::Wording;
 
-/// The properties matched, worded as AutoCAD's "Current active settings".
-pub const SETTINGS: &str =
-    "Color Layer Ltype Ltscale Lineweight Dim Text Hatch Polyline Multileader";
+/// The properties that can be matched, as AutoCAD names them in "Current
+/// active settings".
+const NAMES: [&str; 10] = [
+    "Color",
+    "Layer",
+    "Ltype",
+    "Ltscale",
+    "Lineweight",
+    "Dim",
+    "Text",
+    "Hatch",
+    "Polyline",
+    "Multileader",
+];
+/// What is typed to pick each, one apiece.
+const KEYS: [&str; 10] = ["C", "L", "LT", "LS", "LW", "D", "T", "H", "P", "M"];
+const COLOR: usize = 0;
+const LAYER: usize = 1;
+const LTYPE: usize = 2;
+const LTSCALE: usize = 3;
+const LINEWEIGHT: usize = 4;
+const DIM: usize = 5;
+const TEXT: usize = 6;
+const HATCH: usize = 7;
+const POLYLINE: usize = 8;
+const MULTILEADER: usize = 9;
+
+/// Which properties MATCHPROP copies (its Settings option). All of them to
+/// start with; kept for the session, not saved.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Matching([bool; 10]);
+
+impl Default for Matching {
+    fn default() -> Self {
+        Self([true; 10])
+    }
+}
+
+impl Matching {
+    /// The names of the properties that are on, worded as AutoCAD's
+    /// "Current active settings".
+    pub fn summary(&self) -> String {
+        let on: Vec<&str> = NAMES
+            .iter()
+            .zip(self.0)
+            .filter_map(|(name, on)| on.then_some(*name))
+            .collect();
+        if on.is_empty() {
+            "none".to_owned()
+        } else {
+            on.join(" ")
+        }
+    }
+
+    fn has(&self, which: usize) -> bool {
+        self.0[which]
+    }
+}
 
 /// `target` as it would be after matching `source`: its attributes, and its
 /// entity when one of the special properties changes it. `None` when nothing
@@ -27,47 +86,65 @@ pub fn matched(
     document: &Document,
     source: &Object,
     target: &Object,
+    matching: &Matching,
 ) -> Option<(Attributes, Option<Entity>)> {
-    let mut attrs = Attributes {
-        layer: source.attrs.layer,
-        color: source.attrs.color.clone(),
-        linetype: source.attrs.linetype.clone(),
-        lineweight: source.attrs.lineweight.clone(),
-        linetype_scale: source.attrs.linetype_scale,
-        ..target.attrs.clone()
-    };
-    if has_outline(&source.entity) && has_outline(&target.entity) {
+    let mut attrs = target.attrs.clone();
+    if matching.has(LAYER) {
+        attrs.layer = source.attrs.layer;
+    }
+    if matching.has(COLOR) {
+        attrs.color = source.attrs.color.clone();
+    }
+    if matching.has(LTYPE) {
+        attrs.linetype = source.attrs.linetype.clone();
+    }
+    if matching.has(LINEWEIGHT) {
+        attrs.lineweight = source.attrs.lineweight.clone();
+    }
+    if matching.has(LTSCALE) {
+        attrs.linetype_scale = source.attrs.linetype_scale;
+    }
+    if matching.has(POLYLINE) && has_outline(&source.entity) && has_outline(&target.entity) {
         attrs.continuous_generation = source.attrs.continuous_generation;
     }
-    let entity = special(document, &source.entity, &target.entity);
+    let entity = special(document, &source.entity, &target.entity, matching);
     (attrs != target.attrs || entity.is_some()).then_some((attrs, entity))
 }
 
 /// The target changed by the source's special properties, if they apply and
 /// change it.
-fn special(document: &Document, source: &Entity, target: &Entity) -> Option<Entity> {
+fn special(
+    document: &Document,
+    source: &Entity,
+    target: &Entity,
+    matching: &Matching,
+) -> Option<Entity> {
     let next = match (source, target) {
-        (Entity::Dimension(s), Entity::Dimension(t)) => {
+        (Entity::Dimension(s), Entity::Dimension(t)) if matching.has(DIM) => {
             let mut d = (**t).clone();
             d.style = s.style.clone();
             Entity::Dimension(Box::new(d))
         }
-        (Entity::MText(s), Entity::MText(t)) => Entity::MText(Box::new(MText {
-            style: s.style,
-            nominal_height: s.nominal_height,
-            ..(**t).clone()
-        })),
-        (Entity::Hatch(s), Entity::Hatch(t)) => {
+        (Entity::MText(s), Entity::MText(t)) if matching.has(TEXT) => {
+            Entity::MText(Box::new(MText {
+                style: s.style,
+                nominal_height: s.nominal_height,
+                ..(**t).clone()
+            }))
+        }
+        (Entity::Hatch(s), Entity::Hatch(t)) if matching.has(HATCH) => {
             let mut h = (**t).clone();
             h.fill = s.fill.clone();
             h.style = s.style;
             Entity::Hatch(Box::new(h))
         }
-        (Entity::MLeader(s), Entity::MLeader(t)) => {
+        (Entity::MLeader(s), Entity::MLeader(t)) if matching.has(MULTILEADER) => {
             let style = document.mleader_style_named(&s.style_name)?;
             Entity::MLeader(Box::new(t.restyled(style)))
         }
-        (Entity::Polyline { widths: from, .. }, Entity::Polyline { .. }) => {
+        (Entity::Polyline { widths: from, .. }, Entity::Polyline { .. })
+            if matching.has(POLYLINE) =>
+        {
             let width = global_width(from)?;
             let mut p = target.clone();
             if let Entity::Polyline { points, widths, .. } = &mut p {
@@ -93,40 +170,110 @@ fn global_width(widths: &[(f64, f64)]) -> Option<f64> {
 }
 
 /// MATCHPROP: pick the source object (or have one selected), then each
-/// object picked takes its properties, one undo step each, until Enter.
+/// object picked, or inside a crossing window or along a path dragged from
+/// empty space, takes its properties, one undo step each, until Enter. The
+/// Settings option chooses which properties are copied.
 pub fn match_properties(ed: &mut Editor) -> Result<(), Cancelled> {
     let source = match ed.pickset() {
         [one] => *one,
-        _ => {
+        _ => loop {
             let options = Options::<Picked>::new(key!("Select source object"))
+                .keyword("Settings", "S")
                 .pick_locked()
                 .allow_empty();
             match ed.ask_object(options)? {
-                Answer::Value(Picked { id, .. }) => id,
-                _ => return Ok(()),
+                Answer::Value(Picked { id, .. }) => break id,
+                Answer::Keyword(_) => settings(ed)?,
+                Answer::Enter => return Ok(()),
             }
-        }
+        },
     };
-    ed.say(format!("Current active settings: {SETTINGS}"));
+    say_settings(ed);
     loop {
-        let options = Options::<Picked>::new(key!("Select destination object(s)")).allow_empty();
-        let Answer::Value(Picked { id, .. }) = ed.ask_object(options)? else {
-            return Ok(());
+        let options = Options::<Swept>::new(key!("Select destination object(s)"))
+            .keyword("Settings", "S")
+            .allow_empty();
+        let targets = match ed.ask_object_or_sweep(options)? {
+            Answer::Value(Swept::Object(Picked { id, .. })) => vec![id],
+            Answer::Value(Swept::Missed { at, .. }) => {
+                let corners = ask_window(ed, at)?;
+                let twist = ed.read(|doc| doc.view_twist())?;
+                let region = window_or_crossing(corners, twist);
+                ed.read(move |doc| select_in(doc, &region))?
+            }
+            Answer::Value(Swept::Path { points, .. }) => {
+                let region = Region::Fence(points);
+                ed.read(move |doc| select_in(doc, &region))?
+            }
+            Answer::Keyword(_) => {
+                settings(ed)?;
+                say_settings(ed);
+                continue;
+            }
+            Answer::Enter => return Ok(()),
         };
-        if id != source {
+        for id in targets.into_iter().filter(|id| *id != source) {
             apply(ed, source, id)?;
         }
     }
 }
 
+/// A window drawn to the right of its first corner (on the screen) takes only
+/// what it holds; one drawn to the left takes whatever it touches.
+fn window_or_crossing(corners: Vec<Point>, twist: f64) -> Region {
+    let frame = Ccs::new(Point::new(0.0, 0.0), -twist);
+    let rightward = match (corners.first(), corners.get(2)) {
+        (Some(first), Some(opposite)) => {
+            frame.from_world(*opposite).x >= frame.from_world(*first).x
+        }
+        _ => false,
+    };
+    if rightward {
+        Region::Window(corners)
+    } else {
+        Region::Crossing(corners)
+    }
+}
+
+fn say_settings(ed: &Editor) {
+    let summary = ed.defaults().matching.get().summary();
+    ed.say(Wording::new(
+        key!("Current active settings: %{settings}"),
+        &[("settings", &summary)],
+    ));
+}
+
+/// The Settings option: switch properties on and off one at a time until
+/// Enter.
+fn settings(ed: &Editor) -> Result<(), Cancelled> {
+    loop {
+        let now = ed.defaults().matching.get();
+        let mut options = Options::<String>::new(key!("Switch a property on or off"));
+        for (name, key) in NAMES.iter().zip(KEYS) {
+            options = options.keyword(*name, key);
+        }
+        let Some(chosen) = ed.ask_keyword(options)? else {
+            return Ok(());
+        };
+        let Some(which) = NAMES.iter().position(|n| *n == chosen) else {
+            continue;
+        };
+        ed.defaults()
+            .matching
+            .change(|m| m.0[which] = !now.0[which]);
+        say_settings(ed);
+    }
+}
+
 /// Make `target` match `source`, as one undo step.
 fn apply(ed: &Editor, source: EntityId, target: EntityId) -> Result<(), Cancelled> {
+    let matching = ed.defaults().matching.get();
     ed.transaction("Match Properties", move |tx| {
         let doc = tx.document();
         let (Some(from), Some(to)) = (doc.object(source), doc.object(target)) else {
             return Ok(());
         };
-        let Some((attrs, entity)) = matched(doc, from, to) else {
+        let Some((attrs, entity)) = matched(doc, from, to, &matching) else {
             return Ok(());
         };
         tx.perform(ModifyAttributes::new(
@@ -185,14 +332,17 @@ mod tests {
             radius: 1.0,
         };
         let target = object(circle, Attributes::on_layer(LayerId::DEFAULT));
-        let (attrs, entity) = matched(&doc, &source, &target).unwrap();
+        let (attrs, entity) = matched(&doc, &source, &target, &Matching::default()).unwrap();
         assert_eq!(attrs, red_dashed(LayerId(7)));
         assert!(
             entity.is_none(),
             "a line has no special properties for a circle"
         );
         let same = object(line(5.0), red_dashed(LayerId(7)));
-        assert!(matched(&doc, &source, &same).is_none(), "nothing to change");
+        assert!(
+            matched(&doc, &source, &same, &Matching::default()).is_none(),
+            "nothing to change"
+        );
     }
 
     #[test]
@@ -213,7 +363,7 @@ mod tests {
         let on_zero = Attributes::on_layer(LayerId::DEFAULT);
         let source = object(dim(5.0), on_zero.clone());
         let target = object(dim(2.5), on_zero.clone());
-        let (_, entity) = matched(&doc, &source, &target).unwrap();
+        let (_, entity) = matched(&doc, &source, &target, &Matching::default()).unwrap();
         let Some(Entity::Dimension(d)) = entity else {
             panic!("the dimension changes");
         };
@@ -227,10 +377,148 @@ mod tests {
         };
         let source = object(wide(vec![(0.5, 0.5); 3]), on_zero.clone());
         let target = object(wide(Vec::new()), on_zero.clone());
-        let (_, entity) = matched(&doc, &source, &target).unwrap();
+        let (_, entity) = matched(&doc, &source, &target, &Matching::default()).unwrap();
         assert_eq!(entity, Some(wide(vec![(0.5, 0.5); 3])));
         let tapered = object(wide(vec![(0.0, 1.0); 3]), on_zero);
-        assert!(matched(&doc, &tapered, &target).is_none(), "no one width");
+        assert!(
+            matched(&doc, &tapered, &target, &Matching::default()).is_none(),
+            "no one width"
+        );
+    }
+
+    #[test]
+    fn switched_off_properties_are_not_copied() {
+        let doc = Document::default();
+        let source = object(line(0.0), red_dashed(LayerId(7)));
+        let target = object(line(5.0), Attributes::on_layer(LayerId::DEFAULT));
+        let mut matching = Matching::default();
+        matching.0[COLOR] = false;
+        matching.0[LAYER] = false;
+        let (attrs, _) = matched(&doc, &source, &target, &matching).unwrap();
+        assert_eq!(attrs.layer, LayerId::DEFAULT);
+        assert_eq!(attrs.color, target.attrs.color);
+        assert_eq!(attrs.linetype_scale, 2.0, "the rest still matches");
+        let none = Matching([false; 10]);
+        assert!(matched(&doc, &source, &target, &none).is_none());
+        assert_eq!(none.summary(), "none");
+        assert!(Matching::default()
+            .summary()
+            .starts_with("Color Layer Ltype"));
+    }
+
+    fn red_source_and_two_plain(state: &mut AppState) -> Vec<EntityId> {
+        for y in [0.0, 5.0, 10.0] {
+            state.add_entity(line(y));
+        }
+        let ids: Vec<EntityId> = state
+            .session()
+            .document()
+            .objects()
+            .iter()
+            .map(|o| o.id)
+            .collect();
+        state.perform(ModifyAttributes::new(
+            "Red",
+            vec![(ids[0], red_dashed(LayerId::DEFAULT))],
+        ));
+        ids
+    }
+
+    #[test]
+    fn the_settings_option_switches_properties_for_the_command_and_after() {
+        let mut state = AppState::new();
+        let ids = red_source_and_two_plain(&mut state);
+        state.click_select(Some(ids[0]), false);
+        state.start_command("MATCHPROP", match_properties);
+        state.settle_command();
+        state.cmd_submit("s");
+        state.settle_command();
+        // Colour off, linetype off; Enter finishes the settings.
+        for key in ["c", "lt", ""] {
+            state.cmd_submit(key);
+            state.settle_command();
+        }
+        let line = state.cmdline.log.last().cloned().unwrap_or_default();
+        assert!(!line.contains("Color") && !line.contains("Ltype"), "{line}");
+        state.answer_object(p(1.0, 0.0), Some(ids[1]), false);
+        state.settle_command();
+        let now = state
+            .session()
+            .document()
+            .object(ids[1])
+            .unwrap()
+            .attrs
+            .clone();
+        assert_eq!(now.color, Attributes::on_layer(LayerId::DEFAULT).color);
+        assert_eq!(now.linetype_scale, 2.0, "line type scale still matched");
+        assert!(!state.defaults().matching.get().has(COLOR));
+    }
+
+    #[test]
+    fn a_window_drawn_to_the_right_takes_only_what_it_holds() {
+        let mut state = AppState::new();
+        let ids = red_source_and_two_plain(&mut state);
+        state.click_select(Some(ids[0]), false);
+        state.start_command("MATCHPROP", match_properties);
+        state.settle_command();
+        // Right to left would touch both; left to right holds neither line
+        // (they run to x = 10) until it reaches past them.
+        state.answer_object(p(-5.0, 4.0), None, false);
+        state.settle_command();
+        state.answer_point(p(5.0, 6.0));
+        state.settle_command();
+        let plain = |i: usize, state: &AppState| {
+            state
+                .session()
+                .document()
+                .object(ids[i])
+                .unwrap()
+                .attrs
+                .clone()
+                == Attributes::on_layer(LayerId::DEFAULT)
+        };
+        assert!(plain(1, &state), "the line is only crossed, not held");
+        state.answer_object(p(-5.0, 4.0), None, false);
+        state.settle_command();
+        state.answer_point(p(11.0, 6.0));
+        state.settle_command();
+        assert!(!plain(1, &state), "now the window holds it");
+        assert!(plain(2, &state), "the line at y = 10 is outside");
+    }
+
+    #[test]
+    fn a_crossing_window_matches_everything_it_touches() {
+        let mut state = AppState::new();
+        let ids = red_source_and_two_plain(&mut state);
+        state.click_select(Some(ids[0]), false);
+        state.start_command("MATCHPROP", match_properties);
+        state.settle_command();
+        // A click on nothing, then the opposite corner, around the other two.
+        state.answer_object(p(-5.0, 4.0), None, false);
+        state.settle_command();
+        state.answer_point(p(15.0, 11.0));
+        state.settle_command();
+        for id in &ids[1..] {
+            let now = state
+                .session()
+                .document()
+                .object(*id)
+                .unwrap()
+                .attrs
+                .clone();
+            assert_eq!(now, red_dashed(LayerId::DEFAULT));
+        }
+        assert!(state.command_running(), "back at the destination prompt");
+        state.undo();
+        state.undo();
+        let kept = state
+            .session()
+            .document()
+            .object(ids[1])
+            .unwrap()
+            .attrs
+            .clone();
+        assert_eq!(kept, Attributes::on_layer(LayerId::DEFAULT));
     }
 
     #[test]

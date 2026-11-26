@@ -9,8 +9,8 @@ use opendraft_commands::Editor;
 
 use crate::state::AppState;
 use crate::{
-    attribute_memory, corner_memory, donut_cmd, hatch_memory, overkill_memory, pedit_memory,
-    polygon_cmd, purge_memory, rect_memory, spline_memory, text_memory, trim_memory,
+    attribute_memory, corner_memory, donut_cmd, hatch_memory, offset_memory, overkill_memory,
+    pedit_memory, polygon_cmd, purge_memory, rect_memory, spline_memory, text_memory, trim_memory,
 };
 
 /// One remembered section, shared between the application and the commands
@@ -41,6 +41,10 @@ pub struct CommandDefaults {
     pub corner: Slot<corner_memory::Memory>,
     pub donut: Slot<donut_cmd::Memory>,
     pub hatch: Slot<hatch_memory::Memory>,
+    /// The last delta length LENGTHEN was given, for the session.
+    pub lengthen_delta: Slot<Option<f64>>,
+    pub matching: Slot<crate::match_props::Matching>,
+    pub offset: Slot<offset_memory::Memory>,
     pub overkill: Slot<opendraft_core::overkill::Settings>,
     pub pedit: Slot<pedit_memory::Memory>,
     pub polygon: Slot<polygon_cmd::Memory>,
@@ -64,6 +68,9 @@ impl CommandDefaults {
             corner: Slot::new(corner_memory::load(storage)),
             donut: Slot::default(),
             hatch: Slot::new(hatch_memory::load(storage)),
+            lengthen_delta: Slot::default(),
+            matching: Slot::default(),
+            offset: Slot::new(offset_memory::load(storage)),
             overkill: Slot::new(overkill_memory::load(storage)),
             pedit: Slot::new(pedit_memory::load(storage)),
             polygon: Slot::default(),
@@ -82,6 +89,7 @@ impl CommandDefaults {
         attribute_memory::save(&self.attribute.get(), storage);
         corner_memory::save(&self.corner.get(), storage);
         hatch_memory::save(&self.hatch.get(), storage);
+        offset_memory::save(&self.offset.get(), storage);
         overkill_memory::save(&self.overkill.get(), storage);
         pedit_memory::save(&self.pedit.get(), storage);
         purge_memory::save(&self.purge.get(), storage);

@@ -1,11 +1,14 @@
-//! LENGTHEN: change the length of lines, arcs and open polylines, by an
-//! amount, a percentage, a total or by dragging. The geometry is
+//! LENGTHEN: change the length of lines, arcs, elliptical arcs and open
+//! polylines, by an amount, a percentage, a total or by dragging. The geometry is
 //! `Entity::lengthened` and its relatives in `opendraft_core`.
 
+use opendraft_commands::Wording;
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked, PointOptions};
 use opendraft_core::units::{format_angle, format_length};
 use opendraft_core::{End, Entity};
 use opendraft_ui::key;
+
+use crate::defaults::EditorDefaults;
 
 /// What to do to the end of each object that is picked.
 #[derive(Clone, Copy)]
@@ -38,9 +41,9 @@ impl Mode {
 /// Why an object cannot be lengthened at all, if it cannot.
 fn refusal(target: &Entity) -> Option<&'static str> {
     match target {
-        Entity::Ellipse(_) => Some("LENGTHEN does not support ellipses yet."),
-        Entity::Spline(_) => Some("LENGTHEN does not support splines yet."),
-        other if other.curve_length().is_none() => Some("Object cannot be lengthened."),
+        Entity::Ellipse(e) if e.is_full() => Some(key!("Object cannot be lengthened.")),
+        Entity::Spline(_) => Some(key!("LENGTHEN does not support splines yet.")),
+        other if other.curve_length().is_none() => Some(key!("Object cannot be lengthened.")),
         _ => None,
     }
 }
@@ -83,11 +86,14 @@ fn report(ed: &mut Editor, id: opendraft_core::EntityId) -> Result<(), Cancelled
     match found {
         Some((_, Some(why), ..)) => ed.say(why),
         Some((units, None, Some(length), angle)) => {
-            let mut text = format!("Current length: {}", format_length(&units, length));
-            if let Some(angle) = angle {
-                text += &format!(", included angle: {}", format_angle(&units, angle));
-            }
-            ed.say(text);
+            let length = format_length(&units, length);
+            ed.say(match angle {
+                Some(angle) => Wording::new(
+                    key!("Current length: %{length}, included angle: %{angle}"),
+                    &[("length", &length), ("angle", &format_angle(&units, angle))],
+                ),
+                None => Wording::new(key!("Current length: %{length}"), &[("length", &length)]),
+            });
         }
         _ => {}
     }
@@ -97,12 +103,20 @@ fn report(ed: &mut Editor, id: opendraft_core::EntityId) -> Result<(), Cancelled
 /// Ask for the amount the chosen keyword needs; `None` to go back.
 fn ask_mode(ed: &mut Editor, keyword: &str) -> Result<Option<Mode>, Cancelled> {
     Ok(match keyword {
-        "DElta" => match ask_amount(ed, key!("Enter delta length"), true)? {
-            Amount::Length(d) => Some(Mode::Delta(d)),
+        "DElta" => match ask_amount(
+            ed,
+            key!("Enter delta length"),
+            true,
+            ed.defaults().lengthen_delta.get(),
+        )? {
+            Amount::Length(d) => {
+                ed.defaults().lengthen_delta.change(|m| *m = Some(d));
+                Some(Mode::Delta(d))
+            }
             Amount::Angle(a) => Some(Mode::DeltaAngle(a)),
             Amount::Back => None,
         },
-        "Total" => match ask_amount(ed, key!("Specify total length"), false)? {
+        "Total" => match ask_amount(ed, key!("Specify total length"), false, None)? {
             Amount::Length(t) => Some(Mode::Total(t)),
             Amount::Angle(t) => Some(Mode::TotalAngle(t)),
             Amount::Back => None,
@@ -112,7 +126,7 @@ fn ask_mode(ed: &mut Editor, keyword: &str) -> Result<Option<Mode>, Cancelled> {
             match ed.ask_number(options)? {
                 Answer::Value(p) if p > 0.0 => Some(Mode::Percent(p)),
                 Answer::Value(_) => {
-                    ed.say("Requires a positive value.");
+                    ed.say(key!("Requires a positive value."));
                     None
                 }
                 _ => None,
@@ -129,14 +143,23 @@ enum Amount {
 }
 
 /// A length, or (by the Angle keyword) an angle. `signed`: may be negative
-/// (a change); otherwise it must be positive (a total).
-fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Cancelled> {
-    let options = NumberOptions::new(message).keyword("Angle", "A");
+/// (a change); otherwise it must be positive (a total). `default` is offered
+/// to Enter.
+fn ask_amount(
+    ed: &mut Editor,
+    message: &str,
+    signed: bool,
+    default: Option<f64>,
+) -> Result<Amount, Cancelled> {
+    let mut options = NumberOptions::new(message).keyword("Angle", "A");
+    if let Some(d) = default {
+        options = options.default(d);
+    }
     let ok = |v: f64| signed || v > 0.0;
     Ok(match ed.ask_distance(options)? {
         Answer::Value(v) if ok(v) => Amount::Length(v),
         Answer::Value(_) => {
-            ed.say("Requires a positive value.");
+            ed.say(key!("Requires a positive value."));
             Amount::Back
         }
         Answer::Keyword(_) => {
@@ -148,7 +171,7 @@ fn ask_amount(ed: &mut Editor, message: &str, signed: bool) -> Result<Amount, Ca
             match ed.ask_angle(NumberOptions::new(message).turn())? {
                 Answer::Value(a) if ok(a) => Amount::Angle(a),
                 Answer::Value(_) => {
-                    ed.say("Requires a positive value.");
+                    ed.say(key!("Requires a positive value."));
                     Amount::Back
                 }
                 _ => Amount::Back,
@@ -195,7 +218,7 @@ fn change_objects(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
             fixed => fixed.apply(&target, end),
         };
         let Some(changed) = changed else {
-            ed.say("Cannot lengthen the object that way.");
+            ed.say(key!("Cannot lengthen the object that way."));
             continue;
         };
         ed.transaction("Lengthen", move |tx| {
@@ -346,5 +369,59 @@ mod tests {
         say(&mut state, "1");
         click(&mut state, 0, p(1.0, 0.0));
         assert!(said(&state, "Object cannot be lengthened."));
+    }
+
+    fn half_ellipse() -> Entity {
+        let arc =
+            opendraft_core::Ellipse::new(p(0.0, 0.0), p(4.0, 0.0), 0.5, 0.0, std::f64::consts::PI);
+        Entity::Ellipse(arc.unwrap())
+    }
+
+    #[test]
+    fn an_elliptical_arc_reports_its_length_and_is_lengthened_along_its_curve() {
+        let mut state = lengthening(&[half_ellipse()]);
+        let before = entities(&state)[0].curve_length().unwrap();
+        click(&mut state, 0, p(0.0, 2.0));
+        assert!(said(&state, "Current length:"));
+        say(&mut state, "de");
+        say(&mut state, "1");
+        click(&mut state, 0, p(3.9, 0.1));
+        let after = entities(&state)[0].curve_length().unwrap();
+        assert!((after - before - 1.0).abs() < 1e-6, "{before} {after}");
+    }
+
+    #[test]
+    fn a_whole_ellipse_cannot_be_lengthened() {
+        let full = opendraft_core::Ellipse::full(p(0.0, 0.0), p(4.0, 0.0), 0.5).unwrap();
+        let mut state = lengthening(&[Entity::Ellipse(full)]);
+        click(&mut state, 0, p(0.0, 2.0));
+        assert!(said(&state, "Object cannot be lengthened."));
+    }
+
+    #[test]
+    fn the_last_delta_is_the_default_the_next_time() {
+        let mut state = lengthening(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
+        say(&mut state, "de");
+        assert!(
+            !state.cmd_prompt().text.contains('<'),
+            "{}",
+            state.cmd_prompt().text
+        );
+        say(&mut state, "2");
+        click(&mut state, 0, p(9.0, 1.0));
+        state.answer_enter();
+        state.settle_command();
+        // A new run: DElta offers the 2 and Enter takes it.
+        state.start_command("Lengthen", lengthen_objects);
+        state.settle_command();
+        say(&mut state, "de");
+        assert!(
+            state.cmd_prompt().text.contains("<2"),
+            "{}",
+            state.cmd_prompt().text
+        );
+        say(&mut state, "");
+        click(&mut state, 0, p(11.0, 1.0));
+        assert_eq!(entities(&state), [line(p(0.0, 0.0), p(14.0, 0.0))]);
     }
 }

@@ -13,7 +13,7 @@ use opendraft_core::array::{polar, polar_step, rectangular, Placement, MAX_ITEMS
 use opendraft_core::{Attributes, Bounds, Entity, EntityId, Point};
 
 use crate::array_path::path_with;
-use crate::text::plural;
+use opendraft_commands::Wording;
 
 /// The most objects one array may add.
 const MAX_COPIES: usize = 200_000;
@@ -83,10 +83,11 @@ pub(crate) fn ghost(source: &Source, items: &[Placement]) -> impl Fn(Point) -> V
 pub(crate) fn fits(ed: &Editor, source: &Source, items: usize) -> bool {
     let copies = items.saturating_sub(1).saturating_mul(source.objects.len());
     if items > MAX_ITEMS || copies > MAX_COPIES {
-        ed.say(format!(
-            "The array would have {}; the most is {MAX_ITEMS}.",
-            plural(items, "item")
-        ));
+        let said = Wording::new(
+            key!("The array would have %{items}; the most is %{most}."),
+            &[("most", &MAX_ITEMS.to_string())],
+        );
+        ed.say(said.part("items", crate::text::items(items)));
         return false;
     }
     true
@@ -112,7 +113,7 @@ pub(crate) fn make(ed: &Editor, source: Source, items: Vec<Placement>) -> Result
         tx.add_with(copies);
         Ok(())
     })?;
-    ed.say(format!("Array of {}.", plural(count, "item")));
+    ed.say(Wording::new(key!("Array of %{items}."), &[]).part("items", crate::text::items(count)));
     Ok(())
 }
 
@@ -135,7 +136,7 @@ pub(crate) fn edit_prompt(
             Answer::Keyword(k) if k == "eXit" => return Ok(None),
             Answer::Keyword(k) => return Ok(Some(k)),
             Answer::Enter => return Ok(None),
-            Answer::Value(_) => ed.say("Grip editing of arrays is not built yet."),
+            Answer::Value(_) => ed.say(key!("Grip editing of arrays is not built yet.")),
         }
     }
 }
@@ -148,7 +149,10 @@ pub(crate) fn ask_count(ed: &Editor, message: &str, current: usize) -> Result<us
         if (typed - whole).abs() < 1e-9 && whole >= 1.0 && whole <= MAX_ITEMS as f64 {
             return Ok(whole as usize);
         }
-        ed.say(format!("Requires an integer between 1 and {MAX_ITEMS}."));
+        ed.say(Wording::new(
+            key!("Requires an integer between 1 and %{most}."),
+            &[("most", &MAX_ITEMS.to_string())],
+        ));
     }
 }
 
@@ -189,7 +193,7 @@ fn rect_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
     let Some(source) = read_source(ed, ids)? else {
         return Ok(());
     };
-    ed.say("Type = Rectangular  Associative = No");
+    ed.say(key!("Type = Rectangular  Associative = No"));
     // Columns and rows run along the coordinate system's axes.
     let ccs = ed.read(|doc| doc.ccs())?;
     let (dx, dy) = source.spacing();
@@ -311,7 +315,7 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
     let Some(source) = read_source(ed, ids)? else {
         return Ok(());
     };
-    ed.say("Type = Polar  Associative = No");
+    ed.say(key!("Type = Polar  Associative = No"));
     let center = ed.get_point(key!("Specify center point of array"))?;
     let base = source.center();
     let (mut items, mut fill, mut rotate) = (6, TAU, true);
@@ -346,7 +350,7 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
                 } else if span.abs() <= TAU + 1e-9 && step != 0.0 {
                     fill = span;
                 } else {
-                    ed.say("The items would go round more than once.");
+                    ed.say(key!("The items would go round more than once."));
                 }
             }
             "Fill angle" => {
@@ -357,7 +361,7 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
                 if angle != 0.0 && angle.abs() <= TAU + 1e-9 {
                     fill = angle;
                 } else {
-                    ed.say("Requires a value between -360 and 360, not 0.");
+                    ed.say(key!("Requires a value between -360 and 360, not 0."));
                 }
             }
             _ => {

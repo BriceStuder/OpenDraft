@@ -10,11 +10,15 @@
 //! (take back the last copy) and eXit. A single grip on the end of a line, an
 //! arc or an open polyline can also Lengthen (Ctrl, or the keyword, switches
 //! between Stretch and Lengthen): the end slides along the object to the
-//! pointer instead of leaving it.
+//! pointer instead of leaving it. A single vertex or segment-middle grip of a
+//! polyline also offers Add vertex (a point on the segment) and, for a vertex,
+//! Remove vertex; the middle of a straight segment offers Convert to arc (a
+//! point on the arc) and that of an arc Convert to line. Ctrl switches between
+//! Stretch and Add vertex too.
 
 use opendraft_canvas::GripHit;
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
-use opendraft_core::{Attributes, Entity, EntityId, Point};
+use opendraft_core::{Attributes, Entity, EntityId, Point, VertexGrip};
 use opendraft_ui::key;
 
 use crate::state::AppState;
@@ -39,7 +43,7 @@ impl AppState {
             ask.keywords
                 .iter()
                 .map(|k| k.label.as_str())
-                .find(|l| matches!(*l, "Lengthen" | "Stretch"))
+                .find(|l| matches!(*l, "Lengthen" | "Stretch" | "Add vertex"))
                 .map(str::to_owned)
         });
         if let Some(label) = label {
@@ -61,6 +65,10 @@ enum Mode {
     Stretch,
     /// An end grip slides its end along the object (`Entity::lengthened_to`).
     Lengthen,
+    /// A polyline grip adds a vertex where the pointer is.
+    AddVertex,
+    /// The middle grip of a straight segment bends it through the pointer.
+    ToArc,
     Move,
     Rotate,
     Scale,
@@ -70,7 +78,7 @@ enum Mode {
 impl Mode {
     fn next(self) -> Mode {
         match self {
-            Mode::Stretch | Mode::Lengthen => Mode::Move,
+            Mode::Stretch | Mode::Lengthen | Mode::AddVertex | Mode::ToArc => Mode::Move,
             Mode::Move => Mode::Rotate,
             Mode::Rotate => Mode::Scale,
             Mode::Scale => Mode::Mirror,
@@ -82,6 +90,8 @@ impl Mode {
         match self {
             Mode::Stretch => "Stretch",
             Mode::Lengthen => "Lengthen",
+            Mode::AddVertex => "Add Vertex",
+            Mode::ToArc => "Convert to Arc",
             Mode::Move => "Move",
             Mode::Rotate => "Rotate",
             Mode::Scale => "Scale",
@@ -127,6 +137,11 @@ fn result(mode: Mode, hot: &Hot, base: Point, given: Given) -> Option<Entity> {
             let end = hot.entity.end_grip(*single(hot)?)?;
             hot.entity.lengthened_to(end, at)
         }
+        (Mode::AddVertex, Given::At(at)) => hot.entity.with_vertex_added(*single(hot)?, at),
+        (Mode::ToArc, Given::At(at)) => match hot.entity.vertex_grip(*single(hot)?)? {
+            VertexGrip::Segment { index, .. } => hot.entity.with_segment_arc(index, at),
+            VertexGrip::Vertex(_) => None,
+        },
         (Mode::Move, Given::At(at)) => Some(hot.entity.translated(at.x - base.x, at.y - base.y)),
         (Mode::Rotate, Given::Angle(angle)) => Some(hot.entity.rotated(base, angle)),
         (Mode::Scale, Given::Factor(factor)) => {
@@ -152,6 +167,14 @@ fn single(hot: &Hot) -> Option<&usize> {
 /// be lengthened.
 fn lengthenable(hot: &[Hot]) -> bool {
     matches!(hot, [h] if single(h).is_some_and(|i| h.entity.end_grip(*i).is_some()))
+}
+
+/// The polyline grip being edited, when it is one grip of one polyline.
+fn polyline_grip(hot: &[Hot]) -> Option<VertexGrip> {
+    match hot {
+        [h] => h.entity.vertex_grip(*single(h)?),
+        _ => None,
+    }
 }
 
 /// What the pointer at `at` stands for in `mode`; an angle counts from
@@ -192,6 +215,8 @@ fn ask(
         (Mode::Stretch, true) => key!("Specify stretch point (copy)"),
         (Mode::Lengthen, false) => key!("Specify new end point"),
         (Mode::Lengthen, true) => key!("Specify new end point (copy)"),
+        (Mode::AddVertex, _) => key!("Specify new vertex"),
+        (Mode::ToArc, _) => key!("Specify a point on the arc"),
         (Mode::Move, false) => key!("Specify move point"),
         (Mode::Move, true) => key!("Specify move point (copy)"),
         (Mode::Rotate, false) => key!("Specify rotation angle"),
@@ -215,6 +240,26 @@ fn ask(
                 options = match mode {
                     Mode::Stretch => options.keyword("Lengthen", "L"),
                     Mode::Lengthen => options.keyword("Stretch", "S"),
+                    _ => options,
+                };
+            }
+            // Vertex edits of a polyline's grip.
+            if let Some(vertex) = polyline_grip(&hot) {
+                options = match (mode, vertex) {
+                    (Mode::Stretch | Mode::Lengthen, VertexGrip::Vertex(_)) => options
+                        .keyword("Add vertex", "A")
+                        .keyword("Remove vertex", "R"),
+                    (Mode::Stretch | Mode::Lengthen, VertexGrip::Segment { arc: false, .. }) => {
+                        options
+                            .keyword("Add vertex", "A")
+                            .keyword("Convert to arc", "V")
+                    }
+                    (Mode::Stretch | Mode::Lengthen, VertexGrip::Segment { arc: true, .. }) => {
+                        options
+                            .keyword("Add vertex", "A")
+                            .keyword("Convert to line", "V")
+                    }
+                    (Mode::AddVertex | Mode::ToArc, _) => options.keyword("Stretch", "S"),
                     _ => options,
                 };
             }
@@ -266,6 +311,28 @@ fn read_hot(ed: &Editor, hits: &[GripHit]) -> Result<Vec<Hot>, Cancelled> {
     })
 }
 
+/// Remove the vertex of a grip, or straighten the arc of one, as one undo
+/// step; the command is done.
+fn remove_or_straighten(ed: &Editor, hot: &[Hot]) -> Result<(), Cancelled> {
+    let [h] = hot else { return Ok(()) };
+    let made = match polyline_grip(hot) {
+        Some(VertexGrip::Vertex(i)) => ("Remove Vertex", h.entity.with_vertex_removed(i)),
+        Some(VertexGrip::Segment { index, .. }) => {
+            ("Convert to Line", h.entity.with_segment_straight(index))
+        }
+        None => return Ok(()),
+    };
+    let (name, Some(entity)) = made else {
+        ed.say(key!("The objects cannot be changed that way."));
+        return Ok(());
+    };
+    let id = h.id;
+    ed.transaction(name, move |tx| {
+        tx.modify(id, move |_| entity);
+        Ok(())
+    })
+}
+
 /// The command: edit the hot grips until the user places the result, or, in
 /// Copy mode, until they exit.
 fn edit_grips(ed: &mut Editor, hits: &[GripHit]) -> Result<(), Cancelled> {
@@ -298,6 +365,11 @@ fn edit_grips(ed: &mut Editor, hits: &[GripHit]) -> Result<(), Cancelled> {
                     "Copy" => copy = true,
                     "Lengthen" => mode = Mode::Lengthen,
                     "Stretch" => mode = Mode::Stretch,
+                    "Add vertex" => mode = Mode::AddVertex,
+                    "Convert to arc" => mode = Mode::ToArc,
+                    "Remove vertex" | "Convert to line" => {
+                        return remove_or_straighten(ed, &hot);
+                    }
                     "Undo" => {
                         ed.undo()?;
                         copies = copies.saturating_sub(1);
@@ -313,7 +385,7 @@ fn edit_grips(ed: &mut Editor, hits: &[GripHit]) -> Result<(), Cancelled> {
             .filter_map(|h| Some((h.clone(), result(mode, h, base, given)?)))
             .collect();
         if changes.is_empty() {
-            ed.say("The objects cannot be changed that way.");
+            ed.say(key!("The objects cannot be changed that way."));
             if copy {
                 continue;
             }
@@ -670,5 +742,97 @@ mod tests {
         };
         assert!((radius - 2.0).abs() < 1e-9);
         assert!((end - 0.75 * std::f64::consts::PI).abs() < 1e-9, "{end}");
+    }
+
+    fn zigzag() -> Entity {
+        Entity::Polyline {
+            points: vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: Vec::new(),
+        }
+    }
+
+    fn offers(state: &mut AppState, label: &str) -> bool {
+        state.cmd_prompt().options.iter().any(|o| o.label == label)
+    }
+
+    #[test]
+    fn a_vertex_grip_offers_add_and_remove_vertex_and_removing_is_one_undo_step() {
+        let mut state = begin(&[zigzag()], &[(0, 1)]);
+        assert!(offers(&mut state, "Add vertex") && offers(&mut state, "Remove vertex"));
+        assert!(!offers(&mut state, "Convert to arc"));
+        submit(&mut state, "r");
+        assert!(!state.command_running());
+        let Entity::Polyline { points, .. } = entity(&state) else {
+            panic!()
+        };
+        assert_eq!(points, [p(0.0, 0.0), p(10.0, 10.0)]);
+        state.undo();
+        let Entity::Polyline { points, .. } = entity(&state) else {
+            panic!()
+        };
+        assert_eq!(points.len(), 3);
+    }
+
+    #[test]
+    fn add_vertex_puts_one_where_the_pointer_is_on_the_segment() {
+        // The middle grip of the first segment is grip 3.
+        let mut state = begin(&[zigzag()], &[(0, 3)]);
+        submit(&mut state, "a");
+        assert!(state.cmd_prompt().text.starts_with("Specify new vertex"));
+        assert!(offers(&mut state, "Stretch"));
+        submit(&mut state, "4,-2");
+        let Entity::Polyline { points, .. } = entity(&state) else {
+            panic!()
+        };
+        assert_eq!(
+            points,
+            [p(0.0, 0.0), p(4.0, -2.0), p(10.0, 0.0), p(10.0, 10.0)]
+        );
+    }
+
+    #[test]
+    fn ctrl_switches_a_polyline_grip_between_stretch_and_add_vertex() {
+        let mut state = begin(&[zigzag()], &[(0, 1)]);
+        state.cycle_grip_option();
+        state.settle_command();
+        assert!(state.cmd_prompt().text.starts_with("Specify new vertex"));
+        state.cycle_grip_option();
+        state.settle_command();
+        assert!(state.cmd_prompt().text.starts_with("Specify stretch point"));
+    }
+
+    #[test]
+    fn a_straight_segment_converts_to_an_arc_and_an_arc_back_to_a_line() {
+        let mut state = begin(&[zigzag()], &[(0, 3)]);
+        assert!(offers(&mut state, "Convert to arc"));
+        submit(&mut state, "v");
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Specify a point on the arc"));
+        submit(&mut state, "5,-5");
+        let Entity::Polyline { bulges, .. } = entity(&state) else {
+            panic!()
+        };
+        assert!(bulges[0].abs() > 0.1, "{bulges:?}");
+        // Its middle grip now offers the way back.
+        let mut state = begin(&[entity(&state)], &[(0, 3)]);
+        assert!(offers(&mut state, "Convert to line"));
+        submit(&mut state, "v");
+        assert!(!state.command_running());
+        let Entity::Polyline { bulges, .. } = entity(&state) else {
+            panic!()
+        };
+        assert!(bulges.is_empty());
+    }
+
+    #[test]
+    fn other_objects_and_several_grips_offer_no_vertex_edits() {
+        let mut state = begin(&[line(p(0.0, 0.0), p(10.0, 0.0))], &[(0, 1)]);
+        assert!(!offers(&mut state, "Add vertex"));
+        let mut state = begin(&[zigzag()], &[(0, 0), (0, 1)]);
+        assert!(!offers(&mut state, "Add vertex"));
     }
 }

@@ -80,6 +80,13 @@ fn hint(ui: &mut egui::Ui, theme: &Theme, text: &str) {
 }
 
 pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
+    ui.columns(2, |cols| {
+        cache_column(&mut cols[0], theme, draft);
+        motion_column(&mut cols[1], theme, draft);
+    });
+}
+
+fn cache_column(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
     let p = &mut draft.performance;
     widgets::group_box(ui, theme, "Drawing cache", |ui| {
         hint(
@@ -131,6 +138,25 @@ pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         );
     });
     ui.add_space(6.0);
+    widgets::group_box(ui, theme, "Diagnostics", |ui| {
+        ui.checkbox(
+            &mut p.show_frame_time,
+            "Show frame time and cache use on the canvas",
+        );
+        hint(
+            ui,
+            theme,
+            "Off by default; nothing is measured while it is off.",
+        );
+    });
+    ui.add_space(6.0);
+    if widgets::secondary_button(ui, theme, "Reset to defaults").clicked() {
+        *p = PerformanceSettings::default();
+    }
+}
+
+fn motion_column(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
+    let p = &mut draft.performance;
     widgets::group_box(ui, theme, "While zooming or panning", |ui| {
         hint(
             ui,
@@ -178,22 +204,6 @@ pub fn page(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
              is started. Drawn as an image it is started at once, in the background.",
         );
     });
-    ui.add_space(6.0);
-    widgets::group_box(ui, theme, "Diagnostics", |ui| {
-        ui.checkbox(
-            &mut p.show_frame_time,
-            "Show frame time and cache use on the canvas",
-        );
-        hint(
-            ui,
-            theme,
-            "Off by default; nothing is measured while it is off.",
-        );
-    });
-    ui.add_space(6.0);
-    if widgets::secondary_button(ui, theme, "Reset to defaults").clicked() {
-        *p = PerformanceSettings::default();
-    }
 }
 
 #[cfg(test)]

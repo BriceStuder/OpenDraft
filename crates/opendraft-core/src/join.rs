@@ -9,7 +9,13 @@
 //! As in AutoCAD, lines that all lie on one line join even where they do not
 //! touch: across a gap, overlapping or doubling back, they become the one line
 //! from end to end. That holds only when they are all the selection has to
-//! join; beside other objects, only ends that meet are joined.
+//! join; beside other objects, only ends that meet are joined. Likewise arcs
+//! of one circle join across a gap (see `join_gap.rs`), counter-clockwise from
+//! the first one.
+//!
+//! `tolerance` is how close ends must be to meet: the Fuzz distance. Ends
+//! that are not quite together, by more than a hair, are linked by a straight
+//! segment.
 
 use std::f64::consts::TAU;
 
@@ -24,11 +30,13 @@ pub struct Merged {
     pub entity: Entity,
 }
 
-/// A run of segments: `points`, and one bulge per point (the last unused).
+/// A run of segments: `points`, and one bulge and one width pair (start and
+/// end of the segment) per point (the last unused).
 #[derive(Clone)]
 struct Chain {
     points: Vec<Point>,
     bulges: Vec<f64>,
+    widths: Vec<(f64, f64)>,
 }
 
 impl Chain {
@@ -38,6 +46,7 @@ impl Chain {
             Entity::Line { start, end } if distance(*start, *end) > 0.0 => Some(Chain {
                 points: vec![*start, *end],
                 bulges: vec![0.0, 0.0],
+                widths: vec![(0.0, 0.0); 2],
             }),
             Entity::Arc {
                 center,
@@ -52,22 +61,32 @@ impl Chain {
                         arc::point_at(*center, *radius, *end),
                     ],
                     bulges: vec![bulge::from_sweep(sweep, true), 0.0],
+                    widths: vec![(0.0, 0.0); 2],
                 })
             }
             Entity::Polyline {
                 points,
                 closed: false,
                 bulges,
-                ..
+                widths,
             } if points.len() >= 2 => {
                 let mut bulges: Vec<f64> =
                     (0..points.len()).map(|i| bulge::at(bulges, i)).collect();
                 if let Some(last) = bulges.last_mut() {
                     *last = 0.0;
                 }
+                let mut widths = if widths.is_empty() {
+                    vec![(0.0, 0.0); points.len()]
+                } else {
+                    widths.clone()
+                };
+                if let Some(last) = widths.last_mut() {
+                    *last = (0.0, 0.0);
+                }
                 Some(Chain {
                     points: points.clone(),
                     bulges,
+                    widths,
                 })
             }
             _ => None,
@@ -87,20 +106,42 @@ impl Chain {
         let n = self.points.len();
         let mut bulges: Vec<f64> = (0..n - 1).rev().map(|i| -self.bulges[i]).collect();
         bulges.push(0.0);
+        // Each segment's width runs the other way too.
+        let mut widths: Vec<(f64, f64)> = (0..n - 1)
+            .rev()
+            .map(|i| (self.widths[i].1, self.widths[i].0))
+            .collect();
+        widths.push((0.0, 0.0));
         Chain {
             points: self.points.iter().rev().copied().collect(),
             bulges,
+            widths,
         }
     }
 
-    /// `other` added on, starting where this one ends.
+    /// `other` added on, starting where this one ends. When it starts a little
+    /// way off (within the Fuzz distance), a straight segment links them.
     fn append(&mut self, other: &Chain) {
         let n = self.points.len();
+        if distance(self.last(), other.first()) > TOUCH {
+            self.bulges[n - 1] = 0.0;
+            self.widths[n - 1] = (0.0, 0.0);
+            self.points.extend_from_slice(&other.points);
+            self.bulges.extend_from_slice(&other.bulges);
+            self.widths.extend_from_slice(&other.widths);
+            return;
+        }
         self.bulges[n - 1] = other.bulges[0];
+        self.widths[n - 1] = other.widths[0];
         self.points.extend_from_slice(&other.points[1..]);
         self.bulges.extend_from_slice(&other.bulges[1..]);
+        self.widths.extend_from_slice(&other.widths[1..]);
     }
 }
+
+/// Ends this close are one point; farther apart (up to the tolerance), they
+/// are linked by a segment.
+const TOUCH: f64 = 1e-6;
 
 fn distance(a: Point, b: Point) -> f64 {
     (a.x - b.x).hypot(a.y - b.y)
@@ -112,6 +153,9 @@ fn distance(a: Point, b: Point) -> f64 {
 /// meet is closed. Lines that are all on one line join whether they meet or
 /// not (see the module notes).
 pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
+    if items.iter().any(|e| matches!(e, Entity::Spline(_))) {
+        return join_splines(items, tolerance);
+    }
     if let Some(line) = on_one_line(items, tolerance) {
         return vec![line];
     }
@@ -137,7 +181,66 @@ pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
         let entity = result(chain, closes, tolerance);
         made.push(Merged { used, entity });
     }
-    made.extend(crate::ellipse::join::join_elliptical_arcs(items, tolerance));
+    // Arcs of one circle that the chains did not all take in join across the
+    // gap between them.
+    if let Some(round) = crate::join_gap::arcs_on_one_circle(items, tolerance) {
+        let covered: usize = made.iter().map(|m| m.used.len()).sum();
+        if covered < round.used.len() {
+            return vec![round];
+        }
+    }
+    let elliptical = crate::ellipse::join::join_elliptical_arcs(items, tolerance);
+    if let Some(round) = crate::ellipse::join::elliptical_arcs_across_gaps(items, tolerance) {
+        let covered: usize = elliptical.iter().map(|m| m.used.len()).sum();
+        if covered < round.used.len() {
+            made.push(round);
+            return made;
+        }
+    }
+    made.extend(elliptical);
+    made
+}
+
+/// Splines among `items` that meet end to end, each run as one spline (see
+/// `Spline::joined`). Only for a selection of splines and things JOIN cannot
+/// use: beside lines, arcs and polylines the app refuses splines.
+fn join_splines(items: &[Entity], tolerance: f64) -> Vec<Merged> {
+    let mut taken = vec![false; items.len()];
+    let mut made = Vec::new();
+    for seed in 0..items.len() {
+        let Entity::Spline(first) = &items[seed] else {
+            continue;
+        };
+        if taken[seed] {
+            continue;
+        }
+        taken[seed] = true;
+        let (mut run, mut used) = ((**first).clone(), vec![seed]);
+        'grow: loop {
+            for (i, item) in items.iter().enumerate() {
+                let Entity::Spline(other) = item else {
+                    continue;
+                };
+                if taken[i] {
+                    continue;
+                }
+                if let Some(longer) = run.joined(other, tolerance) {
+                    run = longer;
+                    taken[i] = true;
+                    used.push(i);
+                    continue 'grow;
+                }
+            }
+            break;
+        }
+        if used.len() > 1 {
+            used.sort_unstable();
+            made.push(Merged {
+                used,
+                entity: Entity::Spline(Box::new(run)),
+            });
+        }
+    }
     made
 }
 
@@ -229,16 +332,19 @@ fn grow(
 
 /// The object a finished chain becomes.
 fn result(mut chain: Chain, closed: bool, tolerance: f64) -> Entity {
+    // A wide polyline stays one, whatever its shape.
+    let wide = chain.widths.iter().any(|w| *w != (0.0, 0.0));
     if closed {
         chain.points.pop();
         chain.bulges.pop();
+        chain.widths.pop();
     } else {
         // An open chain of lines on one line is a line.
-        if let Some(line) = as_line(&chain, tolerance) {
+        if let Some(line) = as_line(&chain, tolerance).filter(|_| !wide) {
             return line;
         }
     }
-    if let Some(round) = as_arc(&chain, closed, tolerance) {
+    if let Some(round) = as_arc(&chain, closed, tolerance).filter(|_| !wide) {
         return round;
     }
     let has_arcs = bulge::has_arcs(&chain.bulges);
@@ -246,7 +352,11 @@ fn result(mut chain: Chain, closed: bool, tolerance: f64) -> Entity {
         points: chain.points,
         closed,
         bulges: if has_arcs { chain.bulges } else { Vec::new() },
-        widths: Vec::new(),
+        widths: if chain.widths.iter().any(|w| *w != (0.0, 0.0)) {
+            chain.widths
+        } else {
+            Vec::new()
+        },
     }
 }
 
@@ -350,6 +460,30 @@ mod tests {
                 widths: Vec::new(),
             }
         );
+    }
+
+    #[test]
+    fn a_wide_polyline_keeps_its_widths_when_joined_either_way_round() {
+        let wide = Entity::Polyline {
+            points: vec![p(0.0, 0.0), p(5.0, 0.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: vec![(1.0, 3.0), (0.0, 0.0)],
+        };
+        let thin = line(p(5.0, 5.0), p(5.0, 0.0));
+        let made = join(&[wide.clone(), thin.clone()], 1e-6);
+        let Entity::Polyline { points, widths, .. } = &made[0].entity else {
+            panic!("{:?}", made[0].entity)
+        };
+        assert_eq!(points, &[p(0.0, 0.0), p(5.0, 0.0), p(5.0, 5.0)]);
+        assert_eq!(widths, &[(1.0, 3.0), (0.0, 0.0), (0.0, 0.0)]);
+        // Taken the other way, the first segment's taper runs backwards.
+        let made = join(&[thin, wide], 1e-6);
+        let Entity::Polyline { points, widths, .. } = &made[0].entity else {
+            panic!("{:?}", made[0].entity)
+        };
+        assert_eq!(points[0], p(5.0, 5.0));
+        assert_eq!(widths[1], (3.0, 1.0));
     }
 
     #[test]

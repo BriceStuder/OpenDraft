@@ -86,7 +86,7 @@ fn through(
         match ed.ask_point(options) {
             Ok(Answer::Value(at)) => match toward(base, at) {
                 Some(direction) => add(ed, make(base, direction), name)?,
-                None => ed.say("The through point is the same as the first."),
+                None => ed.say(key!("The through point is the same as the first.")),
             },
             Ok(_) | Err(Cancelled) => return Ok(()),
         }
@@ -117,7 +117,7 @@ fn bisect(ed: &Editor) -> Result<(), Cancelled> {
         if toward(vertex, at).is_some() {
             break at;
         }
-        ed.say("The point is the same as the vertex.");
+        ed.say(key!("The point is the same as the vertex."));
     };
     let first = toward(vertex, start).unwrap_or(Point::new(1.0, 0.0));
     loop {
@@ -135,7 +135,7 @@ fn bisect(ed: &Editor) -> Result<(), Cancelled> {
                 let half = toward(vertex, end).and_then(|second| infinite::bisector(first, second));
                 match half {
                     Some(d) => add(ed, xline(vertex, d), NAME)?,
-                    None => ed.say("The two sides do not make an angle."),
+                    None => ed.say(key!("The two sides do not make an angle.")),
                 }
             }
             Ok(_) | Err(Cancelled) => return Ok(()),
@@ -167,7 +167,7 @@ fn offset(ed: &Editor) -> Result<(), Cancelled> {
     let distance = match ed.ask_distance(options)? {
         Answer::Value(d) if d > MIN_SIZE => Some(d),
         Answer::Value(_) => {
-            ed.say("Requires a positive distance.");
+            ed.say(key!("Requires a positive distance."));
             return Ok(());
         }
         Answer::Keyword(_) | Answer::Enter => None,
@@ -182,7 +182,7 @@ fn offset(ed: &Editor) -> Result<(), Cancelled> {
             continue;
         };
         let (Some(direction), Some(on)) = (direction_of(&entity), point_on(&entity)) else {
-            ed.say("Select a line, construction line or ray.");
+            ed.say(key!("Select a line, construction line or ray."));
             continue;
         };
         let prompt = if distance.is_some() {
@@ -206,7 +206,7 @@ fn offset(ed: &Editor) -> Result<(), Cancelled> {
         if let Answer::Value(at) = ed.ask_point(options)? {
             match made(at) {
                 Some(line) => add(ed, line, NAME)?,
-                None => ed.say("The point is on the line."),
+                None => ed.say(key!("The point is on the line.")),
             }
         }
     }

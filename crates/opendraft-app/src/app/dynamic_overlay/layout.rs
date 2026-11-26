@@ -113,6 +113,12 @@ fn ghost_dimensions(
             -((cx.units.units.base_angle + cx.units.ccs.angle + cx.twist) as f32),
             if cx.units.units.clockwise { 1.0 } else { -1.0 },
         ),
+        [Field::Distance, Field::Length, Field::Angle] => dimensions::mirrored(
+            base,
+            end,
+            -((cx.units.units.base_angle + cx.units.ccs.angle + cx.twist) as f32),
+            if cx.units.units.clockwise { 1.0 } else { -1.0 },
+        ),
         [Field::Distance] => dimensions::linear(base, end),
         // A box centred on the base is measured from its opposite corner.
         [Field::X, Field::Y] if relative => match cx.ask.dynamic_dimensions {

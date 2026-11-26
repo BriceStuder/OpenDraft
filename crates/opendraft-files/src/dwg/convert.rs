@@ -372,6 +372,7 @@ pub(super) fn to_document(
             frozen: l.frozen,
             locked: l.locked,
             frozen_in_model: false,
+            plot: l.plot,
         };
         if is_default {
             document.replace_layer(layer);

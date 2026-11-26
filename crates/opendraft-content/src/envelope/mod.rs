@@ -29,7 +29,7 @@ pub const FORMAT_VERSION: u64 = 1;
 
 /// A package file is at most this big, checked before parsing (5.2).
 pub const MAX_BYTES: usize = 5 * 1024 * 1024;
-/// Starting figures, to be set from measurement (specification 13.5).
+/// Starting figures, to be set from measurement.
 pub const MAX_DEPTH: usize = 32;
 pub const MAX_VALUES: usize = 1_000_000;
 
