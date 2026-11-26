@@ -125,12 +125,11 @@ fn an_empty_name_is_refused() {
 }
 
 #[test]
-fn a_long_description_is_cut_and_the_entry_kept() {
+fn a_long_description_is_cut_quietly_as_autocad_does() {
     let long = "x".repeat(60);
     let file = parse(&format!("*LONG,{long}\nA,1,-1\n"));
     assert_eq!(file.entries[0].description.len(), MAX_DESCRIPTION_CHARS);
-    assert_eq!(file.notes.len(), 1);
-    assert!(!file.notes[0].skipped);
+    assert!(file.notes.is_empty());
 }
 
 #[test]

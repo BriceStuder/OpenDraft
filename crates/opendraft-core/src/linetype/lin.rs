@@ -32,7 +32,7 @@ pub struct LinNote {
     pub name: Option<String>,
     pub message: String,
     /// True when the entry was left out, false when it was kept with a
-    /// change (a long description cut short).
+    /// change (text or shape elements dropped).
     pub skipped: bool,
 }
 
@@ -144,15 +144,9 @@ impl LinFile {
             self.skip(&header, message);
             return header;
         }
-        if description.chars().count() > MAX_DESCRIPTION_CHARS {
-            description = description.chars().take(MAX_DESCRIPTION_CHARS).collect();
-            self.notes.push(LinNote {
-                line,
-                name: Some(header.name.clone()),
-                message: format!("its description was cut to {MAX_DESCRIPTION_CHARS} characters"),
-                skipped: false,
-            });
-        }
+        // AutoCAD's own files have longer ones and it keeps the first 47
+        // characters (its DXF of `DOT` does), so no note is made of it.
+        description = description.chars().take(MAX_DESCRIPTION_CHARS).collect();
         Header {
             description,
             usable: true,
