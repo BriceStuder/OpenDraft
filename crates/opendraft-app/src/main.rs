@@ -138,6 +138,7 @@ mod nav_gizmo;
 mod object_answer;
 mod object_styles;
 mod offset;
+mod offset_memory;
 mod once_input;
 mod option_language;
 mod overkill_cmd;

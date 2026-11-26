@@ -303,7 +303,7 @@ Rectangle (`rectangle.rs`, settings in `rect_memory.rs`; from the centre, by
 three points and the oblongs in `rect_variants.rs`), Polyline
 (`polyline_cmd.rs`, arc options in `polyline_arc.rs`), the window polygon, crossing polygon and fence
 selections (`selection.rs`), Trim and Extend (`edges.rs`; the Edge option, `EDGEMODE`, lets each edge act as if it ran on past its ends: `Entity::with_implied_extension` in `opendraft_core::implied_edge` turns a line into the infinite line, an arc or an elliptical arc into its whole circle or ellipse, and an open polyline into itself plus a ray, or the circle of an arc segment, beyond each end; it is remembered with `TRIMEXTENDMODE` in `trim_memory.rs`, user settings, not the drawing), Offset
-(`offset.rs`: Through, Erase and Layer (Current or Source, asked when chosen, for the rest of the command) at the distance prompt; at the side prompt Multiple keeps offsetting the one object, each copy measured from the last by a distance and each point from the object for Through, Erase removing only the original), Fillet and Chamfer (`corners.rs`, settings in
+(`offset.rs`: Through, Erase and Layer (Current or Source, asked when chosen, for the rest of the command) at the distance prompt; at the side prompt Multiple keeps offsetting the one object, each copy measured from the last by a distance and each point from the object for Through, Erase removing only the original; Exit and Undo at both prompts, each copy being one undo step; the last distance is the default, `OFFSETDIST`, in `offset_memory.rs`, user settings), Fillet and Chamfer (`corners.rs`, settings in
 `corner_memory.rs`), Join (`join.rs`), Explode (`explode.rs`), Break and Break at Point (`break_cmd.rs`; BREAKATPOINT, alias BP, asks for the object, then the one point where it is divided in two, without AutoCAD's `@`), Stretch (`stretch.rs`) and the grip editor (`grips.rs`, which
 starts a "Stretch" command when a grip is pressed). The old model, where a canvas `Tool`
 was armed and each command was spread over a prompt table, a typed-input
@@ -548,7 +548,7 @@ variables with their values. Names are upper case and matched ignoring case.
   saved with the user's settings for free. Built: `GRIDMODE`, `GRIDUNIT`,
   `OSMODE`, `SNAPMODE`, `SAVETIME`, `CURSORSIZE`, `PICKBOX` (defaults to a 4 px pick-box radius; Settings > Drafting > Sizes), `APERTURE`,
   `GRIPSIZE` (pixel radii of the pick, snap and grip targets; see `PointerSizes` in `opendraft-canvas`), `FILLETRAD`, `CHAMFERA`, `CHAMFERB`,
-  `CHAMFERC`, `CHAMFERD`, `CHAMMODE`, `TRIMMODE` (the last seven live in the
+  `OFFSETDIST`, `CHAMFERC`, `CHAMFERD`, `CHAMMODE`, `TRIMMODE` (the last seven live in the
   `CommandDefaults` (`corner_memory.rs`) and are saved with the user's
   settings, not the drawing), and read-only `CMDACTIVE`, `DWGNAME`.
 - **Use AutoCAD's names and values** where the feature matches, so people and

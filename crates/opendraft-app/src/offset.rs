@@ -6,6 +6,8 @@ use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Pick
 use opendraft_core::{Entity, Point};
 use opendraft_ui::key;
 
+use crate::defaults::EditorDefaults;
+
 /// Distances at or below this are refused.
 const MIN_DISTANCE: f64 = 1e-9;
 
@@ -41,16 +43,23 @@ fn copy_for(target: &Entity, gap: Gap, at: Point) -> Option<Entity> {
 /// its own undo step and takes the object's attributes, and its layer unless
 /// the Layer option said Current. At the side prompt, Multiple keeps offsetting
 /// the same object with clicks: by a distance each copy is measured from the
-/// last one; through points are each measured from the object.
+/// last one; through points are each measured from the object. Exit ends the
+/// command and Undo takes back the last copy, at either prompt. A distance
+/// is remembered (`OFFSETDIST`) and offered by Enter.
 pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     let (mut erase, mut layer) = (false, CopyLayer::Source);
     let gap = loop {
+        let remembered = ed.defaults().offset.get().distance;
         let options = NumberOptions::new(key!("Specify offset distance"))
+            .default(remembered)
             .keyword("Through", "T")
             .keyword("Erase", "E")
             .keyword("Layer", "L");
         match ed.ask_distance(options)? {
-            Answer::Value(d) if d > MIN_DISTANCE => break Gap::Distance(d),
+            Answer::Value(d) if d > MIN_DISTANCE => {
+                ed.defaults().offset.change(|m| m.distance = d);
+                break Gap::Distance(d);
+            }
             Answer::Value(_) => ed.say(key!("Requires a positive value.")),
             Answer::Keyword(k) if k == "Through" => break Gap::Through,
             Answer::Keyword(k) if k == "Layer" => {
@@ -78,11 +87,22 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             Answer::Enter => return Err(Cancelled),
         }
     };
+    // The copies made so far that Undo can still take back.
+    let mut made = 0_usize;
     loop {
-        let Ok(Answer::Value(Picked { id, .. })) = ed.ask_object(Options::<Picked>::new(key!(
-            "Select object to offset or <exit>"
-        ))) else {
-            return Ok(());
+        let mut options =
+            Options::<Picked>::new(key!("Select object to offset or <exit>")).keyword("Exit", "E");
+        if made > 0 {
+            options = options.keyword("Undo", "U");
+        }
+        let id = match ed.ask_object(options) {
+            Ok(Answer::Value(Picked { id, .. })) => id,
+            Ok(Answer::Keyword(k)) if k == "Undo" => {
+                ed.undo()?;
+                made -= 1;
+                continue;
+            }
+            _ => return Ok(()),
         };
         let Some(object) = ed.read(move |doc| doc.object(id).cloned())? else {
             continue;
@@ -101,15 +121,33 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             Gap::Through => key!("Specify through point"),
         };
         let (mut source, mut multiple, mut erase_now) = (target, false, erase);
+        // What this object was before each of its copies, for Undo.
+        let mut before: Vec<(Entity, bool)> = Vec::new();
         loop {
             let shown = source.clone();
             let mut options = PointOptions::new(message)
-                .ghost(move |at| copy_for(&shown, gap, at).into_iter().collect());
+                .ghost(move |at| copy_for(&shown, gap, at).into_iter().collect())
+                .keyword("Exit", "E");
             if !multiple {
                 options = options.keyword("Multiple", "M");
             }
+            if made > 0 {
+                options = options.keyword("Undo", "U");
+            }
             let at = match ed.ask_point(options) {
                 Ok(Answer::Value(at)) => at,
+                Ok(Answer::Keyword(k)) if k == "Exit" => return Ok(()),
+                Ok(Answer::Keyword(k)) if k == "Undo" => {
+                    ed.undo()?;
+                    made -= 1;
+                    match before.pop() {
+                        // A copy of this object: its next copy starts again from there.
+                        Some((was, erased)) => (source, erase_now) = (was, erased),
+                        // One of an earlier object: back to choosing.
+                        None => break,
+                    }
+                    continue;
+                }
                 Ok(Answer::Keyword(_)) => {
                     multiple = true;
                     continue;
@@ -129,6 +167,7 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                 attrs.layer = ed.read(|doc| doc.current_layer())?;
             }
             let next = copy.clone();
+            before.push((source.clone(), erase_now));
             let remove = std::mem::take(&mut erase_now);
             ed.transaction("Offset", move |tx| {
                 tx.add_with(vec![(copy, attrs)]);
@@ -137,6 +176,7 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                 }
                 Ok(())
             })?;
+            made += 1;
             if !multiple {
                 break;
             }
@@ -517,5 +557,128 @@ mod tests {
             .cmd_prompt()
             .text
             .starts_with("Specify offset distance"));
+    }
+
+    fn offers(state: &mut AppState, label: &str) -> bool {
+        state.cmd_prompt().options.iter().any(|o| o.label == label)
+    }
+
+    #[test]
+    fn undo_in_multiple_takes_back_the_last_copy_and_carries_on_from_the_one_before() {
+        let mut state = multiple(&[line(p(0.0, 0.0), p(10.0, 0.0))], "2");
+        assert!(!offers(&mut state, "Undo"), "nothing to undo yet");
+        for _ in 0..2 {
+            state.cmd_submit("5,100");
+            state.settle_command();
+        }
+        assert!(offers(&mut state, "Undo"));
+        state.cmd_submit("u");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2);
+        assert!(state.command_running());
+        // The next copy is measured from the one that is left.
+        state.cmd_submit("5,100");
+        state.settle_command();
+        assert_eq!(entities(&state)[2], line(p(0.0, 4.0), p(10.0, 4.0)));
+    }
+
+    #[test]
+    fn undo_after_a_single_copy_returns_to_choosing_an_object() {
+        let mut state = offsetting(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
+        state.cmd_submit("2");
+        state.settle_command();
+        assert!(!offers(&mut state, "Undo"));
+        click(&mut state, 0, p(5.0, 0.0));
+        state.cmd_submit("5,9");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2);
+        // Back at the object prompt, Undo takes the copy away.
+        assert!(offers(&mut state, "Undo") && offers(&mut state, "Exit"));
+        state.cmd_submit("u");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 1);
+        assert!(!offers(&mut state, "Undo"));
+        // And from the side prompt, Undo reaches the copy of the object before.
+        click(&mut state, 0, p(5.0, 0.0));
+        state.cmd_submit("5,9");
+        state.settle_command();
+        click(&mut state, 0, p(5.0, 0.0));
+        assert!(offers(&mut state, "Undo"));
+        state.cmd_submit("u");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 1);
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Select object to offset"));
+    }
+
+    #[test]
+    fn undo_puts_back_an_object_erased_by_its_copy() {
+        let mut state = offsetting(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("y");
+        state.settle_command();
+        state.cmd_submit("2");
+        state.settle_command();
+        click(&mut state, 0, p(5.0, 0.0));
+        state.cmd_submit("5,9");
+        state.settle_command();
+        assert_eq!(entities(&state), [line(p(0.0, 2.0), p(10.0, 2.0))]);
+        state.cmd_submit("u");
+        state.settle_command();
+        assert_eq!(entities(&state), [line(p(0.0, 0.0), p(10.0, 0.0))]);
+    }
+
+    #[test]
+    fn exit_ends_the_command_at_either_prompt() {
+        let mut state = offsetting(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
+        state.cmd_submit("2");
+        state.settle_command();
+        assert!(offers(&mut state, "Exit"));
+        state.cmd_submit("e");
+        state.settle_command();
+        assert!(!state.command_running());
+        let mut state = offsetting(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
+        state.cmd_submit("2");
+        state.settle_command();
+        click(&mut state, 0, p(5.0, 0.0));
+        assert!(offers(&mut state, "Exit"));
+        state.cmd_submit("e");
+        state.settle_command();
+        assert!(!state.command_running());
+        assert_eq!(entities(&state).len(), 1);
+    }
+
+    #[test]
+    fn the_last_distance_is_offered_next_time_and_enter_takes_it() {
+        let mut state = offsetting(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
+        assert!(
+            state.cmd_prompt().text.contains("<1"),
+            "{}",
+            state.cmd_prompt().text
+        );
+        state.cmd_submit("3");
+        state.settle_command();
+        assert_eq!(state.defaults().offset.get().distance, 3.0);
+        state.cmd_submit("");
+        state.settle_command();
+        state.cmd_submit("");
+        state.settle_command();
+        // A second run starts with 3 as the default, and Enter uses it.
+        state.start_command("Offset", offset_objects);
+        state.settle_command();
+        assert!(
+            state.cmd_prompt().text.contains("<3"),
+            "{}",
+            state.cmd_prompt().text
+        );
+        state.cmd_submit("");
+        state.settle_command();
+        click(&mut state, 0, p(5.0, 0.0));
+        state.cmd_submit("5,9");
+        state.settle_command();
+        assert_eq!(entities(&state)[1], line(p(0.0, 3.0), p(10.0, 3.0)));
     }
 }
