@@ -44,6 +44,7 @@ pub mod implied_edge;
 pub mod infinite;
 mod intersect;
 mod join;
+mod join_gap;
 mod layer;
 pub mod layout;
 pub mod leader;
@@ -111,6 +112,7 @@ pub use grip::{Grip, GripKind};
 pub use hatch::HatchEntity;
 pub use intersect::Curve;
 pub use join::{join, Merged};
+pub use join_gap::closed;
 pub use layer::{Attr, Attributes, Color, Layer, LayerId, LayerLook, Lineweight};
 pub use layout::{
     format_scale, paper_size, paper_size_name, parse_scale, Layout, LayoutId, Viewport, ViewportId,

@@ -689,6 +689,9 @@
 
 # Joindre, décomposer, modifier la longueur, diviser, mesurer, transfert de propriétés
 "Select objects to join": "Sélectionnez les objets à joindre"
+"Select objects to join to the source": "Sélectionnez les objets à joindre à la source"
+"Specify fuzz distance": "Spécifiez la tolérance de jonction"
+"Closed the object.": "Objet fermé."
 "Select objects to explode": "Sélectionnez les objets à décomposer"
 "Enter delta length": "Entrez l'incrément de longueur"
 "Specify total length": "Spécifiez la nouvelle longueur totale"
@@ -1038,6 +1041,8 @@
 "[eRase]": "Effacer"
 "[Ucs]": "Scu"
 "[Settings]": "Paramètres"
+"[Fuzz]": "Tolérance"
+"[cLose]": "Fermer"
 "[Filename]": "nom de Fichier"
 "[Fill angle]": "angle de Remplissage"
 "[Fill entire path]": "Remplir tout le trajet"
