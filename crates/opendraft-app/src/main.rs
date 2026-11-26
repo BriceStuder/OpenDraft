@@ -12,6 +12,8 @@ rust_i18n::i18n!("../../locales");
 mod app;
 mod arc_cmd;
 mod array_cmd;
+mod array_edit;
+mod array_make;
 mod array_path;
 mod assistant;
 mod attdef_cmd;

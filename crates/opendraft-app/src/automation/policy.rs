@@ -118,6 +118,7 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("modify.trim", InteractiveInApp, Mutation),
     ("modify.extend", InteractiveInApp, Mutation),
     ("modify.lengthen", InteractiveInApp, Mutation),
+    ("modify.array_edit", InteractiveInApp, Mutation),
     ("modify.draw_order", InteractiveInApp, Mutation),
     ("isolate.objects", InteractiveInApp, Ui),
     ("isolate.hide", InteractiveInApp, Ui),

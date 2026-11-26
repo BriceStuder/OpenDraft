@@ -41,6 +41,8 @@ pub struct CommandDefaults {
     pub corner: Slot<corner_memory::Memory>,
     pub donut: Slot<donut_cmd::Memory>,
     pub hatch: Slot<hatch_memory::Memory>,
+    /// `ARRAYASSOCIATIVITY` turned off: arrays are made without a record.
+    pub array_plain: Slot<bool>,
     /// The last delta length LENGTHEN was given, for the session.
     pub lengthen_delta: Slot<Option<f64>>,
     pub matching: Slot<crate::match_props::Matching>,
@@ -65,6 +67,7 @@ impl CommandDefaults {
             attribute: Slot::new(attribute_memory::load(storage)),
             corner: Slot::new(corner_memory::load(storage)),
             donut: Slot::default(),
+            array_plain: Slot::default(),
             hatch: Slot::new(hatch_memory::load(storage)),
             lengthen_delta: Slot::default(),
             matching: Slot::default(),

@@ -115,11 +115,14 @@ pub struct Document {
     linetype_scale: f64,
     /// How point objects are drawn (`PDMODE`, `PDSIZE`).
     point_style: PointStyle,
+    /// The associative arrays: what is needed to lay their items out again.
+    arrays: Vec<crate::ArrayRecord>,
     /// Where the objects are, for the queries that look at a part of the
     /// drawing. Derived from `objects`: it takes no part in equality.
     spatial: spatial::SpatialIndex,
 }
 
+mod arrays;
 mod attributes;
 mod blocks;
 mod ccs;

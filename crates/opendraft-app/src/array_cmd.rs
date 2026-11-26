@@ -1,121 +1,20 @@
 //! ARRAY, ARRAYRECT and ARRAYPOLAR (ARRAYPATH is in `array_path.rs`):
 //! copies of the selected objects in rows and columns or round a centre,
-//! worded as AutoCAD 2020's. The arrays are not associative: each item is a
-//! plain copy, as AutoCAD's with Associative = No. The geometry is
-//! `opendraft_core::array`.
+//! worded as AutoCAD 2020's. The items are ordinary objects; with
+//! `ARRAYASSOCIATIVITY` on (the default) the drawing also keeps a record of the
+//! array (`opendraft_core::ArrayRecord`) so ARRAYEDIT (`array_edit.rs`) can lay
+//! it out again. The geometry is `opendraft_core::array`.
 
 use opendraft_ui::key;
 use std::f64::consts::TAU;
-use std::sync::Arc;
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, PointOptions};
 use opendraft_core::array::{polar, polar_step, rectangular, Placement, MAX_ITEMS};
-use opendraft_core::{Attributes, Bounds, Entity, EntityId, Point};
+use opendraft_core::{ArrayRecord, ArrayShape, Entity, EntityId, Point};
 
+pub(crate) use crate::array_make::{fits, ghost, make, read_source, say_type};
 use crate::array_path::path_with;
 use opendraft_commands::Wording;
-
-/// The most objects one array may add.
-const MAX_COPIES: usize = 200_000;
-/// The most objects the preview draws.
-const PREVIEW_LIMIT: usize = 2_000;
-
-/// The objects an array copies.
-pub(crate) struct Source {
-    pub objects: Vec<(Entity, Attributes)>,
-    pub bounds: Bounds,
-}
-
-impl Source {
-    /// The width and height of the objects together, for default spacings:
-    /// one and a half times each (a side with no size takes the other's).
-    pub fn spacing(&self) -> (f64, f64) {
-        let (w, h) = (
-            self.bounds.max.x - self.bounds.min.x,
-            self.bounds.max.y - self.bounds.min.y,
-        );
-        let side = |a: f64, b: f64| match (a > 1e-9, b > 1e-9) {
-            (true, _) => a,
-            (false, true) => b,
-            _ => 1.0,
-        };
-        (1.5 * side(w, h), 1.5 * side(h, w))
-    }
-
-    pub fn center(&self) -> Point {
-        Point::new(
-            (self.bounds.min.x + self.bounds.max.x) / 2.0,
-            (self.bounds.min.y + self.bounds.max.y) / 2.0,
-        )
-    }
-}
-
-/// The objects `ids` names, with their size together; `None` when none are
-/// left.
-pub(crate) fn read_source(ed: &Editor, ids: Vec<EntityId>) -> Result<Option<Source>, Cancelled> {
-    ed.read(move |doc| {
-        let found: Vec<_> = ids.iter().filter_map(|id| doc.object(*id)).collect();
-        let bounds = (found.iter().map(|o| o.bounds()))
-            .filter(Bounds::is_finite)
-            .reduce(Bounds::union)?;
-        let objects = found
-            .iter()
-            .map(|o| (o.entity.clone(), o.attrs.clone()))
-            .collect();
-        Some(Source { objects, bounds })
-    })
-}
-
-/// What the preview shows: the copies, up to [`PREVIEW_LIMIT`] objects.
-pub(crate) fn ghost(source: &Source, items: &[Placement]) -> impl Fn(Point) -> Vec<Entity> {
-    let shown: Vec<Entity> = items
-        .iter()
-        .skip(1)
-        .flat_map(|item| source.objects.iter().map(|(e, _)| item.apply(e)))
-        .take(PREVIEW_LIMIT)
-        .collect();
-    let shown = Arc::new(shown);
-    move |_| shown.as_ref().clone()
-}
-
-/// Whether an array of `items` copies of the objects is small enough; says
-/// why not.
-pub(crate) fn fits(ed: &Editor, source: &Source, items: usize) -> bool {
-    let copies = items.saturating_sub(1).saturating_mul(source.objects.len());
-    if items > MAX_ITEMS || copies > MAX_COPIES {
-        let said = Wording::new(
-            key!("The array would have %{items}; the most is %{most}."),
-            &[("most", &MAX_ITEMS.to_string())],
-        );
-        ed.say(said.part("items", crate::text::items(items)));
-        return false;
-    }
-    true
-}
-
-/// Add every item but the first (the objects themselves) as one undo step.
-pub(crate) fn make(ed: &Editor, source: Source, items: Vec<Placement>) -> Result<(), Cancelled> {
-    let count = items.len();
-    let copies: Vec<(Entity, Attributes)> = items
-        .iter()
-        .skip(1)
-        .flat_map(|item| {
-            source
-                .objects
-                .iter()
-                .map(move |(e, attrs)| (item.apply(e), attrs.clone()))
-        })
-        .collect();
-    if copies.is_empty() {
-        return Ok(());
-    }
-    ed.transaction("Array", move |tx| {
-        tx.add_with(copies);
-        Ok(())
-    })?;
-    ed.say(Wording::new(key!("Array of %{items}."), &[]).part("items", crate::text::items(count)));
-    Ok(())
-}
 
 /// The array's edit prompt, AutoCAD's "Select grip to edit array", with the
 /// array previewed. `Some(option)` for a keyword, `None` to finish (Enter
@@ -167,9 +66,9 @@ pub fn array_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             .default("Rectangular".to_owned()),
     )?;
     match kind.as_str() {
-        "PAth" => path_with(ed, ids),
-        "POlar" => polar_with(ed, ids),
-        _ => rect_with(ed, ids),
+        "PAth" => path_with(ed, ids, None),
+        "POlar" => polar_with(ed, ids, None),
+        _ => rect_with(ed, ids, None),
     }
 }
 
@@ -177,7 +76,7 @@ pub fn array_objects(ed: &mut Editor) -> Result<(), Cancelled> {
 /// by the options until Enter.
 pub fn array_rect(ed: &mut Editor) -> Result<(), Cancelled> {
     let ids = ed.pickset_or_select(key!("Select objects"))?;
-    rect_with(ed, ids)
+    rect_with(ed, ids, None)
 }
 
 /// The settings of a rectangular array.
@@ -189,19 +88,44 @@ struct Grid {
     row_spacing: f64,
 }
 
-fn rect_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
+/// A rectangular array being made, or (with `editing`) laid out again.
+pub(crate) fn rect_with(
+    ed: &mut Editor,
+    ids: Vec<EntityId>,
+    editing: Option<ArrayRecord>,
+) -> Result<(), Cancelled> {
     let Some(source) = read_source(ed, ids)? else {
         return Ok(());
     };
-    ed.say(key!("Type = Rectangular  Associative = No"));
-    // Columns and rows run along the coordinate system's axes.
-    let ccs = ed.read(|doc| doc.ccs())?;
+    say_type(ed, "Rectangular");
     let (dx, dy) = source.spacing();
-    let mut grid = Grid {
-        columns: 4,
-        rows: 3,
-        column_spacing: dx,
-        row_spacing: dy,
+    // Columns and rows run along the coordinate system's axes: the current
+    // one, or the one the array was made in.
+    let (ccs, mut grid) = match editing.as_ref().map(|r| r.shape) {
+        Some(ArrayShape::Rectangular {
+            columns,
+            rows,
+            column_spacing,
+            row_spacing,
+            ccs,
+        }) => (
+            ccs,
+            Grid {
+                columns,
+                rows,
+                column_spacing,
+                row_spacing,
+            },
+        ),
+        _ => (
+            ed.read(|doc| doc.ccs())?,
+            Grid {
+                columns: 4,
+                rows: 3,
+                column_spacing: dx,
+                row_spacing: dy,
+            },
+        ),
     };
     let keywords = [
         ("COUnt", "COU"),
@@ -225,7 +149,14 @@ fn rect_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
         })
         .unwrap_or_else(|| vec![Placement::STAY]);
         let Some(option) = edit_prompt(ed, &keywords, ghost(&source, &items))? else {
-            return make(ed, source, items);
+            let shape = ArrayShape::Rectangular {
+                columns: grid.columns,
+                rows: grid.rows,
+                column_spacing: grid.column_spacing,
+                row_spacing: grid.row_spacing,
+                ccs,
+            };
+            return make(ed, source, items, shape, editing);
         };
         let next = change_grid(ed, grid, &option)?;
         if fits(ed, &source, next.columns.saturating_mul(next.rows)) {
@@ -308,17 +239,34 @@ fn change_grid(ed: &Editor, grid: Grid, option: &str) -> Result<Grid, Cancelled>
 /// turned as they go, to begin with, changed by the options until Enter.
 pub fn array_polar(ed: &mut Editor) -> Result<(), Cancelled> {
     let ids = ed.pickset_or_select(key!("Select objects"))?;
-    polar_with(ed, ids)
+    polar_with(ed, ids, None)
 }
 
-fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
+/// A polar array being made, or (with `editing`) laid out again.
+pub(crate) fn polar_with(
+    ed: &mut Editor,
+    ids: Vec<EntityId>,
+    editing: Option<ArrayRecord>,
+) -> Result<(), Cancelled> {
     let Some(source) = read_source(ed, ids)? else {
         return Ok(());
     };
-    ed.say(key!("Type = Polar  Associative = No"));
-    let center = ed.get_point(key!("Specify center point of array"))?;
+    say_type(ed, "Polar");
+    let (center, mut items, mut fill, mut rotate) = match editing.as_ref().map(|r| r.shape) {
+        Some(ArrayShape::Polar {
+            center,
+            items,
+            fill,
+            rotate,
+        }) => (center, items, fill, rotate),
+        _ => (
+            ed.get_point(key!("Specify center point of array"))?,
+            6,
+            TAU,
+            true,
+        ),
+    };
     let base = source.center();
-    let (mut items, mut fill, mut rotate) = (6, TAU, true);
     let keywords = [
         ("Items", "I"),
         ("Angle between", "A"),
@@ -329,7 +277,13 @@ fn polar_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
         let placed =
             polar(center, base, items, fill, rotate).unwrap_or_else(|| vec![Placement::STAY]);
         let Some(option) = edit_prompt(ed, &keywords, ghost(&source, &placed))? else {
-            return make(ed, source, placed);
+            let shape = ArrayShape::Polar {
+                center,
+                items,
+                fill,
+                rotate,
+            };
+            return make(ed, source, placed, shape, editing);
         };
         match option.as_str() {
             "Items" => {

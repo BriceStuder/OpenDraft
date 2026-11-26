@@ -44,6 +44,7 @@ impl Default for Document {
             linetypes: LinetypeTable::default(),
             linetype_scale: 1.0,
             point_style: PointStyle::default(),
+            arrays: Vec::new(),
             spatial: Default::default(),
         };
         doc.push_layer(Layer::new(LayerId::DEFAULT, "0"));
