@@ -6,6 +6,8 @@
 mod equal;
 mod merge;
 mod polyline;
+#[cfg(test)]
+mod polyline_tests;
 mod prepare;
 #[cfg(test)]
 mod prepare_tests;
