@@ -25,7 +25,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - Trim and Extend: the Project option does nothing yet (all geometry is flat; the choice is kept as `PROJMODE`). The Edge option's implied extension covers lines, arcs, elliptical arcs and the ends of open polylines; other edges (splines, text) are used as they are.
 - Offset: the distance default (and Through, as a negative `OFFSETDIST`) is per user, not saved in the drawing.
 - Explode: solid and gradient hatches (AutoCAD gives 2D solids; there is no such object here, so they are left with a note). A pattern hatch explodes to its lines and points, with the hatch's layer and attributes.
-- Polyline widths: Trim, Break, Join, Offset, Fillet, Chamfer and Explode give a hairline polyline (only transforms, stretching, grips and Extend keep widths).
+- Polyline widths: Fillet and Chamfer give a hairline polyline (Explode does too, as in AutoCAD, which drops widths; Trim, Break, Join and Offset keep them, a cut piece tapering as its segment did).
 - Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.
 - Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, AutoCAD conformance fixtures.
 - Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
@@ -170,6 +170,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
+- **Widths kept through Trim, Break, Join and Offset:** covered by unit tests of the geometry; not looked at drawn, and not compared with AutoCAD (Offset keeps each segment's width as it is, where AutoCAD may do otherwise; a Join with Fuzz links the gap with a hairline segment).
 - **JOIN's Close and Fuzz, and arcs across a gap:** follow AutoCAD from memory (source-first, counter-clockwise; Close offered for a lone arc, elliptical arc or open polyline); not compared with AutoCAD or tried in the running app. The same holds for Explode of a pattern hatch (the lines cut to the boundary, not compared with AutoCAD's), Match Properties' Settings, and Trim and Extend's Crossing, Project and eRase.
 - **Offset's Exit, Undo and remembered distance:** the prompts follow AutoCAD from memory (`[Exit/Undo]` at the object prompt, `[Exit/Multiple/Undo]` at the side prompt, the last distance as the default); not compared with AutoCAD, and not tried in the running app.
 - **BEDIT and BSAVE by hand:** the Block Editor now keeps each object's block id as its id (`Document::add_with_id`) and BSAVE reads it back. Tests drive BEDIT, BSAVE and BCLOSE through `AppState` and check the ids, but nobody has used it in the running app since the change.

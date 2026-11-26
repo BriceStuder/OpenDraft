@@ -30,11 +30,13 @@ pub struct Merged {
     pub entity: Entity,
 }
 
-/// A run of segments: `points`, and one bulge per point (the last unused).
+/// A run of segments: `points`, and one bulge and one width pair (start and
+/// end of the segment) per point (the last unused).
 #[derive(Clone)]
 struct Chain {
     points: Vec<Point>,
     bulges: Vec<f64>,
+    widths: Vec<(f64, f64)>,
 }
 
 impl Chain {
@@ -44,6 +46,7 @@ impl Chain {
             Entity::Line { start, end } if distance(*start, *end) > 0.0 => Some(Chain {
                 points: vec![*start, *end],
                 bulges: vec![0.0, 0.0],
+                widths: vec![(0.0, 0.0); 2],
             }),
             Entity::Arc {
                 center,
@@ -58,22 +61,32 @@ impl Chain {
                         arc::point_at(*center, *radius, *end),
                     ],
                     bulges: vec![bulge::from_sweep(sweep, true), 0.0],
+                    widths: vec![(0.0, 0.0); 2],
                 })
             }
             Entity::Polyline {
                 points,
                 closed: false,
                 bulges,
-                ..
+                widths,
             } if points.len() >= 2 => {
                 let mut bulges: Vec<f64> =
                     (0..points.len()).map(|i| bulge::at(bulges, i)).collect();
                 if let Some(last) = bulges.last_mut() {
                     *last = 0.0;
                 }
+                let mut widths = if widths.is_empty() {
+                    vec![(0.0, 0.0); points.len()]
+                } else {
+                    widths.clone()
+                };
+                if let Some(last) = widths.last_mut() {
+                    *last = (0.0, 0.0);
+                }
                 Some(Chain {
                     points: points.clone(),
                     bulges,
+                    widths,
                 })
             }
             _ => None,
@@ -93,9 +106,16 @@ impl Chain {
         let n = self.points.len();
         let mut bulges: Vec<f64> = (0..n - 1).rev().map(|i| -self.bulges[i]).collect();
         bulges.push(0.0);
+        // Each segment's width runs the other way too.
+        let mut widths: Vec<(f64, f64)> = (0..n - 1)
+            .rev()
+            .map(|i| (self.widths[i].1, self.widths[i].0))
+            .collect();
+        widths.push((0.0, 0.0));
         Chain {
             points: self.points.iter().rev().copied().collect(),
             bulges,
+            widths,
         }
     }
 
@@ -105,13 +125,17 @@ impl Chain {
         let n = self.points.len();
         if distance(self.last(), other.first()) > TOUCH {
             self.bulges[n - 1] = 0.0;
+            self.widths[n - 1] = (0.0, 0.0);
             self.points.extend_from_slice(&other.points);
             self.bulges.extend_from_slice(&other.bulges);
+            self.widths.extend_from_slice(&other.widths);
             return;
         }
         self.bulges[n - 1] = other.bulges[0];
+        self.widths[n - 1] = other.widths[0];
         self.points.extend_from_slice(&other.points[1..]);
         self.bulges.extend_from_slice(&other.bulges[1..]);
+        self.widths.extend_from_slice(&other.widths[1..]);
     }
 }
 
@@ -262,16 +286,19 @@ fn grow(
 
 /// The object a finished chain becomes.
 fn result(mut chain: Chain, closed: bool, tolerance: f64) -> Entity {
+    // A wide polyline stays one, whatever its shape.
+    let wide = chain.widths.iter().any(|w| *w != (0.0, 0.0));
     if closed {
         chain.points.pop();
         chain.bulges.pop();
+        chain.widths.pop();
     } else {
         // An open chain of lines on one line is a line.
-        if let Some(line) = as_line(&chain, tolerance) {
+        if let Some(line) = as_line(&chain, tolerance).filter(|_| !wide) {
             return line;
         }
     }
-    if let Some(round) = as_arc(&chain, closed, tolerance) {
+    if let Some(round) = as_arc(&chain, closed, tolerance).filter(|_| !wide) {
         return round;
     }
     let has_arcs = bulge::has_arcs(&chain.bulges);
@@ -279,7 +306,11 @@ fn result(mut chain: Chain, closed: bool, tolerance: f64) -> Entity {
         points: chain.points,
         closed,
         bulges: if has_arcs { chain.bulges } else { Vec::new() },
-        widths: Vec::new(),
+        widths: if chain.widths.iter().any(|w| *w != (0.0, 0.0)) {
+            chain.widths
+        } else {
+            Vec::new()
+        },
     }
 }
 
@@ -383,6 +414,30 @@ mod tests {
                 widths: Vec::new(),
             }
         );
+    }
+
+    #[test]
+    fn a_wide_polyline_keeps_its_widths_when_joined_either_way_round() {
+        let wide = Entity::Polyline {
+            points: vec![p(0.0, 0.0), p(5.0, 0.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: vec![(1.0, 3.0), (0.0, 0.0)],
+        };
+        let thin = line(p(5.0, 5.0), p(5.0, 0.0));
+        let made = join(&[wide.clone(), thin.clone()], 1e-6);
+        let Entity::Polyline { points, widths, .. } = &made[0].entity else {
+            panic!("{:?}", made[0].entity)
+        };
+        assert_eq!(points, &[p(0.0, 0.0), p(5.0, 0.0), p(5.0, 5.0)]);
+        assert_eq!(widths, &[(1.0, 3.0), (0.0, 0.0), (0.0, 0.0)]);
+        // Taken the other way, the first segment's taper runs backwards.
+        let made = join(&[thin, wide], 1e-6);
+        let Entity::Polyline { points, widths, .. } = &made[0].entity else {
+            panic!("{:?}", made[0].entity)
+        };
+        assert_eq!(points[0], p(5.0, 5.0));
+        assert_eq!(widths[1], (3.0, 1.0));
     }
 
     #[test]
