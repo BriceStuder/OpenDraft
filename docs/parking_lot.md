@@ -24,7 +24,6 @@ Keep it current: when something here is built, delete its line in the same chang
 - Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle), Chamfer's Method option, Undo inside Multiple; the fillet and chamfer variables are per user, not saved in the drawing.
 - Trim and Extend: the Edge option and Crossing selection of the objects.
 - Offset: the Layer and Multiple options.
-- Break: `@` alone for "same as the first point".
 - Explode: hatches.
 - Polyline widths: Trim, Break, Join, Offset, Fillet, Chamfer and Explode give a hairline polyline (only transforms, stretching, grips and Extend keep widths).
 - Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.

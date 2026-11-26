@@ -509,6 +509,8 @@ mod tests {
             parse_point(" 1 , 2 ", base, &Units::default()),
             Some(p(1.0, 2.0))
         );
+        // `@` alone is the point the prompt measures from.
+        assert_eq!(parse_point("@", base, &Units::default()), Some(base));
         let polar = parse_point("@10<90", base, &Units::default()).unwrap();
         assert!((polar.x - 10.0).abs() < 1e-9 && (polar.y - 20.0).abs() < 1e-9);
         let abs_polar = parse_point("5<0", base, &Units::default()).unwrap();
@@ -518,7 +520,7 @@ mod tests {
     #[test]
     fn rejects_things_that_are_not_points() {
         let base = p(0.0, 0.0);
-        for text in ["", "5", "abc", "1,", ",2", "1,x", "@", "nan,1", "inf<2"] {
+        for text in ["", "5", "abc", "1,", ",2", "1,x", "nan,1", "inf<2"] {
             assert_eq!(parse_point(text, base, &Units::default()), None, "{text}");
         }
         assert_eq!(parse_number("12.5"), Some(12.5));
