@@ -9,6 +9,15 @@ pub trait FilePicker {
     /// if the user cancelled.
     fn open(&mut self, directory: Option<&Path>) -> Option<PathBuf>;
 
+    /// Ask for one file of the kind `filter`, starting in `directory` if
+    /// known (a linetype file, say); `None` if the user cancelled.
+    fn open_file(
+        &mut self,
+        title: &str,
+        directory: Option<&Path>,
+        filter: Filter,
+    ) -> Option<PathBuf>;
+
     /// Ask where to save; `None` if the user cancelled. `title` is the
     /// dialog's, `suggested` the file name to offer, `directory` where to start if known, and `filter`
     /// the kind of file (name and extensions) to save.
@@ -101,6 +110,21 @@ impl FilePicker for NativePicker {
         self.problem.take()
     }
 
+    fn open_file(
+        &mut self,
+        title: &str,
+        directory: Option<&Path>,
+        (name, extensions): Filter,
+    ) -> Option<PathBuf> {
+        let mut dialog = rfd::FileDialog::new()
+            .set_title(title)
+            .add_filter(name, extensions);
+        if let Some(directory) = directory {
+            dialog = dialog.set_directory(directory);
+        }
+        self.shown(|| dialog.pick_file())
+    }
+
     fn save(
         &mut self,
         title: &str,
@@ -163,6 +187,10 @@ mod scripted {
         /// The starting folder each Open dialog was given.
         pub open_directories: Vec<Option<PathBuf>>,
         pub folders: VecDeque<Option<PathBuf>>,
+        /// What each `open_file` dialog answers, and the title and kind it
+        /// was asked for.
+        pub files: VecDeque<Option<PathBuf>>,
+        pub file_dialogs: Vec<(String, String)>,
     }
 
     /// A handle a test keeps to steer a [`ScriptedPicker`]. An empty queue
@@ -177,6 +205,15 @@ mod scripted {
 
         pub fn will_save_to(&self, path: Option<PathBuf>) {
             self.0.borrow_mut().saves.push_back(path);
+        }
+
+        pub fn will_open_file(&self, path: Option<PathBuf>) {
+            self.0.borrow_mut().files.push_back(path);
+        }
+
+        /// The title and kind of file of each `open_file` dialog shown.
+        pub fn file_dialogs(&self) -> Vec<(String, String)> {
+            self.0.borrow().file_dialogs.clone()
         }
 
         pub fn will_pick_folder(&self, path: Option<PathBuf>) {
@@ -219,6 +256,13 @@ mod scripted {
             data.opens.pop_front().flatten()
         }
 
+        fn open_file(&mut self, title: &str, _: Option<&Path>, filter: Filter) -> Option<PathBuf> {
+            let mut data = self.0 .0.borrow_mut();
+            data.file_dialogs
+                .push((title.to_owned(), filter.0.to_owned()));
+            data.files.pop_front().flatten()
+        }
+
         fn save(
             &mut self,
             title: &str,
@@ -250,6 +294,9 @@ mod tests {
 
     impl FilePicker for Troubled {
         fn open(&mut self, _: Option<&Path>) -> Option<PathBuf> {
+            None
+        }
+        fn open_file(&mut self, _: &str, _: Option<&Path>, _: Filter) -> Option<PathBuf> {
             None
         }
         fn save(&mut self, _: &str, _: &str, _: Option<&Path>, _: Filter) -> Option<PathBuf> {
