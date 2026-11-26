@@ -170,6 +170,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
+- **Grip vertex edits, Draw Order and Offset's remembered Through:** covered by unit tests; not tried in the running app or compared with AutoCAD (the grip options are keywords of the grip's prompt, not AutoCAD's hover menu; DRAWORDER's default is Back as in AutoCAD, from memory).
 - **Widths kept through Trim, Break, Join and Offset:** covered by unit tests of the geometry; not looked at drawn, and not compared with AutoCAD (Offset keeps each segment's width as it is, where AutoCAD may do otherwise; a Join with Fuzz links the gap with a hairline segment).
 - **JOIN's Close and Fuzz, and arcs across a gap:** follow AutoCAD from memory (source-first, counter-clockwise; Close offered for a lone arc, elliptical arc or open polyline); not compared with AutoCAD or tried in the running app. The same holds for Explode of a pattern hatch (the lines cut to the boundary, not compared with AutoCAD's), Match Properties' Settings, and Trim and Extend's Crossing, Project and eRase.
 - **Offset's Exit, Undo and remembered distance:** the prompts follow AutoCAD from memory (`[Exit/Undo]` at the object prompt, `[Exit/Multiple/Undo]` at the side prompt, the last distance as the default); not compared with AutoCAD, and not tried in the running app.
