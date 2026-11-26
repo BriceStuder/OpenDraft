@@ -679,6 +679,7 @@
 "Select polyline": "Sélectionnez la polyligne"
 "Specify offset distance": "Spécifiez la distance de décalage"
 "Erase source object after offsetting?": "Effacer l'objet d'origine après le décalage ?"
+"Enter layer option for offset objects": "Entrez l'option de calque pour les objets décalés"
 "Select object to offset or <exit>": "Sélectionnez l'objet à décaler ou <quitter>"
 "Specify point on side to offset": "Cliquez un point du côté à décaler"
 
@@ -1144,6 +1145,7 @@
 "[Select objects]": "SÉlectionner des objets"
 "[SHapes]": "Formes"
 "[Single]": "Simple"
+"[Source]": "Source"
 "[line: Single]": "Uniques"
 "[Space]": "eSpacer"
 "[Spacing]": "eSPacement"
