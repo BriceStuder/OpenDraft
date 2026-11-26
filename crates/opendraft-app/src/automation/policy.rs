@@ -73,6 +73,8 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("draw.rectangle", InteractiveInApp, Mutation),
     ("draw.rectangle_center", InteractiveInApp, Mutation),
     ("draw.rectangle_3p", InteractiveInApp, Mutation),
+    ("draw.line_single", InteractiveInApp, Mutation),
+    ("draw.line_middle", InteractiveInApp, Mutation),
     ("draw.oblong_center", InteractiveInApp, Mutation),
     ("draw.oblong_2p", InteractiveInApp, Mutation),
     ("draw.polyline", InteractiveInApp, Mutation),

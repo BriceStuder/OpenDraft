@@ -44,9 +44,18 @@ pub(crate) fn add(ed: &Editor, entity: Entity, name: &'static str) -> Result<(),
 
 /// LINE: a chain of segments, each starting where the last ended. Enter or
 /// Esc ends the chain and keeps what was drawn; Undo takes back the last
-/// segment; Close joins the end to the start.
+/// segment; Close joins the end to the start. Single and Middle, at the first
+/// prompt, draw lines that do not chain instead (see `line_modes`).
 pub fn draw_line(ed: &mut Editor) -> Result<(), Cancelled> {
-    let mut first = ed.get_point(key!("Specify first point"))?;
+    let start = PointOptions::new(key!("Specify first point"))
+        .keyword_in("line", "Single", "S")
+        .keyword("Middle", "M");
+    let mut first = match ed.ask_point(start)? {
+        Answer::Value(point) => point,
+        Answer::Keyword(k) if k == "Single" => return crate::line_modes::draw_line_single(ed),
+        Answer::Keyword(_) => return crate::line_modes::draw_line_middle(ed),
+        Answer::Enter => return Ok(()),
+    };
     // The chain's vertices; the segments are between neighbours.
     let mut vertices = vec![first];
     loop {
