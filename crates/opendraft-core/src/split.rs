@@ -32,7 +32,11 @@ impl Entity {
                 .into_iter()
                 .map(|piece| self.resumed(piece))
                 .collect(),
-            // Splines are not cut yet (Trim and Break refuse them).
+            Entity::Spline(s) => s
+                .split_at_points(points)
+                .into_iter()
+                .map(|piece| Entity::Spline(Box::new(piece)))
+                .collect(),
             Entity::Dimension(_)
             | Entity::MText(_)
             | Entity::Text(_)
@@ -41,8 +45,7 @@ impl Entity {
             | Entity::Insert(_)
             | Entity::AttributeDefinition(_)
             | Entity::Point { .. }
-            | Entity::Hatch(_)
-            | Entity::Spline(_) => {
+            | Entity::Hatch(_) => {
                 vec![self.clone()]
             }
             Entity::Line { start, end } => {

@@ -16,7 +16,7 @@ Keep it current: when something here is built, delete its line in the same chang
 
 ## Modify commands
 
-- Spline editing: exact Trim, Extend, Break and Join (knot insertion, curve crossings), Offset (and with it ellipse offset) and Fillet.
+- Spline editing: Break, Trim and Join of splines are built (a cut is exact, by knot insertion; where a cutting edge crosses a spline is found along short segments within a ten-thousandth of its size, not as exact roots; a periodic spline cannot be cut; splines join only with splines of one degree). Still missing: Extend of a spline (continuing its curve), Join with lines, arcs and polylines, Offset (and with it ellipse offset) and Fillet.
 - Lengthen for splines and whole ellipses (elliptical arcs lengthen along their curve; the Angle option does not apply to them); the delta default lasts the session and is not saved.
 - PEDIT: vertex Tangent, and keeping a curve's frame: Fit and Spline give plain geometry (arcs, or short straight segments), so Decurve straightens what is there and does not bring the original vertices back; Fit takes each tangent from the chord across the vertex, which Tangent would set; a spline converts only to straight segments (`PLINECONVERTMODE` is not read), and PEDIT's Multiple does not convert splines.
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
@@ -169,6 +169,7 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
+- **Spline Break, Trim and Join:** the cut is checked exactly (both pieces follow the curve to 1e-9); how it feels (which piece Trim removes near a crest, a crossing found along segments) was not tried in the running app, nor compared with AutoCAD.
 - **Fillet next to arcs, polyline widths through Fillet and Chamfer, object isolation, and PEDIT's Fit, Spline and spline conversion:** covered by unit tests; not tried in the running app or compared with AutoCAD (Fit's biarc and tangents, Spline's uniform cubic B-spline with eight segments a span, the precision scale of the conversion, and what Isolate does to selected and snapped objects are all from memory).
 - **Grip vertex edits, Draw Order and Offset's remembered Through:** covered by unit tests; not tried in the running app or compared with AutoCAD (the grip options are keywords of the grip's prompt, not AutoCAD's hover menu; DRAWORDER's default is Back as in AutoCAD, from memory).
 - **Widths kept through Trim, Break, Join and Offset:** covered by unit tests of the geometry; not looked at drawn, and not compared with AutoCAD (Offset keeps each segment's width as it is, where AutoCAD may do otherwise; a Join with Fuzz links the gap with a hairline segment).

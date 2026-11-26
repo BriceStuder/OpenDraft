@@ -36,7 +36,18 @@ pub fn join_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     })?;
     let entities: Vec<Entity> = found.iter().map(|(_, e)| e.clone()).collect();
     // Nothing changes when any is refused, so the selection stays as it was.
-    if entities.iter().any(|e| matches!(e, Entity::Spline(_))) {
+    // Splines join only with splines.
+    let others = |e: &Entity| {
+        matches!(
+            e,
+            Entity::Line { .. }
+                | Entity::Arc { .. }
+                | Entity::Polyline { .. }
+                | Entity::Ellipse(_)
+                | Entity::Rectangle { .. }
+        )
+    };
+    if entities.iter().any(|e| matches!(e, Entity::Spline(_))) && entities.iter().any(others) {
         ed.say(key!("JOIN does not support splines yet."));
         return Ok(());
     }
@@ -330,5 +341,45 @@ mod tests {
         let now = entities(&state);
         assert_eq!(now.len(), 1);
         assert!(matches!(now[0], Entity::Arc { .. }));
+    }
+
+    fn span(from: f64) -> Entity {
+        Entity::Spline(Box::new(
+            opendraft_core::Spline::from_control_points(
+                3,
+                vec![
+                    p(from, 0.0),
+                    p(from + 2.0, 3.0),
+                    p(from + 4.0, 3.0),
+                    p(from + 6.0, 0.0),
+                ],
+            )
+            .unwrap(),
+        ))
+    }
+
+    #[test]
+    fn splines_that_meet_end_to_end_become_one_spline_in_one_undo_step() {
+        let mut state = joining(&[span(0.0), span(6.0), span(30.0)]);
+        let now = entities(&state);
+        assert_eq!(now.len(), 2);
+        let Entity::Spline(joined) = &now[0] else {
+            panic!("{now:?}")
+        };
+        assert!(joined.start_point().x.abs() < 1e-9 && (joined.end_point().x - 12.0).abs() < 1e-9);
+        assert_eq!(now[1], span(30.0));
+        state.undo();
+        assert_eq!(entities(&state).len(), 3);
+    }
+
+    #[test]
+    fn a_spline_beside_a_line_is_still_refused() {
+        let state = joining(&[span(0.0), line(p(6.0, 0.0), p(9.0, 0.0))]);
+        assert_eq!(entities(&state).len(), 2);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("JOIN does not support splines yet.")));
     }
 }
