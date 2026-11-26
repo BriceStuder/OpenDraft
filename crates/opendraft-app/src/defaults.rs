@@ -41,6 +41,8 @@ pub struct CommandDefaults {
     pub corner: Slot<corner_memory::Memory>,
     pub donut: Slot<donut_cmd::Memory>,
     pub hatch: Slot<hatch_memory::Memory>,
+    /// The last delta length LENGTHEN was given, for the session.
+    pub lengthen_delta: Slot<Option<f64>>,
     pub matching: Slot<crate::match_props::Matching>,
     pub offset: Slot<offset_memory::Memory>,
     pub overkill: Slot<opendraft_core::overkill::Settings>,
@@ -64,6 +66,7 @@ impl CommandDefaults {
             corner: Slot::new(corner_memory::load(storage)),
             donut: Slot::default(),
             hatch: Slot::new(hatch_memory::load(storage)),
+            lengthen_delta: Slot::default(),
             matching: Slot::default(),
             offset: Slot::new(offset_memory::load(storage)),
             overkill: Slot::new(overkill_memory::load(storage)),

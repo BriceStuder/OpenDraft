@@ -49,6 +49,7 @@ mod layer;
 pub mod layout;
 pub mod leader;
 mod lengthen;
+mod lengthen_ellipse;
 pub mod linetype;
 pub mod loop_polyline;
 pub mod measure;

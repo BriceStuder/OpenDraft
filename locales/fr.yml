@@ -1481,7 +1481,6 @@
 "Nothing to extend there.": "Rien à prolonger à cet endroit."
 "Using every object as an edge.": "Tous les objets servent de limites."
 "Using the %{objects} selected as edges.": "Limites : %{objects} sélectionné(s)."
-"LENGTHEN does not support ellipses yet.": "MODIFLONG ne traite pas encore les ellipses."
 "LENGTHEN does not support splines yet.": "MODIFLONG ne traite pas encore les splines."
 "Object cannot be lengthened.": "L'objet ne peut pas être allongé."
 "Cannot lengthen the object that way.": "Impossible d'allonger l'objet ainsi."

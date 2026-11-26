@@ -17,7 +17,7 @@ Keep it current: when something here is built, delete its line in the same chang
 ## Modify commands
 
 - Spline editing: exact Trim, Extend, Break and Join (knot insertion, curve crossings), Offset (and with it ellipse offset) and Fillet.
-- Lengthen for elliptical arcs and splines; a remembered delta as the default.
+- Lengthen for splines and whole ellipses (elliptical arcs lengthen along their curve; the Angle option does not apply to them); the delta default lasts the session and is not saved.
 - PEDIT: Fit, Spline, Jointype and vertex Tangent (and `PLINECONVERTMODE`).
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
 - JOIN: elliptical arcs across gaps (lines on one line and arcs of one circle already join across gaps, the first object being the source), and the Fuzz option on a preselected set (it is asked only at the selection prompt). With Fuzz, ends that miss are linked by a straight segment, as for a polyline; AutoCAD's exact treatment of the gap was not compared.

@@ -104,7 +104,7 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 - [x] Block attributes, done 01-11-2026 (PRs #100 and #101). What is left (multiline attributes, `ATTDISP`, BATTMAN, more data fields) is in `docs/parking_lot.md`.
 - [ ] DWG export (L).
 - [ ] Associative arrays (ARRAY makes plain copies today).
-- [ ] Spline editing (trim, extend, break, join, offset), Lengthen for ellipses and splines, PEDIT's Fit and Spline.
+- [ ] Spline editing (trim, extend, break, join, offset), Lengthen for splines, PEDIT's Fit and Spline.
 - [ ] Dimension depth: other arrowheads, styles with colours and linetypes, `DIMBREAK`, jogged radius and `ARC_DIMENSION` as real DXF, annotative scales.
 - [ ] Multileader depth (spline leaders, block content, MLEADEREDIT).
 - [ ] A plugin system for third-party commands; an AutoLISP-compatible subset is a stretch idea, not a promise.
