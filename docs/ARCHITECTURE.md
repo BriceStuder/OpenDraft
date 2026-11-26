@@ -40,9 +40,10 @@ This table is a test: `opendraft-app/tests/crate_rules.rs` reads each crate's de
    temp memory; **state that belongs to the user** (settings, layout) is
    persisted; **state that belongs to the drawing** lives in `Doc`.
 5. **Files stay under about 400 lines of production code** (tests do not
-   count). `opendraft-app/tests/file_sizes.rs` enforces it at 450 and lists the
-   files still over, which may not grow: `dxf/read.rs`
-   (`view.rs` is done: its painting moved to `view/paint.rs`). Split them, then remove them from the list. Split by
+   count). `opendraft-app/tests/file_sizes.rs` enforces it at 450, and keeps a
+   list of files allowed to stay over, which may not grow (empty now: `view.rs`
+   moved its painting to `view/paint.rs`, and `dxf/read.rs` is 401 lines). A file
+   over the limit is split, or listed there with its size until it is. Split by
    responsibility, not by layer. `opendraft-app/src/app/` shows the pattern: `app.rs`
    owns the struct and the frame loop, and each submodule adds one area as an
    `impl` block.
@@ -301,7 +302,7 @@ LINE MIDDLE's end, dynamic input shows the half length, then on Tab the whole le
 Rectangle (`rectangle.rs`, settings in `rect_memory.rs`; from the centre, by
 three points and the oblongs in `rect_variants.rs`), Polyline
 (`polyline_cmd.rs`, arc options in `polyline_arc.rs`), the window polygon, crossing polygon and fence
-selections (`selection.rs`), Trim and Extend (`edges.rs`), Offset
+selections (`selection.rs`), Trim and Extend (`edges.rs`; the Edge option, `EDGEMODE`, lets each edge act as if it ran on past its ends: `Entity::with_implied_extension` in `opendraft_core::implied_edge` turns a line into the infinite line, an arc or an elliptical arc into its whole circle or ellipse, and an open polyline into itself plus a ray, or the circle of an arc segment, beyond each end; it is remembered with `TRIMEXTENDMODE` in `trim_memory.rs`, user settings, not the drawing), Offset
 (`offset.rs`: Through, Erase and Layer (Current or Source, asked when chosen, for the rest of the command) at the distance prompt; at the side prompt Multiple keeps offsetting the one object, each copy measured from the last by a distance and each point from the object for Through, Erase removing only the original), Fillet and Chamfer (`corners.rs`, settings in
 `corner_memory.rs`), Join (`join.rs`), Explode (`explode.rs`), Break and Break at Point (`break_cmd.rs`; BREAKATPOINT, alias BP, asks for the object, then the one point where it is divided in two, without AutoCAD's `@`), Stretch (`stretch.rs`) and the grip editor (`grips.rs`, which
 starts a "Stretch" command when a grip is pressed). The old model, where a canvas `Tool`

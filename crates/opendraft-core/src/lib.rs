@@ -40,6 +40,7 @@ mod fillet_parallel;
 mod grip;
 pub mod hatch;
 pub mod hsl;
+pub mod implied_edge;
 pub mod infinite;
 mod intersect;
 mod join;
