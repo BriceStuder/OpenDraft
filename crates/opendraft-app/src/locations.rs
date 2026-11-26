@@ -15,15 +15,18 @@ pub enum Location {
     Templates,
     /// Recovery copies of unsaved drawings.
     Recovery,
+    /// The Content Manager's library of the user's own blocks.
+    Library,
 }
 
 impl Location {
-    pub const ALL: [Location; 2] = [Location::Templates, Location::Recovery];
+    pub const ALL: [Location; 3] = [Location::Templates, Location::Recovery, Location::Library];
 
     pub fn label(self) -> &'static str {
         match self {
             Self::Templates => "Template folder",
             Self::Recovery => "Recovery folder",
+            Self::Library => "Block library folder",
         }
     }
 
@@ -33,6 +36,7 @@ impl Location {
             Self::Recovery => {
                 "Autosave copies of unsaved drawings. Takes effect the next time the app starts."
             }
+            Self::Library => "Your own blocks, kept for use in any drawing. A synced folder works; two people should not write to it at once.",
         }
     }
 
@@ -41,6 +45,7 @@ impl Location {
         match self {
             Self::Templates => settings.templates_dir.as_ref(),
             Self::Recovery => settings.recovery_dir.as_ref(),
+            Self::Library => settings.library_dir.as_ref(),
         }
     }
 
@@ -48,6 +53,7 @@ impl Location {
         match self {
             Self::Templates => settings.templates_dir = folder,
             Self::Recovery => settings.recovery_dir = folder,
+            Self::Library => settings.library_dir = folder,
         }
     }
 
@@ -56,6 +62,7 @@ impl Location {
         match self {
             Self::Templates => app_data().map(|d| d.join("templates")),
             Self::Recovery => app_data().map(|d| d.join("recovery")),
+            Self::Library => app_data().map(|d| d.join("library")),
         }
     }
 

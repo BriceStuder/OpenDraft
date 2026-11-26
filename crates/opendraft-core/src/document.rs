@@ -151,7 +151,10 @@ mod transplant;
 
 pub use object::Object;
 pub use spatial::SpatialStats;
-pub use transplant::{Absorbed, Placement, TransferWarning};
+pub use transplant::{
+    Absorbed, BlockClash, BlockNameClash, BringError, Brought, LibraryPlacement, Placed, Placement,
+    TransferWarning,
+};
 
 impl Document {
     // ---- objects ----

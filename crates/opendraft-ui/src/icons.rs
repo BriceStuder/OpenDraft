@@ -78,6 +78,7 @@ icons! {
     BLOCK_EATTEDIT = '\u{e10b}';
     BLOCK_EDIT = '\u{e1f8}';
     BLOCK_INSERT = '\u{e065}';
+    BLOCK_LIBRARY = '\u{e105}';
     BLOCK_PARAMETER = '\u{e14e}';
     BLOCK_PURGE = '\u{e28e}';
     BLOCK_RESET = '\u{e14b}';
@@ -85,6 +86,14 @@ icons! {
     COMBO_ARROW = '\u{e071}';
     COMMAND_LINE_COLLAPSE = '\u{e071}';
     COMMAND_LINE_EXPAND = '\u{e073}';
+    CONTENT_BACK = '\u{e04c}';
+    CONTENT_DRAWING = '\u{e312}';
+    CONTENT_FAVOURITE = '\u{e179}';
+    CONTENT_FOLDER = '\u{e0dc}';
+    CONTENT_FORWARD = '\u{e04d}';
+    CONTENT_RECENT = '\u{e1f4}';
+    CONTENT_TRASH = '\u{e18d}';
+    CONTENT_UP = '\u{e04e}';
     CONTEXT_DESELECT_ALL = '\u{e178}';
     CONTEXT_EDIT_SELECT_ALL = '\u{e1c2}';
     CONTEXT_FIND = '\u{e154}';

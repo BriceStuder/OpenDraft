@@ -11,6 +11,7 @@ members = [
     "crates/opendraft-api",
     "crates/opendraft-mcp",
     "crates/opendraft-agent",
+    "crates/opendraft-content",
 ]
 
 [workspace.lints.rust]
@@ -39,6 +40,7 @@ opendraft-files = { path = "crates/opendraft-files" }
 opendraft-dwg = { path = "crates/opendraft-dwg" }
 opendraft-api = { path = "crates/opendraft-api" }
 opendraft-agent = { path = "crates/opendraft-agent" }
+opendraft-content = { path = "crates/opendraft-content" }
 # Translations (issue #138). Each crate that translates calls `rust_i18n::i18n!`
 # on the shared `locales/` folder at its root.
 rust-i18n = "4"

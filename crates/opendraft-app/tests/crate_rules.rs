@@ -83,6 +83,17 @@ fn rules() -> HashMap<&'static str, Rule> {
             },
         ),
         (
+            // The Content Manager's data side (see ARCHITECTURE.md).
+            // Network calls and the credential token never pass
+            // through the document, so it never reaches the commands either.
+            "opendraft-content",
+            Rule {
+                level: 2,
+                only: Some(&["opendraft-core", "opendraft-files"]),
+                never: &["egui", "eframe", "opendraft-app", "opendraft-commands"],
+            },
+        ),
+        (
             "opendraft-ui",
             Rule {
                 level: 2,

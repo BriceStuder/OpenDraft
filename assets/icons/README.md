@@ -62,6 +62,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](block-eattedit.svg) | `block-eattedit.svg` | list | Multiple |
 | ![](block-edit.svg) | `block-edit.svg` | pencil | Edit |
 | ![](block-insert.svg) | `block-insert.svg` | box | Insert |
+| ![](block-library.svg) | `block-library.svg` | library | Content Manager |
 | ![](block-parameter.svg) | `block-parameter.svg` | ruler | Parameter |
 | ![](block-purge.svg) | `block-purge.svg` | eraser | Purge |
 | ![](block-reset.svg) | `block-reset.svg` | rotate-ccw | Reset |
@@ -69,6 +70,14 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](combo-arrow.svg) | `combo-arrow.svg` | chevron-down | menu.rs |
 | ![](command-line-collapse.svg) | `command-line-collapse.svg` | chevron-down | app/command_line.rs |
 | ![](command-line-expand.svg) | `command-line-expand.svg` | chevron-right | app/command_line.rs |
+| ![](content-back.svg) | `content-back.svg` | arrow-left | (not used) |
+| ![](content-drawing.svg) | `content-drawing.svg` | file-box | (not used) |
+| ![](content-favourite.svg) | `content-favourite.svg` | star | (not used) |
+| ![](content-folder.svg) | `content-folder.svg` | folder | (not used) |
+| ![](content-forward.svg) | `content-forward.svg` | arrow-right | (not used) |
+| ![](content-recent.svg) | `content-recent.svg` | history | (not used) |
+| ![](content-trash.svg) | `content-trash.svg` | trash-2 | (not used) |
+| ![](content-up.svg) | `content-up.svg` | arrow-up | (not used) |
 | ![](context-deselect-all.svg) | `context-deselect-all.svg` | square-x | app/context_menu.rs |
 | ![](context-edit-select-all.svg) | `context-edit-select-all.svg` | mouse-pointer-2 | app/context_menu.rs |
 | ![](context-find.svg) | `context-find.svg` | search | app/context_menu.rs |
