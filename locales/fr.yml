@@ -1489,6 +1489,7 @@
 "JOIN does not support splines yet.": "JOINDRE ne traite pas encore les splines."
 "Nothing to join: the objects do not meet end to end.": "Rien à joindre : les objets ne se touchent pas par leurs extrémités."
 "Nothing to explode: lines, circles, arcs, ellipses and splines are already simple.": "Rien à décomposer : lignes, cercles, arcs, ellipses et splines sont déjà des objets simples."
+"Solid and gradient hatches cannot be exploded yet.": "Les hachures pleines et dégradées ne peuvent pas encore être décomposées."
 "Current active settings: %{settings}": "Paramètres actifs courants : %{settings}"
 "%{count} corner": "%{count} coin"
 "%{count} corners": "%{count} coins"
