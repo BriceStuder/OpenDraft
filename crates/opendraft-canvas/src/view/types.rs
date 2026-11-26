@@ -196,7 +196,6 @@ pub struct CanvasOutput {
 /// A view change asked for, done on the next frame.
 pub(super) enum Request {
     Extents,
-    Zoom(f64),
     /// ZOOM Window: two corners in the space being worked in.
     Window(Point, Point),
     /// Turn the drawing on the screen to this twist, then (when `true`)

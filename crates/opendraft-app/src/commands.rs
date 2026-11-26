@@ -322,16 +322,6 @@ fn all() -> Vec<Command<AppState>> {
             s.docs[s.active].view.request_zoom_extents()
         })
         .transparent(),
-        cmd("view.zoom_in", "Zoom In", |s| {
-            s.docs[s.active].view.request_zoom_step(true)
-        })
-        .key("Ctrl+Plus")
-        .transparent(),
-        cmd("view.zoom_out", "Zoom Out", |s| {
-            s.docs[s.active].view.request_zoom_step(false)
-        })
-        .key("Ctrl+Minus")
-        .transparent(),
         cmd("view.zoom_previous", "Zoom Previous", |s| {
             if !s.docs[s.active].view.zoom_previous() {
                 s.say_no_previous_view();
@@ -574,7 +564,6 @@ mod tests {
         }
         for id in [
             "edit.cancel",
-            "view.zoom_in",
             "view.grid",
             "manage.settings",
             // A layer command, like LAYFRZ.
@@ -764,14 +753,24 @@ mod tests {
         let mut state = AppState::new();
         for id in [
             "view.zoom_extents",
-            "view.zoom_in",
-            "view.zoom_out",
             "view.zoom_previous",
             "view.zoom_objects",
         ] {
             assert!(registry.is_enabled(id, &state), "{id}");
             registry.execute(id, &mut state).unwrap();
         }
+    }
+
+    /// AutoCAD has no Zoom In and Zoom Out step commands, nor a `ZI`: the
+    /// wheel and ZOOM's options do the zooming.
+    #[test]
+    fn there_are_no_zoom_in_and_zoom_out_step_commands() {
+        let registry = build_registry();
+        let mut state = AppState::new();
+        for id in ["view.zoom_in", "view.zoom_out"] {
+            assert!(registry.execute(id, &mut state).is_err(), "{id}");
+        }
+        assert_eq!(state.cmd_submit("ZI"), None);
     }
 
     #[test]

@@ -79,7 +79,7 @@ fn a_zoom_shows_the_old_image_moved_and_ends_on_a_new_one() {
         ..exact(CacheMode::On)
     });
     rig.frame(&doc, &none());
-    rig.view.request_zoom_step(true);
+    rig.view.camera.zoom *= 1.5;
     let mut frames = 0;
     while rig.view.cache_stats().rebuilding.is_some() || frames < 2 {
         let shown = rig.frame(&doc, &none());
