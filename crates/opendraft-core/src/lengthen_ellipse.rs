@@ -129,7 +129,9 @@ mod tests {
         let longer = e.lengthened(End::End, 1.0).unwrap();
         assert!((longer.start - e.start).abs() < 1e-9);
         let longer = e.lengthened(End::Start, 1.0).unwrap();
-        assert!((longer.end - e.end).abs() < 1e-9);
+        // The arc is stored with its start in [0, 2π), so compare round the turn.
+        let moved = (longer.end - e.end).rem_euclid(TAU);
+        assert!(moved < 1e-9 || TAU - moved < 1e-9, "{moved}");
     }
 
     #[test]
