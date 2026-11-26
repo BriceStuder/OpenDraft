@@ -95,8 +95,87 @@ fn picture_of(doc: &Document, block: BlockId) -> Option<Preview> {
 }
 
 fn upload(ctx: &egui::Context, name: &str, picture: Option<Preview>) -> Slot {
-    let p = picture?;
+    // Shrunk here so a tile (about 112 points wide) is not made by the GPU
+    // squeezing a 512 pixel picture, which drops thin lines out of it.
+    let by = if ctx.pixels_per_point() >= 1.5 { 2 } else { 4 };
+    let p = shrink(&picture?, by);
     let image =
         egui::ColorImage::from_rgba_unmultiplied([p.width as usize, p.height as usize], &p.rgba);
     Some(ctx.load_texture(name, image, egui::TextureOptions::LINEAR))
+}
+
+/// How far a pixel is from the picture's background.
+fn contrast(px: &[u8]) -> u32 {
+    let bg = opendraft_canvas::preview::BACKGROUND;
+    (0..3).map(|i| u32::from(px[i].abs_diff(bg[i]))).sum()
+}
+
+/// `p` at `1/by` the size. Each new pixel is half the average of the `by` x
+/// `by` pixels it covers and half the one that differs most from the
+/// background, so the picture's one-pixel lines stay lines, not faint dots.
+fn shrink(p: &Preview, by: usize) -> Preview {
+    let (w, h) = (p.width as usize / by, p.height as usize / by);
+    let mut rgba = Vec::with_capacity(w * h * 4);
+    for y in 0..h {
+        for x in 0..w {
+            let mut sum = [0u32; 3];
+            let mut far = (0u32, [0u8; 3]);
+            for dy in 0..by {
+                for dx in 0..by {
+                    let at = ((y * by + dy) * p.width as usize + x * by + dx) * 4;
+                    let px = &p.rgba[at..at + 3];
+                    for (total, c) in sum.iter_mut().zip(px) {
+                        *total += u32::from(*c);
+                    }
+                    let c = contrast(px);
+                    if c >= far.0 {
+                        far = (c, [px[0], px[1], px[2]]);
+                    }
+                }
+            }
+            let n = (by * by) as u32;
+            for (total, far) in sum.iter().zip(far.1) {
+                rgba.push(((total / n + u32::from(far)) / 2) as u8);
+            }
+            rgba.push(255);
+        }
+    }
+    Preview {
+        width: w as u32,
+        height: h as u32,
+        rgba,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_one_pixel_line_is_still_clearly_there_after_shrinking() {
+        let bg = opendraft_canvas::preview::BACKGROUND;
+        let (w, h) = (16usize, 16usize);
+        let mut rgba = Vec::new();
+        for y in 0..h {
+            for _ in 0..w {
+                let on = y == 8;
+                let c = if on { 255 } else { bg[0] };
+                rgba.extend([c, c, c, 255]);
+            }
+        }
+        let small = shrink(
+            &Preview {
+                width: w as u32,
+                height: h as u32,
+                rgba,
+            },
+            4,
+        );
+        assert_eq!((small.width, small.height), (4, 4));
+        // Row 2 holds the line: well above the background and the plain average.
+        let on = small.rgba[(2 * 4) * 4];
+        let off = small.rgba[0];
+        assert_eq!(off, bg[0]);
+        assert!(on > 140, "line faded to {on}");
+    }
 }
