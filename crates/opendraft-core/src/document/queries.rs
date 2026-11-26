@@ -52,16 +52,35 @@ impl Document {
         attr.resolve(&self.layer_of(object).lineweight, &outside)
     }
 
-    /// Drawn and snapped to: on a layer that is on and not frozen.
+    /// Drawn and snapped to: on a layer that is on and not frozen, and not
+    /// hidden by isolation.
     pub fn is_visible(&self, object: &Object) -> bool {
-        self.layer_of(object).is_visible()
+        self.layer_of(object).is_visible() && !self.is_hidden(object.id)
+    }
+
+    /// Whether isolation hides the object.
+    pub fn is_hidden(&self, id: EntityId) -> bool {
+        !self.hidden_objects.is_empty() && self.hidden_objects.binary_search(&id).is_ok()
+    }
+
+    /// The objects hidden by isolation, sorted.
+    pub fn hidden_objects(&self) -> &[EntityId] {
+        &self.hidden_objects
+    }
+
+    /// Hide exactly these objects from every query (none shows them all).
+    /// Not an edit: it is neither undone nor saved.
+    pub fn set_hidden_objects(&mut self, mut ids: Vec<EntityId>) {
+        ids.sort_unstable();
+        ids.dedup();
+        self.hidden_objects = ids;
     }
 
     /// May be picked and edited: visible, not on a locked layer, nor on one
     /// frozen where the view is (`active_frozen`).
     pub fn is_selectable(&self, object: &Object) -> bool {
         let layer = self.layer_of(object);
-        layer.is_visible() && !layer.locked && !self.active_frozen.contains(&layer.id)
+        self.is_visible(object) && !layer.locked && !self.active_frozen.contains(&layer.id)
     }
 
     /// Visible objects of the space being edited (see `active_layout`).

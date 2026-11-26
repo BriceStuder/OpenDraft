@@ -129,11 +129,11 @@ impl OpenDraftApp {
                 Row::rule(),
                 Row::sub(
                     t!("Isolate"),
-                    soon_all(&[
-                        t!("Isolate Objects"),
-                        t!("Hide Objects"),
-                        t!("End Object Isolation"),
-                    ]),
+                    vec![
+                        Row::run(None, t!("Isolate Objects"), "isolate.objects"),
+                        Row::run(None, t!("Hide Objects"), "isolate.hide"),
+                        Row::run(None, t!("End Object Isolation"), "isolate.end"),
+                    ],
                 ),
                 Row::rule(),
                 Row::run(

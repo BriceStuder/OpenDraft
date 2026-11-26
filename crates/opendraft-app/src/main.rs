@@ -106,6 +106,7 @@ mod icon_library;
 mod insert_cmd;
 mod interact;
 mod io;
+mod isolate;
 mod join;
 mod language;
 mod large_file;

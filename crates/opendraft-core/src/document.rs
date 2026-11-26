@@ -69,6 +69,10 @@ pub struct Document {
     /// Layers frozen in the viewport being worked through (VPLAYER): hidden
     /// from the object queries like a globally frozen layer.
     active_frozen: Vec<LayerId>,
+    /// Objects hidden by isolation (ISOLATEOBJECTS, HIDEOBJECTS), sorted: not
+    /// drawn, picked, snapped to or plotted, but still in the drawing. Not
+    /// part of the drawing's history or file.
+    hidden_objects: Vec<EntityId>,
     /// The layout viewport being worked through, if any. Its layout is not
     /// `active_layout` (which is none there, as new objects go to model
     /// space). Not part of the drawing's history or file.
