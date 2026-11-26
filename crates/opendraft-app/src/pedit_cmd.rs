@@ -3,7 +3,8 @@
 //! Multiple, the same to several at once. Lines, arcs and rectangles become
 //! polylines first. The edits themselves are `opendraft_core::pedit`.
 //!
-//! Not built: Fit, Spline, vertex Tangent and spline conversion.
+//! Fit and Spline turn the polyline into a smooth curve (`pedit_curve.rs`),
+//! and a spline is turned into a polyline first. Not built: vertex Tangent.
 
 use opendraft_commands::{
     Answer, Cancelled, Editor, ModifyAttributes, NumberOptions, Options, Picked,
@@ -13,6 +14,7 @@ use opendraft_core::{Entity, EntityId};
 use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
+use crate::pedit_curve::{convert_spline, curve};
 use crate::pedit_join::{ask_fuzz, join_group};
 use crate::pedit_vertex::edit_vertices;
 
@@ -31,6 +33,12 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                         if data_of(ed, id)?.is_some() {
                             return edit_one(ed, id);
                         }
+                        if is_spline(ed, id)? {
+                            if convert_spline(ed, id)? {
+                                return edit_one(ed, id);
+                            }
+                            continue;
+                        }
                         refuse(ed, id)?;
                     }
                     Answer::Keyword(_) => chosen = ed.get_selection(key!("Select objects"))?,
@@ -41,7 +49,12 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                 if data_of(ed, chosen[0])?.is_some() {
                     return edit_one(ed, chosen[0]);
                 }
-                refuse(ed, chosen[0])?;
+                if is_spline(ed, chosen[0])? && convert_spline(ed, chosen[0])? {
+                    return edit_one(ed, chosen[0]);
+                }
+                if !is_spline(ed, chosen[0])? {
+                    refuse(ed, chosen[0])?;
+                }
                 chosen.clear();
             }
             _ => return edit_many(ed, chosen),
@@ -50,14 +63,13 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
 }
 
 /// Say why `id` cannot be edited.
-fn refuse(ed: &Editor, id: EntityId) -> Result<(), Cancelled> {
-    let spline = ed.read(move |doc| matches!(doc.get(id), Some(Entity::Spline(_))))?;
-    ed.say(if spline {
-        key!("Spline-to-polyline conversion is not yet supported; object was not changed.")
-    } else {
-        key!("Object is not a polyline.")
-    });
+fn refuse(ed: &Editor, _id: EntityId) -> Result<(), Cancelled> {
+    ed.say(key!("Object is not a polyline."));
     Ok(())
+}
+
+fn is_spline(ed: &Editor, id: EntityId) -> Result<bool, Cancelled> {
+    ed.read(move |doc| matches!(doc.get(id), Some(Entity::Spline(_))))
 }
 
 /// The polyline data of `id`, if it is something PEDIT can edit.
@@ -123,6 +135,8 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
             .keyword("Join", "J")
             .keyword("Width", "W")
             .keyword("Edit vertex", "E")
+            .keyword("Fit", "F")
+            .keyword("Spline", "S")
             .keyword("Decurve", "D")
             .keyword("Ltype gen", "L")
             .keyword("Reverse", "R")
@@ -158,6 +172,11 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
                 }
             }
             "Edit vertex" => steps += edit_vertices(ed, id)?,
+            "Fit" | "Spline" => {
+                if curve(ed, id, &data, key == "Fit")? {
+                    steps += 1;
+                }
+            }
             "Decurve" => {
                 store(ed, id, data.decurved())?;
                 steps += 1;

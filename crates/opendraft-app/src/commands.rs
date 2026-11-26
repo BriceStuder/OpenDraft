@@ -52,6 +52,7 @@ pub fn build_registry() -> Registry<AppState> {
         crate::block_commands::commands(),
         crate::linetype_line::commands(),
         crate::draw_order::commands(),
+        crate::isolate::commands(),
         crate::text_commands::commands(),
         crate::clipboard::commands(),
         crate::layer_cmd::commands(),
