@@ -103,7 +103,7 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 - [ ] Text: TEXT/MTEXT in all import and export paths (`ByBlock` is done, 31-10-2026).
 - [x] Block attributes, done 01-11-2026 (PRs #100 and #101). What is left (multiline attributes, `ATTDISP`, BATTMAN, more data fields) is in `docs/parking_lot.md`.
 - [ ] DWG export (L).
-- [x] Associative arrays as a record beside ordinary objects, with ARRAYEDIT, done 26-11-2026. The array as one object (grips, a contextual tab) is in `docs/parking_lot.md`.
+- [x] Associative arrays as a record beside ordinary objects, with ARRAYEDIT, done 26-11-2026 (PR #275). The array as one object (grips, a contextual tab) is in `docs/parking_lot.md`.
 - [ ] Spline editing: trim, break and join are done (26-11-2026); extend, join with other kinds, offset and fillet, Lengthen for splines, and PEDIT's vertex Tangent are left.
 - [ ] Dimension depth: other arrowheads, styles with colours and linetypes, `DIMBREAK`, jogged radius and `ARC_DIMENSION` as real DXF, annotative scales.
 - [ ] Multileader depth (spline leaders, block content, MLEADEREDIT).
