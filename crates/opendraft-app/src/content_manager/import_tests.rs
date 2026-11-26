@@ -181,3 +181,55 @@ fn the_blocks_of_a_dxf_with_attributes_import_with_their_attributes() {
         state.cmdline.log
     );
 }
+
+#[test]
+fn a_search_narrows_the_place_it_is_typed_in() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let (state, mut win) = setup(dir.path());
+    let snapshot = |win: &Window| {
+        let defaults = std::sync::Arc::clone(state.defaults());
+        let env = Env {
+            library: &defaults.library,
+            document: state.session().document(),
+            revision: 0,
+        };
+        snapshot::Snapshot::take(win, &env)
+    };
+
+    // The drawing's own blocks, by the start of a name, whatever the case.
+    win.open_on(Place::Drawing);
+    assert_eq!(snapshot(&win).drawing.len(), 1);
+    win.search = "bo".to_owned();
+    let found = snapshot(&win);
+    assert_eq!(found.drawing.len(), 1);
+    assert!(found.narrowed && !found.searching);
+    win.search = "zz".to_owned();
+    assert!(snapshot(&win).drawing.is_empty());
+
+    // Favourites keep to their own list.
+    let id = state
+        .defaults()
+        .library
+        .with(|l| l.blocks()[0].id)
+        .expect("a block");
+    apply(&mut win, &state, vec![Action::Favourite(id, true)]);
+    win.open_on(Place::Favourites);
+    win.search = "bo".to_owned();
+    assert_eq!(snapshot(&win).shown.len(), 1);
+    win.search = "zz".to_owned();
+    assert!(snapshot(&win).shown.is_empty());
+
+    // The Trash by name, and its count in the tree is not narrowed.
+    apply(&mut win, &state, vec![Action::Delete(id)]);
+    win.open_on(Place::Trash);
+    win.search = "zz".to_owned();
+    let none = snapshot(&win);
+    assert!((none.trash.len(), none.trash_total) == (0, 1));
+    win.search = "BOX".to_owned();
+    assert_eq!(snapshot(&win).trash.len(), 1);
+
+    // My blocks still searches the whole library.
+    win.open_on(Place::default());
+    win.search = "zz".to_owned();
+    assert!(snapshot(&win).searching);
+}

@@ -32,7 +32,7 @@ pub use capture::{CaptureRequest, Captured, NameTaken};
 pub use error::LibraryError;
 pub use import::{importable, Candidate, ImportReport};
 pub use info::BlockInfo;
-pub use search::Query;
+pub use search::{fold, Query};
 pub use state::{TrashRecord, MAX_RECENTS, TRASH_DAYS};
 
 use state::State;

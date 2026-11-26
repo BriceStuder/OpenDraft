@@ -123,13 +123,12 @@ impl Window {
             &snap.subfolders
         };
         if folders.is_empty() && snap.shown.is_empty() {
-            let text = match (&self.place, snap.searching) {
-                (_, true) => "No blocks match.",
-                (Place::Favourites, _) => "No favourites yet: pick a block and choose Favourite.",
-                (Place::Recent, _) => "Blocks you insert are listed here.",
+            let text = match &self.place {
+                Place::Favourites => "No favourites yet: pick a block and choose Favourite.",
+                Place::Recent => "Blocks you insert are listed here.",
                 _ => "Nothing here yet. Add blocks with Add to library.",
             };
-            empty_state(ui, theme, text);
+            empty_state(ui, theme, snap.narrowed, text);
             return;
         }
         match self.view {
@@ -277,11 +276,8 @@ impl Window {
         actions: &mut Vec<Action>,
     ) {
         if snap.drawing.is_empty() {
-            empty_state(
-                ui,
-                theme,
-                "This drawing has no blocks. Make one with BLOCK.",
-            );
+            let plain = "This drawing has no blocks. Make one with BLOCK.";
+            empty_state(ui, theme, snap.narrowed, plain);
             return;
         }
         ui.horizontal_wrapped(|ui| {
@@ -322,7 +318,7 @@ impl Window {
         actions: &mut Vec<Action>,
     ) {
         if snap.trash.is_empty() {
-            empty_state(ui, theme, "The Trash is empty.");
+            empty_state(ui, theme, snap.narrowed, "The Trash is empty.");
             return;
         }
         if ui.button("Empty Trash").clicked() {

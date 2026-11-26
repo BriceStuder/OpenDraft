@@ -42,7 +42,7 @@ pub fn show(
             Place::Trash,
             icons::CONTENT_TRASH,
             "Trash",
-            Some(snap.trash.len()),
+            Some(snap.trash_total),
         ),
     ];
     for (target, icon, label, count) in rows {

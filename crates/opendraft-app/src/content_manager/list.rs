@@ -4,8 +4,10 @@
 use eframe::egui;
 use opendraft_ui::{icon_set, icons, Theme};
 
-/// A centred note and nothing else, for a place with nothing in it.
-pub(super) fn empty_state(ui: &mut egui::Ui, theme: &Theme, text: &str) {
+/// A centred note and nothing else, for a place with nothing in it: `plain`,
+/// or that nothing matches when a search or filter has narrowed the place.
+pub(super) fn empty_state(ui: &mut egui::Ui, theme: &Theme, narrowed: bool, plain: &str) {
+    let text = if narrowed { "Nothing matches." } else { plain };
     ui.add_space(48.0);
     ui.vertical_centered(|ui| {
         let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(40.0), egui::Sense::hover());

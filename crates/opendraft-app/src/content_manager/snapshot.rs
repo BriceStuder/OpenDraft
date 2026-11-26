@@ -1,7 +1,7 @@
 //! What the window shows in one frame, read from the library and the drawing
 //! once, so drawing the window never touches either.
 
-use opendraft_content::library::{BlockInfo, TrashRecord};
+use opendraft_content::library::{fold, BlockInfo, Library, Query, TrashRecord};
 use opendraft_core::BlockId;
 
 use super::{Env, Place, Selected, Window};
@@ -32,16 +32,45 @@ pub struct Snapshot {
     pub selected: Option<BlockInfo>,
     /// Tells pictures of the library's blocks whether they are stale.
     pub stamp: u64,
-    /// What is listed is a search's or a filter's result.
+    /// What is listed is the whole library's search or filter result (only
+    /// in My blocks; the other places are narrowed in place).
     pub searching: bool,
+    /// The search words or a filter narrow what is listed, wherever it is.
+    pub narrowed: bool,
+    /// Blocks in the Trash, before any search narrows the list.
+    pub trash_total: usize,
     /// The units the library's blocks are in.
     pub units: Vec<opendraft_core::InsertUnits>,
 }
 
+/// The search's words, folded for matching.
+fn words_of(text: &str) -> Vec<String> {
+    fold(text).split_whitespace().map(str::to_owned).collect()
+}
+
+/// Whether `name` has every one of `words` (all of them when there are none).
+fn has_words(name: &str, words: &[String]) -> bool {
+    let name = fold(name);
+    words.iter().all(|w| name.contains(w.as_str()))
+}
+
+/// `list` kept to the blocks the search and filters let through.
+fn narrow(lib: &Library, list: Vec<BlockInfo>, narrowed: bool, query: &Query) -> Vec<BlockInfo> {
+    if !narrowed {
+        return list;
+    }
+    let hits: Vec<_> = lib.search(query).into_iter().map(|b| b.id).collect();
+    list.into_iter().filter(|b| hits.contains(&b.id)).collect()
+}
+
 impl Snapshot {
     pub fn take(win: &Window, env: &Env) -> Snapshot {
+        let narrowed = !win.search.trim().is_empty() || win.filter.active();
         let mut snap = Snapshot {
-            searching: !win.search.trim().is_empty() || win.filter.active(),
+            // My blocks searches the whole library; the other places only
+            // narrow what they hold.
+            searching: narrowed && matches!(win.place, Place::Mine(_)),
+            narrowed,
             drawing: Vec::new(),
             ..Snapshot::default()
         };
@@ -49,6 +78,7 @@ impl Snapshot {
         let selected = win.selected.clone();
         let query = win.filter.query(&win.search);
         let searching = snap.searching;
+        let words = words_of(&win.search);
         let read = env.library.with(|lib| {
             let mut s = Snapshot::default();
             s.folders = lib.folders();
@@ -63,8 +93,8 @@ impl Snapshot {
                         s.subfolders = lib.subfolders(folder);
                         lib.blocks_in(folder)
                     }
-                    Place::Favourites => lib.favourites(),
-                    Place::Recent => lib.recents(),
+                    Place::Favourites => narrow(lib, lib.favourites(), narrowed, &query),
+                    Place::Recent => narrow(lib, lib.recents(), narrowed, &query),
                     Place::Drawing | Place::Trash => Vec::new(),
                 }
             };
@@ -86,7 +116,12 @@ impl Snapshot {
                 snap.folders = read.folders;
                 snap.subfolders = read.subfolders;
                 snap.shown = read.shown;
-                snap.trash = read.trash;
+                snap.trash_total = read.trash.len();
+                snap.trash = read
+                    .trash
+                    .into_iter()
+                    .filter(|t| has_words(&t.name, &words))
+                    .collect();
                 snap.favourites = read.favourites;
                 snap.recents = read.recents;
                 snap.selected = read.selected;
@@ -94,6 +129,7 @@ impl Snapshot {
                     .document
                     .blocks()
                     .iter()
+                    .filter(|b| has_words(&b.name, &words))
                     .map(|b| DrawingBlock {
                         id: b.id,
                         name: b.name.clone(),
