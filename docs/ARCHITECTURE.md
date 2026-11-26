@@ -40,9 +40,10 @@ This table is a test: `opendraft-app/tests/crate_rules.rs` reads each crate's de
    temp memory; **state that belongs to the user** (settings, layout) is
    persisted; **state that belongs to the drawing** lives in `Doc`.
 5. **Files stay under about 400 lines of production code** (tests do not
-   count). `opendraft-app/tests/file_sizes.rs` enforces it at 450 and lists the
-   files still over, which may not grow: `dxf/read.rs`
-   (`view.rs` is done: its painting moved to `view/paint.rs`). Split them, then remove them from the list. Split by
+   count). `opendraft-app/tests/file_sizes.rs` enforces it at 450, and keeps a
+   list of files allowed to stay over, which may not grow (empty now: `view.rs`
+   moved its painting to `view/paint.rs`, and `dxf/read.rs` is 401 lines). A file
+   over the limit is split, or listed there with its size until it is. Split by
    responsibility, not by layer. `opendraft-app/src/app/` shows the pattern: `app.rs`
    owns the struct and the frame loop, and each submodule adds one area as an
    `impl` block.
