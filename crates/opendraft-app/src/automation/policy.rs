@@ -180,6 +180,8 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("format.units", Denied, Lifecycle),
     ("format.properties", Denied, Lifecycle),
     ("format.linetype", Denied, Lifecycle),
+    // Reads a file path the user types, which an outside caller must not do.
+    ("format.linetype_line", Denied, FileRead),
     ("annotate.textstyle", Denied, Lifecycle),
     ("dim.style", Denied, Lifecycle),
     ("annotate.mleaderstyle", Denied, Lifecycle),

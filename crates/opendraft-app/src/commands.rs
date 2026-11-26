@@ -50,6 +50,7 @@ pub fn build_registry() -> Registry<AppState> {
     registry.needs_drawing_when(|s| s.home);
     let tables = [
         crate::block_commands::commands(),
+        crate::linetype_line::commands(),
         crate::text_commands::commands(),
         crate::clipboard::commands(),
         crate::layer_cmd::commands(),
