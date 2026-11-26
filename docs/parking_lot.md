@@ -20,15 +20,15 @@ Keep it current: when something here is built, delete its line in the same chang
 - Lengthen for splines and whole ellipses (elliptical arcs lengthen along their curve; the Angle option does not apply to them); the delta default lasts the session and is not saved.
 - PEDIT: Fit, Spline, Jointype and vertex Tangent (and `PLINECONVERTMODE`).
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
-- JOIN: elliptical arcs across gaps (lines on one line and arcs of one circle already join across gaps, the first object being the source), and the Fuzz option on a preselected set (it is asked only at the selection prompt). With Fuzz, ends that miss are linked by a straight segment, as for a polyline; AutoCAD's exact treatment of the gap was not compared.
+- JOIN: Fuzz links ends that miss with a straight segment, as for a polyline; AutoCAD's exact treatment of the gap was not compared. It is asked only at the selection prompt, as in AutoCAD.
 - Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle); the fillet and chamfer variables are per user, not saved in the drawing.
 - Trim and Extend: the Project option does nothing yet (all geometry is flat; the choice is kept as `PROJMODE`). The Edge option's implied extension covers lines, arcs, elliptical arcs and the ends of open polylines; other edges (splines, text) are used as they are.
-- Offset: Through is not remembered as the default (AutoCAD keeps it as a negative `OFFSETDIST`); the distance default is per user, not saved in the drawing.
+- Offset: the distance default (and Through, as a negative `OFFSETDIST`) is per user, not saved in the drawing.
 - Explode: solid and gradient hatches (AutoCAD gives 2D solids; there is no such object here, so they are left with a note). A pattern hatch explodes to its lines and points, with the hatch's layer and attributes.
 - Polyline widths: Trim, Break, Join, Offset, Fillet, Chamfer and Explode give a hairline polyline (only transforms, stretching, grips and Extend keep widths).
 - Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.
-- Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, a ribbon button, AutoCAD conformance fixtures.
-- Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), a window (not only crossing) selection at the destination prompt, and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
+- Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, AutoCAD conformance fixtures.
+- Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
 - Grips: AutoCAD's hover menu and the middle-grip options (Add or Remove Vertex, Convert to Arc).
 
 ## Selection, snapping and input

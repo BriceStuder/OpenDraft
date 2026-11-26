@@ -162,7 +162,15 @@ pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
             return vec![round];
         }
     }
-    made.extend(crate::ellipse::join::join_elliptical_arcs(items, tolerance));
+    let elliptical = crate::ellipse::join::join_elliptical_arcs(items, tolerance);
+    if let Some(round) = crate::ellipse::join::elliptical_arcs_across_gaps(items, tolerance) {
+        let covered: usize = elliptical.iter().map(|m| m.used.len()).sum();
+        if covered < round.used.len() {
+            made.push(round);
+            return made;
+        }
+    }
+    made.extend(elliptical);
     made
 }
 

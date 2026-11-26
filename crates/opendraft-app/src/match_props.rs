@@ -6,7 +6,7 @@ use opendraft_canvas::{select_in, Region};
 use opendraft_commands::{
     Answer, Cancelled, Editor, ModifyAttributes, ModifyEntities, Options, Picked, Swept,
 };
-use opendraft_core::{Attributes, Document, Entity, EntityId, MText, Object};
+use opendraft_core::{Attributes, Ccs, Document, Entity, EntityId, MText, Object, Point};
 use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
@@ -196,7 +196,9 @@ pub fn match_properties(ed: &mut Editor) -> Result<(), Cancelled> {
         let targets = match ed.ask_object_or_sweep(options)? {
             Answer::Value(Swept::Object(Picked { id, .. })) => vec![id],
             Answer::Value(Swept::Missed { at, .. }) => {
-                let region = Region::Crossing(ask_window(ed, at)?);
+                let corners = ask_window(ed, at)?;
+                let twist = ed.read(|doc| doc.view_twist())?;
+                let region = window_or_crossing(corners, twist);
                 ed.read(move |doc| select_in(doc, &region))?
             }
             Answer::Value(Swept::Path { points, .. }) => {
@@ -213,6 +215,23 @@ pub fn match_properties(ed: &mut Editor) -> Result<(), Cancelled> {
         for id in targets.into_iter().filter(|id| *id != source) {
             apply(ed, source, id)?;
         }
+    }
+}
+
+/// A window drawn to the right of its first corner (on the screen) takes only
+/// what it holds; one drawn to the left takes whatever it touches.
+fn window_or_crossing(corners: Vec<Point>, twist: f64) -> Region {
+    let frame = Ccs::new(Point::new(0.0, 0.0), -twist);
+    let rightward = match (corners.first(), corners.get(2)) {
+        (Some(first), Some(opposite)) => {
+            frame.from_world(*opposite).x >= frame.from_world(*first).x
+        }
+        _ => false,
+    };
+    if rightward {
+        Region::Window(corners)
+    } else {
+        Region::Crossing(corners)
     }
 }
 
@@ -433,6 +452,38 @@ mod tests {
         assert_eq!(now.color, Attributes::on_layer(LayerId::DEFAULT).color);
         assert_eq!(now.linetype_scale, 2.0, "line type scale still matched");
         assert!(!state.defaults().matching.get().has(COLOR));
+    }
+
+    #[test]
+    fn a_window_drawn_to_the_right_takes_only_what_it_holds() {
+        let mut state = AppState::new();
+        let ids = red_source_and_two_plain(&mut state);
+        state.click_select(Some(ids[0]), false);
+        state.start_command("MATCHPROP", match_properties);
+        state.settle_command();
+        // Right to left would touch both; left to right holds neither line
+        // (they run to x = 10) until it reaches past them.
+        state.answer_object(p(-5.0, 4.0), None, false);
+        state.settle_command();
+        state.answer_point(p(5.0, 6.0));
+        state.settle_command();
+        let plain = |i: usize, state: &AppState| {
+            state
+                .session()
+                .document()
+                .object(ids[i])
+                .unwrap()
+                .attrs
+                .clone()
+                == Attributes::on_layer(LayerId::DEFAULT)
+        };
+        assert!(plain(1, &state), "the line is only crossed, not held");
+        state.answer_object(p(-5.0, 4.0), None, false);
+        state.settle_command();
+        state.answer_point(p(11.0, 6.0));
+        state.settle_command();
+        assert!(!plain(1, &state), "now the window holds it");
+        assert!(plain(2, &state), "the line at y = 10 is outside");
     }
 
     #[test]
