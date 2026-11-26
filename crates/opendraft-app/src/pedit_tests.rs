@@ -238,19 +238,67 @@ fn multiple_sets_ltype_gen_for_all() {
 }
 
 #[test]
-fn a_spline_is_refused_by_name_and_the_pick_prompt_stays() {
+fn a_spline_is_turned_into_a_polyline_at_the_precision_asked_for() {
+    let spline = Entity::Spline(Box::new(
+        opendraft_core::Spline::from_control_points(
+            3,
+            vec![p(0.0, 0.0), p(2.0, 3.0), p(5.0, 3.0), p(7.0, 0.0)],
+        )
+        .unwrap(),
+    ));
+    let mut state = started(&[spline]);
+    click(&mut state, 0);
+    assert!(state.cmd_prompt().text.contains("turn it into one"));
+    key(&mut state, "Yes");
+    assert!(state.cmd_prompt().text.contains("precision"));
+    state.cmd_submit("");
+    state.settle_command();
+    assert!(state.cmd_prompt().text.contains("Enter an option"));
+    let Entity::Polyline { points, bulges, .. } = &entities(&state)[0] else {
+        panic!("{:?}", entities(&state))
+    };
+    assert!(points.len() > 4 && bulges.is_empty());
+    // One undo step brings the spline back.
+    state.undo();
+    assert!(matches!(entities(&state)[0], Entity::Spline(_)));
+}
+
+#[test]
+fn declining_the_conversion_leaves_the_spline_and_the_pick_prompt_stays() {
     let spline = Entity::Spline(Box::new(
         opendraft_core::Spline::from_control_points(1, vec![p(0.0, 0.0), p(5.0, 0.0)]).unwrap(),
     ));
     let mut state = started(&[spline, square()]);
     click(&mut state, 0);
-    assert!(said(
-        &state,
-        "Spline-to-polyline conversion is not yet supported"
-    ));
+    key(&mut state, "No");
+    assert!(matches!(entities(&state)[0], Entity::Spline(_)));
     assert!(state.cmd_prompt().text.contains("Select polyline"));
     click(&mut state, 1);
     assert!(state.cmd_prompt().text.contains("Enter an option"));
+}
+
+#[test]
+fn fit_and_spline_curve_a_polyline_in_one_undo_step() {
+    let mut state = started(&[polyline(&[(0.0, 0.0), (4.0, 3.0), (8.0, 0.0), (12.0, 3.0)])]);
+    click(&mut state, 0);
+    key(&mut state, "Fit");
+    let Entity::Polyline { points, bulges, .. } = &entities(&state)[0] else {
+        panic!()
+    };
+    assert_eq!(points.len(), 7);
+    assert!(bulges.iter().any(|k| k.abs() > 1e-6));
+    key(&mut state, "Undo");
+    assert!(matches!(&entities(&state)[0], Entity::Polyline { points, .. } if points.len() == 4));
+    key(&mut state, "Spline");
+    let Entity::Polyline { points, bulges, .. } = &entities(&state)[0] else {
+        panic!()
+    };
+    assert!(points.len() > 20 && bulges.is_empty());
+    // Two vertices are too few.
+    let mut state = started(&[polyline(&[(0.0, 0.0), (4.0, 3.0)])]);
+    click(&mut state, 0);
+    key(&mut state, "Fit");
+    assert!(said(&state, "needs at least three vertices"));
 }
 
 #[test]

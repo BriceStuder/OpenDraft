@@ -18,7 +18,7 @@ Keep it current: when something here is built, delete its line in the same chang
 
 - Spline editing: exact Trim, Extend, Break and Join (knot insertion, curve crossings), Offset (and with it ellipse offset) and Fillet.
 - Lengthen for splines and whole ellipses (elliptical arcs lengthen along their curve; the Angle option does not apply to them); the delta default lasts the session and is not saved.
-- PEDIT: Fit, Spline, Jointype and vertex Tangent (and `PLINECONVERTMODE`).
+- PEDIT: vertex Tangent, and keeping a curve's frame: Fit and Spline give plain geometry (arcs, or short straight segments), so Decurve straightens what is there and does not bring the original vertices back; Fit takes each tangent from the chord across the vertex, which Tangent would set; a spline converts only to straight segments (`PLINECONVERTMODE` is not read), and PEDIT's Multiple does not convert splines.
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
 - JOIN: Fuzz links ends that miss with a straight segment, as for a polyline; AutoCAD's exact treatment of the gap was not compared. It is asked only at the selection prompt, as in AutoCAD.
 - Fillet and Chamfer: a Chamfer next to arc segments of a polyline (a Fillet there works, found as the fillet of the two segments), a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle); the fillet and chamfer variables are per user, not saved in the drawing.

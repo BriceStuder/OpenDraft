@@ -149,6 +149,7 @@ mod overkill_line;
 mod overkill_memory;
 mod paper_colour;
 mod pedit_cmd;
+mod pedit_curve;
 mod pedit_join;
 mod pedit_memory;
 mod pedit_vertex;

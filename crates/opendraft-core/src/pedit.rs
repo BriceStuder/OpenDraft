@@ -9,6 +9,7 @@ use std::f64::consts::TAU;
 
 use crate::{arc, bulge, width, Entity, Point};
 
+mod curve;
 mod join;
 mod vertex;
 
