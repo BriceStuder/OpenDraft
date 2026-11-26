@@ -29,7 +29,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.
 - Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, AutoCAD conformance fixtures.
 - Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
-- Grips: AutoCAD's hover menu and the middle-grip options (Add or Remove Vertex, Convert to Arc).
+- Grips: AutoCAD's hover menu. Its polyline choices (Add vertex, Remove vertex, Convert to arc or line) work as options of the grip's prompt, and Ctrl switches Stretch and Add vertex; Add vertex on an end vertex adds beyond the end.
 
 ## Selection, snapping and input
 
