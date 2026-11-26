@@ -8,11 +8,14 @@
 //! comes from and have no pattern of their own.
 
 pub mod dash;
+pub mod lin;
 pub mod paths;
 pub mod stock;
 
 #[cfg(test)]
 mod dash_tests;
+#[cfg(test)]
+mod lin_tests;
 #[cfg(test)]
 mod tests;
 
@@ -127,13 +130,7 @@ impl Linetype {
     /// AutoCAD allows 2 to 12 elements and a first one that is not a gap.
     /// A record read from a DXF file is kept even if this says no.
     pub fn lin_problem(&self) -> Option<&'static str> {
-        if !(2..=12).contains(&self.elements.len()) {
-            Some("a .lin pattern has 2 to 12 elements")
-        } else if matches!(self.elements[0], StrokeElement::Gap(_)) {
-            Some("a .lin pattern cannot start with a gap")
-        } else {
-            None
-        }
+        lin::pattern_problem(&self.elements)
     }
 }
 
