@@ -9,6 +9,8 @@
 
 pub mod dash;
 pub mod lin;
+mod load;
+pub use load::Loaded;
 pub mod paths;
 pub mod stock;
 
@@ -16,6 +18,8 @@ pub mod stock;
 mod dash_tests;
 #[cfg(test)]
 mod lin_tests;
+#[cfg(test)]
+mod load_tests;
 #[cfg(test)]
 mod tests;
 

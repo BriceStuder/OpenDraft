@@ -195,3 +195,15 @@ fn every_stock_pattern_survives_being_written_as_lin_text() {
         assert_eq!(got, want, "{}", s.name);
     }
 }
+
+#[test]
+fn bytes_that_are_not_utf8_still_read() {
+    // Shift-JIS's full-width space, as in acadiso.lin's JIS descriptions.
+    let mut bytes = b"*JIS_09_29,2SASEN29 ____".to_vec();
+    bytes.extend_from_slice(&[0x81, 0x40]);
+    bytes.extend_from_slice(b"__\r\nA,12,-3\r\n");
+    let file = super::lin::parse_bytes(&bytes);
+    assert_eq!(file.entries.len(), 1);
+    assert!(file.entries[0].description.starts_with("2SASEN29 ____"));
+    assert!(file.notes.is_empty());
+}

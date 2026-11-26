@@ -55,6 +55,14 @@ pub fn pattern_problem(elements: &[StrokeElement]) -> Option<&'static str> {
     }
 }
 
+/// Reads the bytes of a `.lin` file. They are not always UTF-8 (AutoCAD's
+/// `acadiso.lin` holds Shift-JIS spaces in its JIS descriptions), so what
+/// does not decode becomes a replacement character in a description rather
+/// than the file being refused.
+pub fn parse_bytes(bytes: &[u8]) -> LinFile {
+    parse(&String::from_utf8_lossy(bytes))
+}
+
 /// A header waiting for its pattern line.
 struct Header {
     line: usize,
