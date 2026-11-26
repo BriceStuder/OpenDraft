@@ -701,6 +701,7 @@
 "Specify length of segment": "Spécifiez la longueur des segments"
 "Select source object": "Sélectionnez l'objet source"
 "Select destination object(s)": "Sélectionnez les objets de destination"
+"Switch a property on or off": "Activez ou désactivez une propriété"
 
 # Modifier une polyligne (PEDIT), supprimer les doublons (OVERKILL)
 "Object selected is not a polyline. Do you want to turn it into one?": "L'objet choisi n'est pas une polyligne. Voulez-vous le transformer en polyligne ?"
@@ -1036,6 +1037,7 @@
 "[Project]": "Projection"
 "[eRase]": "Effacer"
 "[Ucs]": "Scu"
+"[Settings]": "Paramètres"
 "[Filename]": "nom de Fichier"
 "[Fill angle]": "angle de Remplissage"
 "[Fill entire path]": "Remplir tout le trajet"

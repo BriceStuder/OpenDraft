@@ -28,7 +28,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - Polyline widths: Trim, Break, Join, Offset, Fillet, Chamfer and Explode give a hairline polyline (only transforms, stretching, grips and Extend keep widths).
 - Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.
 - Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, a ribbon button, AutoCAD conformance fixtures.
-- Match Properties: the Settings option and dialog, window or crossing selection at the destination prompt.
+- Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), a window (not only crossing) selection at the destination prompt, and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
 - Grips: AutoCAD's hover menu and the middle-grip options (Add or Remove Vertex, Convert to Arc).
 
 ## Selection, snapping and input
