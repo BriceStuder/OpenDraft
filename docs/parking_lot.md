@@ -22,7 +22,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
 - JOIN: arcs across gaps and the Close option (lines on one line already join across gaps), a Fuzz distance.
 - Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle), Chamfer's Method option, Undo inside Multiple; the fillet and chamfer variables are per user, not saved in the drawing.
-- Trim and Extend: the Project and eRase options, and a typed Crossing keyword at the object prompt (a click in empty space already starts the crossing window). The Edge option's implied extension covers lines, arcs, elliptical arcs and the ends of open polylines; other edges (splines, text) are used as they are.
+- Trim and Extend: the Project option does nothing yet (all geometry is flat; the choice is kept as `PROJMODE`). The Edge option's implied extension covers lines, arcs, elliptical arcs and the ends of open polylines; other edges (splines, text) are used as they are.
 - Offset: Through is not remembered as the default (AutoCAD keeps it as a negative `OFFSETDIST`); the distance default is per user, not saved in the drawing.
 - Explode: hatches.
 - Polyline widths: Trim, Break, Join, Offset, Fillet, Chamfer and Explode give a hairline polyline (only transforms, stretching, grips and Extend keep widths).

@@ -1,6 +1,6 @@
 //! What TRIM and EXTEND remember between uses, as AutoCAD's
-//! `TRIMEXTENDMODE` (Quick or Standard mode) and `EDGEMODE` (whether edges
-//! act as if extended past their ends). Saved with the user's settings, not in
+//! `TRIMEXTENDMODE` (Quick or Standard mode), `EDGEMODE` (whether edges act as
+//! if extended past their ends) and `PROJMODE`. Saved with the user's settings, not in
 //! the drawing.
 
 use opendraft_commands::{SysVar, Value};
@@ -16,11 +16,15 @@ pub struct Memory {
     /// The Edge option: cutting and boundary edges act as if they ran on
     /// past their ends along their own paths (`EDGEMODE` 1). Off by default.
     pub edge_extend: bool,
+    /// The Project option, `PROJMODE`: 0 None, 1 Ucs, 2 View. Flat drawings
+    /// are unaffected.
+    pub project: u8,
 }
 
 const DEFAULT: Memory = Memory {
     quick: true,
     edge_extend: false,
+    project: 1,
 };
 
 impl Default for Memory {
@@ -31,6 +35,7 @@ impl Default for Memory {
 
 const KEY: &str = "trim_extend_quick";
 const EDGE_KEY: &str = "trim_extend_edge";
+const PROJECT_KEY: &str = "trim_extend_project";
 
 /// Take the saved settings, keeping the defaults when they are missing.
 pub fn load(storage: Option<&dyn eframe::Storage>) -> Memory {
@@ -38,6 +43,10 @@ pub fn load(storage: Option<&dyn eframe::Storage>) -> Memory {
     Memory {
         quick: saved(KEY).as_deref() != Some("0"),
         edge_extend: saved(EDGE_KEY).as_deref() == Some("1"),
+        project: saved(PROJECT_KEY)
+            .and_then(|v| v.parse::<u8>().ok())
+            .filter(|p| *p <= 2)
+            .unwrap_or(DEFAULT.project),
     }
 }
 
@@ -45,6 +54,7 @@ pub fn load(storage: Option<&dyn eframe::Storage>) -> Memory {
 pub fn save(m: &Memory, storage: &mut dyn eframe::Storage) {
     storage.set_string(KEY, if m.quick { "1" } else { "0" }.to_owned());
     storage.set_string(EDGE_KEY, if m.edge_extend { "1" } else { "0" }.to_owned());
+    storage.set_string(PROJECT_KEY, m.project.to_string());
 }
 
 /// `TRIMEXTENDMODE` and `EDGEMODE`.
@@ -69,6 +79,19 @@ pub fn variables() -> Vec<SysVar<AppState>> {
             |st, v| {
                 let extend = matches!(v, Value::Int(1));
                 st.defaults().trim.change(|m| m.edge_extend = extend);
+                Ok(())
+            },
+        ),
+        SysVar::int(
+            "PROJMODE",
+            "Projection for TRIM and EXTEND: 0 None, 1 Ucs, 2 View",
+            (0, 2),
+            |st| Value::Int(i64::from(st.defaults().trim.get().project)),
+            |st, v| {
+                if let Value::Int(n) = v {
+                    let project = u8::try_from(n).unwrap_or(1);
+                    st.defaults().trim.change(|m| m.project = project);
+                }
                 Ok(())
             },
         ),

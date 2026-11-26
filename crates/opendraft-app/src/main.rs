@@ -82,6 +82,7 @@ mod dynamic_rows;
 mod dynamic_settings;
 mod dynamic_visibility_cmd;
 mod edges;
+mod edges_options;
 mod edges_sweep;
 mod ellipse_cmd;
 mod erase;
