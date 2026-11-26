@@ -320,6 +320,4 @@ icons! {
     VIEW_NAV_GIZMO = '\u{e09f}';
     VIEW_SNAP = '\u{e2b4}';
     VIEW_ZOOM_EXTENTS = '\u{e115}';
-    VIEW_ZOOM_IN = '\u{e1b5}';
-    VIEW_ZOOM_OUT = '\u{e1b6}';
 }

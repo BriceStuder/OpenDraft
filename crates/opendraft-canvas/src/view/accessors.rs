@@ -6,7 +6,7 @@ use std::sync::Arc;
 use egui::{Pos2, Rect};
 use opendraft_core::{EntityId, Point};
 
-use super::{PointPrompt, Request, View, STEP_ZOOM};
+use super::{PointPrompt, Request, View};
 use crate::layer_cache::CacheConfig;
 
 impl View {
@@ -166,12 +166,6 @@ impl View {
     /// sheet, or the model through the active viewport.
     pub fn request_zoom_window(&mut self, a: Point, b: Point) {
         self.request(Request::Window(a, b));
-    }
-
-    /// Zoom about the viewport center on the next frame.
-    pub fn request_zoom_step(&mut self, zoom_in: bool) {
-        let factor = if zoom_in { STEP_ZOOM } else { 1.0 / STEP_ZOOM };
-        self.request(Request::Zoom(factor));
     }
 
     /// A zoom for the next frame; it is a step of its own for ZOOM Previous.

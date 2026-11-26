@@ -292,5 +292,3 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](view-nav-gizmo.svg) | `view-nav-gizmo.svg` | compass | Gizmo |
 | ![](view-snap.svg) | `view-snap.svg` | magnet | Snap |
 | ![](view-zoom-extents.svg) | `view-zoom-extents.svg` | maximize | Zoom Extents |
-| ![](view-zoom-in.svg) | `view-zoom-in.svg` | zoom-in | Zoom In |
-| ![](view-zoom-out.svg) | `view-zoom-out.svg` | zoom-out | Zoom Out |

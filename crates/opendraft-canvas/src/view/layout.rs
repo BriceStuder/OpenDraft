@@ -199,13 +199,6 @@ impl View {
                 }
                 None => self.sheet.show_window(Bounds::from_points(a, b), rect),
             },
-            Some(Request::Zoom(factor)) => {
-                let at = self
-                    .clip
-                    .filter(|_| vp.is_some())
-                    .map_or(rect.center(), |c| c.center());
-                self.zoom_view(&mut vp, &mut edited, rect, at, factor);
-            }
             // Only the view of an unlocked viewport turns; the sheet never does.
             Some(Request::Twist(twist, fit)) => {
                 if let Some(v) = vp.as_mut().filter(|v| !v.locked) {

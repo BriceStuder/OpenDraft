@@ -403,10 +403,9 @@ optional shortcut, `enabled` and `checked` predicates. The one flag built is
 build: finer flags (document-mutating, file operation) if `transparent` proves
 too coarse, and a user-editable alias table in place of `cmdline::ALIASES`.
 Shortcuts are matched by `opendraft_ui::shortcuts::consume_shortcut`, where
-`Plus` also answers to `Equals` (Ctrl+= as Ctrl+Plus, as browsers do), so
-Ctrl+Plus and Ctrl+Minus zoom the drawing (`view.zoom_in`, `view.zoom_out`)
-with or without Shift. egui's own Ctrl+Plus/Minus/0 interface zoom is turned
-off (`zoom_with_keyboard`); the interface scale is set in Options.
+`Plus` also answers to `Equals` (Ctrl+= as Ctrl+Plus, as browsers do); no
+command uses a Plus shortcut now. egui's own Ctrl+Plus/Minus/0 interface zoom
+is turned off (`zoom_with_keyboard`); the interface scale is set in Options.
 
 **Change reporting.** Every `Action` reports a `Changes` value: the ids it
 added, removed and changed, and whether it touched layers. `Session::perform`
@@ -424,8 +423,9 @@ which the UI thread empties into the view, and each zoom is a step for `ZP`. In 
 layout the window frames the sheet, inside an unlocked viewport its view.
 `ZO` (`view.zoom_objects`) and the Objects option zoom to the box round the
 selected objects (asking "Select objects" with none); construction lines and rays
-have no box and are left out, as `ZE` leaves them out. `ZO` was Zoom Out's alias;
-Zoom Out keeps its command and ribbon button.
+have no box and are left out, as `ZE` leaves them out. `ZO` was Zoom Out's alias.
+There are no Zoom In and Zoom Out step commands (AutoCAD has none; they and `ZI`
+were removed 26-11-2026): the mouse wheel and ZOOM's options zoom.
 
 **Erase** (`erase.rs`). `ERASE` (`E`, `DEL`, the ribbon button) is an Editor
 command like MOVE: it erases the selection at once, or asks "Select objects"

@@ -90,7 +90,10 @@ fn panning_a_sheet_remakes_each_viewport_and_the_sheet_in_the_background() {
     rig.view.set_space(crate::Space::Paper(layout));
     rig.frame(&doc, &none());
     assert_eq!(rig.builds(), 2, "one for the viewport, one for the sheet");
-    rig.view.request_zoom_step(true);
+    rig.view.request_zoom_window(
+        opendraft_core::Point::new(0.0, 0.0),
+        opendraft_core::Point::new(100.0, 70.0),
+    );
     until_sharp(&mut rig, &doc);
     rig.frame(&doc, &none());
     assert_eq!(rig.builds(), 4, "both again, in the background");

@@ -252,8 +252,8 @@ fn app_creator() -> eframe::AppCreator<'static> {
         let theme = opendraft_ui::Theme::with_palette(settings.palette);
         theme.apply(&cc.egui_ctx);
         cc.egui_ctx.set_zoom_factor(settings.zoom_factor());
-        // Ctrl+Plus and Ctrl+Minus zoom the drawing; the interface scale is
-        // set in Options, not by egui's own keys.
+        // The interface scale is set in Options, not by egui's own
+        // Ctrl+Plus and Ctrl+Minus.
         cc.egui_ctx.options_mut(|o| o.zoom_with_keyboard = false);
         let dock = dock::load(cc.storage);
         let recent = recent::RecentFiles::load(cc.storage);

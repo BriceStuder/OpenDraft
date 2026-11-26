@@ -199,8 +199,6 @@ pub const TABLE: &[(&str, AutomationPolicy, CommandEffect)] = &[
     ("layer.match", InteractiveInApp, Mutation),
     // View and modes: nothing in the drawing changes.
     ("view.zoom_extents", ImmediateSafe, Ui),
-    ("view.zoom_in", ImmediateSafe, Ui),
-    ("view.zoom_out", ImmediateSafe, Ui),
     ("view.zoom_previous", ImmediateSafe, Ui),
     ("view.zoom", InteractiveInApp, Ui),
     ("view.zoom_objects", InteractiveInApp, Ui),
