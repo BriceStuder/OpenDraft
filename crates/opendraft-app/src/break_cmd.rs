@@ -269,6 +269,35 @@ mod tests {
     }
 
     #[test]
+    fn an_at_sign_alone_is_the_first_point_again_so_the_object_is_divided() {
+        let mut state = AppState::new();
+        state.add_entity(line(p(0.0, 0.0), p(10.0, 0.0)));
+        let id = start(&mut state);
+        state.answer_object(p(4.0, 0.0), Some(id), false);
+        state.cmd_submit("@");
+        state.settle_command();
+        assert!(!state.command_running());
+        assert_eq!(
+            entities(&state),
+            [
+                line(p(0.0, 0.0), p(4.0, 0.0)),
+                line(p(4.0, 0.0), p(10.0, 0.0))
+            ]
+        );
+    }
+
+    #[test]
+    fn at_zero_zero_still_does_the_same() {
+        let mut state = AppState::new();
+        state.add_entity(line(p(0.0, 0.0), p(10.0, 0.0)));
+        let id = start(&mut state);
+        state.answer_object(p(4.0, 0.0), Some(id), false);
+        state.cmd_submit("@0,0");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 2);
+    }
+
+    #[test]
     fn the_first_point_option_replaces_the_click() {
         let mut state = AppState::new();
         state.add_entity(line(p(0.0, 0.0), p(10.0, 0.0)));

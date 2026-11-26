@@ -649,7 +649,9 @@ only changes how points and angles are typed and shown, and which way is
   `UCSXDIR` and `UCSYDIR` only.
 - **Reading and showing values** go through `coordinates::Reading` (the units
   and the system in force; `AppState::reading()`). Typed coordinates are in the
-  system, and `*` after any `@` or `#` means world (`*10,20`, `@*5<0`). A
+  system, and `*` after any `@` or `#` means world (`*10,20`, `@*5<0`). `@` alone is
+  the point the prompt measures from (the last point; at Break's second prompt,
+  the first), so `@` there divides the object. A
   typed angle is a **direction** (counted from the system's X axis and
   `ANGBASE`) unless the prompt says it is an **amount to turn by**
   (`Options::turn`, `Prompt::turn`: ROTATE, grip rotate, included angles,
