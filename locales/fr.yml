@@ -692,6 +692,9 @@
 
 # Joindre, décomposer, modifier la longueur, diviser, mesurer, transfert de propriétés
 "Select objects to join": "Sélectionnez les objets à joindre"
+"Select reference object": "Sélectionnez l'objet de référence"
+"Enter object ordering option": "Entrez une option d'ordre des objets"
+"Draw order changed for %{objects}": "Ordre d'affichage modifié pour %{objects}"
 "Select objects to join to the source": "Sélectionnez les objets à joindre à la source"
 "Specify fuzz distance": "Spécifiez la tolérance de jonction"
 "Closed the object.": "Objet fermé."
@@ -1046,6 +1049,10 @@
 "[Ucs]": "Scu"
 "[Settings]": "Paramètres"
 "[Fuzz]": "Tolérance"
+"[Above objects]": "Au-dessus des objets"
+"[Under objects]": "Sous les objets"
+"[Front]": "Premier plan"
+"[Back]": "Fond"
 "[Add vertex]": "Ajouter un sommet"
 "[Remove vertex]": "Supprimer un sommet"
 "[Convert to arc]": "Courber en arc"
@@ -1281,6 +1288,7 @@
 "$TRIM": "AJUSTER, AJ"
 "$EXTEND": "PROLONGER, PR, PROLONGE"
 "$LENGTHEN": "MODIFLONG, MG"
+"$DRAWORDER": "ORDREAFFICHAGE, OA"
 "$OFFSET": "DECALER, DC"
 "$JOIN": "JOINDRE, J"
 "$BREAK": "COUPURE, CU"

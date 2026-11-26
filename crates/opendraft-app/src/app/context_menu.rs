@@ -151,12 +151,12 @@ impl OpenDraftApp {
                 Row::run(Some(icons::MODIFY_ROTATE), t!("Rotate"), "modify.rotate"),
                 Row::sub(
                     t!("Draw Order"),
-                    soon_all(&[
-                        t!("Bring to Front"),
-                        t!("Send to Back"),
-                        t!("Bring Above Objects"),
-                        t!("Send Under Objects"),
-                    ]),
+                    vec![
+                        Row::run(None, t!("Bring to Front"), "modify.draw_front"),
+                        Row::run(None, t!("Send to Back"), "modify.draw_back"),
+                        Row::run(None, t!("Bring Above Objects"), "modify.draw_above"),
+                        Row::run(None, t!("Send Under Objects"), "modify.draw_under"),
+                    ],
                 ),
                 Row::sub(t!("Group"), soon_all(&[t!("Group"), t!("Ungroup")])),
                 Row::rule(),

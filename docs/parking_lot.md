@@ -26,7 +26,7 @@ Keep it current: when something here is built, delete its line in the same chang
 - Offset: the distance default (and Through, as a negative `OFFSETDIST`) is per user, not saved in the drawing.
 - Explode: solid and gradient hatches (AutoCAD gives 2D solids; there is no such object here, so they are left with a note). A pattern hatch explodes to its lines and points, with the hatch's layer and attributes.
 - Polyline widths: Fillet and Chamfer give a hairline polyline (Explode does too, as in AutoCAD, which drops widths; Trim, Break, Join and Offset keep them, a cut piece tapering as its segment did).
-- Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.
+- Object isolation (isolate, hide, end isolation): greyed in the context menu. Draw order is built for the model and layout objects themselves (DRAWORDER, `DR`), not for the order of a hatch against its boundary (a hatch is not kept behind its boundary after a reorder).
 - Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, AutoCAD conformance fixtures.
 - Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
 - Grips: AutoCAD's hover menu. Its polyline choices (Add vertex, Remove vertex, Convert to arc or line) work as options of the grip's prompt, and Ctrl switches Stretch and Add vertex; Add vertex on an end vertex adds beyond the end.
