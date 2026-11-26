@@ -210,6 +210,7 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
         // No Crossing option: a click in empty space starts the window.
         let mut options = Options::<Swept>::new(message)
             .keyword("Fence", "F")
+            .keyword_in("trim", "Edge", "E")
             .keyword("mOde", "O");
         if changed > 0 {
             options = options.keyword("Undo", "U");
@@ -217,13 +218,21 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
         let doing = |shift: bool| if shift { mode.other() } else { mode };
         // Quick mode with every object as an edge erases what nothing divides.
         let erase = quick && edges.is_none();
+        let implied = ed.defaults().trim.get().edge_extend;
         let done = match ed.ask_object_or_sweep(options) {
             Err(Cancelled) | Ok(Answer::Enter) => return Ok(()),
             Ok(Answer::Keyword(word)) => match word.as_str() {
                 "Fence" => match ask_fence(ed)? {
-                    Some(path) => change_swept(ed, &edges, mode, Region::Fence(path), erase)? > 0,
+                    Some(path) => {
+                        let region = Region::Fence(path);
+                        change_swept(ed, &edges, mode, region, erase, implied)? > 0
+                    }
                     None => false,
                 },
+                "Edge" => {
+                    switch_edge(ed)?;
+                    false
+                }
                 "mOde" => {
                     if switch_mode(ed, &mut quick)? {
                         edges = choose_edges(ed, &mut quick, Vec::new(), mode)?;
@@ -237,15 +246,22 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
                 }
             },
             Ok(Answer::Value(Swept::Object(picked))) => {
-                change_one(ed, &edges, doing(picked.shift), picked, erase)?
+                change_one(ed, &edges, doing(picked.shift), picked, (erase, implied))?
             }
             Ok(Answer::Value(Swept::Missed { at, shift })) => {
                 let corners = ask_window(ed, at)?;
                 let region = Region::Crossing(corners);
-                change_swept(ed, &edges, doing(shift), region, erase)? > 0
+                change_swept(ed, &edges, doing(shift), region, erase, implied)? > 0
             }
             Ok(Answer::Value(Swept::Path { points, shift })) => {
-                change_swept(ed, &edges, doing(shift), Region::Fence(points), erase)? > 0
+                change_swept(
+                    ed,
+                    &edges,
+                    doing(shift),
+                    Region::Fence(points),
+                    erase,
+                    implied,
+                )? > 0
             }
         };
         if done {
@@ -324,19 +340,38 @@ fn switch_mode(ed: &Editor, quick: &mut bool) -> Result<bool, Cancelled> {
     Ok(true)
 }
 
-/// Trim or extend the picked object. Returns whether the drawing changed.
+/// The Edge option: whether edges act as if extended past their ends, the
+/// current choice by default. The choice is remembered (`EDGEMODE`).
+fn switch_edge(ed: &Editor) -> Result<(), Cancelled> {
+    let extend = ed.defaults().trim.get().edge_extend;
+    let options = Options::<String>::new(key!("Enter an implied edge extension mode"))
+        .keyword("Extend", "E")
+        .keyword("No extend", "N")
+        .default(if extend { "Extend" } else { "No extend" }.to_owned());
+    let now = match ed.ask_keyword(options)?.as_deref() {
+        Some("Extend") => true,
+        Some("No extend") => false,
+        _ => extend,
+    };
+    ed.defaults().trim.change(|m| m.edge_extend = now);
+    Ok(())
+}
+
+/// Trim or extend the picked object. `how` is whether to erase what no edge
+/// divides and whether edges are extended. Returns whether the drawing changed.
 fn change_one(
     ed: &Editor,
     edges: &Option<Vec<EntityId>>,
     mode: Mode,
     picked: Picked,
-    erase: bool,
+    how: (bool, bool),
 ) -> Result<bool, Cancelled> {
+    let (erase, implied) = how;
     let Picked { id, at, .. } = picked;
     let edges = edges.clone();
     let plan = ed.read(move |doc| {
         let target = doc.object(id)?;
-        let others = edges_for(doc, &edges, id);
+        let others = edges_for(doc, &edges, id, implied);
         let made = plan(mode, &target.entity, &others, at, erase);
         Some(made.map(|left| (target.attrs.clone(), left)))
     })?;
@@ -835,5 +870,125 @@ mod tests {
         state.answer_object(p(1.9, 0.0), Some(target), true);
         state.settle_command();
         assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(6.0, 0.0)));
+    }
+
+    /// A short vertical edge above the line, which a level line never meets
+    /// unless the edge is taken to run on.
+    fn short_edge(x: f64) -> Entity {
+        line(p(x, 3.0), p(x, 8.0))
+    }
+
+    /// Start `command` with the last object (the edge) selected beforehand.
+    fn with_the_edge_selected(
+        command: fn(&mut Editor) -> Result<(), Cancelled>,
+        entities: &[Entity],
+        extend_edges: bool,
+    ) -> AppState {
+        let mut state = AppState::new();
+        for e in entities {
+            state.add_entity(e.clone());
+        }
+        let edge = id(&state, entities.len() - 1);
+        state.select_ids([edge], false);
+        state
+            .defaults()
+            .trim
+            .change(|m| m.edge_extend = extend_edges);
+        state.start_command("Edit", command);
+        state.settle_command();
+        state
+    }
+
+    #[test]
+    fn a_trim_edge_that_does_not_reach_cuts_once_it_is_taken_to_run_on() {
+        let level = line(p(0.0, 0.0), p(10.0, 0.0));
+        let mut state =
+            with_the_edge_selected(trim_objects, &[level.clone(), short_edge(5.0)], true);
+        let target = id(&state, 0);
+        state.answer_object(p(7.0, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(5.0, 0.0)));
+        // Without the Edge option the same click finds nothing to cut against.
+        let mut state =
+            with_the_edge_selected(trim_objects, &[level.clone(), short_edge(5.0)], false);
+        let target = id(&state, 0);
+        state.answer_object(p(7.0, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], level);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("Object does not intersect an edge.")));
+    }
+
+    #[test]
+    fn an_extend_boundary_that_does_not_reach_stops_the_object_once_it_is_taken_to_run_on() {
+        let short = line(p(0.0, 0.0), p(2.0, 0.0));
+        let mut state =
+            with_the_edge_selected(extend_objects, &[short.clone(), short_edge(6.0)], true);
+        let target = id(&state, 0);
+        state.answer_object(p(1.9, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(6.0, 0.0)));
+        let mut state =
+            with_the_edge_selected(extend_objects, &[short.clone(), short_edge(6.0)], false);
+        let target = id(&state, 0);
+        state.answer_object(p(1.9, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], short);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("No boundary in the way.")));
+    }
+
+    #[test]
+    fn the_edge_option_sets_and_remembers_the_mode() {
+        let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(4.0)]);
+        assert!(state.cmd_prompt().options.iter().any(|o| o.label == "Edge"));
+        assert!(!state.defaults().trim.get().edge_extend);
+        state.cmd_submit("e");
+        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Enter an implied edge extension mode"));
+        state.cmd_submit("extend");
+        state.settle_command();
+        assert!(state.defaults().trim.get().edge_extend);
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Quick mode, select object to trim"));
+        // The prompt offers the current choice, and No extend turns it off.
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("n");
+        state.settle_command();
+        assert!(!state.defaults().trim.get().edge_extend);
+        // Enter keeps what was there.
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("");
+        state.settle_command();
+        assert!(!state.defaults().trim.get().edge_extend);
+    }
+
+    #[test]
+    fn a_fence_trims_against_an_edge_taken_to_run_on() {
+        let mut state = with_the_edge_selected(
+            trim_objects,
+            &[line(p(0.0, 0.0), p(10.0, 0.0)), short_edge(5.0)],
+            true,
+        );
+        state.cmd_submit("f");
+        state.settle_command();
+        state.answer_point(p(7.0, 2.0));
+        state.answer_point(p(7.0, -2.0));
+        state.cmd_submit("");
+        state.settle_command();
+        assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(5.0, 0.0)));
     }
 }

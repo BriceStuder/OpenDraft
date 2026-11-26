@@ -665,6 +665,7 @@
 
 # Ajuster, prolonger, couper, raccord, chanfrein, décaler
 "Enter a trim mode option": "Entrez une option de mode d'ajustement"
+"Enter an implied edge extension mode": "Entrez un mode de prolongement implicite des arêtes"
 "Specify first fence point": "Spécifiez le premier point du trajet"
 "Specify next fence point (Enter to finish)": "Spécifiez le point suivant du trajet (Entrée pour terminer)"
 "Specify first break point": "Spécifiez le premier point de coupure"
@@ -1080,6 +1081,7 @@
 "[Mlinestyles]": "styles de MultiLigne"
 "[Mode]": "Mode"
 "[mOde]": "mOde"
+"[No extend]": "PAs de prolongement"
 "[Move]": "Déplacer"
 "[MR]": "MD"
 "[MUltileaderstyles]": "styles de MUltirepère"
@@ -1188,6 +1190,7 @@
 "[Lookup]": "Consultation"
 "[plot: Center]": "Centrer"
 "[plot: Fit]": "Ajuster"
+"[trim: Edge]": "Arête"
 "[Point]": "POint"
 "[Polar]": "Polaire"
 "[Show all]": "Tout afficher"
