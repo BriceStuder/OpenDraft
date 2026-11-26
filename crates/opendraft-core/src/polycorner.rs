@@ -40,6 +40,8 @@ pub struct Rounded {
 pub struct Path {
     pub points: Vec<Point>,
     pub bulges: Vec<f64>,
+    /// Empty, or the width at each end of each segment.
+    pub widths: Vec<(f64, f64)>,
     pub closed: bool,
 }
 
@@ -51,15 +53,17 @@ impl Entity {
                 points,
                 closed,
                 bulges,
-                ..
+                widths,
             } => Some(Path {
                 points: points.clone(),
                 bulges: bulges.clone(),
+                widths: widths.clone(),
                 closed: *closed,
             }),
             Entity::Rectangle { min, max } => Some(Path {
                 points: corners(*min, *max).to_vec(),
                 bulges: Vec::new(),
+                widths: Vec::new(),
                 closed: true,
             }),
             _ => None,
@@ -125,15 +129,27 @@ struct Cut {
     ta: Point,
     tb: Point,
     step: f64,
-    /// How far the cut reaches along the segment before and after.
+    /// How far the cut reaches along the segment before and after (for
+    /// straight neighbours; an arc neighbour is checked by where it ends).
     before: f64,
     after: f64,
 }
 
+/// What leaves an output vertex.
+#[derive(Clone, Copy)]
+enum Leave {
+    /// Part of the original segment with this index, from this vertex to the
+    /// next one (the segment may have been shortened at either end).
+    Original(usize),
+    /// The step of a rounded corner, with its bulge.
+    Step(f64),
+}
+
 enum Item {
-    /// A vertex that stays, with the bulge of the segment leaving it.
-    Sharp(Point, f64),
-    Cut(Cut),
+    /// A vertex that stays, with the segment leaving it.
+    Sharp(Point, usize),
+    /// A rounded vertex, with the index of the segment that leaves it.
+    Cut(Cut, usize),
 }
 
 /// The cut at vertex `at` between `prev` and `next`, or `None` when the
@@ -181,19 +197,99 @@ fn cut_at(prev: Point, at: Point, next: Point, how: Round) -> Result<Option<Cut>
     }
 }
 
+/// One segment of the polyline as a line or an arc, for the general fillet.
+fn segment_entity(a: Point, b: Point, curve: f64) -> Option<Entity> {
+    match bulge::arc_of(a, b, curve) {
+        None => Some(Entity::Line { start: a, end: b }),
+        Some(s) => Some(Entity::Arc {
+            center: s.center,
+            radius: s.radius,
+            start: s.start,
+            end: s.end,
+        }),
+    }
+}
+
+/// The end of a trimmed line or arc that is not `far`, the end of the
+/// segment that stays where it was.
+fn near_end(piece: &Entity, far: Point) -> Option<Point> {
+    let (first, last) = match piece {
+        Entity::Line { start, end } => (*start, *end),
+        Entity::Arc {
+            center,
+            radius,
+            start,
+            end,
+        } => (
+            crate::arc::point_at(*center, *radius, *start),
+            crate::arc::point_at(*center, *radius, *end),
+        ),
+        _ => return None,
+    };
+    Some(if dist(first, far) <= dist(last, far) {
+        last
+    } else {
+        first
+    })
+}
+
+/// The fillet at vertex `at` where at least one neighbour is an arc, found by
+/// the fillet of the two segments as objects.
+fn arc_cut_at(
+    (prev, at, next): (Point, Point, Point),
+    (curve_in, curve_out): (f64, f64),
+    radius: f64,
+) -> Option<Cut> {
+    let incoming = segment_entity(prev, at, curve_in)?;
+    let outgoing = segment_entity(at, next, curve_out)?;
+    let middle = |a: Point, b: Point, k: f64| bulge::point_at(a, b, k, 0.5);
+    let joined = crate::fillet::fillet(
+        &incoming,
+        &outgoing,
+        radius,
+        middle(prev, at, curve_in),
+        middle(at, next, curve_out),
+    )
+    .ok()?;
+    let ta = near_end(&joined.a, prev)?;
+    let tb = near_end(&joined.b, next)?;
+    let step = match &joined.joint {
+        Some(Entity::Arc {
+            center,
+            radius,
+            start,
+            end,
+        }) => {
+            let from = crate::arc::point_at(*center, *radius, *start);
+            let forward = dist(from, ta) <= dist(crate::arc::point_at(*center, *radius, *end), ta);
+            bulge::from_sweep(crate::arc::sweep(*start, *end), forward)
+        }
+        _ => 0.0,
+    };
+    Some(Cut {
+        ta,
+        tb,
+        step,
+        before: 0.0,
+        after: 0.0,
+    })
+}
+
 /// Round or cut the corners of `path`. `only` limits it to one vertex, which
 /// must be a corner that fits; otherwise every corner that fits is done and
-/// the rest are counted in `skipped`.
+/// the rest are counted in `skipped`. A fillet next to an arc segment is
+/// found through the fillet of the two segments (a chamfer there is left).
 pub fn round_polyline(
     path: &Path,
     how: Round,
     only: Option<usize>,
 ) -> Result<Rounded, CornerError> {
     // Repeated points have no direction.
-    let mut kept: Vec<(Point, f64)> = Vec::new();
+    let mut kept: Vec<(Point, f64, (f64, f64))> = Vec::new();
     for (i, p) in path.points.iter().enumerate() {
         if kept.last().is_none_or(|last| dist(last.0, *p) > EPS) {
-            kept.push((*p, bulge::at(&path.bulges, i)));
+            let width = path.widths.get(i).copied().unwrap_or_default();
+            kept.push((*p, bulge::at(&path.bulges, i), width));
         }
     }
     if path.closed && kept.len() > 1 && dist(kept[0].0, kept[kept.len() - 1].0) <= EPS {
@@ -215,71 +311,127 @@ pub fn round_polyline(
     for v in 0..n {
         let interior = closed || (v > 0 && v < n - 1);
         let (prev, next) = ((v + n - 1) % n, (v + 1) % n);
-        // Only a vertex between two straight segments can be rounded.
-        let wanted = interior && straight(prev) && straight(v) && only.is_none_or(|o| o == v);
+        // Between two straight segments any rounding; next to an arc, a
+        // fillet only.
+        let bends = straight(prev) && straight(v);
+        let arcs_ok = matches!(how, Round::Fillet(_));
+        let wanted = interior && (bends || arcs_ok) && only.is_none_or(|o| o == v);
         if !wanted {
             if only == Some(v) {
                 return Err(CornerError::NotAdjacent);
             }
-            items.push(Item::Sharp(point(v), curve(v)));
+            items.push(Item::Sharp(point(v), v));
             continue;
         }
-        let Some(cut) = cut_at(point(prev), point(v), point(next), how)? else {
+        let found = if bends {
+            cut_at(point(prev), point(v), point(next), how)?
+        } else if let Round::Fillet(radius) = how {
+            arc_cut_at(
+                (point(prev), point(v), point(next)),
+                (curve(prev), curve(v)),
+                radius,
+            )
+        } else {
+            None
+        };
+        let Some(cut) = found else {
             if only.is_some() {
                 return Err(CornerError::NotAdjacent);
             }
-            items.push(Item::Sharp(point(v), curve(v)));
+            items.push(Item::Sharp(point(v), v));
             continue;
         };
         // The segment before vertex v is `prev`; the one after is `v`.
-        let fits =
-            used[prev] + cut.before <= len_of(prev) + EPS && used[v] + cut.after <= len_of(v) + EPS;
+        let fits = !bends
+            || (used[prev] + cut.before <= len_of(prev) + EPS
+                && used[v] + cut.after <= len_of(v) + EPS);
         if !fits {
             if only.is_some() {
                 return Err(CornerError::TooLong);
             }
             skipped += 1;
-            items.push(Item::Sharp(point(v), curve(v)));
+            items.push(Item::Sharp(point(v), v));
             continue;
         }
         used[prev] += cut.before;
         used[v] += cut.after;
         done += 1;
-        items.push(Item::Cut(cut));
+        items.push(Item::Cut(cut, v));
     }
+    let originals: Vec<(Point, Point, f64, (f64, f64))> = (0..n)
+        .map(|i| (point(i), point(i + 1), curve(i), kept[i].2))
+        .collect();
     Ok(Rounded {
-        pieces: vec![build(items, closed)],
+        pieces: vec![build(items, &originals, closed, !path.widths.is_empty())],
         done,
         skipped,
     })
 }
 
 /// The polyline the items make: a cut vertex becomes two points, the first
-/// carrying the bulge of the step between them.
-fn build(items: Vec<Item>, closed: bool) -> Entity {
-    let mut vertices: Vec<(Point, f64)> = Vec::new();
+/// carrying the step between them. `originals` are the segments as they were
+/// (start, end, bulge, widths); one that was shortened keeps its curve and
+/// its width where it still is, and a step takes the widths the segments
+/// beside it have where they meet it.
+fn build(
+    items: Vec<Item>,
+    originals: &[(Point, Point, f64, (f64, f64))],
+    closed: bool,
+    wide: bool,
+) -> Entity {
+    let mut vertices: Vec<(Point, Leave)> = Vec::new();
     for item in items {
         match item {
-            Item::Sharp(p, k) => vertices.push((p, k)),
-            Item::Cut(c) => {
-                vertices.push((c.ta, c.step));
-                vertices.push((c.tb, 0.0));
+            Item::Sharp(p, segment) => vertices.push((p, Leave::Original(segment))),
+            Item::Cut(c, v) => {
+                vertices.push((c.ta, Leave::Step(c.step)));
+                vertices.push((c.tb, Leave::Original(v)));
             }
         }
     }
     // A cut that uses a whole segment puts two points on one spot: keep one,
-    // with the bulge of the segment that leaves it.
-    let mut merged: Vec<(Point, f64)> = Vec::with_capacity(vertices.len());
-    for (p, k) in vertices {
+    // with what leaves the later of them.
+    let mut merged: Vec<(Point, Leave)> = Vec::with_capacity(vertices.len());
+    for (p, leave) in vertices {
         match merged.last_mut() {
-            Some(last) if dist(last.0, p) <= EPS => last.1 = k,
-            _ => merged.push((p, k)),
+            Some(last) if dist(last.0, p) <= EPS => last.1 = leave,
+            _ => merged.push((p, leave)),
         }
     }
     if closed && merged.len() > 1 && dist(merged[0].0, merged[merged.len() - 1].0) <= EPS {
         merged.pop();
     }
-    let (points, curves): (Vec<Point>, Vec<f64>) = merged.into_iter().unzip();
+    let m = merged.len();
+    // Each output segment's bulge and widths.
+    let mut curves = vec![0.0; m];
+    let mut thickness = vec![(0.0, 0.0); m];
+    for k in 0..m {
+        let (start, leave) = merged[k];
+        let end = merged[(k + 1) % m].0;
+        if let Leave::Original(i) = leave {
+            let (a, b, curve, (w0, w1)) = originals[i];
+            let (t0, t1) = (
+                bulge::nearest(a, b, curve, start).1,
+                bulge::nearest(a, b, curve, end).1,
+            );
+            curves[k] = bulge::part(curve, t0, t1);
+            thickness[k] = (w0 + (w1 - w0) * t0, w0 + (w1 - w0) * t1);
+        }
+    }
+    for k in 0..m {
+        if let Leave::Step(step) = merged[k].1 {
+            curves[k] = step;
+            let before = thickness[(k + m - 1) % m].1;
+            let after = thickness[(k + 1) % m].0;
+            thickness[k] = (before, after);
+        }
+    }
+    let points: Vec<Point> = merged.iter().map(|v| v.0).collect();
+    if !closed {
+        // The last point has no segment leaving it.
+        curves[m - 1] = 0.0;
+        thickness[m - 1] = (0.0, 0.0);
+    }
     Entity::Polyline {
         points,
         closed,
@@ -288,7 +440,7 @@ fn build(items: Vec<Item>, closed: bool) -> Entity {
         } else {
             Vec::new()
         },
-        widths: Vec::new(),
+        widths: if wide { thickness } else { Vec::new() },
     }
 }
 
@@ -308,6 +460,7 @@ mod tests {
         Path {
             points: points.to_vec(),
             bulges: Vec::new(),
+            widths: Vec::new(),
             closed,
         }
     }
@@ -466,24 +619,71 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_vertex_next_to_an_arc_segment_is_left_alone() {
-        // The first segment is a half circle: its end vertex has an arc on one side.
-        let shape = Path {
-            points: vec![p(0.0, 0.0), p(4.0, 0.0), p(4.0, 5.0), p(0.0, 5.0)],
-            bulges: vec![1.0, 0.0, 0.0, 0.0],
+    fn arc_then_leg() -> Path {
+        // A shallow arc from (0, 0) to (4, 0), then a straight leg up.
+        Path {
+            points: vec![p(0.0, 0.0), p(4.0, 0.0), p(4.0, 5.0)],
+            bulges: vec![0.3, 0.0, 0.0],
+            widths: Vec::new(),
             closed: false,
-        };
+        }
+    }
+
+    #[test]
+    fn a_fillet_next_to_an_arc_segment_trims_both_and_adds_the_step() {
+        let shape = arc_then_leg();
+        let done = round_polyline(&shape, Round::Fillet(0.5), Some(1)).unwrap();
+        assert_eq!(done.done, 1);
+        let (points, bulges, _) = parts(&done.pieces[0]);
+        assert_eq!(points.len(), 4, "the corner vertex became two points");
+        assert!(points[0] == p(0.0, 0.0) && points[3] == p(4.0, 5.0));
+        // The arc was shortened (still an arc), the step is an arc, the leg is straight.
+        assert!(bulges[0].abs() > 1e-9 && bulges[0].abs() < 0.3 + 1e-9);
+        assert!(bulges[1].abs() > 1e-9);
+        assert!(bulges[2].abs() < 1e-9);
+        // The step's ends are the fillet radius from the corner, near it.
+        assert!(dist(points[1], p(4.0, 0.0)) < 2.0 && dist(points[2], p(4.0, 0.0)) < 2.0);
+        // The leg now starts above the corner by about the reach.
+        assert!(points[2].y > 0.0 && (points[2].x - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_chamfer_next_to_an_arc_segment_is_left_alone() {
+        let shape = arc_then_leg();
+        let chamfer = Round::Chamfer(Chamfer::Distances(0.5, 0.5));
         assert_eq!(
-            round_polyline(&shape, Round::Fillet(0.5), Some(1)),
+            round_polyline(&shape, chamfer, Some(1)),
             Err(CornerError::NotAdjacent)
         );
-        // Vertex 2 is between two straight segments and rounds; the arc stays.
-        let done = round_polyline(&shape, Round::Fillet(0.5), None).unwrap();
-        assert_eq!(done.done, 1);
-        let (_, bulges, _) = parts(&done.pieces[0]);
-        assert_eq!(bulges[0], 1.0, "the original arc is kept");
-        assert!(bulges.iter().filter(|b| b.abs() > 1e-9).count() == 2);
+    }
+
+    #[test]
+    fn rounded_corners_keep_the_widths_of_the_segments_beside_them() {
+        let wide = Path {
+            points: vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0)],
+            bulges: Vec::new(),
+            widths: vec![(2.0, 4.0), (4.0, 6.0), (0.0, 0.0)],
+            closed: false,
+        };
+        let done = round_polyline(&wide, Round::Fillet(2.0), None).unwrap();
+        let Entity::Polyline { points, widths, .. } = &done.pieces[0] else {
+            panic!()
+        };
+        assert_eq!(points.len(), 4);
+        assert_eq!(widths.len(), 4);
+        // The first segment is cut 2 short of its end, so it ends narrower than 4.
+        assert!((widths[0].0 - 2.0).abs() < 1e-9 && (widths[0].1 - 3.6).abs() < 1e-9);
+        // The step joins the width where the first ends to where the second starts.
+        assert!((widths[1].0 - 3.6).abs() < 1e-9 && (widths[1].1 - 4.4).abs() < 1e-9);
+        assert!((widths[2].0 - 4.4).abs() < 1e-9 && (widths[2].1 - 6.0).abs() < 1e-9);
+        assert_eq!(widths[3], (0.0, 0.0));
+        // Thin polylines stay thin.
+        let thin = Path {
+            widths: Vec::new(),
+            ..wide
+        };
+        let done = round_polyline(&thin, Round::Fillet(2.0), None).unwrap();
+        assert!(matches!(&done.pieces[0], Entity::Polyline { widths, .. } if widths.is_empty()));
     }
 
     #[test]

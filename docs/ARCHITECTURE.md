@@ -1076,7 +1076,7 @@ arcs, see "Ellipses"), `spline` (NURBS curves, see "Splines"), `bulge` (polyline
 `intersect` (`Curve::{Segment,Circle,Arc,Ellipse}`, crossings, nearest point),
 `split` (Trim/Break), `extend`, `offset`, `corner` and `fillet` (two-curve
 corners; `Chamfer::{Distances,Angle}`), `polycorner` (rounding a whole
-polyline), `grip` (`Entity::grips`, `with_grip_moved`), `join`
+polyline; its widths are kept, and a fillet next to an arc segment is found through the fillet of the two segments), `grip` (`Entity::grips`, `with_grip_moved`), `join`
 (`join(&[Entity], tol) -> Vec<Merged>`), `polygon` (regular polygons about a
 centre or on an edge, for POLYGON), `array` (where array items go:
 `Placement`s and a measured `Path`) and `transform`.
