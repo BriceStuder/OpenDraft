@@ -80,7 +80,7 @@ fn updates(ui: &mut egui::Ui, theme: &Theme, draft: &mut Settings) {
         ui.add_space(6.0);
         ui.label(
             egui::RichText::new(
-                "The request carries OpenDraft's version number and, as any web request does,                  your internet address. No drawings or personal details are sent, and nothing                  is downloaded or installed: a newer version is only announced, and its                  release page opens when you click.",
+                "The request carries OpenDraft's version number and, as any web request does, your internet address. No drawings or personal details are sent, and nothing is downloaded or installed: a newer version is only announced, and its release page opens when you click.",
             )
             .color(theme.colors.text_weak),
         );
@@ -411,7 +411,7 @@ fn files(
         });
         ui.label(
             egui::RichText::new(
-                "For PDF and SVG plots of a new drawing, and of a drawing whose printer is not                  on this computer.",
+                "For PDF and SVG plots of a new drawing, and of a drawing whose printer is not on this computer.",
             )
             .size(theme.font_size_small)
             .color(theme.colors.text_weak),
