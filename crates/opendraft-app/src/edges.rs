@@ -12,6 +12,7 @@ use opendraft_core::{End, Entity, EntityId, Point};
 use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
+use crate::edges_options::{ask_crossing, erase_some, switch_edge, switch_project};
 use crate::edges_sweep::{ask_fence, ask_window, change_swept, edges_for, put_back};
 use opendraft_commands::Wording;
 
@@ -207,11 +208,14 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
         // Quick mode is named here, its only prompt; Standard mode was named
         // at the edge question.
         let message = object_prompt(mode, quick);
-        // No Crossing option: a click in empty space starts the window.
+        // A click in empty space starts the crossing window too.
         let mut options = Options::<Swept>::new(message)
             .keyword("Fence", "F")
+            .keyword("Crossing", "C")
+            .keyword("mOde", "O")
+            .keyword("Project", "P")
             .keyword_in("trim", "Edge", "E")
-            .keyword("mOde", "O");
+            .keyword("eRase", "R");
         if changed > 0 {
             options = options.keyword("Undo", "U");
         }
@@ -229,8 +233,20 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
                     }
                     None => false,
                 },
+                "Crossing" => match ask_crossing(ed)? {
+                    Some(region) => change_swept(ed, &edges, mode, region, erase, implied)? > 0,
+                    None => false,
+                },
                 "Edge" => {
                     switch_edge(ed)?;
+                    false
+                }
+                "Project" => {
+                    switch_project(ed)?;
+                    false
+                }
+                "eRase" => {
+                    erase_some(ed)?;
                     false
                 }
                 "mOde" => {
@@ -338,23 +354,6 @@ fn switch_mode(ed: &Editor, quick: &mut bool) -> Result<bool, Cancelled> {
     *quick = now;
     ed.defaults().trim.change(|m| m.quick = now);
     Ok(true)
-}
-
-/// The Edge option: whether edges act as if extended past their ends, the
-/// current choice by default. The choice is remembered (`EDGEMODE`).
-fn switch_edge(ed: &Editor) -> Result<(), Cancelled> {
-    let extend = ed.defaults().trim.get().edge_extend;
-    let options = Options::<String>::new(key!("Enter an implied edge extension mode"))
-        .keyword("Extend", "E")
-        .keyword("No extend", "N")
-        .default(if extend { "Extend" } else { "No extend" }.to_owned());
-    let now = match ed.ask_keyword(options)?.as_deref() {
-        Some("Extend") => true,
-        Some("No extend") => false,
-        _ => extend,
-    };
-    ed.defaults().trim.change(|m| m.edge_extend = now);
-    Ok(())
 }
 
 /// Trim or extend the picked object. `how` is whether to erase what no edge

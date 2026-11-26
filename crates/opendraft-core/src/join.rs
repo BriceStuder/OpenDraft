@@ -9,7 +9,13 @@
 //! As in AutoCAD, lines that all lie on one line join even where they do not
 //! touch: across a gap, overlapping or doubling back, they become the one line
 //! from end to end. That holds only when they are all the selection has to
-//! join; beside other objects, only ends that meet are joined.
+//! join; beside other objects, only ends that meet are joined. Likewise arcs
+//! of one circle join across a gap (see `join_gap.rs`), counter-clockwise from
+//! the first one.
+//!
+//! `tolerance` is how close ends must be to meet: the Fuzz distance. Ends
+//! that are not quite together, by more than a hair, are linked by a straight
+//! segment.
 
 use std::f64::consts::TAU;
 
@@ -93,14 +99,25 @@ impl Chain {
         }
     }
 
-    /// `other` added on, starting where this one ends.
+    /// `other` added on, starting where this one ends. When it starts a little
+    /// way off (within the Fuzz distance), a straight segment links them.
     fn append(&mut self, other: &Chain) {
         let n = self.points.len();
+        if distance(self.last(), other.first()) > TOUCH {
+            self.bulges[n - 1] = 0.0;
+            self.points.extend_from_slice(&other.points);
+            self.bulges.extend_from_slice(&other.bulges);
+            return;
+        }
         self.bulges[n - 1] = other.bulges[0];
         self.points.extend_from_slice(&other.points[1..]);
         self.bulges.extend_from_slice(&other.bulges[1..]);
     }
 }
+
+/// Ends this close are one point; farther apart (up to the tolerance), they
+/// are linked by a segment.
+const TOUCH: f64 = 1e-6;
 
 fn distance(a: Point, b: Point) -> f64 {
     (a.x - b.x).hypot(a.y - b.y)
@@ -136,6 +153,14 @@ pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
         used.sort_unstable();
         let entity = result(chain, closes, tolerance);
         made.push(Merged { used, entity });
+    }
+    // Arcs of one circle that the chains did not all take in join across the
+    // gap between them.
+    if let Some(round) = crate::join_gap::arcs_on_one_circle(items, tolerance) {
+        let covered: usize = made.iter().map(|m| m.used.len()).sum();
+        if covered < round.used.len() {
+            return vec![round];
+        }
     }
     made.extend(crate::ellipse::join::join_elliptical_arcs(items, tolerance));
     made

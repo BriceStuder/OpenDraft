@@ -17,18 +17,18 @@ Keep it current: when something here is built, delete its line in the same chang
 ## Modify commands
 
 - Spline editing: exact Trim, Extend, Break and Join (knot insertion, curve crossings), Offset (and with it ellipse offset) and Fillet.
-- Lengthen for elliptical arcs and splines; a remembered delta as the default.
+- Lengthen for splines and whole ellipses (elliptical arcs lengthen along their curve; the Angle option does not apply to them); the delta default lasts the session and is not saved.
 - PEDIT: Fit, Spline, Jointype and vertex Tangent (and `PLINECONVERTMODE`).
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
-- JOIN: arcs across gaps and the Close option (lines on one line already join across gaps), a Fuzz distance.
-- Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle), Chamfer's Method option, Undo inside Multiple; the fillet and chamfer variables are per user, not saved in the drawing.
-- Trim and Extend: the Project and eRase options, and a typed Crossing keyword at the object prompt (a click in empty space already starts the crossing window). The Edge option's implied extension covers lines, arcs, elliptical arcs and the ends of open polylines; other edges (splines, text) are used as they are.
-- Offset: the Exit and Undo options at its side prompt (Enter ends, and undo is the ordinary one: each copy is a step), and remembering the last distance.
-- Explode: hatches.
+- JOIN: elliptical arcs across gaps (lines on one line and arcs of one circle already join across gaps, the first object being the source), and the Fuzz option on a preselected set (it is asked only at the selection prompt). With Fuzz, ends that miss are linked by a straight segment, as for a polyline; AutoCAD's exact treatment of the gap was not compared.
+- Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle); the fillet and chamfer variables are per user, not saved in the drawing.
+- Trim and Extend: the Project option does nothing yet (all geometry is flat; the choice is kept as `PROJMODE`). The Edge option's implied extension covers lines, arcs, elliptical arcs and the ends of open polylines; other edges (splines, text) are used as they are.
+- Offset: Through is not remembered as the default (AutoCAD keeps it as a negative `OFFSETDIST`); the distance default is per user, not saved in the drawing.
+- Explode: solid and gradient hatches (AutoCAD gives 2D solids; there is no such object here, so they are left with a note). A pattern hatch explodes to its lines and points, with the hatch's layer and attributes.
 - Polyline widths: Trim, Break, Join, Offset, Fillet, Chamfer and Explode give a hairline polyline (only transforms, stretching, grips and Extend keep widths).
 - Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.
 - Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, a ribbon button, AutoCAD conformance fixtures.
-- Match Properties: the Settings option and dialog, window or crossing selection at the destination prompt.
+- Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), a window (not only crossing) selection at the destination prompt, and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
 - Grips: AutoCAD's hover menu and the middle-grip options (Add or Remove Vertex, Convert to Arc).
 
 ## Selection, snapping and input
@@ -170,6 +170,8 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
+- **JOIN's Close and Fuzz, and arcs across a gap:** follow AutoCAD from memory (source-first, counter-clockwise; Close offered for a lone arc, elliptical arc or open polyline); not compared with AutoCAD or tried in the running app. The same holds for Explode of a pattern hatch (the lines cut to the boundary, not compared with AutoCAD's), Match Properties' Settings, and Trim and Extend's Crossing, Project and eRase.
+- **Offset's Exit, Undo and remembered distance:** the prompts follow AutoCAD from memory (`[Exit/Undo]` at the object prompt, `[Exit/Multiple/Undo]` at the side prompt, the last distance as the default); not compared with AutoCAD, and not tried in the running app.
 - **BEDIT and BSAVE by hand:** the Block Editor now keeps each object's block id as its id (`Document::add_with_id`) and BSAVE reads it back. Tests drive BEDIT, BSAVE and BCLOSE through `AppState` and check the ids, but nobody has used it in the running app since the change.
 - **Dynamic block authoring by hand:** tried 24-11-2026 in the running app (Windows, dark theme): -BLOCK of a bar and a post, BEDIT, BPARAMETER and BACTION (Stretch) by typing, the schema overlay (orange parameter line with ticks and name, the Stretch1 label and its frame), the Dynamic ribbon panel and its icons, BSAVE and BCLOSE, selecting the reference (two grips: the insertion grip and the parameter's end grip, both drawn as an ordinary grip), dragging the end grip with the mouse (the ghost and the result shortened the bar and carried the post), undo, save as `.odraft` and reopen (the stretched reference came back stretched), and RESETBLOCK from the Insert tab. Tried again after M4: the Custom section in Properties (the reopened file showed 2.0000; typing 3.5 stretched the bar and said "Changed Distance1") and the diamond grip. Not tried: the light theme, a list or increment value set, a rotated, mirrored or scaled insert, a typed point for the grip (a typed point at a grip stretch is relative to the grip, as for any grip), Move actions, several inserts, BEDIT of a dynamic block that already has values, and a large drawing.
 - **Dynamic block evaluation and export against AutoCAD:** evaluation, the grip and the DXF export were tried in the running app (see the authoring and imported-block lines), and a DXF written from a dynamic block was reopened in OpenDraft only, not opened in AutoCAD (the same owed check as the other DXF notes). Evaluated pictures were compared with AutoCAD's own anonymous blocks only for the three linear-stretch instances in `dyn_blocks_2`; other kinds of parameter and action are not built, so they are not compared.

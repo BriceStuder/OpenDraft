@@ -1,7 +1,8 @@
 //! Lengthening or shortening an entity by an amount, the base for LENGTHEN.
 //! (Extending to a boundary is `extend`.) A line keeps its direction, an arc
 //! its circle, and an open polyline changes its first or last segment the same
-//! way. Ellipses and splines are not handled yet.
+//! way. An elliptical arc is lengthened along its curve (`lengthen_ellipse.rs`).
+//! A full ellipse and splines are not handled yet.
 
 use std::f64::consts::TAU;
 
@@ -20,14 +21,15 @@ enum Growth {
 }
 
 impl Entity {
-    /// The length of a line, an arc or an open polyline; `None` for any other
-    /// object.
+    /// The length of a line, an arc, an elliptical arc or an open polyline;
+    /// `None` for any other object.
     pub fn curve_length(&self) -> Option<f64> {
         match self {
             Entity::Line { start, end } => Some((end.x - start.x).hypot(end.y - start.y)),
             Entity::Arc {
                 radius, start, end, ..
             } => Some(radius.abs() * arc::sweep(*start, *end)),
+            Entity::Ellipse(e) if !e.is_full() => Some(e.arc_length()),
             Entity::Polyline {
                 points,
                 closed: false,
@@ -59,6 +61,7 @@ impl Entity {
                 arc::point_at(*center, *radius, *start),
                 arc::point_at(*center, *radius, *end),
             ),
+            Entity::Ellipse(e) if !e.is_full() => (e.start_point(), e.end_point()),
             Entity::Polyline {
                 points,
                 closed: false,
@@ -134,6 +137,7 @@ impl Entity {
                 };
                 self.lengthened_by_angle(end, new_sweep - arc::sweep(*start, *stop))
             }
+            Entity::Ellipse(e) => e.lengthened_to(end, p).map(Entity::Ellipse),
             Entity::Polyline {
                 points,
                 closed: false,
@@ -148,6 +152,11 @@ impl Entity {
 
     fn grown(&self, end: End, growth: Growth) -> Option<Entity> {
         match self {
+            // An angle of an ellipse is not a length along it.
+            Entity::Ellipse(e) => match growth {
+                Growth::Length(delta) => e.lengthened(end, delta).map(Entity::Ellipse),
+                Growth::Angle(_) => None,
+            },
             Entity::Line { start, end: stop } => {
                 let Growth::Length(delta) = growth else {
                     return None;

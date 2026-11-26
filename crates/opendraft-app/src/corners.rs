@@ -30,15 +30,17 @@ impl Kind {
 /// FILLET: round the corner of two objects (lines, arcs, circles, construction lines, rays) with an arc
 /// of the current radius, or two segments of one polyline. Options set the
 /// radius, whether the objects are trimmed back to the arc, round every
-/// vertex of a polyline (Polyline), and carry on with more corners (Multiple).
-/// Shift on the second pick joins them at a sharp corner instead.
+/// vertex of a polyline (Polyline), and carry on with more corners (Multiple,
+/// where Undo takes back the last corner). Shift on the second pick joins them
+/// at a sharp corner instead.
 pub fn fillet_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     join_corners(ed, Kind::Fillet)
 }
 
 /// CHAMFER: cut the corner of two lines (or two segments of a polyline) with
 /// a straight line, by two distances or by a length and an angle. Options as
-/// for FILLET. Shift on the second pick joins them at a sharp corner.
+/// for FILLET, and Method chooses between distances and length and angle.
+/// Shift on the second pick joins them at a sharp corner.
 pub fn chamfer_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     join_corners(ed, Kind::Chamfer)
 }
@@ -74,36 +76,49 @@ fn first_object(kind: Kind, m: &Memory) -> Options<Picked> {
 }
 
 fn join_corners(ed: &mut Editor, kind: Kind) -> Result<(), Cancelled> {
-    let mut multiple = false;
+    let (mut multiple, mut made) = (false, 0_usize);
     loop {
         let m = ed.defaults().corner.get();
         let mut options = first_object(kind, &m);
         options = match kind {
             Kind::Fillet => options.keyword("Radius", "R"),
-            Kind::Chamfer => options.keyword("Distance", "D").keyword("Angle", "A"),
+            Kind::Chamfer => options
+                .keyword("Distance", "D")
+                .keyword("Angle", "A")
+                .keyword("mEthod", "E"),
         };
         options = options.keyword("Polyline", "P").keyword("Trim", "T");
         if !multiple {
             options = options.keyword("Multiple", "M");
+        } else if made > 0 {
+            options = options.keyword("Undo", "U");
         }
         match ed.ask_object(options) {
             Err(Cancelled) | Ok(Answer::Enter) => return Ok(()),
             Ok(Answer::Keyword(k)) => match k.as_str() {
                 "Polyline" => {
-                    if round_whole_polyline(ed, kind)? && !multiple {
-                        return Ok(());
+                    if round_whole_polyline(ed, kind)? {
+                        if !multiple {
+                            return Ok(());
+                        }
+                        made += 1;
                     }
                 }
                 "Multiple" => multiple = true,
+                "Undo" => {
+                    ed.undo()?;
+                    made -= 1;
+                }
                 _ => change_setting(ed, &k, &m)?,
             },
             Ok(Answer::Value(first)) => {
-                if !join_second(ed, kind, first)? {
+                let Some(changed) = join_second(ed, kind, first)? else {
                     return Ok(());
-                }
+                };
                 if !multiple {
                     return Ok(());
                 }
+                made += usize::from(changed);
             }
         }
     }
@@ -147,6 +162,18 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
                 m.by_angle = true;
             });
         }
+        "mEthod" => {
+            let current = if m.by_angle { "Angle" } else { "Distance" };
+            let answer = ed.get_keyword(
+                Options::<String>::new(key!("Enter trim method"))
+                    .keyword("Distance", "D")
+                    .keyword("Angle", "A")
+                    .default(current.to_owned()),
+            )?;
+            ed.defaults()
+                .corner
+                .change(|m| m.by_angle = answer == "Angle");
+        }
         "Trim" => {
             let current = if m.trim { "Trim" } else { "No trim" };
             let answer = ed.get_keyword(
@@ -162,17 +189,17 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
     Ok(())
 }
 
-/// Ask for the second object and join. Returns whether to carry on (`false`
-/// when the user ended the command).
-fn join_second(ed: &Editor, kind: Kind, first: Picked) -> Result<bool, Cancelled> {
+/// Ask for the second object and join. `None` when the user ended the
+/// command; otherwise whether the drawing changed.
+fn join_second(ed: &Editor, kind: Kind, first: Picked) -> Result<Option<bool>, Cancelled> {
     loop {
         let second = match ed.ask_object(Options::<Picked>::new(key!("Select second object"))) {
-            Err(Cancelled) | Ok(Answer::Enter) | Ok(Answer::Keyword(_)) => return Ok(false),
+            Err(Cancelled) | Ok(Answer::Enter) | Ok(Answer::Keyword(_)) => return Ok(None),
             Ok(Answer::Value(second)) => second,
         };
         match join_pair(ed, kind, first, second)? {
             Outcome::Retry => continue,
-            Outcome::Finished => return Ok(true),
+            Outcome::Finished(changed) => return Ok(Some(changed)),
         }
     }
 }
@@ -180,7 +207,8 @@ fn join_second(ed: &Editor, kind: Kind, first: Picked) -> Result<bool, Cancelled
 enum Outcome {
     /// Ask for the second object again.
     Retry,
-    Finished,
+    /// Done with these two; whether the drawing changed.
+    Finished(bool),
 }
 
 /// What joining two picked objects does to the drawing.
@@ -264,7 +292,7 @@ fn join_pair(ed: &Editor, kind: Kind, first: Picked, second: Picked) -> Result<O
         Some((a.entity.clone(), b.entity.clone(), a.attrs.clone()))
     })?;
     let Some((a, b, attrs)) = read else {
-        return Ok(Outcome::Finished);
+        return Ok(Outcome::Finished(false));
     };
     let same = first.id == second.id;
     let plan = match plan_pair(
@@ -283,14 +311,15 @@ fn join_pair(ed: &Editor, kind: Kind, first: Picked, second: Picked) -> Result<O
         }
         Err(Some(why)) => {
             ed.say(why);
-            return Ok(Outcome::Finished);
+            return Ok(Outcome::Finished(false));
         }
     };
-    apply(ed, kind, first.id, second.id, attrs, plan)?;
-    Ok(Outcome::Finished)
+    let changed = apply(ed, kind, first.id, second.id, attrs, plan)?;
+    Ok(Outcome::Finished(changed))
 }
 
-/// Make the change in the drawing, as one undo step.
+/// Make the change in the drawing, as one undo step. Returns whether there was
+/// one to make.
 fn apply(
     ed: &Editor,
     kind: Kind,
@@ -298,13 +327,13 @@ fn apply(
     id_b: EntityId,
     attrs: opendraft_core::Attributes,
     plan: Plan,
-) -> Result<(), Cancelled> {
+) -> Result<bool, Cancelled> {
     let trim = ed.defaults().corner.get().trim;
     match plan {
         Plan::Pair(joined) => {
             if !trim && joined.joint.is_none() {
                 ed.say(key!("Nothing to do: no trim and no joining piece."));
-                return Ok(());
+                return Ok(false);
             }
             ed.transaction(kind.name(), move |tx| {
                 if trim {
@@ -316,11 +345,12 @@ fn apply(
                     tx.add_with(vec![(joint, attrs)]);
                 }
                 Ok(())
-            })
+            })?;
+            Ok(true)
         }
         Plan::Replace(mut pieces) => {
             if pieces.is_empty() {
-                return Ok(());
+                return Ok(false);
             }
             ed.transaction(kind.name(), move |tx| {
                 let first = pieces.remove(0);
@@ -329,7 +359,8 @@ fn apply(
                     tx.add_with(pieces.into_iter().map(|e| (e, attrs.clone())).collect());
                 }
                 Ok(())
-            })
+            })?;
+            Ok(true)
         }
     }
 }
@@ -377,8 +408,7 @@ fn round_whole_polyline(ed: &Editor, kind: Kind) -> Result<bool, Cancelled> {
         Wording::new(key!("%{done} done."), &[])
     };
     ed.say(said.part("done", corners(done.done)));
-    apply(ed, kind, id, id, attrs, Plan::Replace(done.pieces))?;
-    Ok(true)
+    apply(ed, kind, id, id, attrs, Plan::Replace(done.pieces))
 }
 
 #[cfg(test)]
@@ -761,5 +791,60 @@ mod tests {
         state.start_command("Corner", fillet_objects);
         state.settle_command();
         assert!(state.cmd_prompt().text.contains("Radius = 7"));
+    }
+
+    fn offers(state: &mut AppState, label: &str) -> bool {
+        state.cmd_prompt().options.iter().any(|o| o.label == label)
+    }
+
+    #[test]
+    fn undo_in_multiple_takes_back_the_last_corner() {
+        let two_corners = [
+            line(p(0.0, 0.0), p(10.0, 0.0)),
+            line(p(0.0, 0.0), p(0.0, 10.0)),
+            line(p(20.0, 0.0), p(30.0, 0.0)),
+            line(p(20.0, 0.0), p(20.0, 10.0)),
+        ];
+        let mut state = started(&two_corners, chamfer_objects, &["d", "1", "1", "m"]);
+        assert!(!offers(&mut state, "Undo"), "nothing to undo yet");
+        click(&mut state, 0, p(5.0, 0.0));
+        click(&mut state, 1, p(0.0, 5.0));
+        assert!(offers(&mut state, "Undo") && !offers(&mut state, "Multiple"));
+        let one_done = entities(&state);
+        click(&mut state, 2, p(25.0, 0.0));
+        click(&mut state, 3, p(20.0, 5.0));
+        assert_eq!(entities(&state).len(), 6);
+        state.cmd_submit("u");
+        state.settle_command();
+        assert_eq!(entities(&state), one_done, "only the second corner went");
+        state.cmd_submit("u");
+        state.settle_command();
+        assert_eq!(entities(&state).len(), 4);
+        assert!(!offers(&mut state, "Undo"));
+    }
+
+    #[test]
+    fn method_switches_the_chamfer_between_distances_and_length_and_angle() {
+        let mut state = started(&axes(), chamfer_objects, &[]);
+        assert!(offers(&mut state, "mEthod"));
+        assert!(!state.defaults().corner.get().by_angle);
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("a");
+        state.settle_command();
+        assert!(state.defaults().corner.get().by_angle);
+        assert!(state.cmd_prompt().text.contains("Length"));
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("");
+        state.settle_command();
+        assert!(state.defaults().corner.get().by_angle, "Enter keeps it");
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("d");
+        state.settle_command();
+        assert!(!state.defaults().corner.get().by_angle);
+        let mut fillet = started(&axes(), fillet_objects, &[]);
+        assert!(!offers(&mut fillet, "mEthod"));
     }
 }

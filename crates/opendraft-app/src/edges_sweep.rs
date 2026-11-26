@@ -351,11 +351,6 @@ mod tests {
         state.cmd_submit("");
         state.settle_command();
         assert!(tops_gone(&state), "got {:?}", entities(&state));
-        let options = state.cmd_prompt().options;
-        assert!(
-            !options.iter().any(|o| o.label == "Crossing"),
-            "a click starts it"
-        );
     }
 
     #[test]
