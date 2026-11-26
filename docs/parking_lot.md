@@ -162,7 +162,6 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 ## Code
 
-- `dxf/read.rs` is over the file-size limit (listed in `opendraft-app/tests/file_sizes.rs`; it may not grow): split it into tokenizer, tables and entities.
 - Document mutators (`push`, `insert`, `push_layer`, `replace_attrs`) return `Result`, so release builds also reject a bad edit at the call.
 - Performance detail settings (planned in the entity layer cache work, phases 2.6 and 2.7): the skip-tiny-objects threshold (`MIN_DRAW_PX` is a constant), curve smoothness, anti-aliasing, small-text and dense-hatch thresholds; a margin around the kept picture so a fast pan shows no blank strip.
 - Performance leftovers: a dimension's or insert's picture is rebuilt every frame it is on screen (2,000 dimensions in view: 14 ms), dashes are rebuilt every paint, and the spatial index's own leftovers (`docs/ARCHITECTURE.md`).
