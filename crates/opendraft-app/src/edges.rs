@@ -25,21 +25,11 @@ pub fn trim_plan(
     cutters: &[Entity],
     at: Point,
 ) -> Result<Vec<Entity>, &'static str> {
-    if matches!(target, Entity::Spline(_)) {
-        return Err(key!("TRIM does not support splines yet."));
-    }
     let crossings: Vec<Point> = cutters
         .iter()
         .flat_map(|cutter| target.intersections(cutter))
         .collect();
     if crossings.is_empty() {
-        let near = target.bounds();
-        if cutters
-            .iter()
-            .any(|c| matches!(c, Entity::Spline(_)) && c.bounds().intersects(&near))
-        {
-            return Err(key!("Splines cannot be cutting edges yet."));
-        }
         return Err(NO_EDGE);
     }
     let pieces = target.split_at(&crossings);
@@ -52,7 +42,13 @@ pub fn trim_plan(
     // Cut again only at the crossings that bound the clicked piece, so the
     // rest stays whole: a line trimmed at one end is shortened, not broken
     // at every other crossing as well (and can be trimmed there next).
-    let tolerance = 1e-9 * (1.0 + at.x.abs().max(at.y.abs()));
+    let mut tolerance = 1e-9 * (1.0 + at.x.abs().max(at.y.abs()));
+    if matches!(target, Entity::Spline(_)) {
+        // A crossing with a spline is found along short segments, a hair off
+        // the curve itself.
+        let b = target.bounds();
+        tolerance = tolerance.max((b.max.x - b.min.x).hypot(b.max.y - b.min.y) * 1e-3);
+    }
     let bounds: Vec<Point> = crossings
         .into_iter()
         .filter(|c| pieces[nearest].distance_to(*c) <= tolerance)
@@ -156,15 +152,10 @@ pub fn extend_plan(
     } else {
         End::End
     };
-    let splines = boundaries.iter().any(|b| matches!(b, Entity::Spline(_)));
     target
         .extended_to(end, boundaries)
         .map(|longer| vec![longer])
-        .ok_or(if splines {
-            key!("No boundary in the way (splines cannot be boundary edges yet).")
-        } else {
-            key!("No boundary in the way.")
-        })
+        .ok_or(key!("No boundary in the way."))
 }
 
 /// Which of the two commands is running.
@@ -503,29 +494,53 @@ mod tests {
         );
     }
 
+    fn arch() -> Entity {
+        // Over the top of an arch from (-6, 0) to (6, 0), peaking near y = 4.
+        Entity::Spline(Box::new(
+            opendraft_core::Spline::from_control_points(
+                3,
+                vec![p(-6.0, 0.0), p(-4.0, 6.0), p(4.0, 6.0), p(6.0, 0.0)],
+            )
+            .unwrap(),
+        ))
+    }
+
     #[test]
-    fn splines_are_refused_by_name_as_objects_and_as_edges() {
-        let s = Entity::Spline(Box::new(
-            opendraft_core::Spline::from_control_points(1, vec![p(-5.0, 0.0), p(5.0, 0.0)])
-                .unwrap(),
-        ));
+    fn a_spline_is_trimmed_at_its_crossings_and_stays_a_spline() {
+        let (left, right) = (wall(-2.0), wall(2.0));
+        let made = trim_plan(&arch(), &[left, right], p(0.0, 4.5)).unwrap();
+        // The middle goes: the two feet are left, both still splines.
+        assert_eq!(made.len(), 2);
+        assert!(made.iter().all(|e| matches!(e, Entity::Spline(_))));
+        let near = |a: Point, b: Point| (a.x - b.x).hypot(a.y - b.y) < 1e-3;
+        let (Entity::Spline(a), Entity::Spline(b)) = (&made[0], &made[1]) else {
+            panic!()
+        };
+        assert!(near(a.start_point(), p(-6.0, 0.0)) && near(b.end_point(), p(6.0, 0.0)));
+        assert!((a.end_point().x + 2.0).abs() < 1e-3);
+        assert!((b.start_point().x - 2.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_spline_is_a_cutting_edge_for_a_line() {
+        let across = line(p(0.0, -5.0), p(0.0, 9.0));
+        let made = trim_plan(&across, std::slice::from_ref(&arch()), p(0.0, -4.0)).unwrap();
+        assert_eq!(made.len(), 1);
+        let Entity::Line { start, end } = &made[0] else {
+            panic!("{made:?}")
+        };
+        // The part under the arch's crest is cut away, the part above stays.
+        assert!((start.y - 4.5).abs() < 0.1 && (end.y - 9.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_spline_is_a_boundary_for_extend_but_not_itself_extended() {
+        let short = line(p(0.0, 5.5), p(0.0, 6.5));
+        let made = extend_plan(&short, &[arch()], p(0.0, 5.5)).unwrap();
+        assert!(matches!(made[0], Entity::Line { .. }));
         assert_eq!(
-            trim_plan(&s, &[wall(0.0)], p(1.0, 0.0)),
-            Err("TRIM does not support splines yet.")
-        );
-        assert_eq!(
-            extend_plan(&s, &[wall(9.0)], p(4.0, 0.0)),
+            extend_plan(&arch(), &[wall(9.0)], p(4.0, 0.0)),
             Err("EXTEND does not support splines yet.")
-        );
-        let across = line(p(0.0, -5.0), p(0.0, 5.0));
-        assert_eq!(
-            trim_plan(&across, std::slice::from_ref(&s), p(0.0, 1.0)),
-            Err("Splines cannot be cutting edges yet.")
-        );
-        let short = line(p(0.0, -5.0), p(0.0, -3.0));
-        assert_eq!(
-            extend_plan(&short, &[s], p(0.0, -3.0)),
-            Err("No boundary in the way (splines cannot be boundary edges yet).")
         );
     }
 

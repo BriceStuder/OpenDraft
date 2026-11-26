@@ -27,7 +27,10 @@ impl Entity {
     /// - A boundary has to exist where it is met: extending does not
     ///   lengthen the boundary too.
     pub fn extended_to(&self, end: End, boundaries: &[Entity]) -> Option<Entity> {
-        let walls: Vec<Curve> = boundaries.iter().flat_map(Entity::curves).collect();
+        let walls: Vec<Curve> = boundaries
+            .iter()
+            .flat_map(Entity::crossing_curves)
+            .collect();
         match self {
             Entity::Line { start, end: stop } => {
                 let (base, tip) = match end {

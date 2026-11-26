@@ -28,9 +28,14 @@ impl Entity {
     /// A circle becomes an arc, a full ellipse an elliptical arc, a rectangle
     /// an open polyline.
     pub fn break_between(&self, first: Point, second: Point) -> Option<Vec<Entity>> {
-        // Not cut yet: that needs knot insertion.
-        if matches!(self, Entity::Spline(_)) {
-            return None;
+        if let Entity::Spline(s) = self {
+            let pieces = s.break_between(first, second)?;
+            return Some(
+                pieces
+                    .into_iter()
+                    .map(|piece| Entity::Spline(Box::new(piece)))
+                    .collect(),
+            );
         }
         if self.infinite_line().is_some() {
             let pieces = self.long_line().break_between(first, second)?;

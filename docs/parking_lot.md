@@ -16,7 +16,7 @@ Keep it current: when something here is built, delete its line in the same chang
 
 ## Modify commands
 
-- Spline editing: exact Trim, Extend, Break and Join (knot insertion, curve crossings), Offset (and with it ellipse offset) and Fillet.
+- Spline editing: Break, Trim and Join of splines are built (a cut is exact, by knot insertion; where a cutting edge crosses a spline is found along short segments within a ten-thousandth of its size, not as exact roots; a periodic spline cannot be cut; splines join only with splines of one degree). Still missing: Extend of a spline (continuing its curve), Join with lines, arcs and polylines, Offset (and with it ellipse offset) and Fillet.
 - Lengthen for splines and whole ellipses (elliptical arcs lengthen along their curve; the Angle option does not apply to them); the delta default lasts the session and is not saved.
 - PEDIT: vertex Tangent, and keeping a curve's frame: Fit and Spline give plain geometry (arcs, or short straight segments), so Decurve straightens what is there and does not bring the original vertices back; Fit takes each tangent from the chord across the vertex, which Tangent would set; a spline converts only to straight segments (`PLINECONVERTMODE` is not read), and PEDIT's Multiple does not convert splines.
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.

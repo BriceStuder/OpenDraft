@@ -153,6 +153,9 @@ fn distance(a: Point, b: Point) -> f64 {
 /// meet is closed. Lines that are all on one line join whether they meet or
 /// not (see the module notes).
 pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
+    if items.iter().any(|e| matches!(e, Entity::Spline(_))) {
+        return join_splines(items, tolerance);
+    }
     if let Some(line) = on_one_line(items, tolerance) {
         return vec![line];
     }
@@ -195,6 +198,49 @@ pub fn join(items: &[Entity], tolerance: f64) -> Vec<Merged> {
         }
     }
     made.extend(elliptical);
+    made
+}
+
+/// Splines among `items` that meet end to end, each run as one spline (see
+/// `Spline::joined`). Only for a selection of splines and things JOIN cannot
+/// use: beside lines, arcs and polylines the app refuses splines.
+fn join_splines(items: &[Entity], tolerance: f64) -> Vec<Merged> {
+    let mut taken = vec![false; items.len()];
+    let mut made = Vec::new();
+    for seed in 0..items.len() {
+        let Entity::Spline(first) = &items[seed] else {
+            continue;
+        };
+        if taken[seed] {
+            continue;
+        }
+        taken[seed] = true;
+        let (mut run, mut used) = ((**first).clone(), vec![seed]);
+        'grow: loop {
+            for (i, item) in items.iter().enumerate() {
+                let Entity::Spline(other) = item else {
+                    continue;
+                };
+                if taken[i] {
+                    continue;
+                }
+                if let Some(longer) = run.joined(other, tolerance) {
+                    run = longer;
+                    taken[i] = true;
+                    used.push(i);
+                    continue 'grow;
+                }
+            }
+            break;
+        }
+        if used.len() > 1 {
+            used.sort_unstable();
+            made.push(Merged {
+                used,
+                entity: Entity::Spline(Box::new(run)),
+            });
+        }
+    }
     made
 }
 
