@@ -61,6 +61,7 @@ pub(super) fn modify() -> Panel {
             ),
             item("modify.join", "Join", icons::MODIFY_JOIN),
             item("modify.lengthen", "Lengthen", icons::MODIFY_LENGTHEN),
+            item("modify.overkill", "Overkill", icons::MODIFY_OVERKILL),
             item("modify.pedit", "Edit Polyline", icons::MODIFY_PEDIT),
             item("modify.hatchedit", "Edit Hatch", icons::MODIFY_HATCHEDIT),
         ],

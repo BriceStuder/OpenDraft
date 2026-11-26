@@ -94,6 +94,50 @@ pub(crate) fn join_elliptical_arcs(items: &[Entity], tolerance: f64) -> Vec<Merg
     made
 }
 
+/// The one arc (or whole ellipse) that covers every elliptical arc of
+/// `items`, when the objects JOIN can use are at least two elliptical arcs,
+/// all of one ellipse, meeting or not. As for circular arcs the first is the
+/// source: the result starts where it does and runs counter-clockwise until it
+/// has covered the others, across any gap.
+pub(crate) fn elliptical_arcs_across_gaps(items: &[Entity], tolerance: f64) -> Option<Merged> {
+    let mut arcs: Vec<(usize, Ellipse)> = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        match item {
+            Entity::Ellipse(e) if !e.is_full() => arcs.push((i, *e)),
+            Entity::Line { .. } | Entity::Arc { .. } | Entity::Polyline { closed: false, .. } => {
+                return None
+            }
+            _ => {}
+        }
+    }
+    let &(_, source) = arcs.first()?;
+    if arcs.len() < 2 || arcs.iter().any(|(_, e)| !source.same_ellipse(e, tolerance)) {
+        return None;
+    }
+    // How far round from the source's start each arc ends, counter-clockwise.
+    let reach = arcs
+        .iter()
+        .map(|(_, e)| {
+            (source.parameter_of(e.start_point()) - source.start).rem_euclid(TAU) + e.sweep()
+        })
+        .fold(0.0, f64::max);
+    let made = if reach >= TAU - 1e-9 {
+        Ellipse::full(source.center, source.major_axis, source.radius_ratio)
+    } else {
+        Ellipse::new(
+            source.center,
+            source.major_axis,
+            source.radius_ratio,
+            source.start,
+            source.start + reach,
+        )
+    };
+    Some(Merged {
+        used: arcs.iter().map(|(i, _)| *i).collect(),
+        entity: Entity::Ellipse(made.ok()?),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::f64::consts::{FRAC_PI_2, PI};
@@ -133,12 +177,39 @@ mod tests {
     }
 
     #[test]
-    fn arcs_of_other_ellipses_or_with_a_gap_do_not_join() {
+    fn arcs_of_other_ellipses_or_with_a_gap_do_not_meet() {
         let items = [
             piece(p(4.0, 0.0), 0.0, 1.0),
             piece(p(0.0, 4.0), 1.0, 2.0),
             piece(p(4.0, 0.0), 1.5, 2.0),
         ];
         assert!(join_elliptical_arcs(&items, 1e-6).is_empty());
+    }
+
+    #[test]
+    fn arcs_of_one_ellipse_join_across_a_gap_from_the_source() {
+        let axis = p(4.0, 0.0);
+        let items = [piece(axis, 0.0, 1.0), piece(axis, 2.0, 3.0)];
+        let made = elliptical_arcs_across_gaps(&items, 1e-6).unwrap();
+        assert_eq!(made.used, vec![0, 1]);
+        let Entity::Ellipse(e) = made.entity else {
+            panic!()
+        };
+        assert!(e.start.abs() < 1e-9 && (e.end - 3.0).abs() < 1e-9, "{e:?}");
+        // The other way round: from the second's start, round past the first.
+        let made =
+            elliptical_arcs_across_gaps(&[items[1].clone(), items[0].clone()], 1e-6).unwrap();
+        let Entity::Ellipse(e) = made.entity else {
+            panic!()
+        };
+        assert!((e.start - 2.0).abs() < 1e-9);
+        assert!(
+            (e.sweep() - (TAU - 2.0 + 1.0)).abs() < 1e-9,
+            "{}",
+            e.sweep()
+        );
+        // Another ellipse, or a line among them, is not joined this way.
+        let other = piece(p(0.0, 4.0), 2.0, 3.0);
+        assert!(elliptical_arcs_across_gaps(&[items[0].clone(), other], 1e-6).is_none());
     }
 }

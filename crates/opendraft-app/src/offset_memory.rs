@@ -1,7 +1,6 @@
 //! What OFFSET remembers between uses, as AutoCAD's `OFFSETDIST`: the distance
-//! offered as the default. Saved with the user's settings, not in the drawing.
-//! (AutoCAD also keeps Through there as a negative distance; here Through is
-//! not remembered.)
+//! offered as the default, or a negative number for Through. Saved with the
+//! user's settings, not in the drawing.
 
 use opendraft_commands::{SysVar, Value};
 
@@ -10,7 +9,7 @@ use crate::state::AppState;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Memory {
     /// The distance the last offset used, offered by Enter at the distance
-    /// prompt.
+    /// prompt; negative when it was Through (the size is then not used).
     pub distance: f64,
 }
 
@@ -24,13 +23,12 @@ impl Default for Memory {
 
 const KEY: &str = "offset_distance";
 
-/// Take the saved distance, keeping the default when it is missing or not a
-/// positive number.
+/// Take the saved distance, keeping the default when it is missing or zero.
 pub fn load(storage: Option<&dyn eframe::Storage>) -> Memory {
     let distance = storage
         .and_then(|s| s.get_string(KEY))
         .and_then(|v| v.parse::<f64>().ok())
-        .filter(|d| d.is_finite() && *d > 0.0)
+        .filter(|d| d.is_finite() && *d != 0.0)
         .unwrap_or(DEFAULT.distance);
     Memory { distance }
 }
@@ -44,14 +42,16 @@ pub fn save(m: &Memory, storage: &mut dyn eframe::Storage) {
 pub fn variables() -> Vec<SysVar<AppState>> {
     vec![SysVar::real(
         "OFFSETDIST",
-        "OFFSET's default distance",
-        (1.0e-9, 1.0e9),
+        "OFFSET's default distance; negative for Through",
+        (-1.0e9, 1.0e9),
         |st| Value::Real(st.defaults().offset.get().distance),
-        |st, v| {
-            if let Value::Real(n) = v {
+        |st, v| match v {
+            Value::Real(n) if n.abs() < 1e-9 => Err("Requires a non-zero value.".to_owned()),
+            Value::Real(n) => {
                 st.defaults().offset.change(|m| m.distance = n);
+                Ok(())
             }
-            Ok(())
+            _ => Ok(()),
         },
     )]
 }
@@ -68,6 +68,8 @@ mod tests {
         table.set("OFFSETDIST", "2.5", &mut state).unwrap();
         assert_eq!(state.defaults().offset.get().distance, 2.5);
         assert!(table.set("OFFSETDIST", "0", &mut state).is_err());
-        assert!(table.set("OFFSETDIST", "-3", &mut state).is_err());
+        // A negative number is Through.
+        table.set("OFFSETDIST", "-3", &mut state).unwrap();
+        assert_eq!(state.defaults().offset.get().distance, -3.0);
     }
 }

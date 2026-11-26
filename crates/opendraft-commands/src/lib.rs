@@ -20,6 +20,7 @@ mod layer_action;
 mod layout_action;
 mod linetype_action;
 mod mleader_style_action;
+mod order_action;
 mod paste_action;
 mod point_style_action;
 mod prompt;
@@ -47,6 +48,7 @@ pub use layer_action::{AddLayer, ModifyLayers, RemoveLayer, SetCurrentLayer, Set
 pub use layout_action::{SetLayouts, SetModelPlot};
 pub use linetype_action::SetLinetypes;
 pub use mleader_style_action::SetMLeaderStyles;
+pub use order_action::{Place, ReorderObjects};
 pub use paste_action::{PasteDrawing, WarningSink};
 pub use point_style_action::SetPointStyle;
 pub use prompt::{

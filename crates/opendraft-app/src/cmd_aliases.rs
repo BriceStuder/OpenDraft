@@ -146,6 +146,7 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     ("TR", "TRIM", "modify.trim"),
     ("EX", "EXTEND", "modify.extend"),
     ("LEN", "LENGTHEN", "modify.lengthen"),
+    ("DR", "DRAWORDER", "modify.draw_order"),
     ("DI", "DIST", "inquiry.distance"),
     ("DIST", "DIST", "inquiry.distance"),
     ("AA", "AREA", "inquiry.area"),

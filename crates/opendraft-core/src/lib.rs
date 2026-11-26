@@ -93,6 +93,7 @@ pub mod units;
 mod validate;
 #[cfg(test)]
 mod validate_id_tests;
+mod vertex_edit;
 pub mod width;
 
 pub use block::{
@@ -139,6 +140,7 @@ pub use text_style::{
 };
 pub use units::{AngleFormat, InsertUnits, LengthFormat, Units};
 pub use validate::DocumentError;
+pub use vertex_edit::VertexGrip;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Point {

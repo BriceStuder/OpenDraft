@@ -20,16 +20,16 @@ Keep it current: when something here is built, delete its line in the same chang
 - Lengthen for splines and whole ellipses (elliptical arcs lengthen along their curve; the Angle option does not apply to them); the delta default lasts the session and is not saved.
 - PEDIT: Fit, Spline, Jointype and vertex Tangent (and `PLINECONVERTMODE`).
 - Associative arrays (ARRAY makes plain copies): an array object edited as a whole, ARRAYEDIT, a contextual ribbon tab, grips; also Base point, Expression, Levels, the rows of polar and path arrays, Tangent and Z direction.
-- JOIN: elliptical arcs across gaps (lines on one line and arcs of one circle already join across gaps, the first object being the source), and the Fuzz option on a preselected set (it is asked only at the selection prompt). With Fuzz, ends that miss are linked by a straight segment, as for a polyline; AutoCAD's exact treatment of the gap was not compared.
+- JOIN: Fuzz links ends that miss with a straight segment, as for a polyline; AutoCAD's exact treatment of the gap was not compared. It is asked only at the selection prompt, as in AutoCAD.
 - Fillet and Chamfer: next to arc segments of a polyline, a line with a polyline end segment, parallel polyline segments, rays and construction lines (two parallel lines get AutoCAD's half circle); the fillet and chamfer variables are per user, not saved in the drawing.
 - Trim and Extend: the Project option does nothing yet (all geometry is flat; the choice is kept as `PROJMODE`). The Edge option's implied extension covers lines, arcs, elliptical arcs and the ends of open polylines; other edges (splines, text) are used as they are.
-- Offset: Through is not remembered as the default (AutoCAD keeps it as a negative `OFFSETDIST`); the distance default is per user, not saved in the drawing.
+- Offset: the distance default (and Through, as a negative `OFFSETDIST`) is per user, not saved in the drawing.
 - Explode: solid and gradient hatches (AutoCAD gives 2D solids; there is no such object here, so they are left with a note). A pattern hatch explodes to its lines and points, with the hatch's layer and attributes.
-- Polyline widths: Trim, Break, Join, Offset, Fillet, Chamfer and Explode give a hairline polyline (only transforms, stretching, grips and Extend keep widths).
-- Draw Order (bring to front, send to back, above and under objects) and object isolation (isolate, hide, end isolation): greyed in the context menu.
-- Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, a ribbon button, AutoCAD conformance fixtures.
-- Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), a window (not only crossing) selection at the destination prompt, and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
-- Grips: AutoCAD's hover menu and the middle-grip options (Add or Remove Vertex, Convert to Arc).
+- Polyline widths: Fillet and Chamfer give a hairline polyline (Explode does too, as in AutoCAD, which drops widths; Trim, Break, Join and Offset keep them, a cut piece tapering as its segment did).
+- Object isolation (isolate, hide, end isolation): greyed in the context menu. Draw order is built for the model and layout objects themselves (DRAWORDER, `DR`), not for the order of a hatch against its boundary (a hatch is not kept behind its boundary after a reorder).
+- Overkill: comparing polyline segments with loose lines and arcs, redirecting associations to the survivor, AutoCAD conformance fixtures.
+- Match Properties: the Settings dialog (the Settings option works at the command line, switching one property at a time; the choice lasts the session and is not saved), and the properties we have no object for (transparency, thickness, plot style, viewport, table, material).
+- Grips: AutoCAD's hover menu. Its polyline choices (Add vertex, Remove vertex, Convert to arc or line) work as options of the grip's prompt, and Ctrl switches Stretch and Add vertex; Add vertex on an end vertex adds beyond the end.
 
 ## Selection, snapping and input
 
@@ -170,6 +170,8 @@ More in `docs/ARCHITECTURE.md`, "Hatches".
 
 Built and covered by tests, but not yet seen working where it matters. Take a line off when it has been checked, and say what was tried in the pull request.
 
+- **Grip vertex edits, Draw Order and Offset's remembered Through:** covered by unit tests; not tried in the running app or compared with AutoCAD (the grip options are keywords of the grip's prompt, not AutoCAD's hover menu; DRAWORDER's default is Back as in AutoCAD, from memory).
+- **Widths kept through Trim, Break, Join and Offset:** covered by unit tests of the geometry; not looked at drawn, and not compared with AutoCAD (Offset keeps each segment's width as it is, where AutoCAD may do otherwise; a Join with Fuzz links the gap with a hairline segment).
 - **JOIN's Close and Fuzz, and arcs across a gap:** follow AutoCAD from memory (source-first, counter-clockwise; Close offered for a lone arc, elliptical arc or open polyline); not compared with AutoCAD or tried in the running app. The same holds for Explode of a pattern hatch (the lines cut to the boundary, not compared with AutoCAD's), Match Properties' Settings, and Trim and Extend's Crossing, Project and eRase.
 - **Offset's Exit, Undo and remembered distance:** the prompts follow AutoCAD from memory (`[Exit/Undo]` at the object prompt, `[Exit/Multiple/Undo]` at the side prompt, the last distance as the default); not compared with AutoCAD, and not tried in the running app.
 - **BEDIT and BSAVE by hand:** the Block Editor now keeps each object's block id as its id (`Document::add_with_id`) and BSAVE reads it back. Tests drive BEDIT, BSAVE and BCLOSE through `AppState` and check the ids, but nobody has used it in the running app since the change.

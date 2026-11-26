@@ -80,8 +80,8 @@ impl Entity {
                 points,
                 closed,
                 bulges,
-                ..
-            } => offset_polyline(points, *closed, bulges, distance, toward),
+                widths,
+            } => offset_polyline(points, *closed, (bulges, widths), distance, toward),
         }
     }
 }
@@ -140,6 +140,8 @@ struct Shifted {
     from: Point,
     to: Point,
     bulge: f64,
+    /// The width at each end, which the copy keeps.
+    width: (f64, f64),
 }
 
 /// An original segment: its ends and bulge.
@@ -175,6 +177,7 @@ fn shift(seg: Seg, side: f64, distance: f64) -> Option<Shifted> {
                 from: a.translated(by.0, by.1),
                 to: b.translated(by.0, by.1),
                 bulge: 0.0,
+                width: (0.0, 0.0),
             })
         }
         Some(s) => {
@@ -198,6 +201,7 @@ fn shift(seg: Seg, side: f64, distance: f64) -> Option<Shifted> {
                 from: on(a),
                 to: on(b),
                 bulge,
+                width: (0.0, 0.0),
             })
         }
     }
@@ -206,15 +210,19 @@ fn shift(seg: Seg, side: f64, distance: f64) -> Option<Shifted> {
 fn offset_polyline(
     points: &[Point],
     closed: bool,
-    bulges: &[f64],
+    (bulges, widths): (&[f64], &[(f64, f64)]),
     distance: f64,
     toward: Point,
 ) -> Option<Entity> {
     // Repeated points make zero-length segments with no direction.
-    let mut clean: Vec<(Point, f64)> = Vec::new();
+    let mut clean: Vec<(Point, f64, (f64, f64))> = Vec::new();
     for (i, p) in points.iter().enumerate() {
         if clean.last().is_none_or(|last| dist(last.0, *p) > EPS) {
-            clean.push((*p, bulge::at(bulges, i)));
+            clean.push((
+                *p,
+                bulge::at(bulges, i),
+                widths.get(i).copied().unwrap_or_default(),
+            ));
         }
     }
     if closed && clean.len() > 1 && dist(clean[0].0, clean[clean.len() - 1].0) <= EPS {
@@ -241,7 +249,13 @@ fn offset_polyline(
     let side = side_of_segment(*nearest, toward)?;
     let mut shifted: Vec<Shifted> = originals
         .iter()
-        .filter_map(|seg| shift(*seg, side, distance))
+        .enumerate()
+        .filter_map(|(i, seg)| {
+            shift(*seg, side, distance).map(|moved| Shifted {
+                width: clean[i].2,
+                ..moved
+            })
+        })
         .collect();
 
     // Join neighbours; a segment that comes out reversed has been squeezed
@@ -263,8 +277,10 @@ fn offset_polyline(
             }
             None => {
                 let mut curves: Vec<f64> = curves.into_iter().flatten().collect();
+                let mut thickness: Vec<(f64, f64)> = shifted.iter().map(|s| s.width).collect();
                 if !closed {
                     curves.push(0.0);
+                    thickness.push((0.0, 0.0));
                 }
                 return Some(Entity::Polyline {
                     points: vertices,
@@ -274,7 +290,11 @@ fn offset_polyline(
                     } else {
                         Vec::new()
                     },
-                    widths: Vec::new(),
+                    widths: if thickness.iter().any(|w| *w != (0.0, 0.0)) {
+                        thickness
+                    } else {
+                        Vec::new()
+                    },
                 });
             }
         }
@@ -494,6 +514,20 @@ mod tests {
                 "nothing left inside"
             );
         }
+    }
+
+    #[test]
+    fn a_wide_polyline_is_offset_with_its_widths() {
+        let wide = Entity::Polyline {
+            points: vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: vec![(1.0, 2.0), (3.0, 3.0), (0.0, 0.0)],
+        };
+        let Some(Entity::Polyline { widths, .. }) = wide.offset(2.0, p(5.0, 5.0)) else {
+            panic!()
+        };
+        assert_eq!(widths, [(1.0, 2.0), (3.0, 3.0), (0.0, 0.0)]);
     }
 
     #[test]

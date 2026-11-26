@@ -252,6 +252,7 @@ icons! {
     MODIFY_MIRROR = '\u{e360}';
     MODIFY_MOVE = '\u{e124}';
     MODIFY_OFFSET = '\u{e27b}';
+    MODIFY_OVERKILL = '\u{e400}';
     MODIFY_PEDIT = '\u{e546}';
     MODIFY_ROTATE = '\u{e14c}';
     MODIFY_SCALE = '\u{e115}';

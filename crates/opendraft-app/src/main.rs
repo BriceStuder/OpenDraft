@@ -73,6 +73,7 @@ mod divide_cmd;
 mod dock;
 mod donut_cmd;
 mod draw;
+mod draw_order;
 mod dynamic_block_cmd;
 mod dynamic_block_prompts;
 mod dynamic_input;

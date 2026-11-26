@@ -50,18 +50,33 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     let (mut erase, mut layer) = (false, CopyLayer::Source);
     let gap = loop {
         let remembered = ed.defaults().offset.get().distance;
-        let options = NumberOptions::new(key!("Specify offset distance"))
-            .default(remembered)
+        // After Through, Enter is Through again.
+        let through_next = remembered < 0.0;
+        let message = if through_next {
+            key!("Specify offset distance, Enter for Through")
+        } else {
+            key!("Specify offset distance")
+        };
+        let mut options = NumberOptions::new(message);
+        if !through_next {
+            options = options.default(remembered);
+        }
+        let options = options
             .keyword("Through", "T")
             .keyword("Erase", "E")
             .keyword("Layer", "L");
         match ed.ask_distance(options)? {
             Answer::Value(d) if d > MIN_DISTANCE => {
-                ed.defaults().offset.change(|m| m.distance = d);
+                ed.defaults().offset.change(|m| m.distance = d.abs());
                 break Gap::Distance(d);
             }
             Answer::Value(_) => ed.say(key!("Requires a positive value.")),
-            Answer::Keyword(k) if k == "Through" => break Gap::Through,
+            Answer::Keyword(k) if k == "Through" => {
+                ed.defaults()
+                    .offset
+                    .change(|m| m.distance = -m.distance.abs());
+                break Gap::Through;
+            }
             Answer::Keyword(k) if k == "Layer" => {
                 let answer = ed.get_keyword(
                     Options::<String>::new(key!("Enter layer option for offset objects"))
@@ -84,6 +99,7 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                 )?;
                 erase = answer == "Yes";
             }
+            Answer::Enter if through_next => break Gap::Through,
             Answer::Enter => return Err(Cancelled),
         }
     };
@@ -680,5 +696,39 @@ mod tests {
         state.cmd_submit("5,9");
         state.settle_command();
         assert_eq!(entities(&state)[1], line(p(0.0, 3.0), p(10.0, 3.0)));
+    }
+
+    #[test]
+    fn through_is_remembered_and_enter_takes_it_until_a_distance_replaces_it() {
+        let mut state = offsetting(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
+        state.cmd_submit("t");
+        state.settle_command();
+        assert!(state.defaults().offset.get().distance < 0.0);
+        state.cmd_submit("");
+        state.settle_command();
+        state.start_command("Offset", offset_objects);
+        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Specify offset distance, Enter for Through"));
+        state.cmd_submit("");
+        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Select object to offset"));
+        click(&mut state, 0, p(5.0, 0.0));
+        assert!(state.cmd_prompt().text.starts_with("Specify through point"));
+        state.cmd_submit("");
+        state.settle_command();
+        state.cmd_submit("");
+        state.settle_command();
+        // A typed distance goes back to offering a number.
+        state.start_command("Offset", offset_objects);
+        state.settle_command();
+        state.cmd_submit("4");
+        state.settle_command();
+        assert_eq!(state.defaults().offset.get().distance, 4.0);
     }
 }
