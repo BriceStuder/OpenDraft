@@ -8,8 +8,6 @@ use opendraft_core::units::{format_angle, format_length};
 use opendraft_core::{End, Entity};
 use opendraft_ui::key;
 
-use crate::defaults::EditorDefaults;
-
 /// What to do to the end of each object that is picked.
 #[derive(Clone, Copy)]
 enum Mode {
@@ -107,10 +105,10 @@ fn ask_mode(ed: &mut Editor, keyword: &str) -> Result<Option<Mode>, Cancelled> {
             ed,
             key!("Enter delta length"),
             true,
-            ed.defaults().lengthen_delta.get(),
+            ed.read(|doc| doc.modify_settings().lengthen_delta)?,
         )? {
             Amount::Length(d) => {
-                ed.defaults().lengthen_delta.change(|m| *m = Some(d));
+                ed.change_modify_settings(move |s| s.lengthen_delta = Some(d))?;
                 Some(Mode::Delta(d))
             }
             Amount::Angle(a) => Some(Mode::DeltaAngle(a)),

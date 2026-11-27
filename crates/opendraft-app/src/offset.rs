@@ -6,8 +6,6 @@ use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Pick
 use opendraft_core::{Entity, Point};
 use opendraft_ui::key;
 
-use crate::defaults::EditorDefaults;
-
 /// Distances at or below this are refused.
 const MIN_DISTANCE: f64 = 1e-9;
 
@@ -49,7 +47,7 @@ fn copy_for(target: &Entity, gap: Gap, at: Point) -> Option<Entity> {
 pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
     let (mut erase, mut layer) = (false, CopyLayer::Source);
     let gap = loop {
-        let remembered = ed.defaults().offset.get().distance;
+        let remembered = ed.read(|doc| doc.modify_settings().offset_distance)?;
         // After Through, Enter is Through again.
         let through_next = remembered < 0.0;
         let message = if through_next {
@@ -67,14 +65,12 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             .keyword("Layer", "L");
         match ed.ask_distance(options)? {
             Answer::Value(d) if d > MIN_DISTANCE => {
-                ed.defaults().offset.change(|m| m.distance = d.abs());
+                ed.change_modify_settings(move |s| s.offset_distance = d.abs())?;
                 break Gap::Distance(d);
             }
             Answer::Value(_) => ed.say(key!("Requires a positive value.")),
             Answer::Keyword(k) if k == "Through" => {
-                ed.defaults()
-                    .offset
-                    .change(|m| m.distance = -m.distance.abs());
+                ed.change_modify_settings(|s| s.offset_distance = -s.offset_distance.abs())?;
                 break Gap::Through;
             }
             Answer::Keyword(k) if k == "Layer" => {
@@ -677,7 +673,7 @@ mod tests {
         );
         state.cmd_submit("3");
         state.settle_command();
-        assert_eq!(state.defaults().offset.get().distance, 3.0);
+        assert_eq!(state.modify_settings().offset_distance, 3.0);
         state.cmd_submit("");
         state.settle_command();
         state.cmd_submit("");
@@ -703,7 +699,7 @@ mod tests {
         let mut state = offsetting(&[line(p(0.0, 0.0), p(10.0, 0.0))]);
         state.cmd_submit("t");
         state.settle_command();
-        assert!(state.defaults().offset.get().distance < 0.0);
+        assert!(state.modify_settings().offset_distance < 0.0);
         state.cmd_submit("");
         state.settle_command();
         state.start_command("Offset", offset_objects);
@@ -729,6 +725,6 @@ mod tests {
         state.settle_command();
         state.cmd_submit("4");
         state.settle_command();
-        assert_eq!(state.defaults().offset.get().distance, 4.0);
+        assert_eq!(state.modify_settings().offset_distance, 4.0);
     }
 }

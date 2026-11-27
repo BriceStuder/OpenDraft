@@ -12,6 +12,7 @@ mod header;
 mod linetype_tests;
 mod linetypes;
 mod model_freeze;
+mod modify_settings;
 mod point_style;
 mod read;
 mod units;

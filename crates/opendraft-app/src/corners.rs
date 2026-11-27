@@ -9,7 +9,6 @@ use opendraft_core::{
 use opendraft_ui::key;
 
 use crate::corner_memory::Memory;
-use crate::defaults::EditorDefaults;
 use opendraft_commands::Wording;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -78,7 +77,7 @@ fn first_object(kind: Kind, m: &Memory) -> Options<Picked> {
 fn join_corners(ed: &mut Editor, kind: Kind) -> Result<(), Cancelled> {
     let (mut multiple, mut made) = (false, 0_usize);
     loop {
-        let m = ed.defaults().corner.get();
+        let m = Memory::read(ed)?;
         let mut options = first_object(kind, &m);
         options = match kind {
             Kind::Fillet => options.keyword("Radius", "R"),
@@ -131,7 +130,7 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
             let r = ed.get_distance(
                 Options::<f64>::new(key!("Specify fillet radius")).default(m.radius),
             )?;
-            ed.defaults().corner.change(|m| m.radius = r.max(0.0));
+            Memory::change(ed, move |m| m.radius = r.max(0.0))?;
         }
         "Distance" => {
             let first = ed.get_distance(
@@ -140,11 +139,11 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
             let second = ed.get_distance(
                 Options::<f64>::new(key!("Specify second chamfer distance")).default(first),
             )?;
-            ed.defaults().corner.change(|m| {
+            Memory::change(ed, move |m| {
                 m.first = first.max(0.0);
                 m.second = second.max(0.0);
                 m.by_angle = false;
-            });
+            })?;
         }
         "Angle" => {
             let length = ed.get_distance(
@@ -156,11 +155,11 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
                     .default(m.angle.to_radians())
                     .turn(),
             )?;
-            ed.defaults().corner.change(|m| {
+            Memory::change(ed, move |m| {
                 m.length = length.max(0.0);
                 m.angle = angle.to_degrees();
                 m.by_angle = true;
-            });
+            })?;
         }
         "mEthod" => {
             let current = if m.by_angle { "Angle" } else { "Distance" };
@@ -170,9 +169,7 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
                     .keyword("Angle", "A")
                     .default(current.to_owned()),
             )?;
-            ed.defaults()
-                .corner
-                .change(|m| m.by_angle = answer == "Angle");
+            Memory::change(ed, move |m| m.by_angle = answer == "Angle")?;
         }
         "Trim" => {
             let current = if m.trim { "Trim" } else { "No trim" };
@@ -182,7 +179,7 @@ fn change_setting(ed: &Editor, keyword: &str, m: &Memory) -> Result<(), Cancelle
                     .keyword("No trim", "N")
                     .default(current.to_owned()),
             )?;
-            ed.defaults().corner.change(|m| m.trim = answer == "Trim");
+            Memory::change(ed, move |m| m.trim = answer == "Trim")?;
         }
         _ => {}
     }
@@ -295,15 +292,7 @@ fn join_pair(ed: &Editor, kind: Kind, first: Picked, second: Picked) -> Result<O
         return Ok(Outcome::Finished(false));
     };
     let same = first.id == second.id;
-    let plan = match plan_pair(
-        &ed.defaults().corner.get(),
-        kind,
-        &a,
-        &b,
-        same,
-        first,
-        second,
-    ) {
+    let plan = match plan_pair(&Memory::read(ed)?, kind, &a, &b, same, first, second) {
         Ok(plan) => plan,
         Err(None) => {
             ed.say(key!("Select a different object."));
@@ -328,7 +317,7 @@ fn apply(
     attrs: opendraft_core::Attributes,
     plan: Plan,
 ) -> Result<bool, Cancelled> {
-    let trim = ed.defaults().corner.get().trim;
+    let trim = Memory::read(ed)?.trim;
     match plan {
         Plan::Pair(joined) => {
             if !trim && joined.joint.is_none() {
@@ -381,7 +370,7 @@ fn round_whole_polyline(ed: &Editor, kind: Kind) -> Result<bool, Cancelled> {
         ed.say(key!("That is not a polyline."));
         return Ok(false);
     };
-    let m = ed.defaults().corner.get();
+    let m = Memory::read(ed)?;
     let how = match kind {
         Kind::Fillet => Round::Fillet(m.radius),
         Kind::Chamfer => Round::Chamfer(m.chamfer()),
@@ -550,7 +539,7 @@ mod tests {
             (radius - 5.0).abs() < 1e-9,
             "half the gap, not the radius 2"
         );
-        assert_eq!(state.defaults().corner.get().radius, 2.0);
+        assert_eq!(state.modify_settings().fillet_radius, 2.0);
     }
 
     #[test]
@@ -748,7 +737,7 @@ mod tests {
     #[test]
     fn a_chamfer_by_length_and_angle() {
         let mut state = started(&axes(), chamfer_objects, &["a", "3", "45"]);
-        assert!(state.defaults().corner.get().by_angle);
+        assert!(state.modify_settings().chamfer_by_angle);
         click(&mut state, 0, p(5.0, 0.0));
         click(&mut state, 1, p(0.0, 5.0));
         let Entity::Line { start, end } = entities(&state)[2] else {
@@ -786,7 +775,7 @@ mod tests {
     #[test]
     fn the_settings_are_remembered_for_next_time() {
         let mut state = started(&axes(), fillet_objects, &["r", "7"]);
-        assert_eq!(state.defaults().corner.get().radius, 7.0);
+        assert_eq!(state.modify_settings().fillet_radius, 7.0);
         state.cancel();
         state.start_command("Corner", fillet_objects);
         state.settle_command();
@@ -827,23 +816,23 @@ mod tests {
     fn method_switches_the_chamfer_between_distances_and_length_and_angle() {
         let mut state = started(&axes(), chamfer_objects, &[]);
         assert!(offers(&mut state, "mEthod"));
-        assert!(!state.defaults().corner.get().by_angle);
+        assert!(!state.modify_settings().chamfer_by_angle);
         state.cmd_submit("e");
         state.settle_command();
         state.cmd_submit("a");
         state.settle_command();
-        assert!(state.defaults().corner.get().by_angle);
+        assert!(state.modify_settings().chamfer_by_angle);
         assert!(state.cmd_prompt().text.contains("Length"));
         state.cmd_submit("e");
         state.settle_command();
         state.cmd_submit("");
         state.settle_command();
-        assert!(state.defaults().corner.get().by_angle, "Enter keeps it");
+        assert!(state.modify_settings().chamfer_by_angle, "Enter keeps it");
         state.cmd_submit("e");
         state.settle_command();
         state.cmd_submit("d");
         state.settle_command();
-        assert!(!state.defaults().corner.get().by_angle);
+        assert!(!state.modify_settings().chamfer_by_angle);
         let mut fillet = started(&axes(), fillet_objects, &[]);
         assert!(!offers(&mut fillet, "mEthod"));
     }

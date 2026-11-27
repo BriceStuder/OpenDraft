@@ -61,6 +61,7 @@ mod linetype;
 mod load;
 mod mleader;
 mod mleader_style;
+mod modify_settings;
 mod names;
 mod new_style;
 mod point_style;
@@ -279,6 +280,9 @@ struct DrawingDto {
     /// `PDMODE` and `PDSIZE`.
     #[serde(flatten)]
     point_style: point_style::PointStyleDto,
+    /// What FILLET, CHAMFER, OFFSET and LENGTHEN remember.
+    #[serde(flatten)]
+    modify_settings: modify_settings::ModifySettingsDto,
     /// The Model tab's coordinate system and the ones saved by name.
     #[serde(flatten)]
     ccs: ccs::TableDto,
@@ -398,6 +402,7 @@ impl DrawingDto {
             linetypes: linetype::TableDto::of(document),
             new_style: new_style::NewStyleDto::of(document),
             point_style: point_style::PointStyleDto::of(document),
+            modify_settings: modify_settings::ModifySettingsDto::of(document),
             ccs: ccs::TableDto::of(document),
             arrays: array::TableDto::of(document),
         })

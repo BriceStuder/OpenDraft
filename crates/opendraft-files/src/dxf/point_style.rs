@@ -2,12 +2,22 @@
 
 use opendraft_core::{Document, PointStyle};
 
+use super::write::Out;
+
 /// The header variables to write, as (name, group code, value).
 pub(super) fn header(style: PointStyle) -> [(&'static str, i32, String); 2] {
     [
         ("$PDMODE", 70, style.mode.to_string()),
         ("$PDSIZE", 40, style.size.to_string()),
     ]
+}
+
+/// Write the variables into a header.
+pub(super) fn write_header(out: &mut Out, document: &Document) {
+    for (name, code, value) in header(document.point_style()) {
+        out.pair(9, name);
+        out.pair(code, value);
+    }
 }
 
 /// Set the point style from a header's groups (code, value). What is missing

@@ -55,6 +55,7 @@ pub mod linetype;
 pub mod loop_polyline;
 pub mod measure;
 pub mod mleader;
+pub mod modify_settings;
 pub mod mtext;
 pub mod name_order;
 pub mod oblong;
@@ -126,6 +127,7 @@ pub use layout::{
 pub use leader::Leader;
 pub use linetype::{Linetype, LinetypeError, LinetypeId, LinetypeTable, StrokeElement};
 pub use mleader::{MLeader, MLeaderStyle, MLeaderStyleId};
+pub use modify_settings::ModifySettings;
 pub use mtext::MText;
 pub use plot_settings::{
     PaperUnits, PlotArea, PlotRotation, PlotScale, PlotSettings, ShadePlotMode, ShadePlotSettings,

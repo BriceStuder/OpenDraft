@@ -115,6 +115,8 @@ pub struct Document {
     linetype_scale: f64,
     /// How point objects are drawn (`PDMODE`, `PDSIZE`).
     point_style: PointStyle,
+    /// What FILLET, CHAMFER, OFFSET and LENGTHEN remember (`FILLETRAD`...).
+    modify_settings: crate::ModifySettings,
     /// The associative arrays: what is needed to lay their items out again.
     arrays: Vec<crate::ArrayRecord>,
     /// Where the objects are, for the queries that look at a part of the
@@ -133,6 +135,7 @@ mod leaders;
 mod linetypes;
 pub use linetypes::LinetypeUse;
 mod mleader_styles;
+mod modify_settings;
 mod object;
 mod object_list;
 mod point_style;

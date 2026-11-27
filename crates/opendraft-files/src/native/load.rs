@@ -65,6 +65,7 @@ impl DrawingDto {
         self.linetypes.load(&mut document)?;
         self.new_style.load(&mut document);
         self.point_style.load(&mut document);
+        self.modify_settings.load(&mut document);
         self.ccs.load(&mut document)?;
         let blocks = load_blocks(&self.blocks, &dim_styles.pool, |l| layer_ids.contains(&l))?;
         let by_id: Blocks = blocks.iter().map(|b| (b.id.0, b.clone())).collect();

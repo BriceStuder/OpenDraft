@@ -187,6 +187,7 @@ impl Document {
             linetypes: self.linetypes.clone(),
             linetype_scale: self.linetype_scale,
             point_style: self.point_style,
+            modify_settings: self.modify_settings,
             arrays: Vec::new(),
             spatial: Default::default(),
         }

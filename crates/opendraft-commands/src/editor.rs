@@ -51,6 +51,7 @@ pub struct Editor {
 }
 
 mod dialog_asks;
+mod modify_settings;
 mod steps;
 mod sweep_ask;
 

@@ -12,5 +12,6 @@ pub(super) fn apply<'a>(
     document.set_units(super::units::read_header(groups.clone()));
     super::linetypes::apply_header(groups.clone(), document);
     super::point_style::apply_header(groups.clone(), document);
+    super::modify_settings::apply_header(groups.clone(), document);
     super::ccs::apply_header(groups, document)
 }

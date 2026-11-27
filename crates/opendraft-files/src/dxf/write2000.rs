@@ -325,10 +325,8 @@ pub fn write(document: &Document) -> Result<Encoded, FileError> {
     out.pair(3, "ANSI_1252");
     out.pair(9, "$LTSCALE");
     out.pair(40, finite(document.linetype_scale())?);
-    for (name, code, value) in super::point_style::header(document.point_style()) {
-        out.pair(9, name);
-        out.pair(code, value);
-    }
+    super::point_style::write_header(&mut out, document);
+    super::modify_settings::write_header(&mut out, document);
     super::ccs::write_header(&mut out, document);
     out.pair(9, "$INSBASE");
     out.point3(10, 0.0, 0.0, 0.0);
