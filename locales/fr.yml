@@ -1851,7 +1851,7 @@
 "Multileader style %{name} created": "Style de ligne de repère %{name} créé"
 "Multileader style changed": "Style de ligne de repère modifié"
 "There is no such multileader style.": "Ce style de ligne de repère n'existe pas."
-"Standard, the current style and a style that multileaders use cannot be deleted.": "Standard, le style courant et un style utilisé par des multileaders ne peuvent pas être supprimés."
+"Standard, the current style and a style that multileaders use cannot be deleted.": "Standard, le style courant et un style utilisé par des lignes de repère ne peuvent pas être supprimés."
 "The text style no longer exists.": "Le style de texte n'existe plus."
 "The style has a value that is out of range.": "Le style a une valeur hors limites."
 "Text style \"%{name}\" does not exist.": "Le style de texte « %{name} » n'existe pas."
