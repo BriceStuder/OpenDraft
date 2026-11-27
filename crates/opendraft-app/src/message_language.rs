@@ -5,6 +5,7 @@
 use opendraft_commands::Wording;
 
 use crate::state::AppState;
+use opendraft_ui::key;
 
 /// A message in the language of the interface.
 pub fn shown(wording: &Wording) -> String {
@@ -44,6 +45,19 @@ impl AppState {
     pub fn say_step(&mut self, text: &str, name: impl Into<String>) {
         let step = Wording::plain(name.into());
         self.set_message(Wording::new(text, &[]).part("name", step));
+    }
+
+    /// Says in the status bar that the command `id` is not built yet.
+    pub fn say_not_built(&mut self, id: &str) {
+        self.set_message(Wording::new(
+            key!("Not implemented yet: %{id}"),
+            &[("id", id)],
+        ));
+    }
+
+    /// Says in the status bar that the app closes once its files are written.
+    pub fn say_closing_later(&mut self) {
+        self.message = key!("Closing when the files are written...").to_owned();
     }
 
     /// Shows `message` in the status bar.

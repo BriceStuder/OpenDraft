@@ -17,6 +17,11 @@ use opendraft_core::{
 use crate::state::{AppState, Doc};
 use opendraft_ui::key;
 
+const NO_VIEWPORT: &str = key!("This layout has no viewport to enter; use MVIEW");
+const BAD_SETUP: &str = key!("The page setup contains an invalid margin, scale, window or DPI.");
+/// What VPLOCK says, by whether the viewport was locked before.
+const LOCK_SAID: [&str; 2] = [key!("Viewport locked"), key!("Viewport unlocked")];
+
 impl PageDraft {
     /// The working copy of the setup of `space`, or `None` if the layout is gone.
     pub fn of(document: &Document, space: PlotSpace) -> Option<Self> {
@@ -199,9 +204,7 @@ impl AppState {
             .or_else(|| layout.and_then(Layout::default_viewport));
         match target {
             Some(v) => self.switch_space(Space::Viewport(id, v)),
-            None => {
-                self.message = key!("This layout has no viewport to enter; use MVIEW").to_owned()
-            }
+            None => self.message = NO_VIEWPORT.to_owned(),
         }
     }
 
@@ -257,9 +260,7 @@ impl AppState {
         plot.paper_width_mm = draft.width;
         plot.paper_height_mm = draft.height;
         if !plot.is_valid() {
-            return Err(
-                key!("The page setup contains an invalid margin, scale, window or DPI.").into(),
-            );
+            return Err(BAD_SETUP.into());
         }
         let mut layouts = document.layouts().to_vec();
         let layout = layouts
@@ -301,9 +302,7 @@ impl AppState {
         plot.paper_height_mm = draft.height;
         plot.flags |= opendraft_core::plot_settings::flags::MODEL_TYPE;
         if !plot.is_valid() {
-            return Err(
-                key!("The page setup contains an invalid margin, scale, window or DPI.").into(),
-            );
+            return Err(BAD_SETUP.into());
         }
         if self.session().document().model_plot() == &plot {
             return Ok(());
@@ -426,12 +425,7 @@ impl AppState {
                 },
                 layouts,
             ));
-            self.message = if locked {
-                key!("Viewport unlocked")
-            } else {
-                key!("Viewport locked")
-            }
-            .to_owned();
+            self.message = LOCK_SAID[usize::from(locked)].to_owned();
         }
     }
 
