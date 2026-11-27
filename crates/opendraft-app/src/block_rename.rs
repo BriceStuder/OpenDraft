@@ -12,15 +12,19 @@ const STEP: &str = "Rename block";
 
 impl AppState {
     /// Renames block `id` of the active drawing to `name`, in one undo step.
-    /// Returns the sentence to show, empty when the name is unchanged, or
-    /// why it was refused (the drawing is then left as it was).
-    pub(crate) fn rename_block(&mut self, id: BlockId, name: &str) -> Result<String, String> {
+    /// Returns its old name (`None` when the name is unchanged), or why it
+    /// was refused (the drawing is then left as it was).
+    pub(crate) fn rename_block(
+        &mut self,
+        id: BlockId,
+        name: &str,
+    ) -> Result<Option<String>, String> {
         let name = name.trim();
         if self.in_block_editor() {
             return Err("Close the Block Editor before renaming a block.".to_owned());
         }
         let old = match self.session().document().block(id) {
-            Some(block) if block.name == name => return Ok(String::new()),
+            Some(block) if block.name == name => return Ok(None),
             Some(block) => block.name.clone(),
             None => return Err("That block is no longer in the drawing.".to_owned()),
         };
@@ -35,7 +39,7 @@ impl AppState {
             }
             Ok::<(), ()>(())
         });
-        Ok(format!("Block \"{old}\" renamed to \"{name}\"."))
+        Ok(Some(old))
     }
 }
 

@@ -125,16 +125,25 @@ impl Window {
         self.open = true;
     }
 
-    /// Takes the app's answer to [`Request::RenameDrawingBlock`]: the name
-    /// bar closes and the block stays chosen under its new name, or the bar
-    /// stays open with the reason in the status line.
-    pub fn drawing_block_renamed(&mut self, result: Result<String, String>, name: &str) {
+    /// Takes the app's answer to [`Request::RenameDrawingBlock`]: the old
+    /// name (`None` when it was unchanged) and the drawing's revisions before
+    /// and after. The name bar closes and the block stays chosen under its
+    /// new name, with its picture; or the bar stays open with the reason in
+    /// the status line.
+    pub fn drawing_block_renamed(
+        &mut self,
+        result: Result<Option<String>, String>,
+        name: &str,
+        revisions: (u64, u64),
+    ) {
+        let name = name.trim();
         match result {
-            Ok(said) => {
+            Ok(renamed) => {
                 self.editing = None;
-                self.selected = Selected::Drawing(name.trim().to_owned());
-                if !said.is_empty() {
-                    self.status = said;
+                self.selected = Selected::Drawing(name.to_owned());
+                if let Some(old) = renamed {
+                    self.thumbs.drawing_block_renamed(&old, name, revisions);
+                    self.status = format!("Block \"{old}\" renamed to \"{name}\".");
                 }
             }
             Err(why) => self.status = why,

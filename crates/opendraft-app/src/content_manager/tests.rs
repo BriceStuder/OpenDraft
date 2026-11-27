@@ -347,7 +347,8 @@ fn a_block_of_the_drawing_is_renamed_from_its_menu_and_stays_chosen() {
         vec![Action::RenameDrawingBlock(id, "a/b".into())],
     );
     assert_eq!(bad, [Request::RenameDrawingBlock(id, "a/b".into())]);
-    win.drawing_block_renamed(state.rename_block(id, "a/b"), "a/b");
+    let refused = state.rename_block(id, "a/b");
+    win.drawing_block_renamed(refused, "a/b", (0, 0));
     assert!(win.editing.is_some() && win.status.contains("cannot contain"));
     assert!(state.session().document().block_named("Box").is_some());
 
@@ -360,8 +361,10 @@ fn a_block_of_the_drawing_is_renamed_from_its_menu_and_stays_chosen() {
     let [Request::RenameDrawingBlock(asked_id, name)] = asked.as_slice() else {
         panic!("one request: {asked:?}")
     };
+    let before = state.session().revision();
     let result = state.rename_block(*asked_id, name);
-    win.drawing_block_renamed(result, name);
+    let after = state.session().revision();
+    win.drawing_block_renamed(result, name, (before, after));
     assert!(win.editing.is_none());
     assert_eq!(win.selected, Selected::Drawing("Crate".into()));
     assert_eq!(win.status, "Block \"Box\" renamed to \"Crate\".");

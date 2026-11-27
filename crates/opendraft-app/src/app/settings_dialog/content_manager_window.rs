@@ -38,9 +38,11 @@ impl OpenDraftApp {
                 Request::AddObjects => self.state.start_command("LIBADD", library_add),
                 Request::PickImport => self.state.pick_blocks_to_import(),
                 Request::RenameDrawingBlock(id, name) => {
+                    let before = self.state.session().revision();
                     let result = self.state.rename_block(id, &name);
+                    let after = self.state.session().revision();
                     let window = &mut self.state.command_dialogs.content;
-                    window.drawing_block_renamed(result, &name);
+                    window.drawing_block_renamed(result, &name, (before, after));
                 }
             }
         }

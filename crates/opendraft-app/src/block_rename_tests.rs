@@ -43,7 +43,7 @@ fn renaming_a_drawing_block_is_one_undo_step_that_every_insert_follows() {
     assert!(before.len() >= 2 && before.iter().all(|n| n == "Box"));
 
     let said = state.rename_block(id, " Crate ");
-    assert_eq!(said, Ok("Block \"Box\" renamed to \"Crate\".".to_owned()));
+    assert_eq!(said, Ok(Some("Box".to_owned())));
     let doc = state.session().document();
     assert_eq!(doc.block(id).map(|b| b.name.as_str()), Some("Crate"));
     assert!(doc.block_named("Box").is_none());
@@ -71,11 +71,7 @@ fn a_refused_name_leaves_the_drawing_and_its_history_alone() {
     for name in ["", "*U3", "a:b"] {
         assert!(state.rename_block(id, name).is_err(), "{name:?}");
     }
-    assert_eq!(
-        state.rename_block(id, "Box"),
-        Ok(String::new()),
-        "unchanged"
-    );
+    assert_eq!(state.rename_block(id, "Box"), Ok(None), "unchanged");
     assert_eq!(state.session().revision(), revision);
     assert_eq!(
         state.rename_block(BlockId(9999), "Crate"),
