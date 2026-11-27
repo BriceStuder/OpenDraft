@@ -28,8 +28,10 @@ pub(crate) fn switch_edge(ed: &Editor) -> Result<(), Cancelled> {
 
 /// The Project option: how objects are projected onto the plane they are
 /// trimmed or extended in, remembered as `PROJMODE` (0 None, 1 Ucs, 2 View).
-/// Everything here is flat, so the choice changes nothing yet; it is kept so
-/// scripts and the variable agree with AutoCAD.
+/// Everything here is flat (the coordinate system and the view only turn
+/// within the one plane), so the three choices always give the same result;
+/// the option is kept so scripts and the variable agree with AutoCAD, and it
+/// says so.
 pub(crate) fn switch_project(ed: &Editor) -> Result<(), Cancelled> {
     let names = ["None", "Ucs", "View"];
     let current = ed.defaults().trim.get().project.min(2);
@@ -42,6 +44,9 @@ pub(crate) fn switch_project(ed: &Editor) -> Result<(), Cancelled> {
     if let Some(position) = names.iter().position(|n| Some(*n) == chosen.as_deref()) {
         let project = u8::try_from(position).unwrap_or(current);
         ed.defaults().trim.change(|m| m.project = project);
+        ed.say(key!(
+            "All objects here are flat, so projection makes no difference."
+        ))
     }
     Ok(())
 }
@@ -169,6 +174,11 @@ mod tests {
         state.cmd_submit("v");
         state.settle_command();
         assert_eq!(state.defaults().trim.get().project, 2);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("projection makes no difference")));
         state.cmd_submit("p");
         state.settle_command();
         state.cmd_submit("");

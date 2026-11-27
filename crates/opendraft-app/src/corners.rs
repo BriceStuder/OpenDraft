@@ -4,12 +4,11 @@
 
 use opendraft_commands::{Answer, Cancelled, Editor, Options, Picked};
 use opendraft_core::{
-    chamfer_lines, fillet, round_polyline, Chamfer, Entity, EntityId, Joined, Round,
+    chamfer_lines, fillet, join_apart_segments, Chamfer, Entity, EntityId, Joined, Round,
 };
 use opendraft_ui::key;
 
 use crate::corner_memory::Memory;
-use opendraft_commands::Wording;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind {
@@ -214,6 +213,15 @@ enum Plan {
     Pair(Box<Joined>),
     /// One polyline replaced by these pieces (it stays one polyline).
     Replace(Vec<Entity>),
+    /// A line or arc taken into the end of an open polyline: with trimming,
+    /// the polyline becomes `merged` and the other object goes; without, the
+    /// objects stay as they are and only `joint` is added.
+    Merge {
+        /// Whether the polyline is the first picked object.
+        polyline_first: bool,
+        merged: Box<Entity>,
+        joint: Option<Entity>,
+    },
 }
 
 fn plan_pair(
@@ -232,24 +240,28 @@ fn plan_pair(
     }
     let sharp = second.shift;
     if same {
-        // Two segments of one polyline.
+        // Two segments of one polyline: next to each other, or with one
+        // between them (which goes).
         let Some(path) = a.polyline_path() else {
             return Err(None);
         };
         let (Some(i), Some(j)) = (a.segment_at(first.at), a.segment_at(second.at)) else {
-            return Err(Some(
-                key!("Select two adjacent segments of the polyline.").to_owned(),
-            ));
+            return Err(Some(key!("Select two segments of the polyline that are adjacent or have one segment between them.").to_owned()));
         };
-        let vertex = a.shared_vertex(i, j).ok_or_else(|| {
-            Some(key!("Select two adjacent segments of the polyline.").to_owned())
-        })?;
         let how = match kind {
             Kind::Fillet => Round::Fillet(if sharp { 0.0 } else { m.radius }),
             Kind::Chamfer if sharp => Round::Chamfer(Chamfer::Distances(0.0, 0.0)),
             Kind::Chamfer => Round::Chamfer(m.chamfer()),
         };
-        return corner_polyline(&path, how, Some(vertex));
+        return match a.shared_vertex(i, j) {
+            Some(vertex) => corner_polyline(&path, how, Some(vertex)),
+            None => join_apart_segments(&path, i, j, how)
+                .map(|joined| Plan::Replace(vec![joined]))
+                .map_err(|e| Some(e.to_string())),
+        };
+    }
+    if let Some(plan) = join_line_to_end(m, kind, [a, b], [first, second]) {
+        return plan;
     }
     let joined = match kind {
         Kind::Fillet => fillet(
@@ -273,14 +285,8 @@ fn plan_pair(
         .map_err(|e| Some(e.to_string()))
 }
 
-fn corner_polyline(
-    path: &opendraft_core::Path,
-    how: Round,
-    only: Option<usize>,
-) -> Result<Plan, Option<String>> {
-    let done = round_polyline(path, how, only).map_err(|e| Some(e.to_string()))?;
-    Ok(Plan::Replace(done.pieces))
-}
+mod polyline;
+use polyline::{corner_polyline, join_line_to_end, round_whole_polyline};
 
 fn join_pair(ed: &Editor, kind: Kind, first: Picked, second: Picked) -> Result<Outcome, Cancelled> {
     let ids = (first.id, second.id);
@@ -337,6 +343,35 @@ fn apply(
             })?;
             Ok(true)
         }
+        Plan::Merge {
+            polyline_first,
+            merged,
+            joint,
+        } => {
+            let (poly_id, line_id) = if polyline_first {
+                (id_a, id_b)
+            } else {
+                (id_b, id_a)
+            };
+            if !trim {
+                let Some(joint) = joint else {
+                    ed.say(key!("Nothing to do: no trim and no joining piece."));
+                    return Ok(false);
+                };
+                ed.transaction(kind.name(), move |tx| {
+                    tx.add_with(vec![(joint, attrs)]);
+                    Ok(())
+                })?;
+                return Ok(true);
+            }
+            ed.transaction(kind.name(), move |tx| {
+                let merged = *merged;
+                tx.modify(poly_id, move |_| merged);
+                tx.remove(vec![line_id]);
+                Ok(())
+            })?;
+            Ok(true)
+        }
         Plan::Replace(mut pieces) => {
             if pieces.is_empty() {
                 return Ok(false);
@@ -352,52 +387,6 @@ fn apply(
             Ok(true)
         }
     }
-}
-
-/// The Polyline option: pick one polyline and round every corner that fits.
-/// Returns whether something was done.
-fn round_whole_polyline(ed: &Editor, kind: Kind) -> Result<bool, Cancelled> {
-    let picked = match ed.ask_object(Options::<Picked>::new(key!("Select polyline"))) {
-        Ok(Answer::Value(picked)) => picked,
-        Err(Cancelled) | Ok(_) => return Ok(false),
-    };
-    let id = picked.id;
-    let read = ed.read(move |doc| doc.object(id).map(|o| (o.entity.clone(), o.attrs.clone())))?;
-    let Some((entity, attrs)) = read else {
-        return Ok(false);
-    };
-    let Some(path) = entity.polyline_path() else {
-        ed.say(key!("That is not a polyline."));
-        return Ok(false);
-    };
-    let m = Memory::read(ed)?;
-    let how = match kind {
-        Kind::Fillet => Round::Fillet(m.radius),
-        Kind::Chamfer => Round::Chamfer(m.chamfer()),
-    };
-    let done = match round_polyline(&path, how, None) {
-        Ok(done) => done,
-        Err(e) => {
-            ed.say(e.to_string());
-            return Ok(false);
-        }
-    };
-    if done.done == 0 {
-        ed.say(key!("No corner could be done."));
-        return Ok(false);
-    }
-    let corners = |count| Wording::count(count, key!("%{count} corner"), key!("%{count} corners"));
-    let said = if done.skipped > 0 {
-        Wording::new(
-            key!("%{done} done, %{skipped} left sharp (segments too short)."),
-            &[],
-        )
-        .part("skipped", corners(done.skipped))
-    } else {
-        Wording::new(key!("%{done} done."), &[])
-    };
-    ed.say(said.part("done", corners(done.done)));
-    apply(ed, kind, id, id, attrs, Plan::Replace(done.pieces))
 }
 
 #[cfg(test)]
@@ -689,12 +678,23 @@ mod tests {
         };
         assert!(*closed && points.len() == 5);
         assert_eq!(bulges.iter().filter(|b| b.abs() > 1e-9).count(), 1);
-        // Opposite sides do not meet.
+        // Opposite sides have one side between them (whichever way round), so
+        // that side goes and the two are joined by a half circle.
         let mut state = started(&[square()], fillet_objects, &["r", "2"]);
         click(&mut state, 0, p(5.0, 0.0));
         click(&mut state, 0, p(5.0, 10.0));
-        assert!(state.cmdline.log.last().unwrap().contains("adjacent"));
-        assert_eq!(entities(&state), vec![square()]);
+        let all = entities(&state);
+        let Entity::Polyline {
+            points,
+            bulges,
+            closed,
+            ..
+        } = &all[0]
+        else {
+            panic!("still a polyline")
+        };
+        assert!(*closed && points.len() == 4, "{points:?}");
+        assert!(bulges.iter().any(|b| (b.abs() - 1.0).abs() < 1e-9));
     }
 
     #[test]
@@ -835,5 +835,110 @@ mod tests {
         assert!(!state.modify_settings().chamfer_by_angle);
         let mut fillet = started(&axes(), fillet_objects, &[]);
         assert!(!offers(&mut fillet, "mEthod"));
+    }
+
+    fn open_polyline(points: &[Point]) -> Entity {
+        Entity::Polyline {
+            points: points.to_vec(),
+            closed: false,
+            bulges: Vec::new(),
+            widths: Vec::new(),
+        }
+    }
+
+    /// An open polyline along the x axis and a line across its free end.
+    fn polyline_and_line() -> Vec<Entity> {
+        vec![
+            open_polyline(&[p(0.0, 0.0), p(10.0, 0.0)]),
+            line(p(14.0, -8.0), p(14.0, 8.0)),
+        ]
+    }
+
+    fn polyline_points(e: &Entity) -> usize {
+        match e {
+            Entity::Polyline { points, .. } => points.len(),
+            other => panic!("expected a polyline, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_line_and_the_end_of_a_polyline_become_one_polyline_with_an_arc() {
+        let mut state = started(&polyline_and_line(), fillet_objects, &["r", "2"]);
+        click(&mut state, 0, p(3.0, 0.0));
+        click(&mut state, 1, p(14.0, 6.0));
+        let all = entities(&state);
+        assert_eq!(all.len(), 1, "the line went into the polyline: {all:?}");
+        assert_eq!(polyline_points(&all[0]), 4);
+        assert!(!state.command_running());
+        state.undo();
+        assert_eq!(entities(&state).len(), 2, "one undo step");
+        assert_eq!(entities(&state), polyline_and_line());
+    }
+
+    #[test]
+    fn the_line_may_be_picked_first() {
+        let mut state = started(&polyline_and_line(), fillet_objects, &["r", "2"]);
+        click(&mut state, 1, p(14.0, 6.0));
+        click(&mut state, 0, p(3.0, 0.0));
+        let all = entities(&state);
+        assert_eq!(all.len(), 1, "{all:?}");
+        assert_eq!(polyline_points(&all[0]), 4);
+    }
+
+    #[test]
+    fn with_no_trim_the_objects_stay_and_only_the_arc_is_added() {
+        let mut state = started(&polyline_and_line(), fillet_objects, &["t", "n", "r", "2"]);
+        click(&mut state, 0, p(3.0, 0.0));
+        click(&mut state, 1, p(14.0, 6.0));
+        let all = entities(&state);
+        assert_eq!(all.len(), 3, "{all:?}");
+        assert_eq!(all[..2], polyline_and_line()[..]);
+        assert!(matches!(all[2], Entity::Arc { .. }));
+    }
+
+    #[test]
+    fn a_chamfer_joins_a_line_to_the_end_of_a_polyline_too() {
+        let mut state = started(&polyline_and_line(), chamfer_objects, &["d", "1", "1"]);
+        click(&mut state, 0, p(3.0, 0.0));
+        click(&mut state, 1, p(14.0, 6.0));
+        let all = entities(&state);
+        assert_eq!(all.len(), 1, "{all:?}");
+        assert_eq!(polyline_points(&all[0]), 4);
+    }
+
+    #[test]
+    fn a_middle_segment_is_refused_and_says_so() {
+        let objects = vec![
+            open_polyline(&[p(0.0, 0.0), p(10.0, 0.0), p(10.0, 5.0), p(0.0, 5.0)]),
+            line(p(-3.0, 8.0), p(5.0, 8.0)),
+        ];
+        let mut state = started(&objects, fillet_objects, &["r", "1"]);
+        click(&mut state, 0, p(10.0, 2.0));
+        click(&mut state, 1, p(0.0, 8.0));
+        assert_eq!(entities(&state), objects, "nothing changed");
+        assert!(state.cmdline.log.iter().any(|l| l.contains("end segment")));
+    }
+
+    #[test]
+    fn two_parallel_segments_of_one_polyline_get_a_half_circle_and_lose_the_one_between() {
+        let u = open_polyline(&[p(0.0, 0.0), p(10.0, 0.0), p(10.0, 4.0), p(0.0, 4.0)]);
+        let mut state = started(&[u], fillet_objects, &["r", "1"]);
+        click(&mut state, 0, p(3.0, 0.0));
+        click(&mut state, 0, p(3.0, 4.0));
+        let all = entities(&state);
+        assert_eq!(all.len(), 1);
+        let Entity::Polyline { points, bulges, .. } = &all[0] else {
+            panic!("{all:?}")
+        };
+        assert_eq!(points.len(), 4);
+        assert!(
+            (bulges[1].abs() - 1.0).abs() < 1e-9,
+            "a half circle: {bulges:?}"
+        );
+        state.undo();
+        assert_eq!(polyline_points(&entities(&state)[0]), 4);
+        assert!(
+            matches!(&entities(&state)[0], Entity::Polyline { bulges, .. } if bulges.is_empty())
+        );
     }
 }

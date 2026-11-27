@@ -25,6 +25,7 @@ pub mod ccs_align;
 pub mod closed_pair;
 mod corner;
 mod corner_infinite;
+mod corner_polyline;
 mod curve_snap;
 pub mod dimension;
 pub mod divide;
@@ -106,6 +107,7 @@ pub use block::{
 pub use ccs::{Ccs, CcsSpace, NamedCcs};
 pub use corner::{Chamfer, CornerError, Joined};
 pub use corner_infinite::{chamfer_lines, fillet};
+pub use corner_polyline::{join_apart_segments, join_to_end_segment, EndJoin};
 pub use dimension::{Arrow, DimKind, DimStyle, DimText, Dimension};
 pub use document::{
     Absorbed, BlockClash, BlockNameClash, BringError, Brought, Document, EntityId,

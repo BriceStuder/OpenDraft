@@ -31,6 +31,8 @@ pub enum CornerError {
     NoFit,
     /// Two segments of a polyline that do not meet at a vertex.
     NotAdjacent,
+    /// A line joined to a polyline's segment that is not at its end.
+    NotEndSegment,
     /// Parallel lines where the second lies wholly beyond the end of the
     /// first, so no half circle can join them.
     PastTheEnd,
@@ -45,7 +47,8 @@ impl fmt::Display for CornerError {
             CornerError::TooLong => key!("The radius or distance is too large for these objects."),
             CornerError::Unsupported => key!("Those objects cannot be joined at a corner."),
             CornerError::NoFit => key!("No arc of that radius fits between those objects."),
-            CornerError::NotAdjacent => key!("Select two adjacent segments of the polyline."),
+            CornerError::NotAdjacent => key!("Select two segments of the polyline that are adjacent or have one segment between them."),
+            CornerError::NotEndSegment => key!("Select an end segment of the open polyline."),
             CornerError::PastTheEnd => key!("The second line lies beyond the end of the first."),
         })
     }
