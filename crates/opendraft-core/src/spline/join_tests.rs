@@ -97,3 +97,52 @@ fn splines_that_do_not_meet_or_differ_in_degree_do_not_join() {
     let line = Spline::from_control_points(1, vec![p(14.0, 0.0), p(20.0, 0.0)]).unwrap();
     assert!(a.joined(&line, 1e-9).is_none());
 }
+
+#[test]
+fn a_spline_joins_a_line_and_a_polyline_with_an_arc_into_one_spline() {
+    use crate::Entity;
+    let spline = whole();
+    let end = spline.end_point();
+    let line = Entity::Line {
+        start: end,
+        end: p(end.x + 3.0, end.y),
+    };
+    // Starts where the line ends and bends through a quarter-ish arc.
+    let tail = Entity::Polyline {
+        points: vec![p(end.x + 3.0, end.y), p(end.x + 3.0, end.y + 4.0)],
+        closed: false,
+        bulges: vec![0.5, 0.0],
+        widths: Vec::new(),
+    };
+    let items = [
+        line.clone(),
+        Entity::Spline(Box::new(spline.clone())),
+        tail.clone(),
+    ];
+    let merged = crate::join(&items, 1e-6);
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged[0].used, vec![0, 1, 2]);
+    let Entity::Spline(whole_one) = &merged[0].entity else {
+        panic!("a spline")
+    };
+    let sum =
+        spline.length().unwrap() + line.curve_length().unwrap() + tail.curve_length().unwrap();
+    assert!((whole_one.length().unwrap() - sum).abs() < 1e-5);
+    assert!(near(whole_one.start_point(), spline.start_point()));
+    assert!(near(whole_one.end_point(), p(end.x + 3.0, end.y + 4.0)));
+    // A line that does not touch is left out, and a degree-1 spline cannot take an arc.
+    let far = Entity::Line {
+        start: p(100.0, 100.0),
+        end: p(101.0, 100.0),
+    };
+    let merged = crate::join(&[Entity::Spline(Box::new(spline)), far], 1e-6);
+    assert!(merged.is_empty());
+    let flat = Spline::from_control_points(1, vec![p(0.0, 0.0), p(5.0, 0.0)]).unwrap();
+    let arc_tail = Entity::Polyline {
+        points: vec![p(5.0, 0.0), p(5.0, 4.0)],
+        closed: false,
+        bulges: vec![0.5, 0.0],
+        widths: Vec::new(),
+    };
+    assert!(crate::join(&[Entity::Spline(Box::new(flat)), arc_tail], 1e-6).is_empty());
+}

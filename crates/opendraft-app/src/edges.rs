@@ -121,9 +121,6 @@ pub fn extend_plan(
     boundaries: &[Entity],
     at: Point,
 ) -> Result<Vec<Entity>, &'static str> {
-    if matches!(target, Entity::Spline(_)) {
-        return Err(key!("EXTEND does not support splines yet."));
-    }
     let ends = match target {
         Entity::Line { start, end } => Some((*start, *end)),
         Entity::Arc {
@@ -136,6 +133,7 @@ pub fn extend_plan(
             opendraft_core::arc::point_at(*center, *radius, *end),
         )),
         Entity::Ellipse(e) if !e.is_full() => Some((e.start_point(), e.end_point())),
+        Entity::Spline(s) if !s.closed && !s.periodic => Some((s.start_point(), s.end_point())),
         Entity::Polyline {
             points,
             closed: false,
@@ -534,13 +532,29 @@ mod tests {
     }
 
     #[test]
-    fn a_spline_is_a_boundary_for_extend_but_not_itself_extended() {
+    fn a_spline_is_a_boundary_for_extend_and_runs_on_straight_to_one() {
         let short = line(p(0.0, 5.5), p(0.0, 6.5));
         let made = extend_plan(&short, &[arch()], p(0.0, 5.5)).unwrap();
         assert!(matches!(made[0], Entity::Line { .. }));
+        // The arch leaves (6, 0) heading down and right (1, -3): it runs on
+        // straight to the wall at x = 9, at y = -9.
+        let made = extend_plan(&arch(), &[wall(9.0)], p(5.9, 0.1)).unwrap();
+        let Entity::Spline(longer) = &made[0] else {
+            panic!("{made:?}")
+        };
+        let (end, start) = (longer.end_point(), longer.start_point());
+        assert!(
+            (end.x - 9.0).abs() < 1e-6 && (end.y + 9.0).abs() < 1e-6,
+            "{end:?}"
+        );
+        assert!(
+            (start.x + 6.0).abs() < 1e-9 && start.y.abs() < 1e-9,
+            "the other end stayed"
+        );
+        // Nothing in the way: no boundary on the way out.
         assert_eq!(
-            extend_plan(&arch(), &[wall(9.0)], p(4.0, 0.0)),
-            Err("EXTEND does not support splines yet.")
+            extend_plan(&arch(), &[wall(-9.0)], p(5.9, 0.1)),
+            Err("No boundary in the way.")
         );
     }
 

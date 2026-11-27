@@ -1,7 +1,9 @@
 //! PEDIT's Edit vertex: a marker steps along the polyline's vertices and
 //! the options insert, move, straighten, break or widen at it. The edits are
-//! `opendraft_core::pedit`. Not built: Tangent.
+//! `opendraft_core::pedit`. Tangent sets the direction Fit runs along at the
+//! vertex (`pedit_curve.rs`).
 
+use crate::pedit_curve::{can_set_tangent, set_tangent, store_keeping_tangents};
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, PointOptions};
 use opendraft_core::pedit::PolyData;
 use opendraft_core::{Entity, EntityId, Point};
@@ -51,6 +53,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
             .keyword("Move", "M")
             .keyword("Regen", "R")
             .keyword("Straighten", "S")
+            .keyword("Tangent", "T")
             .keyword("Width", "W")
             .keyword("eXit", "X")
             .marker(move |unit| markers(&points, &[v], unit))
@@ -91,7 +94,7 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                 let options = PointOptions::new(key!("Specify new location for marked vertex"))
                     .base(data.points[v]);
                 let at = ed.get_point(options)?;
-                store(ed, id, data.with_moved(v, at))?;
+                store_keeping_tangents(ed, id, &data, data.with_moved(v, at))?;
                 steps += 1;
             }
             "Width" => {
@@ -110,8 +113,19 @@ pub fn edit_vertices(ed: &mut Editor, id: EntityId) -> Result<usize, Cancelled> 
                     ed.say(key!("Requires a value of zero or more."));
                     continue;
                 }
-                store(ed, id, data.with_segment_width(v, w0, w1))?;
+                store_keeping_tangents(ed, id, &data, data.with_segment_width(v, w0, w1))?;
                 steps += 1;
+            }
+            "Tangent" => {
+                if !can_set_tangent(ed, id)? {
+                    continue;
+                }
+                let options = NumberOptions::new(key!("Specify direction of vertex tangent"))
+                    .base(data.points[v]);
+                let angle = ed.get_angle(options)?;
+                if set_tangent(ed, id, &data, v, angle)? {
+                    steps += 1;
+                }
             }
             "Straighten" => {
                 if let Some(w) = other_vertex(ed, &data, v)? {

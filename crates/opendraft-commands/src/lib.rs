@@ -25,6 +25,7 @@ mod mleader_style_action;
 mod order_action;
 mod paste_action;
 mod point_style_action;
+mod polyline_curve_action;
 mod prompt;
 mod properties_action;
 mod registry;
@@ -55,6 +56,7 @@ pub use mleader_style_action::SetMLeaderStyles;
 pub use order_action::{Place, ReorderObjects};
 pub use paste_action::{PasteDrawing, WarningSink};
 pub use point_style_action::SetPointStyle;
+pub use polyline_curve_action::SetPolylineCurve;
 pub use prompt::{
     Answer, BlockDialogButton, Cancelled, DynamicDimensions, Ghost, GhostStyle, Hint, Keyword,
     Marker, NumberOptions, NumberOrPoint, Options, Picked, PointOptions, Prompt, Reply, Swept,

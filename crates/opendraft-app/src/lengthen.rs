@@ -8,8 +8,6 @@ use opendraft_core::units::{format_angle, format_length};
 use opendraft_core::{End, Entity};
 use opendraft_ui::key;
 
-use crate::defaults::EditorDefaults;
-
 /// What to do to the end of each object that is picked.
 #[derive(Clone, Copy)]
 enum Mode {
@@ -42,7 +40,6 @@ impl Mode {
 fn refusal(target: &Entity) -> Option<&'static str> {
     match target {
         Entity::Ellipse(e) if e.is_full() => Some(key!("Object cannot be lengthened.")),
-        Entity::Spline(_) => Some(key!("LENGTHEN does not support splines yet.")),
         other if other.curve_length().is_none() => Some(key!("Object cannot be lengthened.")),
         _ => None,
     }
@@ -107,10 +104,10 @@ fn ask_mode(ed: &mut Editor, keyword: &str) -> Result<Option<Mode>, Cancelled> {
             ed,
             key!("Enter delta length"),
             true,
-            ed.defaults().lengthen_delta.get(),
+            ed.read(|doc| doc.modify_settings().lengthen_delta)?,
         )? {
             Amount::Length(d) => {
-                ed.defaults().lengthen_delta.change(|m| *m = Some(d));
+                ed.change_modify_settings(move |s| s.lengthen_delta = Some(d))?;
                 Some(Mode::Delta(d))
             }
             Amount::Angle(a) => Some(Mode::DeltaAngle(a)),
@@ -423,5 +420,86 @@ mod tests {
         say(&mut state, "");
         click(&mut state, 0, p(11.0, 1.0));
         assert_eq!(entities(&state), [line(p(0.0, 0.0), p(14.0, 0.0))]);
+    }
+
+    fn arch_spline() -> opendraft_core::Spline {
+        opendraft_core::Spline::from_control_points(
+            3,
+            vec![
+                p(0.0, 0.0),
+                p(2.0, 4.0),
+                p(6.0, 4.0),
+                p(8.0, 0.0),
+                p(10.0, -2.0),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn spline_length(state: &AppState) -> f64 {
+        match &entities(state)[0] {
+            Entity::Spline(s) => s.length().unwrap(),
+            other => panic!("a spline, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_spline_is_lengthened_and_shortened_at_the_end_nearer_the_click() {
+        let old = arch_spline();
+        let total = old.length().unwrap();
+        let mut state = lengthening(&[Entity::Spline(Box::new(old.clone()))]);
+        say(&mut state, "de");
+        say(&mut state, "3");
+        click(&mut state, 0, p(9.5, -1.5));
+        assert!((spline_length(&state) - total - 3.0).abs() < 1e-6);
+        say(&mut state, "");
+        assert!(!state.command_running());
+        state.undo();
+        assert!(
+            (spline_length(&state) - total).abs() < 1e-9,
+            "one undo step"
+        );
+        // A negative delta shortens the end nearer the click.
+        let mut state = lengthening(&[Entity::Spline(Box::new(old))]);
+        say(&mut state, "de");
+        say(&mut state, "-2");
+        click(&mut state, 0, p(0.0, 0.1));
+        assert!((spline_length(&state) - total + 2.0).abs() < 1e-6);
+        let Entity::Spline(s) = &entities(&state)[0] else {
+            panic!("a spline")
+        };
+        assert!(s.start_point().x > 0.5, "the start moved in");
+        assert!((s.end_point().x - 10.0).abs() < 1e-9, "the end stayed");
+    }
+
+    #[test]
+    fn percent_and_total_work_on_a_spline_and_a_closed_one_is_refused() {
+        let old = arch_spline();
+        let total = old.length().unwrap();
+        let mut state = lengthening(&[Entity::Spline(Box::new(old.clone()))]);
+        say(&mut state, "t");
+        say(&mut state, &(total * 1.5).to_string());
+        click(&mut state, 0, p(9.5, -1.5));
+        assert!((spline_length(&state) - total * 1.5).abs() < 1e-5);
+        let closed = opendraft_core::Spline::new_nurbs(
+            3,
+            vec![
+                p(0.0, 0.0),
+                p(4.0, 4.0),
+                p(8.0, 0.0),
+                p(4.0, -4.0),
+                p(0.0, 0.0),
+            ],
+            vec![0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0, 1.0],
+            None,
+            true,
+            false,
+        )
+        .unwrap();
+        let mut state = lengthening(&[Entity::Spline(Box::new(closed))]);
+        say(&mut state, "de");
+        say(&mut state, "1");
+        click(&mut state, 0, p(0.0, 0.0));
+        assert!(said(&state, "Object cannot be lengthened."));
     }
 }

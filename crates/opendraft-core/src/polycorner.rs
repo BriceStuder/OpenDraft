@@ -198,7 +198,7 @@ fn cut_at(prev: Point, at: Point, next: Point, how: Round) -> Result<Option<Cut>
 }
 
 /// One segment of the polyline as a line or an arc, for the general fillet.
-fn segment_entity(a: Point, b: Point, curve: f64) -> Option<Entity> {
+pub(crate) fn segment_entity(a: Point, b: Point, curve: f64) -> Option<Entity> {
     match bulge::arc_of(a, b, curve) {
         None => Some(Entity::Line { start: a, end: b }),
         Some(s) => Some(Entity::Arc {

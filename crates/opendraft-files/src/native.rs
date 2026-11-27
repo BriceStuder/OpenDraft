@@ -61,9 +61,11 @@ mod linetype;
 mod load;
 mod mleader;
 mod mleader_style;
+mod modify_settings;
 mod names;
 mod new_style;
 mod point_style;
+mod polyline_curve;
 mod properties;
 pub(crate) mod spline;
 mod text;
@@ -279,12 +281,18 @@ struct DrawingDto {
     /// `PDMODE` and `PDSIZE`.
     #[serde(flatten)]
     point_style: point_style::PointStyleDto,
+    /// What FILLET, CHAMFER, OFFSET and LENGTHEN remember.
+    #[serde(flatten)]
+    modify_settings: modify_settings::ModifySettingsDto,
     /// The Model tab's coordinate system and the ones saved by name.
     #[serde(flatten)]
     ccs: ccs::TableDto,
     /// The associative arrays.
     #[serde(flatten)]
     arrays: array::TableDto,
+    /// What PEDIT keeps beside polylines.
+    #[serde(flatten)]
+    polyline_curves: polyline_curve::TableDto,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -398,8 +406,10 @@ impl DrawingDto {
             linetypes: linetype::TableDto::of(document),
             new_style: new_style::NewStyleDto::of(document),
             point_style: point_style::PointStyleDto::of(document),
+            modify_settings: modify_settings::ModifySettingsDto::of(document),
             ccs: ccs::TableDto::of(document),
             arrays: array::TableDto::of(document),
+            polyline_curves: polyline_curve::TableDto::of(document),
         })
     }
 }

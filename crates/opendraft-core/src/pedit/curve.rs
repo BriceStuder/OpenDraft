@@ -25,6 +25,13 @@ impl PolyData {
     /// fewer than three vertices when open (a line stays a line) or for
     /// coincident vertices.
     pub fn fitted(&self) -> Option<PolyData> {
+        self.fitted_with(&[])
+    }
+
+    /// [`Self::fitted`] with the tangent direction (radians) set at some
+    /// vertices (`tangents[i]`, `None` for the chord's): the curve leaves and
+    /// arrives along it there.
+    pub fn fitted_with(&self, set: &[Option<f64>]) -> Option<PolyData> {
         let n = self.points.len();
         let segments = bulge::segment_count(n, self.closed);
         if n < 3 || segments == 0 {
@@ -43,7 +50,10 @@ impl PolyData {
             } else {
                 (at(i - 1), at(i + 1))
             };
-            tangents.push(unit(before, after)?);
+            tangents.push(match set.get(i).copied().flatten() {
+                Some(angle) => crate::polyline_curve::direction_of(angle),
+                None => unit(before, after)?,
+            });
         }
         let mut points = Vec::new();
         let mut bulges = Vec::new();

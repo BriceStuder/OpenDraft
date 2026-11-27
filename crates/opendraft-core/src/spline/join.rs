@@ -27,7 +27,7 @@ impl Spline {
 
     /// This spline continued by `other`, when `other` starts where this one
     /// ends (within `tolerance`) and both are open and of one degree.
-    fn followed_by(&self, other: &Spline, tolerance: f64) -> Option<Spline> {
+    pub(super) fn followed_by(&self, other: &Spline, tolerance: f64) -> Option<Spline> {
         let p = usize::from(self.degree);
         if self.degree != other.degree
             || self.periodic

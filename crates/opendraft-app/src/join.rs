@@ -35,22 +35,6 @@ pub fn join_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             .collect()
     })?;
     let entities: Vec<Entity> = found.iter().map(|(_, e)| e.clone()).collect();
-    // Nothing changes when any is refused, so the selection stays as it was.
-    // Splines join only with splines.
-    let others = |e: &Entity| {
-        matches!(
-            e,
-            Entity::Line { .. }
-                | Entity::Arc { .. }
-                | Entity::Polyline { .. }
-                | Entity::Ellipse(_)
-                | Entity::Rectangle { .. }
-        )
-    };
-    if entities.iter().any(|e| matches!(e, Entity::Spline(_))) && entities.iter().any(others) {
-        ed.say(key!("JOIN does not support splines yet."));
-        return Ok(());
-    }
     let merged = join(&entities, GAP.max(fuzz));
     if merged.is_empty() {
         ed.say(key!("Nothing to join: the objects do not meet end to end."));
@@ -202,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn a_selection_with_a_spline_is_refused_whole() {
+    fn lines_that_meet_a_spline_join_into_it_in_one_undo_step() {
         let items = [
             line(p(-5.0, 0.0), p(-6.0, 0.0)),
             line(p(-6.0, 0.0), p(-6.0, 1.0)),
@@ -211,13 +195,35 @@ mod tests {
                     .unwrap(),
             )),
         ];
+        let mut state = joining(&items);
+        let all = entities(&state);
+        assert_eq!(all.len(), 1, "{all:?}");
+        let Entity::Spline(s) = &all[0] else {
+            panic!("a spline, got {all:?}")
+        };
+        assert!((s.length().unwrap() - 12.0).abs() < 1e-9);
+        state.undo();
+        assert_eq!(entities(&state), items);
+    }
+
+    #[test]
+    fn a_circle_among_a_spline_and_lines_is_left_alone() {
+        let circle = Entity::Circle {
+            center: p(50.0, 50.0),
+            radius: 2.0,
+        };
+        let items = [
+            Entity::Spline(Box::new(
+                opendraft_core::Spline::from_control_points(1, vec![p(0.0, 0.0), p(5.0, 0.0)])
+                    .unwrap(),
+            )),
+            line(p(5.0, 0.0), p(5.0, 3.0)),
+            circle.clone(),
+        ];
         let state = joining(&items);
-        assert_eq!(entities(&state), items, "the lines are not joined either");
-        assert!(state
-            .cmdline
-            .log
-            .iter()
-            .any(|l| l.contains("JOIN does not support splines yet.")));
+        let all = entities(&state);
+        assert_eq!(all.len(), 2, "{all:?}");
+        assert!(all.contains(&circle));
     }
 
     #[test]
@@ -373,13 +379,17 @@ mod tests {
     }
 
     #[test]
-    fn a_spline_beside_a_line_is_still_refused() {
+    fn a_line_that_touches_a_spline_joins_it_and_one_that_does_not_says_so() {
         let state = joining(&[span(0.0), line(p(6.0, 0.0), p(9.0, 0.0))]);
+        let now = entities(&state);
+        assert_eq!(now.len(), 1, "{now:?}");
+        assert!(matches!(&now[0], Entity::Spline(s) if (s.end_point().x - 9.0).abs() < 1e-9));
+        let state = joining(&[span(0.0), line(p(60.0, 0.0), p(90.0, 0.0))]);
         assert_eq!(entities(&state).len(), 2);
         assert!(state
             .cmdline
             .log
             .iter()
-            .any(|l| l.contains("JOIN does not support splines yet.")));
+            .any(|l| l.contains("Nothing to join")));
     }
 }

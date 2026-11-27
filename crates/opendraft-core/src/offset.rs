@@ -46,11 +46,11 @@ impl Entity {
                     crate::infinite::shifted(*origin, *direction, distance * side.signum());
                 Some(self.with_infinite_line(shifted, *direction))
             }
-            // The offset of an ellipse is not an ellipse; AutoCAD makes a
-            // spline, which the drawing has no kind for yet.
-            Entity::Ellipse(_) => None,
-            // A spline's offset needs fitting a new spline; not built yet.
-            Entity::Spline(_) => None,
+            // The offset of an ellipse or a spline is not one of its own
+            // kind: AutoCAD makes a spline, fitted to within a hundred-
+            // thousandth of the true parallel curve (`offset_fit`).
+            Entity::Ellipse(_) => self.offset_ellipse(distance, toward),
+            Entity::Spline(_) => self.offset_spline(distance, toward),
             Entity::Line { start, end } => {
                 let side = side_of(*start, *end, toward)?;
                 let n = left_normal(*start, *end)?;
