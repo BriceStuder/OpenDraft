@@ -125,6 +125,12 @@ impl Spline {
 
     /// The point `s` along the curve from its start (clamped to the curve).
     pub fn point_at_length(&self, s: f64) -> Result<Point, SplineError> {
+        Ok(self.point_at(self.parameter_at_length(s)?))
+    }
+
+    /// The parameter `s` along the curve from its start (clamped to the
+    /// curve's ends).
+    pub fn parameter_at_length(&self, s: f64) -> Result<f64, SplineError> {
         let pieces = self.pieces()?;
         let mut run = 0.0;
         for piece in &pieces {
@@ -144,9 +150,9 @@ impl Spline {
                     hi = mid;
                 }
             }
-            return Ok(self.point_at((lo + hi) / 2.0));
+            return Ok((lo + hi) / 2.0);
         }
-        Ok(self.end_point())
+        Ok(self.domain().1)
     }
 
     /// The point halfway along the curve (what the Midpoint snap finds).

@@ -76,6 +76,7 @@ pub mod point_style;
 mod polycorner;
 pub mod polygon;
 pub mod polyline;
+pub mod polyline_curve;
 pub mod purge;
 pub mod rect;
 pub mod rect_shape;
@@ -138,6 +139,7 @@ pub use plot_settings::{
 pub use point_style::{PointMarks, PointStyle};
 pub use polycorner::{round_polyline, Path, Round, Rounded};
 pub use polyline::PolylineError;
+pub use polyline_curve::{CurveFrame, PolylineCurve};
 pub use single_line_text::{SingleLineText, TextAlignment, TextAlignmentMode};
 pub use spline::{KnotParameterization, Spline, SplineError, SplineFitData};
 pub use tangent::tangent_circle;

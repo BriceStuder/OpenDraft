@@ -177,6 +177,16 @@ fn build() -> Vec<SysVar<AppState>> {
             },
         ),
         SysVar::int(
+            "PLINECONVERTMODE",
+            "How PEDIT turns a spline into a polyline: 0 straight pieces, 1 arcs",
+            (0, 1),
+            |st| Value::Int(i64::from(st.defaults().pedit.get().convert_arcs)),
+            |st, v| {
+                st.defaults().pedit.change(|m| m.convert_arcs = int(v) == 1);
+                Ok(())
+            },
+        ),
+        SysVar::int(
             "AFLAGS",
             "Attribute modes new definitions start with: 1 invisible, 2 constant, 4 verify, 8 preset, 16 lock position",
             (0, i64::from(crate::attribute_memory::AFLAGS_MASK)),

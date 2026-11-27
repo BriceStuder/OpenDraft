@@ -1,8 +1,10 @@
 //! Lengthening or shortening an entity by an amount, the base for LENGTHEN.
 //! (Extending to a boundary is `extend`.) A line keeps its direction, an arc
 //! its circle, and an open polyline changes its first or last segment the same
-//! way. An elliptical arc is lengthened along its curve (`lengthen_ellipse.rs`).
-//! A full ellipse and splines are not handled yet.
+//! way. An elliptical arc is lengthened along its curve (`lengthen_ellipse.rs`)
+//! and an open spline is cut back or continued straight (`spline/lengthen.rs`).
+//! Closed objects (a circle, a full ellipse, a closed polyline or spline) are
+//! not lengthened, as in AutoCAD.
 
 use std::f64::consts::TAU;
 
@@ -30,6 +32,7 @@ impl Entity {
                 radius, start, end, ..
             } => Some(radius.abs() * arc::sweep(*start, *end)),
             Entity::Ellipse(e) if !e.is_full() => Some(e.arc_length()),
+            Entity::Spline(s) if !s.closed && !s.periodic => s.length().ok(),
             Entity::Polyline {
                 points,
                 closed: false,
@@ -62,6 +65,7 @@ impl Entity {
                 arc::point_at(*center, *radius, *end),
             ),
             Entity::Ellipse(e) if !e.is_full() => (e.start_point(), e.end_point()),
+            Entity::Spline(s) if !s.closed && !s.periodic => (s.start_point(), s.end_point()),
             Entity::Polyline {
                 points,
                 closed: false,
@@ -138,6 +142,7 @@ impl Entity {
                 self.lengthened_by_angle(end, new_sweep - arc::sweep(*start, *stop))
             }
             Entity::Ellipse(e) => e.lengthened_to(end, p).map(Entity::Ellipse),
+            Entity::Spline(s) => s.lengthened_to(end, p).map(|s| Entity::Spline(Box::new(s))),
             Entity::Polyline {
                 points,
                 closed: false,
@@ -155,6 +160,13 @@ impl Entity {
             // An angle of an ellipse is not a length along it.
             Entity::Ellipse(e) => match growth {
                 Growth::Length(delta) => e.lengthened(end, delta).map(Entity::Ellipse),
+                Growth::Angle(_) => None,
+            },
+            // An angle of a spline is not a length along it either.
+            Entity::Spline(s) => match growth {
+                Growth::Length(delta) => s
+                    .lengthened(end, delta)
+                    .map(|s| Entity::Spline(Box::new(s))),
                 Growth::Angle(_) => None,
             },
             Entity::Line { start, end: stop } => {

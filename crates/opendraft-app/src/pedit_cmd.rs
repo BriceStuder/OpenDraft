@@ -4,7 +4,8 @@
 //! polylines first. The edits themselves are `opendraft_core::pedit`.
 //!
 //! Fit and Spline turn the polyline into a smooth curve (`pedit_curve.rs`),
-//! and a spline is turned into a polyline first. Not built: vertex Tangent.
+//! which remembers the polyline it came from for Decurve, and a spline is
+//! turned into a polyline first (also for Multiple).
 
 use opendraft_commands::{
     Answer, Cancelled, Editor, ModifyAttributes, NumberOptions, Options, Picked,
@@ -14,7 +15,7 @@ use opendraft_core::{Entity, EntityId};
 use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
-use crate::pedit_curve::{convert_spline, curve};
+use crate::pedit_curve::{convert_many_splines, convert_spline, curve, decurve, decurve_all};
 use crate::pedit_join::{ask_fuzz, join_group};
 use crate::pedit_vertex::edit_vertices;
 
@@ -178,7 +179,7 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
                 }
             }
             "Decurve" => {
-                store(ed, id, data.decurved())?;
+                decurve(ed, id, &data)?;
                 steps += 1;
             }
             "Reverse" => {
@@ -254,14 +255,15 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
                 .collect()
         })?
     };
+    let editable = |e: &Entity| PolyData::of(e).is_some() || matches!(e, Entity::Spline(_));
     let mut ids: Vec<EntityId> = kinds
         .iter()
-        .filter(|(_, e)| PolyData::of(e).is_some())
+        .filter(|(_, e)| editable(e))
         .map(|(id, _)| *id)
         .collect();
     let others = kinds
         .iter()
-        .filter(|(_, e)| PolyData::of(e).is_some() && !matches!(e, Entity::Polyline { .. }))
+        .filter(|(_, e)| editable(e) && !matches!(e, Entity::Polyline { .. }))
         .count();
     if ids.is_empty() {
         ed.say(key!(
@@ -271,10 +273,12 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
     }
     if others > 0 && !ed.defaults().pedit.get().accept {
         let turn = ed.get_keyword(
-            Options::new(key!("Convert lines, arcs and rectangles to polylines?"))
-                .keyword("Yes", "Y")
-                .keyword("No", "N")
-                .default("Yes".to_owned()),
+            Options::new(key!(
+                "Convert lines, arcs, splines and rectangles to polylines?"
+            ))
+            .keyword("Yes", "Y")
+            .keyword("No", "N")
+            .default("Yes".to_owned()),
         )?;
         if turn == "No" {
             ids.retain(|id| {
@@ -286,6 +290,19 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
     }
     if ids.is_empty() {
         return Ok(());
+    }
+    // Splines become polylines first, at one precision for all of them.
+    let splines: Vec<EntityId> = kinds
+        .iter()
+        .filter(|(id, e)| matches!(e, Entity::Spline(_)) && ids.contains(id))
+        .map(|(id, _)| *id)
+        .collect();
+    if !splines.is_empty() {
+        let converted = convert_many_splines(ed, &splines)?;
+        ids.retain(|id| !splines.contains(id) || converted.contains(id));
+        if ids.is_empty() {
+            return Ok(());
+        }
     }
     let mut steps = 0usize;
     loop {
@@ -305,7 +322,7 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
             "Ltype gen" => set_generation(ed, &ids)?,
             "Close" => change_all(ed, &ids, |d| d.with_closed(true))?,
             "Open" => change_all(ed, &ids, |d| d.with_closed(false))?,
-            "Decurve" => change_all(ed, &ids, PolyData::decurved)?,
+            "Decurve" => decurve_all(ed, &ids)?,
             "Reverse" => change_all(ed, &ids, PolyData::reversed)?,
             "Width" => match ask_width(ed)? {
                 Some(w) => {
@@ -365,6 +382,9 @@ fn change_all(
     Ok(true)
 }
 
+#[cfg(test)]
+#[path = "pedit_curve_tests.rs"]
+mod curve_tests;
 #[cfg(test)]
 #[path = "pedit_join_tests.rs"]
 mod join_tests;

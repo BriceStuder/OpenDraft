@@ -65,6 +65,7 @@ mod modify_settings;
 mod names;
 mod new_style;
 mod point_style;
+mod polyline_curve;
 mod properties;
 pub(crate) mod spline;
 mod text;
@@ -289,6 +290,9 @@ struct DrawingDto {
     /// The associative arrays.
     #[serde(flatten)]
     arrays: array::TableDto,
+    /// What PEDIT keeps beside polylines.
+    #[serde(flatten)]
+    polyline_curves: polyline_curve::TableDto,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -405,6 +409,7 @@ impl DrawingDto {
             modify_settings: modify_settings::ModifySettingsDto::of(document),
             ccs: ccs::TableDto::of(document),
             arrays: array::TableDto::of(document),
+            polyline_curves: polyline_curve::TableDto::of(document),
         })
     }
 }

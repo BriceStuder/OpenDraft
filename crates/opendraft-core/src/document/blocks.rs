@@ -189,6 +189,7 @@ impl Document {
             point_style: self.point_style,
             modify_settings: self.modify_settings,
             arrays: Vec::new(),
+            polyline_curves: Vec::new(),
             spatial: Default::default(),
         }
     }

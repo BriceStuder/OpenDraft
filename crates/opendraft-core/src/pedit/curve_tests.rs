@@ -109,3 +109,33 @@ fn a_spline_becomes_a_polyline_along_it() {
     assert!(near(line.points[0], spline.start_point()));
     assert!(line.points.len() > 4 && !line.closed);
 }
+
+#[test]
+fn a_tangent_set_at_a_vertex_bends_the_fit_to_leave_along_it() {
+    // Three points in a line fit to a straight line...
+    let line = data(&[p(0.0, 0.0), p(5.0, 0.0), p(10.0, 0.0)], false);
+    assert!(!bulge::has_arcs(&line.fitted().unwrap().bulges));
+    // ...until the middle one is told to run straight up.
+    let set = [None, Some(std::f64::consts::FRAC_PI_2), None];
+    let bent = line.fitted_with(&set).unwrap();
+    assert!(bulge::has_arcs(&bent.bulges));
+    // The curve passes through the same vertices, and at the middle one the
+    // first arc arrives and the next leaves along the set direction.
+    assert!(near(bent.points[2], p(5.0, 0.0)));
+    let (a, m, b) = (bent.points[1], bent.points[2], bent.points[3]);
+    let arriving = (
+        bulge::point_at(a, m, bent.bulges[1], 1.0),
+        bulge::point_at(a, m, bent.bulges[1], 0.999_999),
+    );
+    let leaving = (
+        bulge::point_at(m, b, bent.bulges[2], 0.000_001),
+        bulge::point_at(m, b, bent.bulges[2], 0.0),
+    );
+    for (to, from) in [arriving, leaving] {
+        let d = distance(from, to);
+        let (dx, dy) = ((to.x - from.x) / d, (to.y - from.y) / d);
+        assert!(dx.abs() < 1e-3 && dy.abs() > 0.999, "{dx} {dy}");
+    }
+    // A tangent nobody set leaves the chord's direction as it was.
+    assert_eq!(line.fitted_with(&[None, None, None]), line.fitted());
+}

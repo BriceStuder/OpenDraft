@@ -30,6 +30,7 @@ mod fit;
 mod fit_closed;
 mod flatten;
 mod join;
+mod lengthen;
 mod query;
 mod snap;
 mod transform;
