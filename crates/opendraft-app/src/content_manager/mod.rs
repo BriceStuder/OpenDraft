@@ -151,6 +151,27 @@ impl Window {
         }
     }
 
+    /// Opens the window on This drawing with block `id` being renamed, as
+    /// its pencil does.
+    #[cfg(test)]
+    pub(crate) fn start_drawing_rename(&mut self, id: BlockId, name: &str) {
+        self.open_on(Place::Drawing);
+        self.selected = Selected::Drawing(name.to_owned());
+        self.editing = Some(Editing::RenameDrawingBlock {
+            id,
+            text: name.to_owned(),
+        });
+    }
+
+    /// Whether a block's name field is open.
+    #[cfg(test)]
+    pub(crate) fn renaming(&self) -> bool {
+        matches!(
+            self.editing,
+            Some(Editing::RenameBlock { .. } | Editing::RenameDrawingBlock { .. })
+        )
+    }
+
     /// Opens the window on `place`.
     pub fn open_on(&mut self, place: Place) {
         self.open = true;

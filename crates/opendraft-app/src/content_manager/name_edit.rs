@@ -40,17 +40,27 @@ pub(super) fn name_line(
             ui.weak(facts);
             return;
         };
-        let field = ui.add(
+        // Read before the field: on Enter it gives up the focus it is given
+        // again below, so it never reports having lost it.
+        let id = egui::Id::new("content_manager_block_name");
+        let typing_here = ui.memory(|m| m.has_focus(id));
+        let (enter, escape) = ui.input(|i| {
+            (
+                i.key_pressed(egui::Key::Enter),
+                i.key_pressed(egui::Key::Escape),
+            )
+        });
+        ui.add(
             egui::TextEdit::singleline(text)
+                .id(id)
                 .font(egui::FontId::proportional(theme.font_size_heading))
                 .desired_width(220.0),
-        );
-        field.request_focus();
-        let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        if ui.button("OK").clicked() || enter {
+        )
+        .request_focus();
+        if ui.button("OK").clicked() || (typing_here && enter) {
             asked = NameEdit::Accept(text.trim().to_owned());
         }
-        if ui.button("Cancel").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if ui.button("Cancel").clicked() || escape {
             asked = NameEdit::Cancel;
         }
     });
