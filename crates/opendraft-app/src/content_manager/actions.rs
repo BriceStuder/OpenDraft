@@ -3,6 +3,7 @@
 use opendraft_content::blocks_payload::folder;
 use opendraft_content::blocks_payload::BlockUuid;
 use opendraft_content::library::{CaptureRequest, Library, LibraryError, NameTaken};
+use opendraft_core::BlockId;
 
 use super::{Editing, Env, Place, Request, Selected, Window};
 use crate::content_library::now;
@@ -32,6 +33,8 @@ pub enum Action {
     DropOffer,
     Edit(Option<Editing>),
     RenameBlock(BlockUuid, String),
+    /// Rename a block of the drawing, which the app does.
+    RenameDrawingBlock(BlockId, String),
     SetDescription(BlockUuid, String),
     SetTags(BlockUuid, Vec<String>),
     Move(BlockUuid, String),
@@ -75,6 +78,9 @@ impl Window {
                 Action::Insert(id) => requests.push(Request::Insert(id)),
                 Action::AddObjects => requests.push(Request::AddObjects),
                 Action::ImportFile => requests.push(Request::PickImport),
+                Action::RenameDrawingBlock(id, name) => {
+                    requests.push(Request::RenameDrawingBlock(id, name))
+                }
                 Action::RunImport => self.run_import(env),
                 Action::CancelImport => self.import = None,
                 Action::DropOffer => self.taken = None,

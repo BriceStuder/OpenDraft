@@ -7,6 +7,7 @@ use opendraft_content::library::BlockInfo;
 use opendraft_ui::{icons, Theme};
 
 use super::actions::{Action, Taken};
+use super::drawing::drawing_menu;
 use super::list::{empty_state, list_header, list_row, list_widths};
 use super::snapshot::Snapshot;
 use super::{Editing, Env, Place, Selected, View, Window};
@@ -83,7 +84,9 @@ impl Window {
         let (label, text) = match editing {
             Editing::NewFolder { text, .. } => ("New folder name", text),
             Editing::RenameFolder { text, .. } => ("Folder name", text),
-            Editing::RenameBlock { text, .. } => ("Block name", text),
+            Editing::RenameBlock { text, .. } | Editing::RenameDrawingBlock { text, .. } => {
+                ("Block name", text)
+            }
         };
         let (mut accept, mut cancel) = (false, false);
         ui.horizontal(|ui| {
@@ -105,6 +108,7 @@ impl Window {
                     Action::RenameFolder(path.clone(), folder::join(folder::parent(path), &name))
                 }
                 Editing::RenameBlock { id, .. } => Action::RenameBlock(*id, name),
+                Editing::RenameDrawingBlock { id, .. } => Action::RenameDrawingBlock(*id, name),
             });
         }
     }
@@ -300,12 +304,7 @@ impl Window {
                 if response.double_clicked() {
                     actions.push(Action::AddFromDrawing(name.clone(), Taken::Cancel));
                 }
-                response.context_menu(|ui| {
-                    if ui.button("Add to library").clicked() {
-                        actions.push(Action::AddFromDrawing(name.clone(), Taken::Cancel));
-                        ui.close_menu();
-                    }
-                });
+                response.context_menu(|ui| drawing_menu(ui, block.id, &name, actions));
             }
         });
     }

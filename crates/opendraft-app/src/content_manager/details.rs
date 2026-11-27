@@ -89,9 +89,16 @@ impl Window {
                         ui.weak("The library has a block of this name already.");
                     }
                 }
-                if ui.button("Add to library").clicked() {
-                    actions.push(Action::AddFromDrawing(name, Taken::Cancel));
-                }
+                ui.horizontal(|ui| {
+                    if ui.button("Add to library").clicked() {
+                        actions.push(Action::AddFromDrawing(name.clone(), Taken::Cancel));
+                    }
+                    if let Some(b) = known {
+                        if ui.button("Rename").clicked() {
+                            actions.extend(super::drawing::rename(b.id, &name));
+                        }
+                    }
+                });
             }
             Selected::Trashed(id) => {
                 if let Some(item) = snap.trash.iter().find(|t| t.id == id) {

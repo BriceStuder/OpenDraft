@@ -11,7 +11,7 @@
 
 use eframe::egui;
 use opendraft_content::blocks_payload::BlockUuid;
-use opendraft_core::Document;
+use opendraft_core::{BlockId, Document};
 use opendraft_ui::{icons, Theme};
 
 use crate::content_library::LibraryHandle;
@@ -20,6 +20,7 @@ mod actions;
 mod chrome;
 mod contents;
 mod details;
+mod drawing;
 mod filter;
 mod import;
 mod list;
@@ -65,16 +66,18 @@ pub enum Selected {
     Trashed(u64),
 }
 
-/// A name being typed.
+/// A name being typed: a new folder's, or a folder's, a library block's or
+/// a block of the open drawing's new name.
 #[derive(Clone, Debug)]
 pub enum Editing {
     NewFolder { parent: String, text: String },
     RenameFolder { path: String, text: String },
     RenameBlock { id: BlockUuid, text: String },
+    RenameDrawingBlock { id: BlockId, text: String },
 }
 
 /// What the window asks of the app, which owns the commands.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Request {
     /// Start LIBINSERT on this block.
     Insert(BlockUuid),
@@ -82,6 +85,9 @@ pub enum Request {
     AddObjects,
     /// Ask for a drawing file and offer its blocks for import.
     PickImport,
+    /// Rename a block of the open drawing (one undo step); the answer comes
+    /// back through [`Window::drawing_block_renamed`].
+    RenameDrawingBlock(BlockId, String),
 }
 
 /// What the window reads of the app.
@@ -117,6 +123,22 @@ impl Window {
     pub fn say(&mut self, text: String) {
         self.status = text;
         self.open = true;
+    }
+
+    /// Takes the app's answer to [`Request::RenameDrawingBlock`]: the name
+    /// bar closes and the block stays chosen under its new name, or the bar
+    /// stays open with the reason in the status line.
+    pub fn drawing_block_renamed(&mut self, result: Result<String, String>, name: &str) {
+        match result {
+            Ok(said) => {
+                self.editing = None;
+                self.selected = Selected::Drawing(name.trim().to_owned());
+                if !said.is_empty() {
+                    self.status = said;
+                }
+            }
+            Err(why) => self.status = why,
+        }
     }
 
     /// Opens the window on `place`.
