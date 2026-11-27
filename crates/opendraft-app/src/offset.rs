@@ -120,14 +120,6 @@ pub fn offset_objects(ed: &mut Editor) -> Result<(), Cancelled> {
             continue;
         };
         let target = object.entity.clone();
-        if matches!(target, Entity::Ellipse(_)) {
-            ed.say(key!("OFFSET does not support ellipses yet."));
-            continue;
-        }
-        if matches!(target, Entity::Spline(_)) {
-            ed.say(key!("OFFSET does not support splines yet."));
-            continue;
-        }
         let message = match gap {
             Gap::Distance(_) => key!("Specify point on side to offset"),
             Gap::Through => key!("Specify through point"),
@@ -499,44 +491,66 @@ mod tests {
     }
 
     #[test]
-    fn an_ellipse_is_refused_and_the_next_object_asked_for() {
-        let e = opendraft_core::Ellipse::full(p(0.0, 0.0), p(4.0, 0.0), 0.5).unwrap();
+    fn an_ellipse_is_offset_into_a_spline() {
+        let e = opendraft_core::Ellipse::full(p(0.0, 0.0), p(6.0, 0.0), 0.5).unwrap();
         let mut state = offsetting(&[Entity::Ellipse(e)]);
         state.cmd_submit("1");
         state.settle_command();
-        click(&mut state, 0, p(4.0, 0.0));
-        assert_eq!(entities(&state), [Entity::Ellipse(e)]);
-        let said = state.cmdline.log.last().unwrap();
-        assert!(
-            said.contains("OFFSET does not support ellipses yet."),
-            "{said}"
-        );
-        assert!(state
-            .cmd_prompt()
-            .text
-            .starts_with("Select object to offset"));
+        click(&mut state, 0, p(6.0, 0.0));
+        state.cmd_submit("9,0");
+        state.settle_command();
+        let all = entities(&state);
+        assert_eq!(all.len(), 2, "{all:?}");
+        assert_eq!(all[0], Entity::Ellipse(e));
+        let Entity::Spline(copy) = &all[1] else {
+            panic!("a spline, got {:?}", all[1])
+        };
+        assert!(copy.closed);
+        assert!((copy.nearest(p(30.0, 0.0)).0.x - 7.0).abs() < 1e-3);
+        state.undo();
+        assert_eq!(entities(&state).len(), 1);
     }
 
     #[test]
-    fn a_spline_is_refused_and_the_next_object_asked_for() {
+    fn an_offset_that_would_fold_a_curve_is_refused_and_the_next_object_asked_for() {
+        let e = opendraft_core::Ellipse::full(p(0.0, 0.0), p(6.0, 0.0), 0.5).unwrap();
+        let mut state = offsetting(&[Entity::Ellipse(e)]);
+        // The tightest curve of this ellipse has radius 1.5.
+        state.cmd_submit("2");
+        state.settle_command();
+        click(&mut state, 0, p(6.0, 0.0));
+        state.cmd_submit("0,0");
+        state.settle_command();
+        assert_eq!(entities(&state), [Entity::Ellipse(e)]);
+        assert!(state.cmdline.log.last().unwrap().contains("Cannot offset"));
+    }
+
+    #[test]
+    fn a_spline_is_offset_to_the_side_clicked() {
         let s = Entity::Spline(Box::new(
-            opendraft_core::Spline::from_control_points(1, vec![p(-5.0, 0.0), p(5.0, 0.0)])
-                .unwrap(),
+            opendraft_core::Spline::from_control_points(
+                3,
+                vec![p(0.0, 0.0), p(2.0, 6.0), p(8.0, 6.0), p(10.0, 0.0)],
+            )
+            .unwrap(),
         ));
         let mut state = offsetting(std::slice::from_ref(&s));
         state.cmd_submit("1");
         state.settle_command();
-        click(&mut state, 0, p(0.0, 0.0));
-        assert_eq!(entities(&state), [s]);
-        assert!(state
-            .cmdline
-            .log
-            .iter()
-            .any(|l| l.contains("OFFSET does not support splines yet.")));
-        assert!(state
-            .cmd_prompt()
-            .text
-            .starts_with("Select object to offset"));
+        click(&mut state, 0, p(5.0, 4.5));
+        state.cmd_submit("5,12");
+        state.settle_command();
+        let all = entities(&state);
+        assert_eq!(all.len(), 2, "{all:?}");
+        let (Entity::Spline(base), Entity::Spline(copy)) = (&all[0], &all[1]) else {
+            panic!("{all:?}")
+        };
+        let (a, b) = copy.domain();
+        for i in 0..=20 {
+            let q = copy.point_at(a + (b - a) * f64::from(i) / 20.0);
+            assert!((base.distance_to(q) - 1.0).abs() < 1e-3, "{q:?}");
+        }
+        assert!(copy.nearest(p(5.0, 30.0)).0.y > base.nearest(p(5.0, 30.0)).0.y);
     }
 
     #[test]

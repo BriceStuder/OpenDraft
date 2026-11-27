@@ -210,6 +210,9 @@ pub fn fillet(
     if matches!(a, Entity::Ellipse(_)) || matches!(b, Entity::Ellipse(_)) {
         return crate::fillet_ellipse::fillet_ellipse(a, b, radius, picked_a, picked_b);
     }
+    if matches!(a, Entity::Spline(_)) || matches!(b, Entity::Spline(_)) {
+        return crate::fillet_spline::fillet_spline(a, b, radius, picked_a, picked_b);
+    }
     let (Some(ca), Some(cb)) = (carrier(a), carrier(b)) else {
         return Err(CornerError::Unsupported);
     };

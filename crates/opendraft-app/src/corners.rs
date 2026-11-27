@@ -233,11 +233,6 @@ fn plan_pair(
     first: Picked,
     second: Picked,
 ) -> Result<Plan, Option<String>> {
-    if kind == Kind::Fillet && [a, b].iter().any(|e| matches!(e, Entity::Spline(_))) {
-        return Err(Some(
-            key!("FILLET does not support splines yet.").to_owned(),
-        ));
-    }
     let sharp = second.shift;
     if same {
         // Two segments of one polyline: next to each other, or with one
@@ -562,25 +557,56 @@ mod tests {
             .any(|l| l.contains("A chamfer needs lines")));
     }
 
-    #[test]
-    fn a_spline_is_not_filleted() {
-        let items = vec![
-            axes()[0].clone(),
+    fn arch_and_wall() -> Vec<Entity> {
+        vec![
             Entity::Spline(Box::new(
-                opendraft_core::Spline::from_control_points(1, vec![p(-5.0, 0.0), p(5.0, 0.0)])
-                    .unwrap()
-                    .translated(0.0, 10.0),
+                opendraft_core::Spline::from_control_points(
+                    3,
+                    vec![p(0.0, 0.0), p(2.0, 6.0), p(8.0, 6.0), p(10.0, 0.0)],
+                )
+                .unwrap(),
             )),
-        ];
-        let mut state = started(&items, fillet_objects, &[]);
-        click(&mut state, 0, p(5.0, 0.0));
-        click(&mut state, 1, p(0.0, 10.0));
+            line(p(3.0, -2.0), p(3.0, 12.0)),
+        ]
+    }
+
+    #[test]
+    fn a_spline_and_a_line_are_filleted_in_one_undo_step() {
+        let items = arch_and_wall();
+        let mut state = started(&items, fillet_objects, &["r", "1"]);
+        click(&mut state, 0, p(7.0, 3.9));
+        click(&mut state, 1, p(3.0, 9.0));
+        let all = entities(&state);
+        assert_eq!(all.len(), 3, "{all:?}");
+        assert!(matches!(all[0], Entity::Spline(_)));
+        assert!(matches!(all[2], Entity::Arc { radius, .. } if (radius - 1.0).abs() < 1e-12));
+        let Entity::Line { start, end } = all[1] else {
+            panic!("the wall stays a line")
+        };
+        assert!(
+            start.y.min(end.y) > 5.0,
+            "the wall was cut back: {start:?} {end:?}"
+        );
+        state.undo();
         assert_eq!(entities(&state), items);
+    }
+
+    #[test]
+    fn a_chamfer_still_needs_lines_and_a_spline_that_cannot_fit_says_so() {
+        let mut state = started(&arch_and_wall(), chamfer_objects, &["d", "1", "1"]);
+        click(&mut state, 0, p(7.0, 3.9));
+        click(&mut state, 1, p(3.0, 9.0));
+        assert_eq!(entities(&state), arch_and_wall());
         assert!(state
             .cmdline
             .log
             .iter()
-            .any(|l| l.contains("FILLET does not support splines yet.")));
+            .any(|l| l.contains("A chamfer needs lines")));
+        // A radius too big for the room between them has no fit.
+        let mut state = started(&arch_and_wall(), fillet_objects, &["r", "400"]);
+        click(&mut state, 0, p(7.0, 3.9));
+        click(&mut state, 1, p(3.0, 9.0));
+        assert_eq!(entities(&state), arch_and_wall());
     }
 
     #[test]
