@@ -66,6 +66,22 @@ impl Spline {
         })
     }
 
+    /// The end `end` of an open spline and the direction it runs out of it
+    /// (a unit vector). `None` for a closed or periodic spline.
+    pub(crate) fn end_ray(&self, end: End) -> Option<(Point, Point)> {
+        if !self.can_change_ends() {
+            return None;
+        }
+        let (a, b) = self.domain();
+        Some(match end {
+            End::End => (self.end_point(), self.tangent_at(b)?),
+            End::Start => {
+                let t = self.tangent_at(a)?;
+                (self.start_point(), Point::new(-t.x, -t.y))
+            }
+        })
+    }
+
     fn can_change_ends(&self) -> bool {
         !self.closed && !self.periodic && self.well_formed()
     }

@@ -104,7 +104,7 @@ Written 2026-10-31. Update it when something is done or the plan changes: tick t
 - [x] Block attributes, done 01-11-2026 (PRs #100 and #101). What is left (multiline attributes, `ATTDISP`, BATTMAN, more data fields) is in `docs/parking_lot.md`.
 - [ ] DWG export (L).
 - [x] Associative arrays as a record beside ordinary objects, with ARRAYEDIT, done 26-11-2026 (PR #275). The array as one object (grips, a contextual tab) is in `docs/parking_lot.md`.
-- [ ] Spline editing: trim, break and join are done (26-11-2026); extend, join with other kinds, offset and fillet are left (Lengthen for splines and PEDIT's vertex Tangent are done).
+- [ ] Spline editing: trim, break and join are done (26-11-2026); offset and fillet are left (extend, join with other kinds, Lengthen for splines and PEDIT's vertex Tangent are done).
 - [ ] Dimension depth: other arrowheads, styles with colours and linetypes, `DIMBREAK`, jogged radius and `ARC_DIMENSION` as real DXF, annotative scales.
 - [ ] Multileader depth (spline leaders, block content, MLEADEREDIT).
 - [ ] A plugin system for third-party commands; an AutoLISP-compatible subset is a stretch idea, not a promise.
@@ -117,7 +117,7 @@ Dynamic blocks come last of these, and are built in stages that show a user noth
 What to build next, roughly in order, beside the phases above. The details of each are in `docs/parking_lot.md`; take an item off this list when it is done.
 
 1. The custom coordinate system (in progress, 22-11-2026): the system is built; next, turning the view (PLAN and a gesture). Plan in `docs/parking_lot.md`.
-2. Spline editing: Extend and Join with other kinds, then Offset and Fillet.
+2. Spline editing: Offset and Fillet.
 3. The commands still dimmed on the Home tab (`NOT_BUILT` in `opendraft-app/src/ribbon_def/home.rs`): Groups, Table, Radius, Angle and ID Point, Isolate, Layer States and the rest.
 4. Associative arrays as one object, with grips.
 5. Annotation: the MTEXT toolbar's font menu and symbols, then its ruler (waits for AutoCAD paragraph samples); the dimensions that are left, starting with DWG dimension import; leaders and multileaders.

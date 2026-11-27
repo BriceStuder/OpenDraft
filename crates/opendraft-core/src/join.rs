@@ -19,7 +19,7 @@
 
 use std::f64::consts::TAU;
 
-use crate::{arc, bulge, Entity, Point};
+use crate::{arc, bulge, Entity, Point, Spline};
 
 /// One object made from several.
 #[derive(Clone, Debug, PartialEq)]
@@ -218,12 +218,22 @@ fn join_splines(items: &[Entity], tolerance: f64) -> Vec<Merged> {
         let (mut run, mut used) = ((**first).clone(), vec![seed]);
         'grow: loop {
             for (i, item) in items.iter().enumerate() {
-                let Entity::Spline(other) = item else {
-                    continue;
-                };
                 if taken[i] {
                     continue;
                 }
+                // A line, an arc or an open polyline joins as the spline of
+                // the run's degree it exactly is.
+                let converted;
+                let other: &Spline = match item {
+                    Entity::Spline(other) => other,
+                    plain => match Spline::from_entity(plain, run.degree) {
+                        Some(spline) => {
+                            converted = spline;
+                            &converted
+                        }
+                        None => continue,
+                    },
+                };
                 if let Some(longer) = run.joined(other, tolerance) {
                     run = longer;
                     taken[i] = true;

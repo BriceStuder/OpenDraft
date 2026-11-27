@@ -23,7 +23,8 @@ impl Entity {
     /// - A line keeps its direction; an arc keeps its circle and grows round
     ///   it, never past a full turn, and an elliptical arc likewise round its
     ///   ellipse; an open polyline extends its first or last segment as a
-    ///   line.
+    ///   line, and an open spline runs on in a straight line along its end
+    ///   tangent.
     /// - A boundary has to exist where it is met: extending does not
     ///   lengthen the boundary too.
     pub fn extended_to(&self, end: End, boundaries: &[Entity]) -> Option<Entity> {
@@ -116,6 +117,15 @@ impl Entity {
                     bulges: curves,
                     widths: widths.clone(),
                 })
+            }
+            // A spline runs on straight, along its end tangent.
+            Entity::Spline(s) => {
+                let (tip, out) = s.end_ray(end)?;
+                let base = Point::new(tip.x - out.x, tip.y - out.y);
+                let reached = reach_along(base, tip, &walls)?;
+                let length = (reached.x - tip.x).hypot(reached.y - tip.y);
+                s.lengthened(end, length)
+                    .map(|longer| Entity::Spline(Box::new(longer)))
             }
             _ => None,
         }

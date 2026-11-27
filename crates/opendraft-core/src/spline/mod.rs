@@ -24,6 +24,7 @@ use std::fmt;
 
 use crate::{Bounds, Point};
 
+mod convert;
 mod cut;
 mod eval;
 mod fit;
