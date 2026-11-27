@@ -81,12 +81,11 @@ impl Window {
         let Some(editing) = &mut self.editing else {
             return;
         };
+        // A block is renamed in its details, where its name is.
         let (label, text) = match editing {
             Editing::NewFolder { text, .. } => ("New folder name", text),
             Editing::RenameFolder { text, .. } => ("Folder name", text),
-            Editing::RenameBlock { text, .. } | Editing::RenameDrawingBlock { text, .. } => {
-                ("Block name", text)
-            }
+            Editing::RenameBlock { .. } | Editing::RenameDrawingBlock { .. } => return,
         };
         let (mut accept, mut cancel) = (false, false);
         ui.horizontal(|ui| {
@@ -107,8 +106,7 @@ impl Window {
                 Editing::RenameFolder { path, .. } => {
                     Action::RenameFolder(path.clone(), folder::join(folder::parent(path), &name))
                 }
-                Editing::RenameBlock { id, .. } => Action::RenameBlock(*id, name),
-                Editing::RenameDrawingBlock { id, .. } => Action::RenameDrawingBlock(*id, name),
+                Editing::RenameBlock { .. } | Editing::RenameDrawingBlock { .. } => return,
             });
         }
     }

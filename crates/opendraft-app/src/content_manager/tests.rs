@@ -372,3 +372,25 @@ fn a_block_of_the_drawing_is_renamed_from_its_menu_and_stays_chosen() {
     // The window still draws, the details of the renamed block included.
     let _ = frame(&mut win, &state);
 }
+
+#[test]
+fn a_block_is_renamed_in_its_details_and_choosing_another_closes_the_field() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let (state, mut win) = setup(dir.path());
+    win.open_on(Place::Drawing);
+    let id = state
+        .session()
+        .document()
+        .block_named("Box")
+        .map(|b| b.id)
+        .expect("the drawing's block");
+    apply(&mut win, &state, drawing::rename(id, "Box").to_vec());
+    // The field is drawn in the details, where the name is, not above the tiles.
+    let _ = frame(&mut win, &state);
+    assert!(matches!(
+        win.editing,
+        Some(Editing::RenameDrawingBlock { .. })
+    ));
+    apply(&mut win, &state, vec![Action::Select(Selected::Nothing)]);
+    assert!(win.editing.is_none());
+}

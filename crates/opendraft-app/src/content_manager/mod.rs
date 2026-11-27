@@ -24,6 +24,7 @@ mod drawing;
 mod filter;
 mod import;
 mod list;
+mod name_edit;
 mod snapshot;
 mod thumbnails;
 mod tree;

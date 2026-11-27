@@ -74,7 +74,17 @@ impl Window {
                         self.go(Place::Mine(up));
                     }
                 }
-                Action::Select(selected) => self.selected = selected,
+                Action::Select(selected) => {
+                    // A block's name field belongs to the block it was opened on.
+                    let renaming = matches!(
+                        self.editing,
+                        Some(Editing::RenameBlock { .. } | Editing::RenameDrawingBlock { .. })
+                    );
+                    if renaming && selected != self.selected {
+                        self.editing = None;
+                    }
+                    self.selected = selected;
+                }
                 Action::Insert(id) => requests.push(Request::Insert(id)),
                 Action::AddObjects => requests.push(Request::AddObjects),
                 Action::ImportFile => requests.push(Request::PickImport),
