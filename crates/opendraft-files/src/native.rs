@@ -37,13 +37,15 @@
 //! The file is bounded by [`MAX_BYTES`] and checked with
 //! [`Document::validate`] before it is handed over.
 
-use opendraft_core::{Attr, Color, Document};
+use opendraft_core::{Color, Document};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{Encoded, FileError, FileFormat, Loaded};
 
-pub(super) mod attribute;
+pub(super) mod array;
+mod attr_dto;
+mod attribute;
 mod block;
 mod block_dynamic;
 mod ccs;
@@ -59,14 +61,17 @@ mod linetype;
 mod load;
 mod mleader;
 mod mleader_style;
+mod modify_settings;
 mod names;
 mod new_style;
 mod point_style;
+mod polyline_curve;
 mod properties;
 pub(crate) mod spline;
 mod text;
 mod units;
 
+use attr_dto::{attr_from_dto, attr_to_dto, AttrDto, ColorDto};
 use block::BlockDto;
 use dimension_style::{DimStylesDto, StylePool};
 use entity::EntityDto;
@@ -276,9 +281,18 @@ struct DrawingDto {
     /// `PDMODE` and `PDSIZE`.
     #[serde(flatten)]
     point_style: point_style::PointStyleDto,
+    /// What FILLET, CHAMFER, OFFSET and LENGTHEN remember.
+    #[serde(flatten)]
+    modify_settings: modify_settings::ModifySettingsDto,
     /// The Model tab's coordinate system and the ones saved by name.
     #[serde(flatten)]
     ccs: ccs::TableDto,
+    /// The associative arrays.
+    #[serde(flatten)]
+    arrays: array::TableDto,
+    /// What PEDIT keeps beside polylines.
+    #[serde(flatten)]
+    polyline_curves: polyline_curve::TableDto,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -301,22 +315,6 @@ struct LayerDto {
     no_plot: bool,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum ColorDto {
-    Foreground,
-    Rgb([u8; 3]),
-}
-
-#[derive(Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-enum AttrDto<T> {
-    #[default]
-    ByLayer,
-    ByBlock,
-    Set(T),
-}
-
 #[derive(Serialize, Deserialize)]
 struct ObjectDto {
     id: u64,
@@ -330,40 +328,6 @@ struct ObjectDto {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     layout: Option<u64>,
     entity: EntityDto,
-}
-
-impl From<Color> for ColorDto {
-    fn from(color: Color) -> Self {
-        match color {
-            Color::Foreground => ColorDto::Foreground,
-            Color::Rgb(r, g, b) => ColorDto::Rgb([r, g, b]),
-        }
-    }
-}
-
-impl From<ColorDto> for Color {
-    fn from(color: ColorDto) -> Self {
-        match color {
-            ColorDto::Foreground => Color::Foreground,
-            ColorDto::Rgb([r, g, b]) => Color::Rgb(r, g, b),
-        }
-    }
-}
-
-fn attr_to_dto<T, U>(attr: &Attr<T>, convert: impl Fn(&T) -> U) -> AttrDto<U> {
-    match attr {
-        Attr::ByLayer => AttrDto::ByLayer,
-        Attr::ByBlock => AttrDto::ByBlock,
-        Attr::Set(value) => AttrDto::Set(convert(value)),
-    }
-}
-
-fn attr_from_dto<T, U>(attr: AttrDto<T>, convert: impl Fn(T) -> U) -> Attr<U> {
-    match attr {
-        AttrDto::ByLayer => Attr::ByLayer,
-        AttrDto::ByBlock => Attr::ByBlock,
-        AttrDto::Set(value) => Attr::Set(convert(value)),
-    }
 }
 
 impl DrawingDto {
@@ -442,7 +406,10 @@ impl DrawingDto {
             linetypes: linetype::TableDto::of(document),
             new_style: new_style::NewStyleDto::of(document),
             point_style: point_style::PointStyleDto::of(document),
+            modify_settings: modify_settings::ModifySettingsDto::of(document),
             ccs: ccs::TableDto::of(document),
+            arrays: array::TableDto::of(document),
+            polyline_curves: polyline_curve::TableDto::of(document),
         })
     }
 }
@@ -450,8 +417,9 @@ impl DrawingDto {
 #[cfg(test)]
 mod tests {
     use opendraft_core::{
-        AngleFormat, Attributes, Ellipse, Entity, EntityId, InsertUnits, KnotParameterization,
-        Layer, LayerId, LengthFormat, Lineweight, Point, Spline, SplineFitData, TextStyleId, Units,
+        AngleFormat, Attr, Attributes, Ellipse, Entity, EntityId, InsertUnits,
+        KnotParameterization, Layer, LayerId, LengthFormat, Lineweight, Point, Spline,
+        SplineFitData, TextStyleId, Units,
     };
 
     use super::*;

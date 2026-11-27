@@ -62,6 +62,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](block-eattedit.svg) | `block-eattedit.svg` | list | Multiple |
 | ![](block-edit.svg) | `block-edit.svg` | pencil | Edit |
 | ![](block-insert.svg) | `block-insert.svg` | box | Insert |
+| ![](block-library.svg) | `block-library.svg` | library | Content Manager |
 | ![](block-parameter.svg) | `block-parameter.svg` | ruler | Parameter |
 | ![](block-purge.svg) | `block-purge.svg` | eraser | Purge |
 | ![](block-reset.svg) | `block-reset.svg` | rotate-ccw | Reset |
@@ -69,6 +70,15 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](combo-arrow.svg) | `combo-arrow.svg` | chevron-down | menu.rs |
 | ![](command-line-collapse.svg) | `command-line-collapse.svg` | chevron-down | app/command_line.rs |
 | ![](command-line-expand.svg) | `command-line-expand.svg` | chevron-right | app/command_line.rs |
+| ![](content-back.svg) | `content-back.svg` | arrow-left | (not used) |
+| ![](content-drawing.svg) | `content-drawing.svg` | file-box | (not used) |
+| ![](content-favourite.svg) | `content-favourite.svg` | star | (not used) |
+| ![](content-folder.svg) | `content-folder.svg` | folder | (not used) |
+| ![](content-forward.svg) | `content-forward.svg` | arrow-right | (not used) |
+| ![](content-recent.svg) | `content-recent.svg` | history | (not used) |
+| ![](content-rename.svg) | `content-rename.svg` | pencil | (not used) |
+| ![](content-trash.svg) | `content-trash.svg` | trash-2 | (not used) |
+| ![](content-up.svg) | `content-up.svg` | arrow-up | (not used) |
 | ![](context-deselect-all.svg) | `context-deselect-all.svg` | square-x | app/context_menu.rs |
 | ![](context-edit-select-all.svg) | `context-edit-select-all.svg` | mouse-pointer-2 | app/context_menu.rs |
 | ![](context-find.svg) | `context-find.svg` | search | app/context_menu.rs |
@@ -117,11 +127,11 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](draw-gradient.svg) | `draw-gradient.svg` | blend | Gradient |
 | ![](draw-hatch.svg) | `draw-hatch.svg` | square-slash | Hatch (A square with a diagonal: the nearest Lucide has to hatching.) |
 | ![](draw-line.svg) | `draw-line.svg` | minus | Line |
-| ![](draw-line-middle.svg) | `draw-line-middle.svg` | minus | Line, Middle |
-| ![](draw-line-single.svg) | `draw-line-single.svg` | minus | Line, Single |
-| ![](draw-measure.svg) | `draw-measure.svg` | between-horizontal-start | Measure (Lucide's marks between two ends.) |
+| ![](draw-line-middle.svg) | `draw-line-middle.svg` | minus | From Middle |
+| ![](draw-line-single.svg) | `draw-line-single.svg` | minus | Single Lines |
 | ![](draw-oblong-2p.svg) | `draw-oblong-2p.svg` | square | Oblong, 2-Point |
 | ![](draw-oblong-center.svg) | `draw-oblong-center.svg` | square | Oblong, Center |
+| ![](draw-measure.svg) | `draw-measure.svg` | between-horizontal-start | Measure (Lucide's marks between two ends.) |
 | ![](draw-point.svg) | `draw-point.svg` | dot | Multiple Point, Point Style..., Single Point (Lucide's dot.) |
 | ![](draw-polygon.svg) | `draw-polygon.svg` | hexagon | Polygon |
 | ![](draw-polyline.svg) | `draw-polyline.svg` | spline | Polyline |
@@ -145,7 +155,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](edit-undo.svg) | `edit-undo.svg` | undo-2 | app.rs, app/context_menu.rs |
 | ![](file-new.svg) | `file-new.svg` | file | app.rs, app/home_page/start.rs |
 | ![](file-open.svg) | `file-open.svg` | folder-open | app.rs, app/home_page/start.rs |
-| ![](file-plot.svg) | `file-plot.svg` | printer | Plot, app.rs |
+| ![](file-plot.svg) | `file-plot.svg` | printer | Plot, app.rs, layer_columns.rs, ribbon_slots.rs |
 | ![](file-save.svg) | `file-save.svg` | save | app.rs, theme.rs |
 | ![](format-linetype.svg) | `format-linetype.svg` | ellipsis | Linetypes |
 | ![](format-properties.svg) | `format-properties.svg` | file-text | Properties |
@@ -226,6 +236,7 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](modify-mirror.svg) | `modify-mirror.svg` | flip-horizontal | Mirror |
 | ![](modify-move.svg) | `modify-move.svg` | move | Move, app/context_menu.rs |
 | ![](modify-offset.svg) | `modify-offset.svg` | stretch-horizontal | Offset |
+| ![](modify-overkill.svg) | `modify-overkill.svg` | copy-minus | Overkill |
 | ![](modify-pedit.svg) | `modify-pedit.svg` | waypoints | Edit Polyline |
 | ![](modify-rotate.svg) | `modify-rotate.svg` | rotate-cw | Rotate, app/context_menu.rs |
 | ![](modify-scale.svg) | `modify-scale.svg` | maximize | Scale, app/context_menu.rs |
@@ -292,5 +303,3 @@ The starting drawings are Lucide's (ISC licence, `LICENSE-Lucide.txt`).
 | ![](view-nav-gizmo.svg) | `view-nav-gizmo.svg` | compass | Gizmo |
 | ![](view-snap.svg) | `view-snap.svg` | magnet | Snap |
 | ![](view-zoom-extents.svg) | `view-zoom-extents.svg` | maximize | Zoom Extents |
-| ![](view-zoom-in.svg) | `view-zoom-in.svg` | zoom-in | Zoom In |
-| ![](view-zoom-out.svg) | `view-zoom-out.svg` | zoom-out | Zoom Out |

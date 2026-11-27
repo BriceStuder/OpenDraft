@@ -11,7 +11,7 @@ use opendraft_ui::key;
 use crate::attribute_prompt::ask_values;
 use crate::block_cmd::{ask_block_name, list_blocks, NameAnswer};
 
-fn placed(
+pub(crate) fn placed(
     block: &Arc<BlockDef>,
     at: Point,
     scale: (f64, f64),
@@ -30,7 +30,7 @@ fn placed(
 }
 
 /// A scale factor: any finite number but zero (negative mirrors).
-fn get_factor(ed: &Editor, message: &str, default: f64) -> Result<f64, Cancelled> {
+pub(crate) fn get_factor(ed: &Editor, message: &str, default: f64) -> Result<f64, Cancelled> {
     loop {
         let factor = ed.get_number(NumberOptions::new(message).default(default))?;
         if factor.is_finite() && factor != 0.0 {

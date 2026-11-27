@@ -3,7 +3,9 @@
 //! Multiple, the same to several at once. Lines, arcs and rectangles become
 //! polylines first. The edits themselves are `opendraft_core::pedit`.
 //!
-//! Not built: Fit, Spline, vertex Tangent and spline conversion.
+//! Fit and Spline turn the polyline into a smooth curve (`pedit_curve.rs`),
+//! which remembers the polyline it came from for Decurve, and a spline is
+//! turned into a polyline first (also for Multiple).
 
 use opendraft_commands::{
     Answer, Cancelled, Editor, ModifyAttributes, NumberOptions, Options, Picked,
@@ -13,6 +15,7 @@ use opendraft_core::{Entity, EntityId};
 use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
+use crate::pedit_curve::{convert_many_splines, convert_spline, curve, decurve, decurve_all};
 use crate::pedit_join::{ask_fuzz, join_group};
 use crate::pedit_vertex::edit_vertices;
 
@@ -31,6 +34,12 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                         if data_of(ed, id)?.is_some() {
                             return edit_one(ed, id);
                         }
+                        if is_spline(ed, id)? {
+                            if convert_spline(ed, id)? {
+                                return edit_one(ed, id);
+                            }
+                            continue;
+                        }
                         refuse(ed, id)?;
                     }
                     Answer::Keyword(_) => chosen = ed.get_selection(key!("Select objects"))?,
@@ -41,7 +50,12 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
                 if data_of(ed, chosen[0])?.is_some() {
                     return edit_one(ed, chosen[0]);
                 }
-                refuse(ed, chosen[0])?;
+                if is_spline(ed, chosen[0])? && convert_spline(ed, chosen[0])? {
+                    return edit_one(ed, chosen[0]);
+                }
+                if !is_spline(ed, chosen[0])? {
+                    refuse(ed, chosen[0])?;
+                }
                 chosen.clear();
             }
             _ => return edit_many(ed, chosen),
@@ -50,14 +64,13 @@ pub fn pedit_objects(ed: &mut Editor) -> Result<(), Cancelled> {
 }
 
 /// Say why `id` cannot be edited.
-fn refuse(ed: &Editor, id: EntityId) -> Result<(), Cancelled> {
-    let spline = ed.read(move |doc| matches!(doc.get(id), Some(Entity::Spline(_))))?;
-    ed.say(if spline {
-        key!("Spline-to-polyline conversion is not yet supported; object was not changed.")
-    } else {
-        key!("Object is not a polyline.")
-    });
+fn refuse(ed: &Editor, _id: EntityId) -> Result<(), Cancelled> {
+    ed.say(key!("Object is not a polyline."));
     Ok(())
+}
+
+fn is_spline(ed: &Editor, id: EntityId) -> Result<bool, Cancelled> {
+    ed.read(move |doc| matches!(doc.get(id), Some(Entity::Spline(_))))
 }
 
 /// The polyline data of `id`, if it is something PEDIT can edit.
@@ -123,6 +136,8 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
             .keyword("Join", "J")
             .keyword("Width", "W")
             .keyword("Edit vertex", "E")
+            .keyword("Fit", "F")
+            .keyword("Spline", "S")
             .keyword("Decurve", "D")
             .keyword("Ltype gen", "L")
             .keyword("Reverse", "R")
@@ -158,8 +173,13 @@ fn edit_one(ed: &mut Editor, id: EntityId) -> Result<(), Cancelled> {
                 }
             }
             "Edit vertex" => steps += edit_vertices(ed, id)?,
+            "Fit" | "Spline" => {
+                if curve(ed, id, &data, key == "Fit")? {
+                    steps += 1;
+                }
+            }
             "Decurve" => {
-                store(ed, id, data.decurved())?;
+                decurve(ed, id, &data)?;
                 steps += 1;
             }
             "Reverse" => {
@@ -235,14 +255,15 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
                 .collect()
         })?
     };
+    let editable = |e: &Entity| PolyData::of(e).is_some() || matches!(e, Entity::Spline(_));
     let mut ids: Vec<EntityId> = kinds
         .iter()
-        .filter(|(_, e)| PolyData::of(e).is_some())
+        .filter(|(_, e)| editable(e))
         .map(|(id, _)| *id)
         .collect();
     let others = kinds
         .iter()
-        .filter(|(_, e)| PolyData::of(e).is_some() && !matches!(e, Entity::Polyline { .. }))
+        .filter(|(_, e)| editable(e) && !matches!(e, Entity::Polyline { .. }))
         .count();
     if ids.is_empty() {
         ed.say(key!(
@@ -252,10 +273,12 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
     }
     if others > 0 && !ed.defaults().pedit.get().accept {
         let turn = ed.get_keyword(
-            Options::new(key!("Convert lines, arcs and rectangles to polylines?"))
-                .keyword("Yes", "Y")
-                .keyword("No", "N")
-                .default("Yes".to_owned()),
+            Options::new(key!(
+                "Convert lines, arcs, splines and rectangles to polylines?"
+            ))
+            .keyword("Yes", "Y")
+            .keyword("No", "N")
+            .default("Yes".to_owned()),
         )?;
         if turn == "No" {
             ids.retain(|id| {
@@ -267,6 +290,19 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
     }
     if ids.is_empty() {
         return Ok(());
+    }
+    // Splines become polylines first, at one precision for all of them.
+    let splines: Vec<EntityId> = kinds
+        .iter()
+        .filter(|(id, e)| matches!(e, Entity::Spline(_)) && ids.contains(id))
+        .map(|(id, _)| *id)
+        .collect();
+    if !splines.is_empty() {
+        let converted = convert_many_splines(ed, &splines)?;
+        ids.retain(|id| !splines.contains(id) || converted.contains(id));
+        if ids.is_empty() {
+            return Ok(());
+        }
     }
     let mut steps = 0usize;
     loop {
@@ -286,7 +322,7 @@ fn edit_many(ed: &mut Editor, chosen: Vec<EntityId>) -> Result<(), Cancelled> {
             "Ltype gen" => set_generation(ed, &ids)?,
             "Close" => change_all(ed, &ids, |d| d.with_closed(true))?,
             "Open" => change_all(ed, &ids, |d| d.with_closed(false))?,
-            "Decurve" => change_all(ed, &ids, PolyData::decurved)?,
+            "Decurve" => decurve_all(ed, &ids)?,
             "Reverse" => change_all(ed, &ids, PolyData::reversed)?,
             "Width" => match ask_width(ed)? {
                 Some(w) => {
@@ -346,6 +382,9 @@ fn change_all(
     Ok(true)
 }
 
+#[cfg(test)]
+#[path = "pedit_curve_tests.rs"]
+mod curve_tests;
 #[cfg(test)]
 #[path = "pedit_join_tests.rs"]
 mod join_tests;

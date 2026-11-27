@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::super::{after, Document};
+use super::library::BlockClash;
 use super::TransferWarning;
 use crate::block::{BlockDef, BlockEntity, BlockId};
 use crate::dimension::DimStyle;
@@ -11,7 +12,7 @@ use crate::layer::{Attr, Attributes, Layer, LayerId};
 use crate::linetype::LinetypeId;
 use crate::mleader::MLeaderContent;
 use crate::text_style::TextStyleId;
-use crate::Entity;
+use crate::{Entity, EntityId};
 
 /// The matching of one drawing's tables to another's while absorbing.
 pub(super) struct Merge<'a> {
@@ -25,6 +26,15 @@ pub(super) struct Merge<'a> {
     pub(super) linetypes: HashMap<LinetypeId, LinetypeId>,
     pub(super) warnings: Vec<TransferWarning>,
     pub(super) blocks: HashMap<BlockId, Arc<BlockDef>>,
+    /// `None` matches blocks by name, as a paste does. `Some` is the caller's
+    /// choice for each source block whose name the target has (see
+    /// `transplant/library.rs`); a block with no choice is renamed.
+    pub(super) choices: Option<&'a HashMap<BlockId, BlockClash>>,
+    /// Objects a `Replace` changed (their insert follows the new definition),
+    /// as they were before the first change, for undoing it.
+    pub(super) replaced: Vec<(EntityId, Entity)>,
+    /// Set when a `Replace` was refused (a block that would hold itself).
+    pub(super) refused: Option<&'static str>,
 }
 
 impl Merge<'_> {
@@ -151,30 +161,84 @@ impl Merge<'_> {
         if let Some(done) = self.blocks.get(&def.id) {
             return done.clone();
         }
-        let found = match self.dst.block_named(&def.name) {
-            Some(same) => same.clone(),
-            None => {
-                let entities = def
-                    .entities
-                    .iter()
-                    .map(|e| BlockEntity::new(e.id, self.entity(&e.entity), self.attrs(&e.attrs)))
-                    .collect();
-                let copy = Arc::new(BlockDef {
-                    unit: def.unit,
-                    id: self.dst.allocate_block_id(),
-                    name: def.name.clone(),
-                    base: def.base,
-                    description: def.description.clone(),
-                    entities,
-                    dynamic: def.dynamic.clone(),
-                });
-                self.dst.push_block(copy.clone());
-                copy
-            }
+        let existing = self.dst.block_named(&def.name).cloned();
+        let found = match (existing, self.choices) {
+            (Some(same), None) => same,
+            (None, _) => self.copy_block(def, def.name.clone()),
+            (Some(same), Some(choices)) => match choices.get(&def.id) {
+                Some(BlockClash::UseExisting) => same,
+                Some(BlockClash::Replace) => self.replace_block(def, &same),
+                _ => {
+                    let name = self.dst.unused_block_name_like(&def.name);
+                    self.copy_block(def, name)
+                }
+            },
         };
         self.blocks.insert(def.id, found.clone());
         found
     }
+
+    /// The target's block `same` redefined as `def`: it keeps its id and
+    /// name, every block and object that holds it follows, and an insert keeps
+    /// its attribute values (`Insert::rebound`).
+    fn replace_block(&mut self, def: &Arc<BlockDef>, same: &Arc<BlockDef>) -> Arc<BlockDef> {
+        let entities = def
+            .entities
+            .iter()
+            .map(|e| BlockEntity::new(e.id, self.entity(&e.entity), self.attrs(&e.attrs)))
+            .collect();
+        let new = BlockDef {
+            unit: def.unit,
+            id: same.id,
+            name: same.name.clone(),
+            base: def.base,
+            description: def.description.clone(),
+            entities,
+            dynamic: def.dynamic.clone(),
+        };
+        match self.dst.redefined_blocks(new) {
+            Ok(change) => {
+                self.dst.set_blocks(change.blocks);
+                let new = change.objects.clone();
+                for ((id, _), old) in change.objects.iter().zip(self.dst.replace_many(new)) {
+                    if let Some(old) = old {
+                        if !self.replaced.iter().any(|(done, _)| done == id) {
+                            self.replaced.push((*id, old));
+                        }
+                    }
+                }
+                self.dst
+                    .block(same.id)
+                    .cloned()
+                    .unwrap_or_else(|| same.clone())
+            }
+            Err(why) => {
+                self.refused = Some(why);
+                same.clone()
+            }
+        }
+    }
+
+    /// A new block in the target, a copy of `def` called `name`.
+    fn copy_block(&mut self, def: &Arc<BlockDef>, name: String) -> Arc<BlockDef> {
+        let entities = def
+            .entities
+            .iter()
+            .map(|e| BlockEntity::new(e.id, self.entity(&e.entity), self.attrs(&e.attrs)))
+            .collect();
+        let copy = Arc::new(BlockDef {
+            unit: def.unit,
+            id: self.dst.allocate_block_id(),
+            name,
+            base: def.base,
+            description: def.description.clone(),
+            entities,
+            dynamic: def.dynamic.clone(),
+        });
+        self.dst.push_block(copy.clone());
+        copy
+    }
+
     pub(super) fn entity(&mut self, entity: &Entity) -> Entity {
         match entity {
             Entity::MText(m) => {

@@ -12,6 +12,7 @@ use opendraft_core::{End, Entity, EntityId, Point};
 use opendraft_ui::key;
 
 use crate::defaults::EditorDefaults;
+use crate::edges_options::{ask_crossing, erase_some, switch_edge, switch_project};
 use crate::edges_sweep::{ask_fence, ask_window, change_swept, edges_for, put_back};
 use opendraft_commands::Wording;
 
@@ -24,21 +25,11 @@ pub fn trim_plan(
     cutters: &[Entity],
     at: Point,
 ) -> Result<Vec<Entity>, &'static str> {
-    if matches!(target, Entity::Spline(_)) {
-        return Err(key!("TRIM does not support splines yet."));
-    }
     let crossings: Vec<Point> = cutters
         .iter()
         .flat_map(|cutter| target.intersections(cutter))
         .collect();
     if crossings.is_empty() {
-        let near = target.bounds();
-        if cutters
-            .iter()
-            .any(|c| matches!(c, Entity::Spline(_)) && c.bounds().intersects(&near))
-        {
-            return Err(key!("Splines cannot be cutting edges yet."));
-        }
         return Err(NO_EDGE);
     }
     let pieces = target.split_at(&crossings);
@@ -51,7 +42,13 @@ pub fn trim_plan(
     // Cut again only at the crossings that bound the clicked piece, so the
     // rest stays whole: a line trimmed at one end is shortened, not broken
     // at every other crossing as well (and can be trimmed there next).
-    let tolerance = 1e-9 * (1.0 + at.x.abs().max(at.y.abs()));
+    let mut tolerance = 1e-9 * (1.0 + at.x.abs().max(at.y.abs()));
+    if matches!(target, Entity::Spline(_)) {
+        // A crossing with a spline is found along short segments, a hair off
+        // the curve itself.
+        let b = target.bounds();
+        tolerance = tolerance.max((b.max.x - b.min.x).hypot(b.max.y - b.min.y) * 1e-3);
+    }
     let bounds: Vec<Point> = crossings
         .into_iter()
         .filter(|c| pieces[nearest].distance_to(*c) <= tolerance)
@@ -124,9 +121,6 @@ pub fn extend_plan(
     boundaries: &[Entity],
     at: Point,
 ) -> Result<Vec<Entity>, &'static str> {
-    if matches!(target, Entity::Spline(_)) {
-        return Err(key!("EXTEND does not support splines yet."));
-    }
     let ends = match target {
         Entity::Line { start, end } => Some((*start, *end)),
         Entity::Arc {
@@ -139,6 +133,7 @@ pub fn extend_plan(
             opendraft_core::arc::point_at(*center, *radius, *end),
         )),
         Entity::Ellipse(e) if !e.is_full() => Some((e.start_point(), e.end_point())),
+        Entity::Spline(s) if !s.closed && !s.periodic => Some((s.start_point(), s.end_point())),
         Entity::Polyline {
             points,
             closed: false,
@@ -155,15 +150,10 @@ pub fn extend_plan(
     } else {
         End::End
     };
-    let splines = boundaries.iter().any(|b| matches!(b, Entity::Spline(_)));
     target
         .extended_to(end, boundaries)
         .map(|longer| vec![longer])
-        .ok_or(if splines {
-            key!("No boundary in the way (splines cannot be boundary edges yet).")
-        } else {
-            key!("No boundary in the way.")
-        })
+        .ok_or(key!("No boundary in the way."))
 }
 
 /// Which of the two commands is running.
@@ -207,23 +197,47 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
         // Quick mode is named here, its only prompt; Standard mode was named
         // at the edge question.
         let message = object_prompt(mode, quick);
-        // No Crossing option: a click in empty space starts the window.
+        // A click in empty space starts the crossing window too.
         let mut options = Options::<Swept>::new(message)
             .keyword("Fence", "F")
-            .keyword("mOde", "O");
+            .keyword("Crossing", "C")
+            .keyword("mOde", "O")
+            .keyword("Project", "P")
+            .keyword_in("trim", "Edge", "E")
+            .keyword("eRase", "R");
         if changed > 0 {
             options = options.keyword("Undo", "U");
         }
         let doing = |shift: bool| if shift { mode.other() } else { mode };
         // Quick mode with every object as an edge erases what nothing divides.
         let erase = quick && edges.is_none();
+        let implied = ed.defaults().trim.get().edge_extend;
         let done = match ed.ask_object_or_sweep(options) {
             Err(Cancelled) | Ok(Answer::Enter) => return Ok(()),
             Ok(Answer::Keyword(word)) => match word.as_str() {
                 "Fence" => match ask_fence(ed)? {
-                    Some(path) => change_swept(ed, &edges, mode, Region::Fence(path), erase)? > 0,
+                    Some(path) => {
+                        let region = Region::Fence(path);
+                        change_swept(ed, &edges, mode, region, erase, implied)? > 0
+                    }
                     None => false,
                 },
+                "Crossing" => match ask_crossing(ed)? {
+                    Some(region) => change_swept(ed, &edges, mode, region, erase, implied)? > 0,
+                    None => false,
+                },
+                "Edge" => {
+                    switch_edge(ed)?;
+                    false
+                }
+                "Project" => {
+                    switch_project(ed)?;
+                    false
+                }
+                "eRase" => {
+                    erase_some(ed)?;
+                    false
+                }
                 "mOde" => {
                     if switch_mode(ed, &mut quick)? {
                         edges = choose_edges(ed, &mut quick, Vec::new(), mode)?;
@@ -237,15 +251,22 @@ fn edit_against_edges(ed: &mut Editor, mode: Mode) -> Result<(), Cancelled> {
                 }
             },
             Ok(Answer::Value(Swept::Object(picked))) => {
-                change_one(ed, &edges, doing(picked.shift), picked, erase)?
+                change_one(ed, &edges, doing(picked.shift), picked, (erase, implied))?
             }
             Ok(Answer::Value(Swept::Missed { at, shift })) => {
                 let corners = ask_window(ed, at)?;
                 let region = Region::Crossing(corners);
-                change_swept(ed, &edges, doing(shift), region, erase)? > 0
+                change_swept(ed, &edges, doing(shift), region, erase, implied)? > 0
             }
             Ok(Answer::Value(Swept::Path { points, shift })) => {
-                change_swept(ed, &edges, doing(shift), Region::Fence(points), erase)? > 0
+                change_swept(
+                    ed,
+                    &edges,
+                    doing(shift),
+                    Region::Fence(points),
+                    erase,
+                    implied,
+                )? > 0
             }
         };
         if done {
@@ -324,19 +345,21 @@ fn switch_mode(ed: &Editor, quick: &mut bool) -> Result<bool, Cancelled> {
     Ok(true)
 }
 
-/// Trim or extend the picked object. Returns whether the drawing changed.
+/// Trim or extend the picked object. `how` is whether to erase what no edge
+/// divides and whether edges are extended. Returns whether the drawing changed.
 fn change_one(
     ed: &Editor,
     edges: &Option<Vec<EntityId>>,
     mode: Mode,
     picked: Picked,
-    erase: bool,
+    how: (bool, bool),
 ) -> Result<bool, Cancelled> {
+    let (erase, implied) = how;
     let Picked { id, at, .. } = picked;
     let edges = edges.clone();
     let plan = ed.read(move |doc| {
         let target = doc.object(id)?;
-        let others = edges_for(doc, &edges, id);
+        let others = edges_for(doc, &edges, id, implied);
         let made = plan(mode, &target.entity, &others, at, erase);
         Some(made.map(|left| (target.attrs.clone(), left)))
     })?;
@@ -469,29 +492,69 @@ mod tests {
         );
     }
 
+    fn arch() -> Entity {
+        // Over the top of an arch from (-6, 0) to (6, 0), peaking near y = 4.
+        Entity::Spline(Box::new(
+            opendraft_core::Spline::from_control_points(
+                3,
+                vec![p(-6.0, 0.0), p(-4.0, 6.0), p(4.0, 6.0), p(6.0, 0.0)],
+            )
+            .unwrap(),
+        ))
+    }
+
     #[test]
-    fn splines_are_refused_by_name_as_objects_and_as_edges() {
-        let s = Entity::Spline(Box::new(
-            opendraft_core::Spline::from_control_points(1, vec![p(-5.0, 0.0), p(5.0, 0.0)])
-                .unwrap(),
-        ));
-        assert_eq!(
-            trim_plan(&s, &[wall(0.0)], p(1.0, 0.0)),
-            Err("TRIM does not support splines yet.")
+    fn a_spline_is_trimmed_at_its_crossings_and_stays_a_spline() {
+        let (left, right) = (wall(-2.0), wall(2.0));
+        let made = trim_plan(&arch(), &[left, right], p(0.0, 4.5)).unwrap();
+        // The middle goes: the two feet are left, both still splines.
+        assert_eq!(made.len(), 2);
+        assert!(made.iter().all(|e| matches!(e, Entity::Spline(_))));
+        let near = |a: Point, b: Point| (a.x - b.x).hypot(a.y - b.y) < 1e-3;
+        let (Entity::Spline(a), Entity::Spline(b)) = (&made[0], &made[1]) else {
+            panic!()
+        };
+        assert!(near(a.start_point(), p(-6.0, 0.0)) && near(b.end_point(), p(6.0, 0.0)));
+        assert!((a.end_point().x + 2.0).abs() < 1e-3);
+        assert!((b.start_point().x - 2.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_spline_is_a_cutting_edge_for_a_line() {
+        let across = line(p(0.0, -5.0), p(0.0, 9.0));
+        let made = trim_plan(&across, std::slice::from_ref(&arch()), p(0.0, -4.0)).unwrap();
+        assert_eq!(made.len(), 1);
+        let Entity::Line { start, end } = &made[0] else {
+            panic!("{made:?}")
+        };
+        // The part under the arch's crest is cut away, the part above stays.
+        assert!((start.y - 4.5).abs() < 0.1 && (end.y - 9.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_spline_is_a_boundary_for_extend_and_runs_on_straight_to_one() {
+        let short = line(p(0.0, 5.5), p(0.0, 6.5));
+        let made = extend_plan(&short, &[arch()], p(0.0, 5.5)).unwrap();
+        assert!(matches!(made[0], Entity::Line { .. }));
+        // The arch leaves (6, 0) heading down and right (1, -3): it runs on
+        // straight to the wall at x = 9, at y = -9.
+        let made = extend_plan(&arch(), &[wall(9.0)], p(5.9, 0.1)).unwrap();
+        let Entity::Spline(longer) = &made[0] else {
+            panic!("{made:?}")
+        };
+        let (end, start) = (longer.end_point(), longer.start_point());
+        assert!(
+            (end.x - 9.0).abs() < 1e-6 && (end.y + 9.0).abs() < 1e-6,
+            "{end:?}"
         );
-        assert_eq!(
-            extend_plan(&s, &[wall(9.0)], p(4.0, 0.0)),
-            Err("EXTEND does not support splines yet.")
+        assert!(
+            (start.x + 6.0).abs() < 1e-9 && start.y.abs() < 1e-9,
+            "the other end stayed"
         );
-        let across = line(p(0.0, -5.0), p(0.0, 5.0));
+        // Nothing in the way: no boundary on the way out.
         assert_eq!(
-            trim_plan(&across, std::slice::from_ref(&s), p(0.0, 1.0)),
-            Err("Splines cannot be cutting edges yet.")
-        );
-        let short = line(p(0.0, -5.0), p(0.0, -3.0));
-        assert_eq!(
-            extend_plan(&short, &[s], p(0.0, -3.0)),
-            Err("No boundary in the way (splines cannot be boundary edges yet).")
+            extend_plan(&arch(), &[wall(-9.0)], p(5.9, 0.1)),
+            Err("No boundary in the way.")
         );
     }
 
@@ -835,5 +898,125 @@ mod tests {
         state.answer_object(p(1.9, 0.0), Some(target), true);
         state.settle_command();
         assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(6.0, 0.0)));
+    }
+
+    /// A short vertical edge above the line, which a level line never meets
+    /// unless the edge is taken to run on.
+    fn short_edge(x: f64) -> Entity {
+        line(p(x, 3.0), p(x, 8.0))
+    }
+
+    /// Start `command` with the last object (the edge) selected beforehand.
+    fn with_the_edge_selected(
+        command: fn(&mut Editor) -> Result<(), Cancelled>,
+        entities: &[Entity],
+        extend_edges: bool,
+    ) -> AppState {
+        let mut state = AppState::new();
+        for e in entities {
+            state.add_entity(e.clone());
+        }
+        let edge = id(&state, entities.len() - 1);
+        state.select_ids([edge], false);
+        state
+            .defaults()
+            .trim
+            .change(|m| m.edge_extend = extend_edges);
+        state.start_command("Edit", command);
+        state.settle_command();
+        state
+    }
+
+    #[test]
+    fn a_trim_edge_that_does_not_reach_cuts_once_it_is_taken_to_run_on() {
+        let level = line(p(0.0, 0.0), p(10.0, 0.0));
+        let mut state =
+            with_the_edge_selected(trim_objects, &[level.clone(), short_edge(5.0)], true);
+        let target = id(&state, 0);
+        state.answer_object(p(7.0, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(5.0, 0.0)));
+        // Without the Edge option the same click finds nothing to cut against.
+        let mut state =
+            with_the_edge_selected(trim_objects, &[level.clone(), short_edge(5.0)], false);
+        let target = id(&state, 0);
+        state.answer_object(p(7.0, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], level);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("Object does not intersect an edge.")));
+    }
+
+    #[test]
+    fn an_extend_boundary_that_does_not_reach_stops_the_object_once_it_is_taken_to_run_on() {
+        let short = line(p(0.0, 0.0), p(2.0, 0.0));
+        let mut state =
+            with_the_edge_selected(extend_objects, &[short.clone(), short_edge(6.0)], true);
+        let target = id(&state, 0);
+        state.answer_object(p(1.9, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(6.0, 0.0)));
+        let mut state =
+            with_the_edge_selected(extend_objects, &[short.clone(), short_edge(6.0)], false);
+        let target = id(&state, 0);
+        state.answer_object(p(1.9, 0.0), Some(target), false);
+        state.settle_command();
+        assert_eq!(entities(&state)[0], short);
+        assert!(state
+            .cmdline
+            .log
+            .iter()
+            .any(|l| l.contains("No boundary in the way.")));
+    }
+
+    #[test]
+    fn the_edge_option_sets_and_remembers_the_mode() {
+        let mut state = trimming(&[line(p(0.0, 0.0), p(10.0, 0.0)), wall(4.0)]);
+        assert!(state.cmd_prompt().options.iter().any(|o| o.label == "Edge"));
+        assert!(!state.defaults().trim.get().edge_extend);
+        state.cmd_submit("e");
+        state.settle_command();
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Enter an implied edge extension mode"));
+        state.cmd_submit("extend");
+        state.settle_command();
+        assert!(state.defaults().trim.get().edge_extend);
+        assert!(state
+            .cmd_prompt()
+            .text
+            .starts_with("Quick mode, select object to trim"));
+        // The prompt offers the current choice, and No extend turns it off.
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("n");
+        state.settle_command();
+        assert!(!state.defaults().trim.get().edge_extend);
+        // Enter keeps what was there.
+        state.cmd_submit("e");
+        state.settle_command();
+        state.cmd_submit("");
+        state.settle_command();
+        assert!(!state.defaults().trim.get().edge_extend);
+    }
+
+    #[test]
+    fn a_fence_trims_against_an_edge_taken_to_run_on() {
+        let mut state = with_the_edge_selected(
+            trim_objects,
+            &[line(p(0.0, 0.0), p(10.0, 0.0)), short_edge(5.0)],
+            true,
+        );
+        state.cmd_submit("f");
+        state.settle_command();
+        state.answer_point(p(7.0, 2.0));
+        state.answer_point(p(7.0, -2.0));
+        state.cmd_submit("");
+        state.settle_command();
+        assert_eq!(entities(&state)[0], line(p(0.0, 0.0), p(5.0, 0.0)));
     }
 }

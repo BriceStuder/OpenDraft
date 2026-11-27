@@ -15,6 +15,7 @@ pub mod aci;
 pub mod arc;
 pub mod arc_make;
 pub mod array;
+mod array_record;
 pub mod block;
 mod breaking;
 pub mod bulge;
@@ -24,6 +25,7 @@ pub mod ccs_align;
 pub mod closed_pair;
 mod corner;
 mod corner_infinite;
+mod corner_polyline;
 mod curve_snap;
 pub mod dimension;
 pub mod divide;
@@ -37,24 +39,30 @@ mod extend;
 mod fillet;
 mod fillet_ellipse;
 mod fillet_parallel;
+mod fillet_spline;
 mod grip;
 pub mod hatch;
 pub mod hsl;
+pub mod implied_edge;
 pub mod infinite;
 mod intersect;
 mod join;
+mod join_gap;
 mod layer;
 pub mod layout;
 pub mod leader;
 mod lengthen;
+mod lengthen_ellipse;
 pub mod linetype;
 pub mod loop_polyline;
 pub mod measure;
 pub mod mleader;
+pub mod modify_settings;
 pub mod mtext;
 pub mod name_order;
 pub mod oblong;
 mod offset;
+mod offset_fit;
 pub mod ortho;
 pub mod outline;
 pub mod overkill;
@@ -70,6 +78,7 @@ pub mod point_style;
 mod polycorner;
 pub mod polygon;
 pub mod polyline;
+pub mod polyline_curve;
 pub mod purge;
 pub mod rect;
 pub mod rect_shape;
@@ -90,8 +99,10 @@ pub mod units;
 mod validate;
 #[cfg(test)]
 mod validate_id_tests;
+mod vertex_edit;
 pub mod width;
 
+pub use array_record::{ArrayRecord, ArrayShape};
 pub use block::{
     Affine, AttributeDefinition, AttributeDefinitionId, AttributeReference, BlockDef, BlockEntity,
     BlockId, BlockObjectId, Insert,
@@ -99,9 +110,11 @@ pub use block::{
 pub use ccs::{Ccs, CcsSpace, NamedCcs};
 pub use corner::{Chamfer, CornerError, Joined};
 pub use corner_infinite::{chamfer_lines, fillet};
+pub use corner_polyline::{join_apart_segments, join_to_end_segment, EndJoin};
 pub use dimension::{Arrow, DimKind, DimStyle, DimText, Dimension};
 pub use document::{
-    Absorbed, Document, EntityId, LinetypeUse, Object, Placement, SpatialStats, TransferWarning,
+    Absorbed, BlockClash, BlockNameClash, BringError, Brought, Document, EntityId,
+    LibraryPlacement, LinetypeUse, Object, Placed, Placement, SpatialStats, TransferWarning,
 };
 pub use ellipse::{Ellipse, EllipseError};
 pub use entity_kind::EntityKind;
@@ -110,6 +123,7 @@ pub use grip::{Grip, GripKind};
 pub use hatch::HatchEntity;
 pub use intersect::Curve;
 pub use join::{join, Merged};
+pub use join_gap::closed;
 pub use layer::{Attr, Attributes, Color, Layer, LayerId, LayerLook, Lineweight};
 pub use layout::{
     format_scale, paper_size, paper_size_name, parse_scale, Layout, LayoutId, Viewport, ViewportId,
@@ -118,6 +132,7 @@ pub use layout::{
 pub use leader::Leader;
 pub use linetype::{Linetype, LinetypeError, LinetypeId, LinetypeTable, StrokeElement};
 pub use mleader::{MLeader, MLeaderStyle, MLeaderStyleId};
+pub use modify_settings::ModifySettings;
 pub use mtext::MText;
 pub use plot_settings::{
     PaperUnits, PlotArea, PlotRotation, PlotScale, PlotSettings, ShadePlotMode, ShadePlotSettings,
@@ -126,6 +141,7 @@ pub use plot_settings::{
 pub use point_style::{PointMarks, PointStyle};
 pub use polycorner::{round_polyline, Path, Round, Rounded};
 pub use polyline::PolylineError;
+pub use polyline_curve::{CurveFrame, PolylineCurve};
 pub use single_line_text::{SingleLineText, TextAlignment, TextAlignmentMode};
 pub use spline::{KnotParameterization, Spline, SplineError, SplineFitData};
 pub use tangent::tangent_circle;
@@ -135,6 +151,7 @@ pub use text_style::{
 };
 pub use units::{AngleFormat, InsertUnits, LengthFormat, Units};
 pub use validate::DocumentError;
+pub use vertex_edit::VertexGrip;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Point {

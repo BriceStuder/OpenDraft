@@ -51,6 +51,8 @@ pub struct Editor {
 }
 
 mod dialog_asks;
+mod modify_settings;
+mod steps;
 mod sweep_ask;
 
 pub use dialog_asks::{AttributeEditorAnswer, FieldAnswer};
@@ -136,14 +138,6 @@ impl Editor {
         edit: impl FnOnce(&mut Transaction) -> Result<T, Cancelled> + Send + 'static,
     ) -> Result<T, Cancelled> {
         self.run(move |session| session.transaction(name, edit))?
-    }
-
-    /// Undo the most recent step in the drawing's history. A command uses
-    /// this only to take back a step it made itself (Line's Undo option).
-    pub fn undo(&self) -> Result<(), Cancelled> {
-        self.run(|session| {
-            session.undo();
-        })
     }
 
     fn run<R: Send + 'static>(

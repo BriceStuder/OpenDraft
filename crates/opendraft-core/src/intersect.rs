@@ -52,6 +52,17 @@ pub(crate) fn path_segments(points: &[Point], closed: bool) -> Vec<(Point, Point
     found
 }
 
+/// The segments along a spline, within a ten-thousandth of its size.
+fn spline_segments(spline: &crate::Spline) -> Vec<(Point, Point)> {
+    let b = spline.bounds();
+    let size = (b.max.x - b.min.x).hypot(b.max.y - b.min.y);
+    let tolerance = (size * 1e-4).max(1e-9);
+    match spline.flatten(tolerance) {
+        Ok(points) => path_segments(&points, false),
+        Err(_) => Vec::new(),
+    }
+}
+
 /// The corners of a rectangle, counter-clockwise from `min`.
 pub(crate) fn corners(min: Point, max: Point) -> [Point; 4] {
     [min, Point::new(max.x, min.y), max, Point::new(min.x, max.y)]
@@ -83,8 +94,8 @@ impl Entity {
                 vec![Curve::Segment { a, b }]
             }
             Entity::Ellipse(e) => vec![Curve::Ellipse(*e)],
-            // Not a curve the crossing code knows yet: Trim, Extend and the
-            // corner commands refuse splines by name.
+            // Snaps and tangents do not know a spline as a curve; crossings
+            // see it as segments (`crossing_curves`).
             Entity::Spline(_) => Vec::new(),
             Entity::Line { start, end } => vec![Curve::Segment { a: *start, b: *end }],
             Entity::Circle { center, radius } => vec![Curve::Circle {
@@ -128,12 +139,25 @@ impl Entity {
         }
     }
 
+    /// The curves crossings are found with: [`curves`](Self::curves), but a
+    /// spline as the short straight segments along it, close enough to find
+    /// where it meets another curve.
+    pub(crate) fn crossing_curves(&self) -> Vec<Curve> {
+        match self {
+            Entity::Spline(s) => spline_segments(s)
+                .into_iter()
+                .map(|(a, b)| Curve::Segment { a, b })
+                .collect(),
+            _ => self.curves(),
+        }
+    }
+
     /// Every point where this entity's outline crosses `other`'s, without
     /// repeats (a corner shared by two segments counts once).
     pub fn intersections(&self, other: &Entity) -> Vec<Point> {
-        let theirs = other.curves();
+        let theirs = other.crossing_curves();
         let mut found = Vec::new();
-        for mine in self.curves() {
+        for mine in self.crossing_curves() {
             for curve in &theirs {
                 found.extend(mine.intersections(curve));
             }

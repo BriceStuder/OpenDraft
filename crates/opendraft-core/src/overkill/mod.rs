@@ -6,6 +6,8 @@
 mod equal;
 mod merge;
 mod polyline;
+#[cfg(test)]
+mod polyline_tests;
 mod prepare;
 #[cfg(test)]
 mod prepare_tests;
@@ -167,6 +169,19 @@ pub fn overkill_capped(
             count(1)?;
             if gone[j] || items[i].group != items[j].group {
                 continue;
+            }
+            // A loose line or arc lying on a polyline segment goes; the polyline
+            // is not touched.
+            let on = |loose: usize, shape: usize| {
+                !items[loose].protected && equal::lies_on_polyline(&now[loose], &now[shape], tol)
+            };
+            if on(j, i) {
+                gone[j] = true;
+                continue;
+            }
+            if on(i, j) {
+                gone[i] = true;
+                break;
             }
             if equal::same(&now[i], &now[j], tol) {
                 // The one that must stay survives, whichever came first.

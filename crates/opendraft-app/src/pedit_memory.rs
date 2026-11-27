@@ -1,6 +1,7 @@
 //! What PEDIT remembers between uses, shared by the command, the system
 //! variable and the saved settings: whether it turns lines and arcs into
-//! polylines without asking (`PEDITACCEPT`), and the Join type.
+//! polylines without asking (`PEDITACCEPT`), the Join type, and whether a
+//! spline becomes straight pieces or arcs (`PLINECONVERTMODE`).
 
 use opendraft_core::pedit::JoinType;
 
@@ -11,11 +12,15 @@ pub struct Memory {
     pub accept: bool,
     /// What Multiple's Join does with ends that nearly meet.
     pub join_type: JoinType,
+    /// A spline becomes arcs rather than straight pieces
+    /// (`PLINECONVERTMODE` 1).
+    pub convert_arcs: bool,
 }
 
 const DEFAULT: Memory = Memory {
     accept: false,
     join_type: JoinType::Extend,
+    convert_arcs: false,
 };
 
 impl Default for Memory {
@@ -24,7 +29,7 @@ impl Default for Memory {
     }
 }
 
-const KEYS: [&str; 2] = ["pedit_accept", "pedit_join_type"];
+const KEYS: [&str; 3] = ["pedit_accept", "pedit_join_type", "pline_convert_arcs"];
 
 fn join_name(kind: JoinType) -> &'static str {
     match kind {
@@ -50,6 +55,10 @@ pub fn load(storage: Option<&dyn eframe::Storage>) -> Memory {
     });
     m.accept = accept.unwrap_or(m.accept);
     m.join_type = kind.unwrap_or(m.join_type);
+    let arcs = storage
+        .get_string(KEYS[2])
+        .and_then(|v| v.parse::<bool>().ok());
+    m.convert_arcs = arcs.unwrap_or(m.convert_arcs);
     m
 }
 
@@ -57,6 +66,7 @@ pub fn load(storage: Option<&dyn eframe::Storage>) -> Memory {
 pub fn save(m: &Memory, storage: &mut dyn eframe::Storage) {
     storage.set_string(KEYS[0], m.accept.to_string());
     storage.set_string(KEYS[1], join_name(m.join_type).to_owned());
+    storage.set_string(KEYS[2], m.convert_arcs.to_string());
 }
 
 #[cfg(test)]
@@ -83,12 +93,14 @@ mod tests {
         let kept = Memory {
             accept: true,
             join_type: JoinType::Both,
+            convert_arcs: true,
         };
         let mut saved = Saved::default();
         save(&kept, &mut saved);
         assert_eq!(load(Some(&saved)), kept);
         saved.set_string(KEYS[1], "Sideways".to_owned());
         saved.set_string(KEYS[0], "maybe".to_owned());
+        saved.set_string(KEYS[2], "2".to_owned());
         assert_eq!(load(Some(&saved)), Memory::default());
     }
 }

@@ -1,12 +1,13 @@
 //! ARRAYPATH: copies of the selected objects along a path curve, worded as
-//! AutoCAD 2020's and not associative (see `array_cmd.rs`).
+//! AutoCAD 2020's, recorded as associative or not like the other arrays (see
+//! `array_cmd.rs`).
 
 use opendraft_commands::{Answer, Cancelled, Editor, NumberOptions, Options, Picked};
 use opendraft_core::array::{Path, Placement};
-use opendraft_core::{EntityId, Point};
+use opendraft_core::{ArrayRecord, ArrayShape, EntityId, Point};
 use opendraft_ui::key;
 
-use crate::array_cmd::{ask_count, edit_prompt, fits, ghost, make, read_source};
+use crate::array_cmd::{ask_count, edit_prompt, fits, ghost, make, read_source, say_type};
 use opendraft_commands::Wording;
 
 /// ARRAYPATH: select objects and the path curve; the items are spaced along
@@ -14,7 +15,7 @@ use opendraft_commands::Wording;
 /// options until Enter.
 pub fn array_path(ed: &mut Editor) -> Result<(), Cancelled> {
     let ids = ed.pickset_or_select(key!("Select objects"))?;
-    path_with(ed, ids)
+    path_with(ed, ids, None)
 }
 
 /// How the items are laid along the path.
@@ -26,25 +27,66 @@ enum Method {
     Divide,
 }
 
-pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cancelled> {
+/// A path array being made, or (with `editing`) laid out again along the
+/// curve it was made along.
+pub(crate) fn path_with(
+    ed: &mut Editor,
+    ids: Vec<EntityId>,
+    editing: Option<ArrayRecord>,
+) -> Result<(), Cancelled> {
     let Some(source) = read_source(ed, ids.clone())? else {
         return Ok(());
     };
-    ed.say(key!("Type = Path  Associative = No"));
-    let Some(path) = ask_path(ed, ids)? else {
-        return Ok(());
-    };
+    say_type(ed, "Path");
     let (dx, dy) = source.spacing();
-    let mut spacing = dx.max(dy);
-    let mut items = path.items_fitting(spacing);
-    let (mut method, mut align) = (Method::Measure, true);
+    let (path, path_id, reversed, mut spacing, mut items, mut method, mut align);
+    match editing.as_ref().map(|r| r.shape) {
+        Some(ArrayShape::Path {
+            path: id,
+            reversed: back,
+            items: count,
+            spacing: step,
+            align: aligned,
+            divide,
+        }) => {
+            let found = ed.read(move |doc| doc.get(id).and_then(Path::of))?;
+            let Some(found) = found else {
+                ed.say(key!("The path curve of the array is gone."));
+                return Ok(());
+            };
+            path = if back { found.reversed() } else { found };
+            (path_id, reversed, spacing, items, align) = (id, back, step, count, aligned);
+            method = if divide {
+                Method::Divide
+            } else {
+                Method::Measure
+            };
+        }
+        _ => {
+            let Some((found, id, back)) = ask_path(ed, ids)? else {
+                return Ok(());
+            };
+            (path, path_id, reversed) = (found, id, back);
+            spacing = dx.max(dy);
+            items = path.items_fitting(spacing);
+            (method, align) = (Method::Measure, true);
+        }
+    }
     let keywords = [("Method", "M"), ("Items", "I"), ("Align items", "A")];
     loop {
         let placed = path
             .array(items, spacing, align)
             .unwrap_or_else(|| vec![Placement::STAY]);
         let Some(option) = edit_prompt(ed, &keywords, ghost(&source, &placed))? else {
-            return make(ed, source, placed);
+            let shape = ArrayShape::Path {
+                path: path_id,
+                reversed,
+                items,
+                spacing,
+                align,
+                divide: method == Method::Divide,
+            };
+            return make(ed, source, placed, shape, editing);
         };
         match option.as_str() {
             "Method" => {
@@ -118,9 +160,13 @@ pub(crate) fn path_with(ed: &mut Editor, ids: Vec<EntityId>) -> Result<(), Cance
     }
 }
 
-/// The path curve picked, run from the end nearer the pick. The objects
-/// being arrayed cannot be their own path.
-fn ask_path(ed: &Editor, arrayed: Vec<EntityId>) -> Result<Option<Path>, Cancelled> {
+/// The path curve picked, run from the end nearer the pick, with its id and
+/// whether it was turned round to do that. The objects being arrayed cannot be
+/// their own path.
+fn ask_path(
+    ed: &Editor,
+    arrayed: Vec<EntityId>,
+) -> Result<Option<(Path, EntityId, bool)>, Cancelled> {
     loop {
         let options = Options::<Picked>::new(key!("Select path curve")).allow_empty();
         let Answer::Value(Picked { id, at, .. }) = ed.ask_object(options)? else {
@@ -137,7 +183,8 @@ fn ask_path(ed: &Editor, arrayed: Vec<EntityId>) -> Result<Option<Path>, Cancell
         };
         let near = |p: Point| (p.x - at.x).hypot(p.y - at.y);
         let nearer_end = !path.is_closed() && near(path.end()) < near(path.start());
-        return Ok(Some(if nearer_end { path.reversed() } else { path }));
+        let path = if nearer_end { path.reversed() } else { path };
+        return Ok(Some((path, id, nearer_end)));
     }
 }
 

@@ -142,6 +142,11 @@ fn insert() -> Tab {
                     Column::Large(Item::new("block.create", "Create", icons::BLOCK_CREATE)),
                     Column::Large(Item::new("block.edit", "Edit", icons::BLOCK_EDIT)),
                     Column::Large(Item::new("block.purge", "Purge", icons::BLOCK_PURGE)),
+                    Column::Large(Item::new(
+                        "block.content_manager",
+                        "Content Manager",
+                        icons::BLOCK_LIBRARY,
+                    )),
                     Column::Large(Item::new("block.reset", "Reset", icons::BLOCK_RESET)),
                 ],
                 ..Default::default()
@@ -287,15 +292,11 @@ fn view() -> Tab {
                 title: "Navigate",
                 columns: vec![
                     Column::Large(Item::new("view.pan", "Pan", icons::VIEW_PAN)),
-                    Column::Stack(vec![
-                        Item::new("view.zoom_in", "Zoom In", icons::VIEW_ZOOM_IN),
-                        Item::new("view.zoom_out", "Zoom Out", icons::VIEW_ZOOM_OUT),
-                        Item::new(
-                            "view.zoom_extents",
-                            "Zoom Extents",
-                            icons::VIEW_ZOOM_EXTENTS,
-                        ),
-                    ]),
+                    Column::Large(Item::new(
+                        "view.zoom_extents",
+                        "Zoom Extents",
+                        icons::VIEW_ZOOM_EXTENTS,
+                    )),
                 ],
                 ..Default::default()
             },

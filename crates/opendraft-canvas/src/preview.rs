@@ -22,8 +22,39 @@ const MARGIN: f64 = 0.06;
 const SHEET_WIDTH: f64 = 25.6;
 /// What the picture is drawn on: a dark grey, a little lighter than the page.
 pub const BACKGROUND: [u8; 3] = [43, 43, 43];
+/// What the picture is drawn on in the light palette.
+pub const LIGHT_BACKGROUND: [u8; 3] = [243, 243, 243];
 /// Subsamples per pixel row when filling.
 const SUBROWS: usize = 4;
+
+/// Which colours a picture is drawn in: the dark grey of the drawing area, or
+/// light grey for the light palette.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Palette {
+    #[default]
+    Dark,
+    Light,
+}
+
+impl Palette {
+    pub fn background(self) -> [u8; 3] {
+        match self {
+            Palette::Dark => BACKGROUND,
+            Palette::Light => LIGHT_BACKGROUND,
+        }
+    }
+
+    /// A plotted colour as it shows on this background: on dark, the plot's
+    /// black (and anything too dark to see) becomes white; on light, white
+    /// (and anything too pale to see) becomes black.
+    fn show(self, rgb: [u8; 3]) -> [u8; 3] {
+        match self {
+            Palette::Dark if rgb.iter().all(|c| *c < 64) => [255; 3],
+            Palette::Light if rgb.iter().all(|c| *c > 215) => [0; 3],
+            _ => rgb,
+        }
+    }
+}
 
 /// A picture: `width` x `height` pixels, RGBA, rows from the top.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -151,24 +182,36 @@ pub fn content_bounds(document: &Document) -> Option<Bounds> {
 
 /// The picture of `document`'s model space; a blank grid when it is empty.
 pub fn render(document: &Document) -> Result<Preview, PreviewError> {
+    render_in(document, Palette::Dark)
+}
+
+/// As [`render`], in `palette`.
+pub fn render_in(document: &Document, palette: Palette) -> Result<Preview, PreviewError> {
     let Some(bounds) = content_bounds(document) else {
-        return Ok(blank());
+        return Ok(blank_in(palette));
     };
     let region = window(bounds).ok_or(PreviewError::Extents)?;
     let sheet = plot_region(document, region, SHEET_WIDTH, None).map_err(PreviewError::Plot)?;
-    Ok(render_sheet(&sheet))
+    Ok(render_sheet_in(&sheet, palette))
 }
 
 /// The picture for an empty drawing: faint grid on dark grey.
 pub fn blank() -> Preview {
-    let mut canvas = Canvas::new();
+    blank_in(Palette::Dark)
+}
+
+/// As [`blank`], in `palette`.
+pub fn blank_in(palette: Palette) -> Preview {
+    let mut canvas = Canvas::new(palette.background());
     for y in 0..HEIGHT {
         for x in 0..WIDTH {
             let major = x % 128 == 0 || y % 128 == 0;
             let minor = x % 32 == 0 || y % 32 == 0;
-            let grey = match (major, minor) {
-                (true, _) => 78,
-                (_, true) => 58,
+            let grey = match (major, minor, palette) {
+                (true, _, Palette::Dark) => 78,
+                (_, true, Palette::Dark) => 58,
+                (true, _, Palette::Light) => 200,
+                (_, true, Palette::Light) => 224,
                 _ => continue,
             };
             canvas.blend(x as i64, y as i64, [grey; 3], 1.0);
@@ -177,19 +220,14 @@ pub fn blank() -> Preview {
     canvas.into_preview()
 }
 
-/// A plotted colour as it shows on the dark background: the plot's black, and anything
-/// else too dark to see, becomes white.
-fn on_black(rgb: [u8; 3]) -> [u8; 3] {
-    if rgb.iter().all(|c| *c < 64) {
-        [255; 3]
-    } else {
-        rgb
-    }
-}
-
 /// A plotted sheet as a picture, its width spread over the picture's.
 pub fn render_sheet(sheet: &PlotSheet) -> Preview {
-    let mut canvas = Canvas::new();
+    render_sheet_in(sheet, Palette::Dark)
+}
+
+/// As [`render_sheet`], in `palette`.
+pub fn render_sheet_in(sheet: &PlotSheet, palette: Palette) -> Preview {
+    let mut canvas = Canvas::new(palette.background());
     if !(sheet.width > 0.0 && sheet.width.is_finite() && sheet.height.is_finite()) {
         return canvas.into_preview();
     }
@@ -200,10 +238,10 @@ pub fn render_sheet(sheet: &PlotSheet) -> Preview {
             Painted::Path(path) => {
                 let points: Vec<(f32, f32)> = path.points.iter().map(to_px).collect();
                 for pair in points.windows(2) {
-                    canvas.line(pair[0], pair[1], on_black(path.rgb));
+                    canvas.line(pair[0], pair[1], palette.show(path.rgb));
                 }
                 if path.closed && points.len() > 2 {
-                    canvas.line(points[points.len() - 1], points[0], on_black(path.rgb));
+                    canvas.line(points[points.len() - 1], points[0], palette.show(path.rgb));
                 }
             }
             Painted::Fill(fill) => {
@@ -212,7 +250,7 @@ pub fn render_sheet(sheet: &PlotSheet) -> Preview {
                     .iter()
                     .map(|c| c.iter().map(to_px).collect())
                     .collect();
-                canvas.fill(&contours, on_black(fill.rgb));
+                canvas.fill(&contours, palette.show(fill.rgb));
             }
         }
     }
@@ -224,10 +262,10 @@ struct Canvas {
 }
 
 impl Canvas {
-    fn new() -> Self {
+    fn new(background: [u8; 3]) -> Self {
         let mut rgba = Vec::with_capacity((WIDTH * HEIGHT * 4) as usize);
         for _ in 0..WIDTH * HEIGHT {
-            rgba.extend([BACKGROUND[0], BACKGROUND[1], BACKGROUND[2], 255]);
+            rgba.extend([background[0], background[1], background[2], 255]);
         }
         Self { rgba }
     }

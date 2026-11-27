@@ -69,6 +69,10 @@ pub struct Document {
     /// Layers frozen in the viewport being worked through (VPLAYER): hidden
     /// from the object queries like a globally frozen layer.
     active_frozen: Vec<LayerId>,
+    /// Objects hidden by isolation (ISOLATEOBJECTS, HIDEOBJECTS), sorted: not
+    /// drawn, picked, snapped to or plotted, but still in the drawing. Not
+    /// part of the drawing's history or file.
+    hidden_objects: Vec<EntityId>,
     /// The layout viewport being worked through, if any. Its layout is not
     /// `active_layout` (which is none there, as new objects go to model
     /// space). Not part of the drawing's history or file.
@@ -111,11 +115,18 @@ pub struct Document {
     linetype_scale: f64,
     /// How point objects are drawn (`PDMODE`, `PDSIZE`).
     point_style: PointStyle,
+    /// What FILLET, CHAMFER, OFFSET and LENGTHEN remember (`FILLETRAD`...).
+    modify_settings: crate::ModifySettings,
+    /// The associative arrays: what is needed to lay their items out again.
+    arrays: Vec<crate::ArrayRecord>,
+    /// The tangents and curve frames PEDIT keeps beside polylines.
+    polyline_curves: Vec<crate::PolylineCurve>,
     /// Where the objects are, for the queries that look at a part of the
     /// drawing. Derived from `objects`: it takes no part in equality.
     spatial: spatial::SpatialIndex,
 }
 
+mod arrays;
 mod attributes;
 mod blocks;
 mod ccs;
@@ -126,9 +137,11 @@ mod leaders;
 mod linetypes;
 pub use linetypes::LinetypeUse;
 mod mleader_styles;
+mod modify_settings;
 mod object;
 mod object_list;
 mod point_style;
+mod polyline_curves;
 mod queries;
 mod settings;
 mod spatial;
@@ -144,7 +157,10 @@ mod transplant;
 
 pub use object::Object;
 pub use spatial::SpatialStats;
-pub use transplant::{Absorbed, Placement, TransferWarning};
+pub use transplant::{
+    Absorbed, BlockClash, BlockNameClash, BringError, Brought, LibraryPlacement, Placed, Placement,
+    TransferWarning,
+};
 
 impl Document {
     // ---- objects ----

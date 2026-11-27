@@ -9,8 +9,8 @@ use opendraft_commands::Editor;
 
 use crate::state::AppState;
 use crate::{
-    attribute_memory, corner_memory, donut_cmd, hatch_memory, overkill_memory, pedit_memory,
-    polygon_cmd, purge_memory, rect_memory, spline_memory, text_memory, trim_memory,
+    attribute_memory, donut_cmd, hatch_memory, overkill_memory, pedit_memory, polygon_cmd,
+    purge_memory, rect_memory, spline_memory, text_memory, trim_memory,
 };
 
 /// One remembered section, shared between the application and the commands
@@ -38,9 +38,11 @@ impl<T: Clone> Slot<T> {
 #[derive(Default)]
 pub struct CommandDefaults {
     pub attribute: Slot<attribute_memory::Memory>,
-    pub corner: Slot<corner_memory::Memory>,
     pub donut: Slot<donut_cmd::Memory>,
     pub hatch: Slot<hatch_memory::Memory>,
+    /// `ARRAYASSOCIATIVITY` turned off: arrays are made without a record.
+    pub array_plain: Slot<bool>,
+    pub matching: Slot<crate::match_props::Matching>,
     pub overkill: Slot<opendraft_core::overkill::Settings>,
     pub pedit: Slot<pedit_memory::Memory>,
     pub polygon: Slot<polygon_cmd::Memory>,
@@ -52,6 +54,8 @@ pub struct CommandDefaults {
     /// The margin of every side of a new layout, in mm: the user setting
     /// `plot_margins_mm`, kept here for the LAYOUT command (not saved here).
     pub plot_margins: Slot<f64>,
+    /// The block library of the Content Manager, opened on first use.
+    pub library: crate::content_library::LibraryHandle,
 }
 
 impl CommandDefaults {
@@ -59,9 +63,10 @@ impl CommandDefaults {
     pub fn load(storage: Option<&dyn eframe::Storage>) -> Self {
         Self {
             attribute: Slot::new(attribute_memory::load(storage)),
-            corner: Slot::new(corner_memory::load(storage)),
             donut: Slot::default(),
+            array_plain: Slot::default(),
             hatch: Slot::new(hatch_memory::load(storage)),
+            matching: Slot::default(),
             overkill: Slot::new(overkill_memory::load(storage)),
             pedit: Slot::new(pedit_memory::load(storage)),
             polygon: Slot::default(),
@@ -71,13 +76,13 @@ impl CommandDefaults {
             text: Slot::new(text_memory::load(storage)),
             trim: Slot::new(trim_memory::load(storage)),
             plot_margins: Slot::default(),
+            library: Default::default(),
         }
     }
 
     /// Write the sections for the next run.
     pub fn save(&self, storage: &mut dyn eframe::Storage) {
         attribute_memory::save(&self.attribute.get(), storage);
-        corner_memory::save(&self.corner.get(), storage);
         hatch_memory::save(&self.hatch.get(), storage);
         overkill_memory::save(&self.overkill.get(), storage);
         pedit_memory::save(&self.pedit.get(), storage);

@@ -25,6 +25,7 @@ impl Default for Document {
             next_viewport_id: 1,
             active_layout: None,
             active_frozen: Vec::new(),
+            hidden_objects: Vec::new(),
             active_viewport: None,
             view_twist: 0.0,
             model_ccs: crate::ccs::Ccs::WORLD,
@@ -43,6 +44,9 @@ impl Default for Document {
             linetypes: LinetypeTable::default(),
             linetype_scale: 1.0,
             point_style: PointStyle::default(),
+            modify_settings: Default::default(),
+            arrays: Vec::new(),
+            polyline_curves: Vec::new(),
             spatial: Default::default(),
         };
         doc.push_layer(Layer::new(LayerId::DEFAULT, "0"));

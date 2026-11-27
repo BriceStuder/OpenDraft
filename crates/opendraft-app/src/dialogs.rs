@@ -37,6 +37,8 @@ pub struct CommandDialogs {
     /// Plot files written for the Plot dialog with "Open in viewer when done",
     /// for the window to open in the system's viewer.
     pub plots_to_view: Vec<std::path::PathBuf>,
+    /// The Content Manager window (it never takes the keyboard: it is modeless).
+    pub content: crate::content_manager::Window,
 }
 
 impl AppState {

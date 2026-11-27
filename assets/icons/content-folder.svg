@@ -1,6 +1,6 @@
 <!-- @license lucide-static v0.469.0 - ISC -->
 <svg
-  class="lucide lucide-zoom-out"
+  class="lucide lucide-folder"
   xmlns="http://www.w3.org/2000/svg"
   width="24"
   height="24"
@@ -11,7 +11,5 @@
   stroke-linecap="round"
   stroke-linejoin="round"
 >
-  <circle cx="11" cy="11" r="8" />
-  <line x1="21" x2="16.65" y1="21" y2="16.65" />
-  <line x1="8" x2="14" y1="11" y2="11" />
+  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
 </svg>

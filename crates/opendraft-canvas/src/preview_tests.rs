@@ -286,3 +286,24 @@ fn a_small_drawing_counts_every_object_whatever_their_spread() {
     assert!(fit.max.x > 4.0e8, "{fit:?}");
     assert_eq!(content_bounds(&Document::default()), None);
 }
+
+#[test]
+fn the_light_palette_draws_dark_ink_on_light_grey() {
+    let preview = render_in(&line_and_circle(), Palette::Light).unwrap();
+    assert_eq!(pixel(&preview, 2, 2), LIGHT_BACKGROUND);
+    // The line near the centre is dark, where the dark palette's is light.
+    let darkest = (250..262)
+        .flat_map(|x| (154..166).map(move |y| (x, y)))
+        .map(|(x, y)| pixel(&preview, x, y)[0])
+        .min();
+    assert!(darkest.unwrap() < 120, "{darkest:?}");
+    let dark = render(&line_and_circle()).unwrap();
+    assert_eq!(pixel(&dark, 2, 2), BACKGROUND);
+}
+
+#[test]
+fn an_empty_drawing_in_the_light_palette_is_a_light_grid() {
+    let preview = render_in(&Document::default(), Palette::Light).unwrap();
+    assert_eq!(pixel(&preview, 5, 5), LIGHT_BACKGROUND);
+    assert!(pixel(&preview, 128, 5)[0] < LIGHT_BACKGROUND[0]);
+}

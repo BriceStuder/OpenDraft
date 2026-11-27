@@ -155,15 +155,14 @@ fn build() -> Vec<SysVar<AppState>> {
                 Ok(())
             },
         ),
-        SysVar::real(
-            "FILLETRAD",
-            "Fillet radius",
-            (0.0, 1.0e9),
-            |st| Value::Real(st.defaults().corner.get().radius),
+        SysVar::int(
+            "ARRAYASSOCIATIVITY",
+            "1 to make arrays that ARRAYEDIT can edit as a whole, 0 for plain copies",
+            (0, 1),
+            |st| Value::Int(i64::from(!st.defaults().array_plain.get())),
             |st, v| {
-                if let Value::Real(n) = v {
-                    st.defaults().corner.change(|m| m.radius = n);
-                }
+                let plain = !matches!(v, Value::Int(1));
+                st.defaults().array_plain.change(|p| *p = plain);
                 Ok(())
             },
         ),
@@ -174,6 +173,16 @@ fn build() -> Vec<SysVar<AppState>> {
             |st| Value::Int(i64::from(st.defaults().pedit.get().accept)),
             |st, v| {
                 st.defaults().pedit.change(|m| m.accept = int(v) == 1);
+                Ok(())
+            },
+        ),
+        SysVar::int(
+            "PLINECONVERTMODE",
+            "How PEDIT turns a spline into a polyline: 0 straight pieces, 1 arcs",
+            (0, 1),
+            |st| Value::Int(i64::from(st.defaults().pedit.get().convert_arcs)),
+            |st, v| {
+                st.defaults().pedit.change(|m| m.convert_arcs = int(v) == 1);
                 Ok(())
             },
         ),
@@ -267,74 +276,6 @@ fn build() -> Vec<SysVar<AppState>> {
                 Ok(())
             },
         ),
-        SysVar::real(
-            "CHAMFERA",
-            "First chamfer distance",
-            (0.0, 1.0e9),
-            |st| Value::Real(st.defaults().corner.get().first),
-            |st, v| {
-                if let Value::Real(n) = v {
-                    st.defaults().corner.change(|m| m.first = n);
-                }
-                Ok(())
-            },
-        ),
-        SysVar::real(
-            "CHAMFERB",
-            "Second chamfer distance",
-            (0.0, 1.0e9),
-            |st| Value::Real(st.defaults().corner.get().second),
-            |st, v| {
-                if let Value::Real(n) = v {
-                    st.defaults().corner.change(|m| m.second = n);
-                }
-                Ok(())
-            },
-        ),
-        SysVar::real(
-            "CHAMFERC",
-            "Chamfer length when measured by length and angle",
-            (0.0, 1.0e9),
-            |st| Value::Real(st.defaults().corner.get().length),
-            |st, v| {
-                if let Value::Real(n) = v {
-                    st.defaults().corner.change(|m| m.length = n);
-                }
-                Ok(())
-            },
-        ),
-        SysVar::real(
-            "CHAMFERD",
-            "Chamfer angle in degrees when measured by length and angle",
-            (0.0, 180.0),
-            |st| Value::Real(st.defaults().corner.get().angle),
-            |st, v| {
-                if let Value::Real(n) = v {
-                    st.defaults().corner.change(|m| m.angle = n);
-                }
-                Ok(())
-            },
-        ),
-        SysVar::int(
-            "CHAMMODE",
-            "Chamfer measured by: 0 two distances, 1 length and angle",
-            (0, 1),
-            |st| flag(st.defaults().corner.get().by_angle),
-            |st, v| {
-                st.defaults().corner.change(|m| m.by_angle = int(v) == 1);
-                Ok(())
-            },
-        ),
-        SysVar::int(
-            "TRIMMODE",
-            "Fillet and chamfer trim the lines: 0 no, 1 yes",
-            (0, 1),
-            |st| flag(st.defaults().corner.get().trim),
-            |st, v| {
-                st.defaults().corner.change(|m| m.trim = int(v) == 1);
-                Ok(())
-            },
-        ),
         SysVar::read_only(
             "CMDACTIVE",
             "Whether a command is running: 0 no, 1 yes",
@@ -362,6 +303,7 @@ pub fn table() -> &'static SysVarTable<AppState> {
         variables.extend(crate::spline_memory::variables());
         variables.extend(crate::hatch_memory::variables());
         variables.extend(crate::trim_memory::variables());
+        variables.extend(crate::modify_vars::variables());
         SysVarTable::new(variables).unwrap_or_else(|e| panic!("invalid system variable table: {e}"))
     })
 }
@@ -445,13 +387,13 @@ mod tests {
         let (table, mut state) = (table(), AppState::new());
         table.set("FILLETRAD", "4.5", &mut state).unwrap();
         assert_eq!(table.get("FILLETRAD", &state), Ok(Value::Real(4.5)));
-        assert_eq!(state.defaults().corner.get().radius, 4.5);
+        assert_eq!(state.modify_settings().fillet_radius, 4.5);
         table.set("CHAMMODE", "1", &mut state).unwrap();
-        assert!(state.defaults().corner.get().by_angle);
+        assert!(state.modify_settings().chamfer_by_angle);
         table.set("CHAMFERD", "30", &mut state).unwrap();
-        assert_eq!(state.defaults().corner.get().angle, 30.0);
+        assert_eq!(state.modify_settings().chamfer_angle, 30.0);
         table.set("TRIMMODE", "0", &mut state).unwrap();
-        assert!(!state.defaults().corner.get().trim);
+        assert!(!state.modify_settings().trim);
         assert!(
             table.set("CHAMFERD", "200", &mut state).is_err(),
             "out of range"

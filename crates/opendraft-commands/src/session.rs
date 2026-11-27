@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use opendraft_core::{Document, LayerId, Layout, LayoutId, ViewportId};
+use opendraft_core::{Document, EntityId, LayerId, Layout, LayoutId, ModifySettings, ViewportId};
 
 use crate::transaction::Batch;
 use crate::{Action, Changes, History, ModifyEntities, Provenance, Step, StepInfo, Transaction};
@@ -108,6 +108,19 @@ impl Session {
         }
     }
 
+    /// Hide exactly these objects (isolation), or show all with none. Not an
+    /// edit: no history, and the drawing is not marked modified, but the
+    /// revision moves so that what was drawn is drawn again.
+    pub fn set_hidden_objects(&mut self, ids: Vec<EntityId>) {
+        let mut sorted = ids;
+        sorted.sort_unstable();
+        sorted.dedup();
+        if self.document.hidden_objects() != sorted {
+            self.document_mut().set_hidden_objects(sorted);
+            self.revision += 1;
+        }
+    }
+
     /// Tell the document how the view being worked in is turned. Not an
     /// edit; run every frame, so nothing is copied when it is unchanged.
     pub fn set_view_twist(&mut self, twist: f64) {
@@ -122,6 +135,18 @@ impl Session {
     pub fn store_view_layouts(&mut self, layouts: Vec<Layout>) {
         self.document_mut().set_layouts(layouts);
         self.revision += 1;
+    }
+
+    /// Change what the modify commands remember (`FILLETRAD`...). Like a
+    /// system variable in AutoCAD it is saved with the drawing but is not an
+    /// undo step, and on its own does not mark the drawing modified. Nothing
+    /// is copied when the closure leaves the settings as they were.
+    pub fn change_modify_settings(&mut self, change: impl FnOnce(&mut ModifySettings)) {
+        let mut settings = self.document.modify_settings();
+        change(&mut settings);
+        if settings.sanitized() != self.document.modify_settings() {
+            self.document_mut().set_modify_settings(settings);
+        }
     }
 
     /// A token that changes whenever an edit, undo or redo alters the drawing.

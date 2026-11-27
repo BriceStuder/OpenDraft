@@ -8,6 +8,7 @@
 use opendraft_commands::{Command, Registry};
 
 use crate::array_cmd::{array_objects, array_polar, array_rect};
+use crate::array_edit::array_edit;
 use crate::array_path::array_path;
 use crate::break_cmd::{break_at_point, break_object};
 use crate::corners::{chamfer_objects, fillet_objects};
@@ -50,6 +51,9 @@ pub fn build_registry() -> Registry<AppState> {
     registry.needs_drawing_when(|s| s.home);
     let tables = [
         crate::block_commands::commands(),
+        crate::linetype_line::commands(),
+        crate::draw_order::commands(),
+        crate::isolate::commands(),
         crate::text_commands::commands(),
         crate::clipboard::commands(),
         crate::layer_cmd::commands(),
@@ -217,6 +221,7 @@ fn all() -> Vec<Command<AppState>> {
             break_at_point
         ),
         editor_command!("modify.array", "Array", "ARRAY", array_objects),
+        editor_command!("modify.array_edit", "Edit Array", "ARRAYEDIT", array_edit),
         editor_command!(
             "modify.array_rect",
             "Rectangular Array",
@@ -321,16 +326,6 @@ fn all() -> Vec<Command<AppState>> {
         cmd("view.zoom_extents", "Zoom Extents", |s| {
             s.docs[s.active].view.request_zoom_extents()
         })
-        .transparent(),
-        cmd("view.zoom_in", "Zoom In", |s| {
-            s.docs[s.active].view.request_zoom_step(true)
-        })
-        .key("Ctrl+Plus")
-        .transparent(),
-        cmd("view.zoom_out", "Zoom Out", |s| {
-            s.docs[s.active].view.request_zoom_step(false)
-        })
-        .key("Ctrl+Minus")
         .transparent(),
         cmd("view.zoom_previous", "Zoom Previous", |s| {
             if !s.docs[s.active].view.zoom_previous() {
@@ -574,7 +569,6 @@ mod tests {
         }
         for id in [
             "edit.cancel",
-            "view.zoom_in",
             "view.grid",
             "manage.settings",
             // A layer command, like LAYFRZ.
@@ -764,14 +758,24 @@ mod tests {
         let mut state = AppState::new();
         for id in [
             "view.zoom_extents",
-            "view.zoom_in",
-            "view.zoom_out",
             "view.zoom_previous",
             "view.zoom_objects",
         ] {
             assert!(registry.is_enabled(id, &state), "{id}");
             registry.execute(id, &mut state).unwrap();
         }
+    }
+
+    /// AutoCAD has no Zoom In and Zoom Out step commands, nor a `ZI`: the
+    /// wheel and ZOOM's options do the zooming.
+    #[test]
+    fn there_are_no_zoom_in_and_zoom_out_step_commands() {
+        let registry = build_registry();
+        let mut state = AppState::new();
+        for id in ["view.zoom_in", "view.zoom_out"] {
+            assert!(registry.execute(id, &mut state).is_err(), "{id}");
+        }
+        assert_eq!(state.cmd_submit("ZI"), None);
     }
 
     #[test]

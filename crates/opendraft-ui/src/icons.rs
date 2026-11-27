@@ -78,6 +78,7 @@ icons! {
     BLOCK_EATTEDIT = '\u{e10b}';
     BLOCK_EDIT = '\u{e1f8}';
     BLOCK_INSERT = '\u{e065}';
+    BLOCK_LIBRARY = '\u{e105}';
     BLOCK_PARAMETER = '\u{e14e}';
     BLOCK_PURGE = '\u{e28e}';
     BLOCK_RESET = '\u{e14b}';
@@ -85,6 +86,15 @@ icons! {
     COMBO_ARROW = '\u{e071}';
     COMMAND_LINE_COLLAPSE = '\u{e071}';
     COMMAND_LINE_EXPAND = '\u{e073}';
+    CONTENT_BACK = '\u{e04c}';
+    CONTENT_DRAWING = '\u{e312}';
+    CONTENT_FAVOURITE = '\u{e179}';
+    CONTENT_FOLDER = '\u{e0dc}';
+    CONTENT_FORWARD = '\u{e04d}';
+    CONTENT_RECENT = '\u{e1f4}';
+    CONTENT_RENAME = '\u{e1f8}';
+    CONTENT_TRASH = '\u{e18d}';
+    CONTENT_UP = '\u{e04e}';
     CONTEXT_DESELECT_ALL = '\u{e178}';
     CONTEXT_EDIT_SELECT_ALL = '\u{e1c2}';
     CONTEXT_FIND = '\u{e154}';
@@ -252,6 +262,7 @@ icons! {
     MODIFY_MIRROR = '\u{e360}';
     MODIFY_MOVE = '\u{e124}';
     MODIFY_OFFSET = '\u{e27b}';
+    MODIFY_OVERKILL = '\u{e400}';
     MODIFY_PEDIT = '\u{e546}';
     MODIFY_ROTATE = '\u{e14c}';
     MODIFY_SCALE = '\u{e115}';
@@ -320,6 +331,4 @@ icons! {
     VIEW_NAV_GIZMO = '\u{e09f}';
     VIEW_SNAP = '\u{e2b4}';
     VIEW_ZOOM_EXTENTS = '\u{e115}';
-    VIEW_ZOOM_IN = '\u{e1b5}';
-    VIEW_ZOOM_OUT = '\u{e1b6}';
 }

@@ -32,7 +32,11 @@ impl Entity {
                 .into_iter()
                 .map(|piece| self.resumed(piece))
                 .collect(),
-            // Splines are not cut yet (Trim and Break refuse them).
+            Entity::Spline(s) => s
+                .split_at_points(points)
+                .into_iter()
+                .map(|piece| Entity::Spline(Box::new(piece)))
+                .collect(),
             Entity::Dimension(_)
             | Entity::MText(_)
             | Entity::Text(_)
@@ -41,8 +45,7 @@ impl Entity {
             | Entity::Insert(_)
             | Entity::AttributeDefinition(_)
             | Entity::Point { .. }
-            | Entity::Hatch(_)
-            | Entity::Spline(_) => {
+            | Entity::Hatch(_) => {
                 vec![self.clone()]
             }
             Entity::Line { start, end } => {
@@ -62,16 +65,17 @@ impl Entity {
                 || vec![self.clone()],
                 |pieces| pieces.into_iter().map(Entity::Ellipse).collect(),
             ),
-            Entity::Rectangle { min, max } => split_path(&corners(*min, *max), &[], true, points)
-                .unwrap_or_else(|| vec![self.clone()]),
+            Entity::Rectangle { min, max } => {
+                split_path(&corners(*min, *max), (&[], &[]), true, points)
+                    .unwrap_or_else(|| vec![self.clone()])
+            }
             Entity::Polyline {
                 points: vertices,
                 closed,
                 bulges,
-                ..
-            } => {
-                split_path(vertices, bulges, *closed, points).unwrap_or_else(|| vec![self.clone()])
-            }
+                widths,
+            } => split_path(vertices, (bulges, widths), *closed, points)
+                .unwrap_or_else(|| vec![self.clone()]),
         }
     }
 }
@@ -192,9 +196,12 @@ fn path_position(segment: &dyn Fn(usize) -> Seg, count: usize, p: Point) -> f64 
     best.1
 }
 
+/// Cut a path of `vertices` with `(bulges, widths)` (either may be empty) at
+/// `cuts`. Each piece keeps the width of what it takes from a segment, tapering
+/// as the segment does.
 fn split_path(
     vertices: &[Point],
-    bulges: &[f64],
+    (bulges, widths): (&[f64], &[(f64, f64)]),
     closed: bool,
     cuts: &[Point],
 ) -> Option<Vec<Entity>> {
@@ -236,6 +243,7 @@ fn split_path(
     let piece = |from: f64, to: f64| {
         let mut points: Vec<Point> = Vec::new();
         let mut curves: Vec<f64> = Vec::new();
+        let mut thickness: Vec<(f64, f64)> = Vec::new();
         let mut position = from;
         while position < to - EPS {
             let i = position.floor() as usize;
@@ -244,22 +252,31 @@ fn split_path(
             let (t0, t1) = (position - i as f64, end - i as f64);
             points.push(bulge::point_at(a, b, bulge, t0));
             curves.push(bulge::part(bulge, t0, t1));
+            let (w0, w1) = widths.get(i % n).copied().unwrap_or((0.0, 0.0));
+            let along = |t: f64| w0 + (w1 - w0) * t;
+            thickness.push((along(t0), along(t1)));
             position = end;
             if position >= to - EPS {
                 points.push(bulge::point_at(a, b, bulge, t1));
                 curves.push(0.0);
+                thickness.push((0.0, 0.0));
             }
         }
         // A repeated point leaves a zero-length stretch: keep the point once,
         // with the bulge of the stretch that goes on from it.
-        let mut merged: Vec<(Point, f64)> = Vec::new();
-        for (p, k) in points.into_iter().zip(curves) {
+        let mut merged: Vec<(Point, f64, (f64, f64))> = Vec::new();
+        for ((p, k), w) in points.into_iter().zip(curves).zip(thickness) {
             match merged.last_mut() {
-                Some(last) if (p.x - last.0.x).hypot(p.y - last.0.y) < EPS => last.1 = k,
-                _ => merged.push((p, k)),
+                Some(last) if (p.x - last.0.x).hypot(p.y - last.0.y) < EPS => {
+                    last.1 = k;
+                    last.2 = w;
+                }
+                _ => merged.push((p, k, w)),
             }
         }
-        let (points, curves): (Vec<Point>, Vec<f64>) = merged.into_iter().unzip();
+        let points: Vec<Point> = merged.iter().map(|m| m.0).collect();
+        let curves: Vec<f64> = merged.iter().map(|m| m.1).collect();
+        let thickness: Vec<(f64, f64)> = merged.iter().map(|m| m.2).collect();
         (points.len() >= 2).then(|| Entity::Polyline {
             points,
             closed: false,
@@ -268,7 +285,11 @@ fn split_path(
             } else {
                 Vec::new()
             },
-            widths: Vec::new(),
+            widths: if thickness.iter().any(|w| *w != (0.0, 0.0)) {
+                thickness
+            } else {
+                Vec::new()
+            },
         })
     };
 
@@ -491,6 +512,37 @@ mod tests {
         assert!(bulges[1].abs() < 1e-12, "the straight leg stays straight");
         // Cutting through the arc and the leg gives three pieces.
         assert_eq!(l.split_at(&[p(2.0, -2.0), p(4.0, 3.0)]).len(), 3);
+    }
+
+    #[test]
+    fn pieces_of_a_wide_polyline_keep_its_width_and_taper() {
+        let l = Entity::Polyline {
+            points: vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: vec![(2.0, 4.0), (1.0, 1.0), (0.0, 0.0)],
+        };
+        let pieces = l.split_at(&[p(5.0, 0.0), p(10.0, 5.0)]);
+        assert_eq!(pieces.len(), 3);
+        let widths = |e: &Entity| match e {
+            Entity::Polyline { widths, .. } => widths.clone(),
+            other => panic!("{other:?}"),
+        };
+        // The first half of a segment that goes 2 to 4 ends at 3.
+        assert_eq!(widths(&pieces[0]), [(2.0, 3.0), (0.0, 0.0)]);
+        assert_eq!(widths(&pieces[1]), [(3.0, 4.0), (1.0, 1.0), (0.0, 0.0)]);
+        assert_eq!(widths(&pieces[2]), [(1.0, 1.0), (0.0, 0.0)]);
+        // Without widths, the pieces have none.
+        let thin = Entity::Polyline {
+            points: vec![p(0.0, 0.0), p(10.0, 0.0)],
+            closed: false,
+            bulges: Vec::new(),
+            widths: Vec::new(),
+        };
+        assert!(thin
+            .split_at(&[p(5.0, 0.0)])
+            .iter()
+            .all(|e| widths(e).is_empty()));
     }
 
     #[test]
