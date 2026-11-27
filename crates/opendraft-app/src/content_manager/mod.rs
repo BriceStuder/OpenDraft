@@ -163,6 +163,11 @@ impl Window {
         });
     }
 
+    /// Whether a name is being typed in the window (a block's or a folder's).
+    pub fn typing_a_name(&self) -> bool {
+        self.open && self.editing.is_some()
+    }
+
     /// Whether a block's name field is open.
     #[cfg(test)]
     pub(crate) fn renaming(&self) -> bool {

@@ -24,10 +24,22 @@ fn frame_with_windows(app: &mut OpenDraftApp, ctx: &egui::Context, events: Vec<E
     });
 }
 
-/// An app on a drawing with block "Box", renaming it in the details.
+/// An app on a drawing with block "Box", renaming it in the details, with
+/// the app's own shortcuts (Escape cancels in the drawing) and something to
+/// cancel: the selection.
 fn renaming(dir: &std::path::Path) -> (OpenDraftApp, egui::Context) {
     let mut app = app();
+    app.shortcuts = app
+        .registry
+        .iter()
+        .filter_map(|c| {
+            let shortcut = opendraft_ui::shortcuts::parse_shortcut(c.shortcut?)?;
+            Some((shortcut, c.id))
+        })
+        .collect();
     app.state = crate::library_cmd_tests::drawing_with_box(dir, 5.0);
+    app.state.select_all();
+    assert!(app.state.can_cancel(), "Escape would cancel in the drawing");
     let id = app
         .state
         .session()
